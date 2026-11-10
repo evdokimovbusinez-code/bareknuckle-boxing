@@ -1,5 +1,6 @@
 /* ───────── wardrobe: the registry of things a fighter can wear ─────────
-   ITEMS = { id: { cat, label, model, colors, price, tags, brand } }. A look keeps a choice per category as { id, color }
+   ITEMS = { id: { cat, label, model, colors, price, tags, brand, reward?, noShop? } } (price 0 = free for everyone; reward n = not for sale,
+   opens after n career wins; noShop = not shown in the shop; ownership and money: 07b_economy.js, the shop: 14b_shop.js). A look keeps a choice per category as { id, color }
    (LOOK.top = { id: 'tee', color: 'black' }); old saves and the opponents' looks with plain strings ('teeB') are read through
    wearGet(). Any item takes any colour of the common palette WCOL; `colors` are its native ones (shown first), `nat` holds
    item-specific shades / extras of a native colour. itemVar() = the model + the colour = what the mesh builders get.
@@ -20,28 +21,28 @@ const ITEMS = {
   // head
   cap: { cat: 'head', label: 'кепка', model: { hat: 'cap', off: [0.6, 0.75], logo: 'front' }, colors: ['black', 'white', 'red'], price: 300, tags: ['street'], brand: 'GUTTERWAVE' },
   capB: { cat: 'head', label: 'кепка назад', model: { hat: 'capB', off: [0.6, 0.75], logo: 'front' }, colors: ['black', 'navy', 'olive'], price: 300, tags: ['street'], brand: 'GUTTERWAVE' },
-  beanie: { cat: 'head', label: 'бини', model: { hat: 'beanie', off: [0.8, 0.4], logo: 'cuff' }, colors: ['black', 'grey', 'wine'], price: 250, tags: ['street'], brand: 'CONCRETE SAINTS' },
-  bandana: { cat: 'head', label: 'бандана', model: { hat: 'bandana', off: [0.95, 0.25] }, colors: ['red', 'black', 'navy'], price: 120, tags: ['street'] },
+  beanie: { cat: 'head', label: 'бини', model: { hat: 'beanie', off: [0.8, 0.4], logo: 'cuff' }, colors: ['black', 'grey', 'wine'], price: 250, reward: 3, tags: ['street'], brand: 'CONCRETE SAINTS' },
+  bandana: { cat: 'head', label: 'бандана', model: { hat: 'bandana', off: [0.95, 0.25] }, colors: ['red', 'black', 'navy'], price: 120, reward: 1, tags: ['street'] },
   // eyes
-  shades: { cat: 'eyes', label: 'тёмные очки', model: { glass: 'shades', tint: [0.04, 0.04, 0.05, 0.95] }, colors: ['black', 'white', 'red'], price: 400, tags: ['street'], brand: 'AFTERHOURS' },
+  shades: { cat: 'eyes', label: 'тёмные очки', model: { glass: 'shades', tint: [0.04, 0.04, 0.05, 0.95] }, colors: ['black', 'white', 'red'], price: 400, reward: 4, tags: ['street'], brand: 'AFTERHOURS' },
   specs: { cat: 'eyes', label: 'очки в оправе', model: { glass: 'specs', tint: [0.75, 0.85, 0.9, 0.16] }, colors: ['black', 'brown', 'grey'], price: 200, tags: [] },
   // tops: shells of the torso (04_gear.js)
-  tank: { cat: 'top', label: 'майка', model: { tex: 'cotton', sleeve: 0, thick: 0.42 }, colors: ['white', 'black'], price: 100, tags: ['street', 'basic'] },
+  tank: { cat: 'top', label: 'майка', model: { tex: 'cotton', sleeve: 0, thick: 0.42 }, colors: ['white', 'black'], price: 0, tags: ['street', 'basic'] },
   tee: { cat: 'top', label: 'футболка', model: { tex: 'cotton', sleeve: 0.55, thick: 0.45 }, colors: ['white', 'black', 'grey'], nat: wNat({ white: '#e9e6df', grey: '#9a9ca2' }), price: 150, tags: ['street', 'basic'] },
   teeSD: { cat: 'top', label: 'футболка', model: { tex: 'cotton', sleeve: 0.55, thick: 0.45, decal: { f: [0, 17, 21] } }, colors: ['black', 'white', 'wine'], price: 350, tags: ['street'], brand: 'STRAY DOGS' },
-  hoodie: { cat: 'top', label: 'худи', model: { tex: 'sweat', sleeve: 1.9, thick: 1.15, hem: 11 }, colors: ['graphite', 'grey', 'black'], nat: wNat({ graphite: '#2b2e36' }, { graphite: { label: 'графит' } }), price: 400, tags: ['street', 'basic'] },
-  hoodieCS: { cat: 'top', label: 'худи', model: { tex: 'sweat', sleeve: 1.9, thick: 1.15, hem: 11, decal: { f: [-7.5, 13, 8.5], b: [0, 17, 25] } }, colors: ['black', 'sand', 'wine'], price: 900, tags: ['street'], brand: 'CONCRETE SAINTS' },
+  hoodie: { cat: 'top', label: 'худи', model: { tex: 'sweat', sleeve: 1.9, thick: 1.15, hem: 11 }, colors: ['graphite', 'grey', 'black'], nat: wNat({ graphite: '#2b2e36' }, { graphite: { label: 'графит' } }), price: 400, reward: 6, tags: ['street', 'basic'] },
+  hoodieCS: { cat: 'top', label: 'худи', model: { tex: 'sweat', sleeve: 1.9, thick: 1.15, hem: 11, decal: { f: [-7.5, 13, 8.5], b: [0, 17, 25] } }, colors: ['black', 'sand', 'wine'], price: 900, reward: 8, tags: ['street'], brand: 'CONCRETE SAINTS' },
   // bottoms: boxing trunks (cloth) or loose trousers / long shorts (04d_street.js)
   shorts: { cat: 'bottom', label: 'шорты', model: {}, colors: ['red', 'blue', 'black', 'white', 'green', 'purple'], nat: wNat({ red: '#8a0e1a', blue: '#12357e', black: '#17171a', white: '#ddd8cc', green: '#0f5a36', purple: '#4a1a6e' }, { green: { label: 'зелёный' }, purple: { label: 'фиолетовый' } }), price: 0, tags: ['ring', 'basic'] },
   jeans: { cat: 'bottom', label: 'джинсы', model: { cut: 'jeans', belt: 1 }, colors: ['indigo', 'black', 'worn'], nat: wNat({ indigo: '#34507a', black: '#1e1f24', worn: '#7f99b8' }, { indigo: { label: 'индиго' }, worn: { worn: 1, label: 'потёртые' } }), price: 300, tags: ['street', 'basic'] },
   sweat: { cat: 'bottom', label: 'спортивки', model: { cut: 'sweat' }, colors: ['grey', 'black'], nat: wNat({ black: '#1c1d21' }), price: 200, tags: ['street', 'basic'] },
-  sweatS: { cat: 'bottom', label: 'с лампасами', model: { cut: 'sweat', stripe: '#e8e6e0', logo: 1 }, colors: ['black', 'navy', 'red'], nat: wNat({ black: '#1c1d21' }), price: 450, tags: ['street'], brand: 'COLDBLOOD' },
+  sweatS: { cat: 'bottom', label: 'с лампасами', model: { cut: 'sweat', stripe: '#e8e6e0', logo: 1 }, colors: ['black', 'navy', 'red'], nat: wNat({ black: '#1c1d21' }), price: 450, reward: 5, tags: ['street'], brand: 'COLDBLOOD' },
   cargo: { cat: 'bottom', label: 'карго', model: { cut: 'short', style: 'cargo', belt: 1, logo: 1 }, colors: ['olive', 'camo', 'black'], price: 400, tags: ['street'], brand: 'BLACKOUT SUPPLY' },
   bball: { cat: 'bottom', label: 'баскетбольные', model: { cut: 'short', style: 'bball', stripe: '#e8e6e0' }, colors: ['black', 'red', 'yellow'], nat: wNat({ black: '#18191d' }), price: 250, tags: ['street', 'basic'] },
   // belts (on jeans and cargo): leather + a metal buckle
-  beltFrame: { cat: 'belt', label: 'рамка', model: { buckle: 'frame', metal: '#c9ccd2' }, colors: ['black', 'brown'], price: 150, tags: ['street', 'basic'] },
+  beltFrame: { cat: 'belt', label: 'рамка', model: { buckle: 'frame', metal: '#c9ccd2' }, colors: ['black', 'brown'], price: 150, reward: 2, tags: ['street', 'basic'] },
   beltPlate: { cat: 'belt', label: 'пластина', model: { buckle: 'plate', metal: '#b9bcc4' }, colors: ['black', 'brown'], price: 350, tags: ['street'], brand: 'IRON JAW' },
-  beltWest: { cat: 'belt', label: 'ковбойская', model: { buckle: 'west', metal: '#c9a24a' }, colors: ['brown', 'black'], price: 500, tags: ['street'] },
+  beltWest: { cat: 'belt', label: 'ковбойская', model: { buckle: 'west', metal: '#c9a24a' }, colors: ['brown', 'black'], price: 500, reward: 7, tags: ['street'] },
   beltMil: { cat: 'belt', label: 'военная', model: { buckle: 'mil', metal: '#7d7f78' }, colors: ['olive', 'black', 'sand'], price: 250, tags: ['street'], brand: 'BLACKOUT SUPPLY' },
   // shoes
   sneak: { cat: 'shoes', label: 'кроссовки', model: { sole: '#f4f2ec', top: 8.5, stripe: '#9a9ca4', lace: '#ffffff', auto: 1 }, colors: ['white', 'black'], nat: wNat({ white: '#e9e9ec', black: '#17181c' }, { white: { stripe: '#9a9ca4' }, black: { sole: '#e9e6df', stripe: '#e8e6e0', lace: '#d8d8dc' } }), price: 300, tags: ['street', 'basic'] },
@@ -52,8 +53,8 @@ const ITEMS = {
   // hands and the gum shield: the registry knows them (brand, price); their look fields are still LOOK.hands / wraps / gloves / guard
   wraps: { cat: 'hands', label: 'бинты', model: {}, colors: ['white', 'black', 'red', 'blue', 'gold'], price: 0, tags: ['ring', 'basic'] },
   mma: { cat: 'hands', label: 'MMA 4 oz', model: {}, colors: ['red', 'black', 'blue', 'white'], price: 600, tags: ['ring'], brand: 'IRON JAW' },
-  box16: { cat: 'hands', label: 'спарринговые 16 oz', model: {}, colors: ['red', 'black', 'blue', 'white'], price: 800, tags: ['ring'], brand: '16OZ' },
-  guard: { cat: 'guard', label: 'капа', model: {}, colors: ['clear', 'black', 'red', 'blue', 'gold'], price: 100, tags: ['ring'], brand: 'LOW BLOW' },
+  box16: { cat: 'hands', label: 'спарринговые 16 oz', model: {}, colors: ['red', 'black', 'blue', 'white'], price: 0, noShop: 1, tags: ['ring'], brand: '16OZ' },
+  guard: { cat: 'guard', label: 'капа', model: {}, colors: ['clear', 'black', 'red', 'blue', 'gold'], price: 0, noShop: 1, tags: ['ring'], brand: 'LOW BLOW' },
 };
 for (const k in ITEMS) ITEMS[k].id = k;
 const WNONE = { head: 'без', eyes: 'без', top: 'без', belt: 'без', shoes: 'босиком' };   // categories that may be empty (id 'none')
@@ -399,10 +400,12 @@ function wearUI() {
   const cat = UI.wcat || (UI.wcat = 'top'), sel = () => wearGet(LOOK, cat), none = WNONE[cat];
   swatches('o-wcat', WCATS.map(c => ({ id: c, label: WCAT_LABEL[c] })), () => cat, v => { UI.wcat = v; wearUI(); if (UI.scr === 'creator') setView(v === 'head' || v === 'eyes' ? VIEW_FACE : VIEW_FULL); }, true, true);
   const items = wearItems(cat), list = [...(none ? [{ id: 'none', label: none }] : []), ...items.map(i => ({ id: i.id, label: i.label }))];
-  swatches('o-wmodel', list, () => sel().id, v => { LOOK[cat] = v === 'none' ? { id: 'none' } : { id: v, color: ITEMS[v].colors[0] }; setTimeout(wearUI, 0); }, true);
-  [...$('o-wmodel').children].forEach((b, i) => { const it = ITEMS[list[i].id]; if (it && it.brand) { const im = document.createElement('img'); im.src = brandIcon(it.brand); im.alt = ''; b.prepend(im); const s = document.createElement('small'); s.textContent = it.brand; b.append(s); } });
+  swatches('o-wmodel', list, () => sel().id, v => { if (v !== 'none' && !itemOwned(v)) { setTimeout(() => { wearUI(); shopOpen(cat, v); }, 0); return; }   // not owned: the shop opens on it
+    LOOK[cat] = v === 'none' ? { id: 'none' } : { id: v, color: ITEMS[v].colors[0] }; setTimeout(wearUI, 0); }, true);
+  [...$('o-wmodel').children].forEach((b, i) => { const it = ITEMS[list[i].id]; if (it && !itemOwned(it.id)) { b.classList.add('lock'); b.title = it.reward ? 'награда: ' + it.reward + '-я победа в карьере' : 'купить в магазине'; const s = document.createElement('small'); s.className = 'pr'; s.textContent = it.reward ? '🔒 бой ' + it.reward : '🔒 ' + cash(it.price); b.append(s); }
+    if (it && it.brand) { const im = document.createElement('img'); im.src = brandIcon(it.brand); im.alt = ''; b.prepend(im); const s = document.createElement('small'); s.textContent = it.brand; b.append(s); } });
   const it = ITEMS[sel().id], cols = it && it.cat === cat ? wearColors(it).map(id => { const c = wearColor(it, id); return { id, c: c.c, label: c.label || id, pat: c.pat }; }) : [];
   swatches('o-wcolor', cols, () => sel().color || (it && it.colors[0]), v => { LOOK[cat] = { id: it.id, color: v }; });
   [...$('o-wcolor').children].forEach((b, i) => { b.title = cols[i].label; if (cols[i].pat) b.style.backgroundImage = `url(${GEAR.camoUrl || (GEAR.camoUrl = (() => { const c = document.createElement('canvas'); c.width = c.height = 48; camoPaint(c.getContext('2d'), 48, 48, 0.35); return c.toDataURL(); })())})`; if (it && i === it.colors.length - 1) b.style.marginRight = '10px'; });
-  $('o-wnote').textContent = !it || it.cat !== cat ? '' : (it.brand ? it.brand + ' · ' : '') + (cat === 'belt' && !itemVar('bottom', wearGet(LOOK, 'bottom')).belt ? 'ремень виден на джинсах и карго' : it.price ? 'цена ' + it.price : 'базовая вещь');
+  $('o-wnote').textContent = !it || it.cat !== cat ? '' : (it.brand ? it.brand + ' · ' : '') + (cat === 'belt' && !itemVar('bottom', wearGet(LOOK, 'bottom')).belt ? 'ремень виден на джинсах и карго' : itemTag(it));
 }

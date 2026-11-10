@@ -190,7 +190,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .mnav{display:flex;flex-direction:column;align-items:flex-start;gap:clamp(0px,.7vmin,6px)}
 .mnav button{position:relative;display:flex;align-items:baseline;gap:clamp(8px,1.6vmin,14px);border:0;background:none;padding:1px 16px 1px 0;font-family:var(--poster);font-weight:700;font-size:clamp(21px,5.8vmin,44px);line-height:1.14;
   letter-spacing:.02em;text-transform:uppercase;text-align:left;color:#b4aea2;outline:none;transition:transform .16s ease-out,color .16s;animation:mIn .34s cubic-bezier(.2,.8,.2,1) both}
-.mnav button:nth-child(2){animation-delay:.04s}.mnav button:nth-child(3){animation-delay:.08s}.mnav button:nth-child(4){animation-delay:.12s}.mnav button:nth-child(5){animation-delay:.16s}
+.mnav button:nth-child(2){animation-delay:.04s}.mnav button:nth-child(3){animation-delay:.08s}.mnav button:nth-child(4){animation-delay:.12s}.mnav button:nth-child(5){animation-delay:.16s}.mnav button:nth-child(6){animation-delay:.2s}
 .mnav button b{font-weight:700;white-space:nowrap}
 .mnav button i{flex:none;width:20px;font:500 11px var(--mono);font-style:normal;letter-spacing:.08em;color:var(--muted);transition:color .16s}
 .mnav button small{font:400 clamp(10px,1.7vmin,12px) var(--mono);letter-spacing:.03em;text-transform:none;color:var(--muted);white-space:nowrap}
@@ -238,6 +238,24 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .cats i{position:absolute;top:50%;right:8px;width:7px;height:7px;margin-top:-3px;border-radius:50%;background:var(--gold);display:none}.cats i.on{display:block}
 .sw button.txt img{height:15px;vertical-align:-3px;margin-right:5px;opacity:.9}.sw button.txt small{margin-left:6px;font-size:8px;letter-spacing:.08em;opacity:.55}.sw button{background-size:cover}.wnote{font-size:11px;letter-spacing:.06em;opacity:.6;min-height:14px}
 .cpane{display:flex;flex-direction:column;gap:clamp(8px,1.8vmin,13px)}
+/* shop cards, prices, locks of the creator, the purse on the result screen */
+.ptitle .cash{float:right;font:600 clamp(14px,2.6vmin,19px) var(--mono);letter-spacing:.02em;color:var(--gold);text-transform:none;margin-top:4px}
+.shgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.shc{position:relative;display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid rgba(255,255,255,.16);border-radius:2px;background:rgba(255,255,255,.04);padding:clamp(5px,1.2vmin,8px) 9px;transition:border-color .15s,background .15s}
+.shc img{position:absolute;right:7px;top:6px;height:15px;opacity:.55}
+.shc b{font-family:var(--poster);font-weight:700;font-size:clamp(14px,2.6vmin,17px);letter-spacing:.04em;text-transform:uppercase;line-height:1.1}
+.shc small{font:400 8.5px var(--mono);letter-spacing:.1em;color:var(--muted);min-height:10px}
+.shc .pr{font:600 11.5px var(--mono);color:var(--gold)}
+.shc.own .pr{color:#8fd49a}.shc.lock{opacity:.7}.shc.lock .pr{color:var(--muted)}
+.shc:hover,.shc:focus{border-color:rgba(255,255,255,.5);outline:none}
+.shc[aria-pressed="true"]{border-color:var(--gold);background:rgba(226,177,74,.1)}.shc[aria-pressed="true"] b{color:var(--gold)}
+.sw button.txt.lock{opacity:.7}.sw button.txt.lock::after{content:none}.sw button.txt .pr{font-size:9px;letter-spacing:.04em;opacity:.8;color:var(--gold)}
+.btn:disabled{opacity:.55;cursor:default;box-shadow:none}.btn.pri:disabled{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.2)}
+.rtabs{display:flex;gap:clamp(10px,3vmin,34px);align-items:flex-start;justify-content:center}.rtabs .fstats{margin:6px 0 0}
+.fstats.pay{font-size:12px}.fstats.pay td{text-align:right;padding:1px 6px}.fstats.pay td.l{text-align:left;color:#d8d2c6;font-size:11px;letter-spacing:.03em;text-transform:none}.fstats.pay td.h{text-align:left;color:var(--muted);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.fstats.pay td:nth-child(2){color:#9fdca8;font-size:12px;letter-spacing:0;text-transform:none}.fstats.pay td.l{font-size:12px}
+.fstats.pay tr:last-of-type td:nth-child(2){color:var(--text)}
+.fstats.pay tr.tot td,.fstats.pay tr.tot td:nth-child(2){color:#e2b14a;border-top:1px solid rgba(255,255,255,.2);padding-top:3px;font-weight:600}.fstats.pay td.new{text-align:left;color:#8fd49a;font-size:11px}
 .dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
 .views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
 .locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -329,7 +347,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="rt" id="r-title">Победа</div>
     <div class="rs" id="r-sub"></div>
     <div class="rs car" id="r-car"></div>
-    <table class="fstats" id="r-stats"></table>
+    <div class="rtabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table></div>
     <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
   </div>
 
@@ -342,7 +360,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
         <button id="go-quick"><i>02</i><b>Быстрый бой</b><small>место и соперник</small></button>
         <button id="go-train"><i>03</i><b>Тренировка</b><small>груша · спарринг</small></button>
         <button id="go-fighter"><i>04</i><b>Боец</b><small id="fighter-lbl"></small></button>
-        <button id="go-set"><i>05</i><b>Настройки</b></button>
+        <button id="go-shop"><i>05</i><b>Магазин</b><small id="shop-lbl"></small></button>
+        <button id="go-set"><i>06</i><b>Настройки</b></button>
       </nav>
       <nav class="mnav" id="nav-train" hidden>
         <button id="go-bag"><i>01</i><b>Груша</b><small id="bag-lbl"></small></button>
@@ -408,6 +427,22 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="pfoot"><button class="btn" id="cr-rand">Случайно</button><button class="btn pri" id="cr-done">Готово</button></div>
     </div>
     <div class="views"><span class="khint" id="cr-hint">тяни — вращать · колесо — зум</span><button class="btn sm" id="v-face">Лицо</button><button class="btn sm" id="v-full">Полный рост</button></div>
+  </div>
+
+  <!-- shop: categories, cards with prices, colours; the man in the try-on on the right (drag = turn) -->
+  <div class="ui scr" id="shop" hidden>
+    <div class="dragl" id="sh-drag"></div>
+    <div class="panel wide">
+      <div class="ptitle"><small>одежда и экипировка</small>Магазин<b class="cash" id="sh-cash"></b></div>
+      <div class="pbody">
+        <div class="fld"><span>что</span><div class="sw" id="o-scat"></div></div>
+        <div class="shgrid" id="o-sitems"></div>
+        <div class="fld"><span>цвет</span><div class="sw" id="o-scolor"></div></div>
+        <div class="wnote" id="o-snote"></div>
+      </div>
+      <div class="pfoot"><button class="btn" id="shop-back">Назад</button><button class="btn pri" id="sh-buy">Купить</button></div>
+    </div>
+    <div class="views"><span class="khint">примерка на бойце · тяни — вращать</span><button class="btn sm" id="sh-face">Лицо</button><button class="btn sm" id="sh-full">Полный рост</button></div>
   </div>
 
   <!-- settings (from the menu and from the pause) -->
@@ -3515,7 +3550,8 @@ function shoeMesh(F, f) {
 // → streetLook() in 04e_wardrobe.js (it picks from the registry)
 const isStreet = () => G.mode !== 'spar' && G.mode !== 'bag' && !!G.loc && G.loc !== 'gym';   // a street fight = any location but the gym
 /* ───────── wardrobe: the registry of things a fighter can wear ─────────
-   ITEMS = { id: { cat, label, model, colors, price, tags, brand } }. A look keeps a choice per category as { id, color }
+   ITEMS = { id: { cat, label, model, colors, price, tags, brand, reward?, noShop? } } (price 0 = free for everyone; reward n = not for sale,
+   opens after n career wins; noShop = not shown in the shop; ownership and money: 07b_economy.js, the shop: 14b_shop.js). A look keeps a choice per category as { id, color }
    (LOOK.top = { id: 'tee', color: 'black' }); old saves and the opponents' looks with plain strings ('teeB') are read through
    wearGet(). Any item takes any colour of the common palette WCOL; `colors` are its native ones (shown first), `nat` holds
    item-specific shades / extras of a native colour. itemVar() = the model + the colour = what the mesh builders get.
@@ -3536,28 +3572,28 @@ const ITEMS = {
   // head
   cap: { cat: 'head', label: 'кепка', model: { hat: 'cap', off: [0.6, 0.75], logo: 'front' }, colors: ['black', 'white', 'red'], price: 300, tags: ['street'], brand: 'GUTTERWAVE' },
   capB: { cat: 'head', label: 'кепка назад', model: { hat: 'capB', off: [0.6, 0.75], logo: 'front' }, colors: ['black', 'navy', 'olive'], price: 300, tags: ['street'], brand: 'GUTTERWAVE' },
-  beanie: { cat: 'head', label: 'бини', model: { hat: 'beanie', off: [0.8, 0.4], logo: 'cuff' }, colors: ['black', 'grey', 'wine'], price: 250, tags: ['street'], brand: 'CONCRETE SAINTS' },
-  bandana: { cat: 'head', label: 'бандана', model: { hat: 'bandana', off: [0.95, 0.25] }, colors: ['red', 'black', 'navy'], price: 120, tags: ['street'] },
+  beanie: { cat: 'head', label: 'бини', model: { hat: 'beanie', off: [0.8, 0.4], logo: 'cuff' }, colors: ['black', 'grey', 'wine'], price: 250, reward: 3, tags: ['street'], brand: 'CONCRETE SAINTS' },
+  bandana: { cat: 'head', label: 'бандана', model: { hat: 'bandana', off: [0.95, 0.25] }, colors: ['red', 'black', 'navy'], price: 120, reward: 1, tags: ['street'] },
   // eyes
-  shades: { cat: 'eyes', label: 'тёмные очки', model: { glass: 'shades', tint: [0.04, 0.04, 0.05, 0.95] }, colors: ['black', 'white', 'red'], price: 400, tags: ['street'], brand: 'AFTERHOURS' },
+  shades: { cat: 'eyes', label: 'тёмные очки', model: { glass: 'shades', tint: [0.04, 0.04, 0.05, 0.95] }, colors: ['black', 'white', 'red'], price: 400, reward: 4, tags: ['street'], brand: 'AFTERHOURS' },
   specs: { cat: 'eyes', label: 'очки в оправе', model: { glass: 'specs', tint: [0.75, 0.85, 0.9, 0.16] }, colors: ['black', 'brown', 'grey'], price: 200, tags: [] },
   // tops: shells of the torso (04_gear.js)
-  tank: { cat: 'top', label: 'майка', model: { tex: 'cotton', sleeve: 0, thick: 0.42 }, colors: ['white', 'black'], price: 100, tags: ['street', 'basic'] },
+  tank: { cat: 'top', label: 'майка', model: { tex: 'cotton', sleeve: 0, thick: 0.42 }, colors: ['white', 'black'], price: 0, tags: ['street', 'basic'] },
   tee: { cat: 'top', label: 'футболка', model: { tex: 'cotton', sleeve: 0.55, thick: 0.45 }, colors: ['white', 'black', 'grey'], nat: wNat({ white: '#e9e6df', grey: '#9a9ca2' }), price: 150, tags: ['street', 'basic'] },
   teeSD: { cat: 'top', label: 'футболка', model: { tex: 'cotton', sleeve: 0.55, thick: 0.45, decal: { f: [0, 17, 21] } }, colors: ['black', 'white', 'wine'], price: 350, tags: ['street'], brand: 'STRAY DOGS' },
-  hoodie: { cat: 'top', label: 'худи', model: { tex: 'sweat', sleeve: 1.9, thick: 1.15, hem: 11 }, colors: ['graphite', 'grey', 'black'], nat: wNat({ graphite: '#2b2e36' }, { graphite: { label: 'графит' } }), price: 400, tags: ['street', 'basic'] },
-  hoodieCS: { cat: 'top', label: 'худи', model: { tex: 'sweat', sleeve: 1.9, thick: 1.15, hem: 11, decal: { f: [-7.5, 13, 8.5], b: [0, 17, 25] } }, colors: ['black', 'sand', 'wine'], price: 900, tags: ['street'], brand: 'CONCRETE SAINTS' },
+  hoodie: { cat: 'top', label: 'худи', model: { tex: 'sweat', sleeve: 1.9, thick: 1.15, hem: 11 }, colors: ['graphite', 'grey', 'black'], nat: wNat({ graphite: '#2b2e36' }, { graphite: { label: 'графит' } }), price: 400, reward: 6, tags: ['street', 'basic'] },
+  hoodieCS: { cat: 'top', label: 'худи', model: { tex: 'sweat', sleeve: 1.9, thick: 1.15, hem: 11, decal: { f: [-7.5, 13, 8.5], b: [0, 17, 25] } }, colors: ['black', 'sand', 'wine'], price: 900, reward: 8, tags: ['street'], brand: 'CONCRETE SAINTS' },
   // bottoms: boxing trunks (cloth) or loose trousers / long shorts (04d_street.js)
   shorts: { cat: 'bottom', label: 'шорты', model: {}, colors: ['red', 'blue', 'black', 'white', 'green', 'purple'], nat: wNat({ red: '#8a0e1a', blue: '#12357e', black: '#17171a', white: '#ddd8cc', green: '#0f5a36', purple: '#4a1a6e' }, { green: { label: 'зелёный' }, purple: { label: 'фиолетовый' } }), price: 0, tags: ['ring', 'basic'] },
   jeans: { cat: 'bottom', label: 'джинсы', model: { cut: 'jeans', belt: 1 }, colors: ['indigo', 'black', 'worn'], nat: wNat({ indigo: '#34507a', black: '#1e1f24', worn: '#7f99b8' }, { indigo: { label: 'индиго' }, worn: { worn: 1, label: 'потёртые' } }), price: 300, tags: ['street', 'basic'] },
   sweat: { cat: 'bottom', label: 'спортивки', model: { cut: 'sweat' }, colors: ['grey', 'black'], nat: wNat({ black: '#1c1d21' }), price: 200, tags: ['street', 'basic'] },
-  sweatS: { cat: 'bottom', label: 'с лампасами', model: { cut: 'sweat', stripe: '#e8e6e0', logo: 1 }, colors: ['black', 'navy', 'red'], nat: wNat({ black: '#1c1d21' }), price: 450, tags: ['street'], brand: 'COLDBLOOD' },
+  sweatS: { cat: 'bottom', label: 'с лампасами', model: { cut: 'sweat', stripe: '#e8e6e0', logo: 1 }, colors: ['black', 'navy', 'red'], nat: wNat({ black: '#1c1d21' }), price: 450, reward: 5, tags: ['street'], brand: 'COLDBLOOD' },
   cargo: { cat: 'bottom', label: 'карго', model: { cut: 'short', style: 'cargo', belt: 1, logo: 1 }, colors: ['olive', 'camo', 'black'], price: 400, tags: ['street'], brand: 'BLACKOUT SUPPLY' },
   bball: { cat: 'bottom', label: 'баскетбольные', model: { cut: 'short', style: 'bball', stripe: '#e8e6e0' }, colors: ['black', 'red', 'yellow'], nat: wNat({ black: '#18191d' }), price: 250, tags: ['street', 'basic'] },
   // belts (on jeans and cargo): leather + a metal buckle
-  beltFrame: { cat: 'belt', label: 'рамка', model: { buckle: 'frame', metal: '#c9ccd2' }, colors: ['black', 'brown'], price: 150, tags: ['street', 'basic'] },
+  beltFrame: { cat: 'belt', label: 'рамка', model: { buckle: 'frame', metal: '#c9ccd2' }, colors: ['black', 'brown'], price: 150, reward: 2, tags: ['street', 'basic'] },
   beltPlate: { cat: 'belt', label: 'пластина', model: { buckle: 'plate', metal: '#b9bcc4' }, colors: ['black', 'brown'], price: 350, tags: ['street'], brand: 'IRON JAW' },
-  beltWest: { cat: 'belt', label: 'ковбойская', model: { buckle: 'west', metal: '#c9a24a' }, colors: ['brown', 'black'], price: 500, tags: ['street'] },
+  beltWest: { cat: 'belt', label: 'ковбойская', model: { buckle: 'west', metal: '#c9a24a' }, colors: ['brown', 'black'], price: 500, reward: 7, tags: ['street'] },
   beltMil: { cat: 'belt', label: 'военная', model: { buckle: 'mil', metal: '#7d7f78' }, colors: ['olive', 'black', 'sand'], price: 250, tags: ['street'], brand: 'BLACKOUT SUPPLY' },
   // shoes
   sneak: { cat: 'shoes', label: 'кроссовки', model: { sole: '#f4f2ec', top: 8.5, stripe: '#9a9ca4', lace: '#ffffff', auto: 1 }, colors: ['white', 'black'], nat: wNat({ white: '#e9e9ec', black: '#17181c' }, { white: { stripe: '#9a9ca4' }, black: { sole: '#e9e6df', stripe: '#e8e6e0', lace: '#d8d8dc' } }), price: 300, tags: ['street', 'basic'] },
@@ -3568,8 +3604,8 @@ const ITEMS = {
   // hands and the gum shield: the registry knows them (brand, price); their look fields are still LOOK.hands / wraps / gloves / guard
   wraps: { cat: 'hands', label: 'бинты', model: {}, colors: ['white', 'black', 'red', 'blue', 'gold'], price: 0, tags: ['ring', 'basic'] },
   mma: { cat: 'hands', label: 'MMA 4 oz', model: {}, colors: ['red', 'black', 'blue', 'white'], price: 600, tags: ['ring'], brand: 'IRON JAW' },
-  box16: { cat: 'hands', label: 'спарринговые 16 oz', model: {}, colors: ['red', 'black', 'blue', 'white'], price: 800, tags: ['ring'], brand: '16OZ' },
-  guard: { cat: 'guard', label: 'капа', model: {}, colors: ['clear', 'black', 'red', 'blue', 'gold'], price: 100, tags: ['ring'], brand: 'LOW BLOW' },
+  box16: { cat: 'hands', label: 'спарринговые 16 oz', model: {}, colors: ['red', 'black', 'blue', 'white'], price: 0, noShop: 1, tags: ['ring'], brand: '16OZ' },
+  guard: { cat: 'guard', label: 'капа', model: {}, colors: ['clear', 'black', 'red', 'blue', 'gold'], price: 0, noShop: 1, tags: ['ring'], brand: 'LOW BLOW' },
 };
 for (const k in ITEMS) ITEMS[k].id = k;
 const WNONE = { head: 'без', eyes: 'без', top: 'без', belt: 'без', shoes: 'босиком' };   // categories that may be empty (id 'none')
@@ -3915,12 +3951,14 @@ function wearUI() {
   const cat = UI.wcat || (UI.wcat = 'top'), sel = () => wearGet(LOOK, cat), none = WNONE[cat];
   swatches('o-wcat', WCATS.map(c => ({ id: c, label: WCAT_LABEL[c] })), () => cat, v => { UI.wcat = v; wearUI(); if (UI.scr === 'creator') setView(v === 'head' || v === 'eyes' ? VIEW_FACE : VIEW_FULL); }, true, true);
   const items = wearItems(cat), list = [...(none ? [{ id: 'none', label: none }] : []), ...items.map(i => ({ id: i.id, label: i.label }))];
-  swatches('o-wmodel', list, () => sel().id, v => { LOOK[cat] = v === 'none' ? { id: 'none' } : { id: v, color: ITEMS[v].colors[0] }; setTimeout(wearUI, 0); }, true);
-  [...$('o-wmodel').children].forEach((b, i) => { const it = ITEMS[list[i].id]; if (it && it.brand) { const im = document.createElement('img'); im.src = brandIcon(it.brand); im.alt = ''; b.prepend(im); const s = document.createElement('small'); s.textContent = it.brand; b.append(s); } });
+  swatches('o-wmodel', list, () => sel().id, v => { if (v !== 'none' && !itemOwned(v)) { setTimeout(() => { wearUI(); shopOpen(cat, v); }, 0); return; }   // not owned: the shop opens on it
+    LOOK[cat] = v === 'none' ? { id: 'none' } : { id: v, color: ITEMS[v].colors[0] }; setTimeout(wearUI, 0); }, true);
+  [...$('o-wmodel').children].forEach((b, i) => { const it = ITEMS[list[i].id]; if (it && !itemOwned(it.id)) { b.classList.add('lock'); b.title = it.reward ? 'награда: ' + it.reward + '-я победа в карьере' : 'купить в магазине'; const s = document.createElement('small'); s.className = 'pr'; s.textContent = it.reward ? '🔒 бой ' + it.reward : '🔒 ' + cash(it.price); b.append(s); }
+    if (it && it.brand) { const im = document.createElement('img'); im.src = brandIcon(it.brand); im.alt = ''; b.prepend(im); const s = document.createElement('small'); s.textContent = it.brand; b.append(s); } });
   const it = ITEMS[sel().id], cols = it && it.cat === cat ? wearColors(it).map(id => { const c = wearColor(it, id); return { id, c: c.c, label: c.label || id, pat: c.pat }; }) : [];
   swatches('o-wcolor', cols, () => sel().color || (it && it.colors[0]), v => { LOOK[cat] = { id: it.id, color: v }; });
   [...$('o-wcolor').children].forEach((b, i) => { b.title = cols[i].label; if (cols[i].pat) b.style.backgroundImage = `url(${GEAR.camoUrl || (GEAR.camoUrl = (() => { const c = document.createElement('canvas'); c.width = c.height = 48; camoPaint(c.getContext('2d'), 48, 48, 0.35); return c.toDataURL(); })())})`; if (it && i === it.colors.length - 1) b.style.marginRight = '10px'; });
-  $('o-wnote').textContent = !it || it.cat !== cat ? '' : (it.brand ? it.brand + ' · ' : '') + (cat === 'belt' && !itemVar('bottom', wearGet(LOOK, 'bottom')).belt ? 'ремень виден на джинсах и карго' : it.price ? 'цена ' + it.price : 'базовая вещь');
+  $('o-wnote').textContent = !it || it.cat !== cat ? '' : (it.brand ? it.brand + ' · ' : '') + (cat === 'belt' && !itemVar('bottom', wearGet(LOOK, 'bottom')).belt ? 'ремень виден на джинсах и карго' : itemTag(it));
 }
 /* ───────── fighter ───────── */
 // scratch for the per-frame fighter code (walk, ik, pose, plantFeet, armClear): nothing there allocates
@@ -4811,7 +4849,7 @@ const LOOK = { hair: 'brown', skin: 'light', beard: false, bottom: { id: 'shorts
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { Object.assign(LOOK, s.look || {}); G.diff = DIFFS[s.diff] ? s.diff : 'normal'; G.wins = s.wins | 0; G.losses = s.losses | 0; } } catch (e) {}
 G.mode = 'quick'; G.career = 0; G.bagBest = 0; G.userDiff = G.diff; G.loc = 'gym';
 const OPT = { vol: 1, shake: true, keys: true, cine: true };   // settings screen: master volume 0..1, camera shake, the key hint bar in a fight, cutscenes (stare-down, end-of-round close-up + highlights)
-const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0 };
+const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0, cash: 0, own: {}, eco: 0 };   // cash, own (bought items), eco (the money system has seen this save): 07b_economy.js
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; OPT.cine = s.opt.cine !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
 wearMigrate(LOOK);   // old saves kept plain ids (top: 'teeB', shorts: 'red')
 const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc, opt: OPT })); } catch (e) {} };
@@ -4841,15 +4879,18 @@ const LADDER = [
 const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1)].loc; return LOCS[id] ? id : G.loc; };
 // «Склад · аншлаг»: the place of career fight i as the menu, the card and the result screen name it
 const careerPlace = (i = G.career) => { const L = LADDER[Math.min(i, LADDER.length - 1)]; return (LOCS[L.loc] ? LOCS[L.loc].label : LOC.label) + (L.champ ? ' · аншлаг' : ''); };
-function fightOver(win, draw) {
+function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | 'tko' (the doctor stops it) — the purse depends on it
   fightTable();
-  if (draw) return; if (win) G.wins++; else G.losses++;
+  const stage = Math.min(G.career, LADDER.length - 1), before = careerWins();
+  if (draw) { payShow(payOut(false, true, how, stage, before)); save(); return; }
+  if (win) G.wins++; else G.losses++;
   let t = '', pts = 0;
   if (G.mode === 'career') {
     if (win) { G.career = Math.min(LADDER.length, G.career + 1); pts = 2; if (G.career >= LADDER.length) { PROF.champ++; pts += 3; t = 'ЧЕМПИОН! Пояс твой'; } else t = `карьера ${G.career}/${LADDER.length} · следующий: ${LADDER[G.career].nm} — ${careerPlace()}`; }
     else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути — ${careerPlace()}`;
   } else if (win) pts = 1;
   if (pts) { PROF.pts += pts; t += (t ? ' · ' : '') + `+${pts} ${pts === 1 ? 'очко' : 'очка'} бойцу`; }
+  payShow(payOut(win, false, how, stage, before));   // the purse (07b_economy.js) onto the result screen
   save(); const c = $('r-car'); if (c) c.textContent = t;
   const a = $('r-again'); if (a) a.textContent = G.mode === 'career' && win && G.career < LADDER.length ? 'Следующий бой' : G.mode === 'career' && !win ? 'Ещё раз' : 'Реванш';
 }
@@ -5111,7 +5152,7 @@ function countOut(K) {
   const D = K.def, A = K.att; D.ko = true; G.state = 'ko'; G.koT = K.t0; G.winner = A; G.loser = D; G.fallSnd = true; G.kd = null;
   if (D.rag.on) D.rag.prof.conscious = false;   // he stops trying
   else D.collapse();
-  fightOver(A === P1);
+  fightOver(A === P1, false, 'ko');
   msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 300); EVT.emit('ko', { pos: D.headNow }); $('pad').hidden = true; Q.length = 0;
 }
 function knockout(att, def, dir, power, name, fwd, forced) {
@@ -5137,11 +5178,62 @@ function knockout(att, def, dir, power, name, fwd, forced) {
   def.rag.start(forced ? imp.multiplyScalar(0.3) : imp, def.lastContact, window.__fall || (forced ? (rr() < 0.5 ? 'fwd' : 'drop') : frozen ? (rr() < 0.65 ? 'back' : 'fwd') : fall), new V3(-fwd, 0, 0), false, frozen ? 0.35 + rr() * 0.5 : 0);
   G.slow = 0.3; G.slowT = 0.75; G.hitstop = 0.09; G.shake = 0.06; flash();
   if (def.flesh.wounds.length) def.flesh.spray(def.flesh.wounds, dir, 1.4, def);
-  fightOver(att === P1);
+  fightOver(att === P1, false, 'ko');
   msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 500); EVT.emit('ko', { pos: def.headNow });
   $('pad').hidden = true; Q.length = 0;
 }
 
+/* ───────── money: purses for fights, what is owned, career rewards ─────────
+   Currency: roubles (₽), PROF.cash. PROF.own = { itemId: 1 } is what was bought in the shop (14b_shop.js): an item is bought with all
+   its colours. Free (price 0) things are always owned; an item with `reward: n` (04e_wardrobe.js) is not for sale — it opens by
+   itself after n career wins (careerWins(), so it also covers old saves and the title runs). The purse of a fight is built line by
+   line by purse() (fightOver calls it) and drawn on the result screen (#r-pay). Heavy bag and sparring pay nothing. */
+const PAY = { career: { part: 100, win: 250, ko: 150, tko: 100, fotn: 150, title: 1500, step: 0.2 }, quick: { part: 50, win: 120, ko: 80, tko: 60, fotn: 70 } };
+const PAY_DIFF = { easy: 0.7, normal: 1, hard: 1.4 };   // a quick fight pays by the opponent's level
+const FOTN_MIN = 100;   // «бой вечера»: punches landed by both + 15 per knockdown (a 5-round fight: ~60–120 landed)
+const cash = n => '₽ ' + String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ' ');
+const itemOwned = id => { const it = ITEMS[id]; return !it || !it.price || !!PROF.own[id] || !!(it.reward && careerWins() >= it.reward); };
+const itemForSale = it => !it.reward && !it.noShop;
+// the line under an item in the shop / the creator: what it takes to get it
+const itemTag = it => itemOwned(it.id) ? (it.price ? 'есть' : 'базовое') : it.reward ? 'награда · бой ' + it.reward : cash(it.price);
+// whatever is worn but not owned (after a reset, or a try-on that was left) goes back to the defaults
+function wearSanitize(L = LOOK) {
+  for (const c of WCATS) { const s = wearGet(L, c); if (s.id !== 'none' && !itemOwned(s.id)) L[c] = c === 'bottom' ? { id: 'shorts', color: 'red' } : { id: 'none' }; }
+  if (L.hands === 'mma' && !itemOwned('mma')) L.hands = 'wraps';
+}
+// an older save: everything chosen so far stays available, and the wins already won are paid back a little
+if (!PROF.eco) {
+  for (const c of WCATS) { const s = wearGet(LOOK, c); if (ITEMS[s.id]) PROF.own[s.id] = 1; }
+  if (LOOK.hands === 'mma') PROF.own.mma = 1;
+  PROF.cash = Math.min(G.wins, 20) * 150; PROF.eco = 1;
+}
+wearSanitize();
+/* the purse: lines [label, roubles]; `how` = 'dec' | 'ko' | 'tko'; stage = the career step of this fight (before the win is counted) */
+function purse(win, draw, how, stage) {
+  if (G.mode === 'spar') return { lines: [], total: 0, note: 'Спарринг — без оплаты' };
+  if (G.mode !== 'career' && G.mode !== 'quick') return { lines: [], total: 0 };
+  const car = G.mode === 'career', T = car ? PAY.career : PAY.quick, k = car ? 1 + T.step * stage : PAY_DIFF[G.diff] || 1, r10 = v => Math.round(v * k / 10) * 10, lines = [];
+  lines.push(['Участие', r10(T.part)]);
+  if (win) lines.push(['Победа', r10(T.win)]);
+  if (win && how === 'ko') lines.push(['Нокаут', r10(T.ko)]); else if (win && how === 'tko') lines.push(['Остановка боя', r10(T.tko)]);
+  const a = P1.fs, b = P2.fs;
+  if (a && b && a.land + b.land + 15 * (a.kd + b.kd) >= FOTN_MIN) lines.push(['Бой вечера', r10(T.fotn)]);
+  if (car && win && stage === LADDER.length - 1) lines.push(['Титул — пояс', T.title]);
+  return { lines, total: lines.reduce((s, l) => s + l[1], 0) };
+}
+// pays it out and returns what to draw: the purse + the items that a career step has just opened
+function payOut(win, draw, how, stage, before) {
+  const p = purse(win, draw, how, stage); PROF.cash += p.total;
+  const opened = G.mode === 'career' && win ? Object.values(ITEMS).filter(i => i.reward && i.reward > before && i.reward <= careerWins()) : [];
+  p.opened = opened.map(i => i.label + (i.brand ? ' · ' + i.brand : '')); return p;
+}
+function payShow(p) {
+  const el = $('r-pay'); if (!el) return;
+  if (!p || (!p.lines.length && !p.note)) { el.innerHTML = ''; return; }
+  el.innerHTML = '<tr><td colspan="2" class="h">выплата</td></tr>' + (p.note ? `<tr><td colspan="2">${p.note}</td></tr>` : p.lines.map(l => `<tr><td class="l">${l[0]}</td><td>+${cash(l[1])}</td></tr>`).join('') +
+    `<tr class="tot"><td class="l">Итого</td><td>${cash(p.total)}</td></tr><tr><td class="l">В кошельке</td><td>${cash(PROF.cash)}</td></tr>` +
+    (p.opened && p.opened.length ? `<tr><td colspan="2" class="new">открыто: ${p.opened.map(esc).join(', ')}</td></tr>` : ''));
+}
 /* ───────── AI ───────── */
 /* opponent styles, after how bare-knuckle bouts actually go: short range, lots of hooks and overhands, fighters who stand and trade,
    counter-punchers who make you miss and make you pay, and pressure fighters who walk you to the ropes with combinations and body shots */
@@ -5282,7 +5374,7 @@ function bagStep(dt) {
 function bagEnd() {
   G.state = 'result'; G.winner = P1; G.loser = P2; BAG.on = true; sfx.bell(3); $('pad').hidden = true; Q.length = 0;
   const rec = BAG.score > G.bagBest; if (rec) G.bagBest = BAG.score; const bp = (BAG.score >= 400 ? 1 : 0) + (BAG.score >= 800 ? 1 : 0); PROF.pts += bp; save();
-  $('r-stats').innerHTML = '';
+  $('r-stats').innerHTML = ''; payShow(null);
   $('r-title').textContent = rec ? 'Рекорд!' : 'Время'; $('r-title').className = 'rt win';
   $('r-sub').textContent = `очки ${BAG.score} · попаданий ${BAG.hits} · лучшая серия ×${BAG.best} · рекорд ${G.bagBest}`;
   $('r-car').textContent = (BAG.score >= 900 ? 'Готов к титулу' : BAG.score >= 600 ? 'Боевая форма' : BAG.score >= 350 ? 'Неплохо — добавь серий' : 'Разминка') + (bp ? ` · +${bp} ${bp === 1 ? 'очко' : 'очка'} бойцу` : ' · 400+ очков дают очко бойцу');
@@ -5293,7 +5385,8 @@ function updateMenu() {
   const el = $('ladder'); if (el) el.innerHTML = LADDER.map((L, i) => `<i class="${i < G.career ? 'done' : i === G.career ? 'next' : ''}">${L.nm}${L.champ ? ' ★' : ''}</i>`).join('');
   const c = $('car-lbl'); if (c) c.textContent = G.career >= LADDER.length ? 'ты чемпион — пройти заново' : `бой ${G.career + 1}/${LADDER.length} · ${LADDER[G.career].nm} · ${careerPlace()}`;
   const f = $('fighter-lbl'); f.textContent = PROF.pts > 0 ? `свободных очков: ${PROF.pts}` : 'внешность · стиль'; f.classList.toggle('pt', PROF.pts > 0);
-  $('who').innerHTML = `${esc(PROF.name || 'Боец')}${PROF.nick ? ` «${esc(PROF.nick)}»` : ''}<small>побед ${G.wins} · поражений ${G.losses}${PROF.champ ? ' · чемпион ×' + PROF.champ : ''}</small>`;
+  $('who').innerHTML = `${esc(PROF.name || 'Боец')}${PROF.nick ? ` «${esc(PROF.nick)}»` : ''}<small>побед ${G.wins} · поражений ${G.losses}${PROF.champ ? ' · чемпион ×' + PROF.champ : ''} · ${cash(PROF.cash)}</small>`;
+  const sh = $('shop-lbl'); if (sh) sh.textContent = cash(PROF.cash);
   const b = $('bag-lbl'); if (b) b.textContent = G.bagBest ? 'рекорд ' + G.bagBest : '45 секунд';
 }
 /* the post-fight sheet (CompuBox style): punches thrown / landed, accuracy, power shots, knockdowns, damage */
@@ -5320,7 +5413,7 @@ function startFight(fromMode) {
   CROWD.fill = G.mode === 'career' ? LADDER[Math.min(G.career, LADDER.length - 1)].crowd ?? 1 : 1;   // the semi-final in the warehouse: a half-empty hall; the title fight: everybody came
   setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'gym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the gym; a career fight is where the ladder says
   G.paused = false; UI.from = null; uiShow(null);
-  BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; }
+  BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; payShow(null); }
   sfx.unlock();
   P1.stat = PROF.stats; P1.sig = PROF.sig; P2.stat = lvlStats(G.mode === 'career' ? Math.min(5, Math.floor(G.career * 0.7)) : ({ easy: 0, normal: 1, hard: 2 })[G.diff] || 0); P2.sig = SIGS[(rr() * SIGS.length) | 0].id;
   $('n1').textContent = myName();
@@ -5410,7 +5503,7 @@ function cutCheck() {
     if (w.kind !== 'cut' || w.sev < 0.85) continue;
     const near = Math.min(w.p.distanceTo(F.flesh.u.uEyeL.value), w.p.distanceTo(F.flesh.u.uEyeR.value)) / F.flesh.U; if (near > 0.045) continue;
     if (!F.cutLook) { F.cutLook = true; msg('Врач смотрит рассечение'); G.state = 'break'; G.breakT = 3.5; G.doc = true; corner(F, 0.35); return; }
-    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; fightOver(A === P1); $('pad').hidden = true;
+    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; fightOver(A === P1, false, 'tko'); $('pad').hidden = true;
       $('r-title').textContent = A === P1 ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (A === P1 ? 'win' : 'lose');
       $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false; msg('Стоп! Рассечение', 'ko'); return; }
   }
@@ -7417,16 +7510,18 @@ EVT.on((type, e) => {
    All of them except the pause (and the settings opened from it) live in G.state === 'menu'; the pause sets G.paused, frame() then
    runs with dt = 0. The menu camera (menuCam) orbits P1: the creator turns it by dragging, the other screens just frame him. */
 const UI = { scr: null, from: null, cat: 'name', spar: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };
-const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', settings: 'settings', pause: 'pause' };
+const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', settings: 'settings', pause: 'pause' };
 const VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
 const myName = () => PROF.nick || PROF.name || 'Ты';
 function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [...root.querySelectorAll('button:not([disabled]),input')].filter(b => b.offsetParent !== null) : []; }
 function uiShow(scr, focusId) {
+  if (UI.scr === 'shop' && scr !== 'shop') shopLeave();   // a try-on that was not bought comes off (14b_shop.js)
   UI.scr = scr; const on = scr ? UI_IDS[scr] : null;
-  for (const id of ['menu', 'quick', 'creator', 'settings', 'pause']) $(id).hidden = id !== on;
+  for (const id of ['menu', 'quick', 'creator', 'shop', 'settings', 'pause']) $(id).hidden = id !== on;
   if (on === 'menu') { $('nav-main').hidden = scr !== 'main'; $('nav-train').hidden = scr !== 'train'; }
   if (scr === 'settings') { const p = UI.from === 'pause'; $('settings').classList.toggle('dim', p); $('reset-row').hidden = p; buildSettings(); setTab('opt'); }
   if (scr === 'pause') $('p-quit-l').textContent = BAG.on ? 'Выйти' : 'Сдаться';
+  if (scr === 'shop') shopEnter();
   if (scr !== 'creator' && UI.spar) { UI.spar = false; if (G.state === 'menu') P1.sparGear(false); }   // the glove preview of the creator
   const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur();
   if (!TOUCH && scr && scr !== 'creator') { const b = (focusId && $(focusId)) || (scr === 'main' || scr === 'train' || scr === 'pause' ? uiItems()[0] : null); b && b.focus({ preventScroll: true }); }
@@ -7434,7 +7529,7 @@ function uiShow(scr, focusId) {
 function uiBack() {
   if (UI.scr === 'settings' && UI.from === 'pause') return uiShow('pause', 'p-set');
   if (UI.scr === 'main' || G.state !== 'menu') return;
-  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', settings: 'go-set' }[UI.scr];
+  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', settings: 'go-set' }[UI.scr];
   updateMenu(); uiShow('main', back);
 }
 /* keys of the screens; true = the key is taken (12_ui.js then leaves it alone). Esc: back / pause / skip the replay / leave the result */
@@ -7466,7 +7561,7 @@ function surrender() { if (!BAG.on && G.state !== 'ko') { G.losses++; save(); } 
 const MCAM = { yaw: 0.5, d: 4, tx: 0, ty: 1, tz: 0, sh: 0.36, h: 0.1, init: false };
 function menuCam(dt, cp, cl) {
   const x = P1.group.position.x, th = Math.tan(camera.fov * Math.PI / 360), asp = VW / VH, dFull = 1.13 / th, hd = P1.headNow, T = { tx: x, tz: 0 };
-  if (UI.scr === 'creator') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1; }
+  if (UI.scr === 'creator' || UI.scr === 'shop') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1; }
   else if (UI.scr === 'quick') { T.yaw = 0.2; T.d = dFull * 1.18; T.ty = 1.02; T.sh = 0.4; T.h = 0.32; }
   else { T.yaw = 0.52 + 0.05 * Math.sin(camClock * 0.4); T.d = dFull * 0.84; T.ty = 1.05; T.sh = UI.scr === 'settings' ? 0.5 : 0.38; T.h = 0.12; }
   const M = MCAM, a = camCut || !M.init ? 1 : 1 - Math.exp(-dt * (UI.drag ? 16 : 4.2)); M.init = true;
@@ -7491,7 +7586,8 @@ function buildCreator() {
   swatches('o-beard', [{ id: 'no', label: 'нет' }, { id: 'yes', label: 'есть' }], () => LOOK.beard ? 'yes' : 'no', v => { LOOK.beard = v === 'yes'; }, true);
   wearUI();   // clothes: category → model → the colours of that model (04e_wardrobe.js)
   swatches('o-wraps', col(WRAPS_LOOKS, w => ({ id: w.id, c: w.c, label: w.label })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; spar(false)(); });
-  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { LOOK.hands = v; spar(false)(); }, true);   // street fights: wraps or 4 oz MMA gloves
+  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { if (!itemOwned(v)) { setTimeout(() => { buildCreator(); shopOpen('hands', v); }, 0); return; } LOOK.hands = v; spar(false)(); }, true);   // street fights: wraps or 4 oz MMA gloves (bought)
+  [...$('o-hands').children].forEach((b, i) => { const it = ITEMS[HANDS[i].id]; if (it && !itemOwned(it.id)) { b.classList.add('lock'); b.title = 'купить в магазине'; const s = document.createElement('small'); s.className = 'pr'; s.textContent = '🔒 ' + cash(it.price); b.append(s); } });
   swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; spar(true)(); });   // sparring (and MMA) gloves + headgear: shown on him while choosing
   swatches('o-guard', col(GUARDS, b => ({ id: b.id, c: b.c, label: b.label })), () => LOOK.guard || 'clear', v => { LOOK.guard = v; });
   swatches('o-sig', [{ id: 'none', label: 'нет' }, ...SIGS], () => PROF.sig || 'none', v => { PROF.sig = v === 'none' ? null : v; }, true, true);
@@ -7500,9 +7596,9 @@ function buildCreator() {
 }
 function randomLook() {
   const pick = a => a[(Math.random() * a.length) | 0], cw = careerWins();
-  const of = (cat, pNone) => { if (Math.random() < pNone) return { id: 'none' }; const it = pick(wearItems(cat)); return { id: it.id, color: pick(Math.random() < 0.7 ? it.colors : wearColors(it)) }; };
+  const of = (cat, pNone) => { if (Math.random() < pNone) return { id: 'none' }; const it = pick(wearItems(cat).filter(i => itemOwned(i.id))); return { id: it.id, color: pick(Math.random() < 0.7 ? it.colors : wearColors(it)) }; };   // only what he owns
   Object.assign(LOOK, { hair: pick(HAIR_LOOKS).id, skin: pick(SKIN_LOOKS).id, beard: Math.random() < 0.5, bottom: of('bottom', 0), top: of('top', 0.3), shoes: of('shoes', 0.25), head: of('head', 0.6), eyes: of('eyes', 0.7), belt: of('belt', 0.4),
-    guard: pick(GUARDS).id, wraps: pick(WRAPS_LOOKS.filter(w => cw >= w.need)).id, hands: pick(HANDS).id, gloves: pick(GLOVES).id });
+    guard: pick(GUARDS).id, wraps: pick(WRAPS_LOOKS.filter(w => cw >= w.need)).id, hands: pick(HANDS.filter(h => itemOwned(h.id))).id, gloves: pick(GLOVES).id });
   P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar); save(); buildCreator();
 }
 function renderStats() {
@@ -7539,8 +7635,8 @@ function resetAsk(sure) {   // wiping the progress takes a second, explicit pres
   const no = btn('отмена', '', () => resetAsk(false).focus()); btn('да, стереть всё', 'warn', () => { resetProgress(); resetAsk(false).focus(); }); return no;
 }
 function resetProgress() {   // record, career, belt, points and stats; the name and the look stay (minus wraps that are locked again)
-  G.wins = G.losses = G.career = G.bagBest = 0; Object.assign(PROF, { sig: null, pts: 1, champ: 0 }); for (const k in PROF.stats) PROF.stats[k] = 0;
-  const w = WRAPS_LOOKS.find(x => x.id === (LOOK.wraps || 'white')); if (w && w.need > 0) { LOOK.wraps = 'white'; P1.applyLook(LOOK); }
+  G.wins = G.losses = G.career = G.bagBest = 0; Object.assign(PROF, { sig: null, pts: 1, champ: 0, cash: 0, own: {} }); for (const k in PROF.stats) PROF.stats[k] = 0;
+  wearSanitize(); const w = WRAPS_LOOKS.find(x => x.id === (LOOK.wraps || 'white')); if (w && w.need > 0) LOOK.wraps = 'white'; P1.applyLook(LOOK);   // bought and career clothes go away with the money
   save(); buildCreator(); updateMenu(); msg('Прогресс сброшен', 'tip');
 }
 
@@ -7563,6 +7659,8 @@ function buildMenu() {
   on('go', startQuick); on('quick-back', uiBack);
   on('go-train', () => uiShow('train')); on('train-back', uiBack); on('go-bag', startBag); on('go-spar', startSpar);
   on('go-fighter', () => { buildCreator(); uiShow('creator'); setCat(UI.cat); });
+  buildShop(); on('go-shop', () => uiShow('shop', 'sh-buy')); on('shop-back', uiBack); on('sh-face', () => setView(VIEW_FACE)); on('sh-full', () => setView(VIEW_FULL));
+  on('sh-buy', shopBuy);
   on('cr-done', uiBack); on('cr-rand', randomLook); on('v-face', () => setView(VIEW_FACE)); on('v-full', () => setView(VIEW_FULL));
   for (const b of $('cats').children) b.addEventListener('click', () => setCat(b.dataset.cat));
   on('go-set', () => { UI.from = 'menu'; uiShow('settings'); }); on('set-back', uiBack);
@@ -7570,7 +7668,10 @@ function buildMenu() {
   on('p-resume', resumeGame); on('p-set', () => uiShow('settings')); on('p-quit', surrender); on('pause-btn', pauseGame);
   if (TOUCH) $('cr-hint').textContent = 'тяни — вращать · щипок — зум';
   // the creator: drag turns him (the camera orbits), wheel / pinch zooms between the face and the full figure
-  const el = $('cr-drag'), pts = new Map(); let pinch = 0;
+  for (const el of [$('cr-drag'), $('sh-drag')]) dragView(el);
+}
+function dragView(el) {
+  const pts = new Map(); let pinch = 0;
   el.addEventListener('pointerdown', e => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (_) {} pts.set(e.pointerId, [e.clientX, e.clientY]); pinch = 0; UI.drag = pts.size; });
   el.addEventListener('pointermove', e => {
     const p = pts.get(e.pointerId), o = UI.orb; if (!p) return;
@@ -7581,4 +7682,67 @@ function buildMenu() {
   for (const ev of ['pointerup', 'pointercancel']) el.addEventListener(ev, e => { pts.delete(e.pointerId); pinch = 0; UI.drag = pts.size; });
   el.addEventListener('wheel', e => { e.preventDefault(); UI.orb.zoom = clamp(UI.orb.zoom + Math.sign(e.deltaY) * 0.14, 0, 1); }, { passive: false });
 }
+/* ───────── the shop («Магазин», menu screen 'shop') ─────────
+   Category → cards of the items (price / «есть» / «награда · бой N») → colours. A click on a card puts the thing on the man
+   (try-on: LOOK is changed and P1.applyLook'ed); «Купить» pays it (PROF.cash → PROF.own, 07b_economy.js) and the thing stays on.
+   Leaving the shop takes off everything that was only tried (shopLeave). A locked item of the creator opens the shop on itself
+   (shopOpen). Free things (price 0) are in the list as «базовое», career rewards are shown locked with the fight they come from. */
+const SHOP = { cat: 'top', pick: null, sel: null, snap: null };
+const SHOP_CATS = [...WCATS, 'hands'];
+const SHOP_HANDS = { yaw: 0.85, zoom: 0.82 };   // the gloves with the man still in his cap: not as close as the creator's VIEW_HANDS
+const shopCur = cat => cat === 'hands' ? (LOOK.hands || 'wraps') : wearGet(LOOK, cat).id;
+const shopList = cat => [...(WNONE[cat] ? [{ id: 'none', label: WNONE[cat], free: 1 }] : []), ...wearItems(cat).filter(i => !i.noShop)];
+function shopTry(cat, id) {   // put it on (nothing is paid)
+  if (cat === 'hands') LOOK.hands = id;
+  else if (id === 'none') LOOK[cat] = { id: 'none' };
+  else { const it = ITEMS[id], old = wearGet(LOOK, cat); LOOK[cat] = { id, color: old.color && (old.id === id || wearColors(it).includes(old.color)) ? old.color : it.colors[0] }; }   // the colour stays while trying things on
+  P1.applyLook(LOOK);
+}
+function shopEnter() {
+  SHOP.snap = JSON.parse(JSON.stringify(LOOK));
+  if (SHOP.pick) { shopTry(SHOP.cat, SHOP.pick); SHOP.pick = null; }
+  setView(SHOP.cat === 'head' || SHOP.cat === 'eyes' ? VIEW_FACE : SHOP.cat === 'hands' ? SHOP_HANDS : VIEW_FULL);
+  shopRender();
+}
+function shopLeave() {   // what is worn but not owned goes back to what was worn before
+  const S = SHOP.snap; if (!S) return;
+  for (const c of WCATS) { const w = wearGet(LOOK, c); if (w.id !== 'none' && !itemOwned(w.id)) LOOK[c] = S[c]; }
+  if (!itemOwned(LOOK.hands || 'wraps')) LOOK.hands = S.hands || 'wraps';
+  SHOP.snap = null; P1.applyLook(LOOK); save();
+}
+function shopOpen(cat, id) { SHOP.cat = cat; SHOP.pick = id || null; uiShow('shop', 'sh-buy'); }
+function shopRender() {
+  const cat = SHOP.cat, cur = shopCur(cat);
+  $('sh-cash').textContent = cash(PROF.cash); $('shop-lbl') && ($('shop-lbl').textContent = cash(PROF.cash));
+  swatches('o-scat', SHOP_CATS.map(c => ({ id: c, label: WCAT_LABEL[c] })), () => cat, v => { SHOP.cat = v; shopRender(); setView(v === 'head' || v === 'eyes' ? VIEW_FACE : v === 'hands' ? SHOP_HANDS : VIEW_FULL); }, true, true);
+  const box = $('o-sitems'); box.textContent = ''; SHOP.sel = cur;
+  shopList(cat).forEach((it, i) => {
+    const own = it.free || itemOwned(it.id), b = document.createElement('button'); b.type = 'button'; b.className = 'shc' + (own ? ' own' : it.reward ? ' lock' : '');
+    b.setAttribute('aria-pressed', String(it.id === cur));
+    if (it.brand) { const im = document.createElement('img'); im.src = brandIcon(it.brand); im.alt = ''; b.append(im); }
+    const t = document.createElement('b'); t.textContent = it.label; b.append(t);
+    if (it.brand) { const s = document.createElement('small'); s.textContent = it.brand; b.append(s); }
+    const p = document.createElement('span'); p.className = 'pr'; p.textContent = it.free ? 'базовое' : own ? (it.price ? '✓ есть' : 'базовое') : it.reward ? '🔒 награда · бой ' + it.reward : cash(it.price); b.append(p);
+    b.onclick = () => { shopTry(cat, it.id); shopRender(); const n = $('o-sitems').children[i]; n && n.focus({ preventScroll: true }); };
+    box.appendChild(b);
+  });
+  const it = ITEMS[cur], cols = cat !== 'hands' && it && it.cat === cat ? wearColors(it).map(id => { const c = wearColor(it, id); return { id, c: c.c, label: c.label || id, pat: c.pat }; }) : [];
+  swatches('o-scolor', cols, () => wearGet(LOOK, cat).color || (it && it.colors[0]), v => { LOOK[cat] = { id: it.id, color: v }; });
+  [...$('o-scolor').children].forEach((b, i) => { b.title = cols[i].label; if (cols[i].pat) b.style.backgroundImage = `url(${GEAR.camoUrl || (GEAR.camoUrl = (() => { const c = document.createElement('canvas'); c.width = c.height = 48; camoPaint(c.getContext('2d'), 48, 48, 0.35); return c.toDataURL(); })())})`; if (i === it.colors.length - 1) b.style.marginRight = '10px'; });
+  $('o-scolor').parentElement.hidden = !cols.length;
+  // the buy button: what it says depends on the item
+  const buy = $('sh-buy'), own = !it || itemOwned(cur), left = it && !own && !it.reward ? it.price - PROF.cash : 0;
+  buy.disabled = own || !!(it && it.reward) || left > 0;
+  buy.textContent = !it ? 'Без вещи' : own ? (it.price ? 'Уже есть' : 'Базовое') : it.reward ? 'Награда за карьеру' : left > 0 ? 'Не хватает ' + cash(left) : 'Купить · ' + cash(it.price);
+  $('o-snote').textContent = !it ? 'снять вещь — бесплатно' : it.reward && !own ? `откроется после ${it.reward}-й победы в карьере (сейчас ${careerWins()})` : own ? 'надето на бойце — выйди из магазина, чтобы оставить' : 'примерка: купи, чтобы оставить';
+}
+function shopBuy() {
+  const cat = SHOP.cat, id = shopCur(cat), it = ITEMS[id]; if (!it || itemOwned(id) || it.reward || PROF.cash < it.price) return;
+  PROF.cash -= it.price; PROF.own[id] = 1; SHOP.snap[cat === 'hands' ? 'hands' : cat] = cat === 'hands' ? id : { ...wearGet(LOOK, cat) };
+  save(); sfx.thud(0.4, true); shopRender(); updateMenu(); msg('Куплено: ' + it.label, 'tip');
+  const n = $('sh-buy'); !n.disabled ? n.focus() : $('shop-back').focus();
+}
+function buildShop() { shopRender(); }
+// debug: __shop.PROF.cash = 5000; __shop.open('top', 'hoodie'); __shop.fightOver(true, false, 'ko')
+window.__shop = { PROF, LOOK, ITEMS, SHOP, cash, itemOwned, purse, open: shopOpen, buy: shopBuy, tryOn: shopTry, save, fightOver, careerWins, LADDER };
 </script>

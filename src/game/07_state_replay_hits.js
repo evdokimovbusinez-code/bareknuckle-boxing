@@ -11,7 +11,7 @@ const LOOK = { hair: 'brown', skin: 'light', beard: false, bottom: { id: 'shorts
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { Object.assign(LOOK, s.look || {}); G.diff = DIFFS[s.diff] ? s.diff : 'normal'; G.wins = s.wins | 0; G.losses = s.losses | 0; } } catch (e) {}
 G.mode = 'quick'; G.career = 0; G.bagBest = 0; G.userDiff = G.diff; G.loc = 'gym';
 const OPT = { vol: 1, shake: true, keys: true, cine: true };   // settings screen: master volume 0..1, camera shake, the key hint bar in a fight, cutscenes (stare-down, end-of-round close-up + highlights)
-const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0 };
+const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0, cash: 0, own: {}, eco: 0 };   // cash, own (bought items), eco (the money system has seen this save): 07b_economy.js
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; OPT.cine = s.opt.cine !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
 wearMigrate(LOOK);   // old saves kept plain ids (top: 'teeB', shorts: 'red')
 const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc, opt: OPT })); } catch (e) {} };
@@ -41,15 +41,18 @@ const LADDER = [
 const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1)].loc; return LOCS[id] ? id : G.loc; };
 // «Склад · аншлаг»: the place of career fight i as the menu, the card and the result screen name it
 const careerPlace = (i = G.career) => { const L = LADDER[Math.min(i, LADDER.length - 1)]; return (LOCS[L.loc] ? LOCS[L.loc].label : LOC.label) + (L.champ ? ' · аншлаг' : ''); };
-function fightOver(win, draw) {
+function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | 'tko' (the doctor stops it) — the purse depends on it
   fightTable();
-  if (draw) return; if (win) G.wins++; else G.losses++;
+  const stage = Math.min(G.career, LADDER.length - 1), before = careerWins();
+  if (draw) { payShow(payOut(false, true, how, stage, before)); save(); return; }
+  if (win) G.wins++; else G.losses++;
   let t = '', pts = 0;
   if (G.mode === 'career') {
     if (win) { G.career = Math.min(LADDER.length, G.career + 1); pts = 2; if (G.career >= LADDER.length) { PROF.champ++; pts += 3; t = 'ЧЕМПИОН! Пояс твой'; } else t = `карьера ${G.career}/${LADDER.length} · следующий: ${LADDER[G.career].nm} — ${careerPlace()}`; }
     else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути — ${careerPlace()}`;
   } else if (win) pts = 1;
   if (pts) { PROF.pts += pts; t += (t ? ' · ' : '') + `+${pts} ${pts === 1 ? 'очко' : 'очка'} бойцу`; }
+  payShow(payOut(win, false, how, stage, before));   // the purse (07b_economy.js) onto the result screen
   save(); const c = $('r-car'); if (c) c.textContent = t;
   const a = $('r-again'); if (a) a.textContent = G.mode === 'career' && win && G.career < LADDER.length ? 'Следующий бой' : G.mode === 'career' && !win ? 'Ещё раз' : 'Реванш';
 }
@@ -311,7 +314,7 @@ function countOut(K) {
   const D = K.def, A = K.att; D.ko = true; G.state = 'ko'; G.koT = K.t0; G.winner = A; G.loser = D; G.fallSnd = true; G.kd = null;
   if (D.rag.on) D.rag.prof.conscious = false;   // he stops trying
   else D.collapse();
-  fightOver(A === P1);
+  fightOver(A === P1, false, 'ko');
   msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 300); EVT.emit('ko', { pos: D.headNow }); $('pad').hidden = true; Q.length = 0;
 }
 function knockout(att, def, dir, power, name, fwd, forced) {
@@ -337,7 +340,7 @@ function knockout(att, def, dir, power, name, fwd, forced) {
   def.rag.start(forced ? imp.multiplyScalar(0.3) : imp, def.lastContact, window.__fall || (forced ? (rr() < 0.5 ? 'fwd' : 'drop') : frozen ? (rr() < 0.65 ? 'back' : 'fwd') : fall), new V3(-fwd, 0, 0), false, frozen ? 0.35 + rr() * 0.5 : 0);
   G.slow = 0.3; G.slowT = 0.75; G.hitstop = 0.09; G.shake = 0.06; flash();
   if (def.flesh.wounds.length) def.flesh.spray(def.flesh.wounds, dir, 1.4, def);
-  fightOver(att === P1);
+  fightOver(att === P1, false, 'ko');
   msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 500); EVT.emit('ko', { pos: def.headNow });
   $('pad').hidden = true; Q.length = 0;
 }
