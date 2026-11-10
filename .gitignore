@@ -5,3 +5,4 @@ __pycache__/
 .claude-summary.md
 .claude-result.json
 node_modules
+.claude/
