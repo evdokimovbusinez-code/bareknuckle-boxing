@@ -1,6 +1,6 @@
 name: Claude bot
 # "@claude ..." in a new issue or in a comment (issue or PR) from the repo owner/collaborators starts the bot.
-# It runs Claude through the Agent SDK on the ANTHROPIC_API_KEY secret (API credits), works on branch claude/issue-N
+# It runs Claude Fable 5.2 (effort high) through the Agent SDK on the ANTHROPIC_API_KEY secret (API credits), works on branch claude/issue-N
 # (or the PR's own branch), runs tools/check.sh, pushes, opens/updates a PR and reports back in the thread.
 on:
   issues:
@@ -62,6 +62,9 @@ jobs:
       - name: Run Claude
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BOT_MODEL: claude-fable-5-2   # model and reasoning effort of the bot
+          BOT_EFFORT: high
+          BOT_BUDGET: "8"               # hard cap per task, USD
         run: |
           pip install -q claude-agent-sdk
           python tools/agent.py /tmp/prompt.md
@@ -70,7 +73,7 @@ jobs:
         run: |
           B="${{ steps.br.outputs.b }}"
           RES=$(jq -r 'if .is_error then "❌ Ошибка: " + .result else "" end' .claude-result.json 2>/dev/null || echo "❌ Бот упал, см. лог")
-          COST=$(jq -r '"$" + ((.cost*1000|round)/1000|tostring) + ", ходов: " + (.turns|tostring)' .claude-result.json 2>/dev/null || echo "?")
+          COST=$(jq -r '"$" + ((.cost*1000|round)/1000|tostring) + ", ходов: " + (.turns|tostring) + ", модель: " + (.model // "?")' .claude-result.json 2>/dev/null || echo "?")
           SUM=$(cat .claude-summary.md 2>/dev/null || echo "")
           rm -f .claude-summary.md .claude-result.json
           if [ -n "$(git status --porcelain)" ]; then

@@ -1,6 +1,6 @@
-"""Repo bot: runs Claude (Agent SDK, billed to API credits) on a task prompt in the checked-out repo.
+"""Repo bot: runs Claude Fable 5.2, effort high by default (Agent SDK, billed to API credits) on a task prompt in the checked-out repo.
 Usage: python tools/agent.py PROMPT_FILE   -> writes .claude-result.json (is_error, result, cost, turns)."""
-import asyncio, json, sys
+import asyncio, json, os, sys
 from claude_agent_sdk import query, ClaudeAgentOptions
 
 TOOLS = ["Read", "Edit", "MultiEdit", "Write", "Glob", "Grep", "LS", "TodoWrite",
@@ -9,7 +9,8 @@ TOOLS = ["Read", "Edit", "MultiEdit", "Write", "Glob", "Grep", "LS", "TodoWrite"
 
 async def main():
     prompt = open(sys.argv[1]).read()
-    opts = ClaudeAgentOptions(model="claude-sonnet-5-5", max_turns=80, allowed_tools=TOOLS, permission_mode="acceptEdits",
+    opts = ClaudeAgentOptions(model=os.environ.get("BOT_MODEL", "claude-fable-5-2"), effort=os.environ.get("BOT_EFFORT", "high"),
+                              max_budget_usd=float(os.environ.get("BOT_BUDGET", "8")), max_turns=80, allowed_tools=TOOLS, permission_mode="acceptEdits",
                               setting_sources=["project"], system_prompt={"type": "preset", "preset": "claude_code"})
     out = {"is_error": True, "result": "no result", "cost": 0, "turns": 0}
     async for m in query(prompt=prompt, options=opts):
@@ -20,8 +21,10 @@ async def main():
                     arg = b.input.get("file_path") or b.input.get("command") or b.input.get("pattern") or ""
                     print(f"· {b.name} {str(arg)[:120]}", flush=True)
         elif n == "ResultMessage":
-            out = {"is_error": bool(m.is_error), "result": m.result or "", "cost": m.total_cost_usd or 0, "turns": m.num_turns}
+            models = ", ".join(sorted((m.model_usage or {}).keys())) or opts.model
+            out = {"is_error": bool(m.is_error), "result": m.result or "; ".join(map(str, m.errors or [])) or (m.subtype or ""),
+                   "cost": m.total_cost_usd or 0, "turns": m.num_turns, "model": f"{models} · effort {opts.effort}"}
     json.dump(out, open(".claude-result.json", "w"), ensure_ascii=False)
-    print("RESULT", "error" if out["is_error"] else "ok", f"${out['cost']:.3f}", out["turns"], "turns", flush=True)
+    print("RESULT", "error" if out["is_error"] else "ok", f"${out['cost']:.3f}", out["turns"], "turns", out.get("model", ""), flush=True)
 
 asyncio.run(main())
