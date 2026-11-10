@@ -25,7 +25,7 @@ async def main():
             base, ext = os.path.splitext(out); path = f'{base}-{tag}{ext}'
             await pg.evaluate("__step(1, 1/60)"); await pg.screenshot(path=path, **fmt); print('saved', path)
         await pg.expose_function('__shot', extra)
-        await pg.goto('http://localhost:8766/gtest.html')
+        await pg.goto(f"http://localhost:{os.environ.get('SHOT_PORT', '8766')}/gtest.html")
         await pg.wait_for_function("document.getElementById('loading').hidden || document.querySelector('.err')", timeout=240000)
         if sc == 'menu': await pg.evaluate("__step(2, 1/60)")
         elif sc == 'fight':
