@@ -2,3 +2,5 @@ gtest.html
 __pycache__/
 *.png
 .DS_Store
+.claude-summary.md
+.claude-result.json

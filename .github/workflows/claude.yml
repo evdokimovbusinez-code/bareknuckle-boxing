@@ -1,54 +1,87 @@
-name: Claude Code
-# @claude in an issue (title or body), an issue comment, a PR comment or a PR review starts the bot.
-# It runs on the ANTHROPIC_API_KEY repository secret, so it spends API credits, not the Claude subscription.
+name: Claude bot
+# "@claude ..." in a new issue or in a comment (issue or PR) from the repo owner/collaborators starts the bot.
+# It runs Claude through the Agent SDK on the ANTHROPIC_API_KEY secret (API credits), works on branch claude/issue-N
+# (or the PR's own branch), runs tools/check.sh, pushes, opens/updates a PR and reports back in the thread.
 on:
+  issues:
+    types: [opened]
   issue_comment:
     types: [created]
-  pull_request_review_comment:
-    types: [created]
-  issues:
-    types: [opened, assigned]
-  pull_request_review:
-    types: [submitted]
 
 concurrency:
-  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  group: claude-${{ github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:
-  claude:
+  bot:
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event_name == 'issues' && github.event.issue.author_association || github.event.comment.author_association) &&
+      ((github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
+       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')))
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: write
       pull-requests: write
       issues: write
-      id-token: write
-      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      N: ${{ github.event.issue.number }}
+      IS_PR: ${{ github.event.issue.pull_request && 'yes' || 'no' }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - uses: anthropics/claude-code-action@v1
-        id: claude
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          track_progress: true
-          claude_args: >-
-            --model claude-sonnet-5-5
-            --max-turns 60
-            --allowedTools "Edit,MultiEdit,Write,Bash(python3 src/assemble.py),Bash(bash tools/check.sh),Bash(node --check:*),Bash(grep:*),Bash(sed -n:*),Bash(wc:*)"
-      # on failure print only Claude's final message (e.g. an API error), never the full transcript
-      - name: Show Claude error
-        if: failure()
+          node-version: 22
+      - name: Pick branch
+        id: br
         run: |
-          f=/home/runner/work/_temp/claude-execution-output.json
-          [ -f "$f" ] && jq -r '[.[] | select(.type=="result")][-1].result // "no result message"' "$f" || echo "no execution output"
+          git config user.name "claude-bot"; git config user.email "claude-bot@users.noreply.github.com"
+          if [ "$IS_PR" = yes ]; then B=$(gh pr view "$N" --json headRefName -q .headRefName); else B="claude/issue-$N"; fi
+          if git ls-remote --exit-code --heads origin "$B" >/dev/null; then git checkout -B "$B" "origin/$B"; else git checkout -b "$B"; fi
+          echo "b=$B" >> "$GITHUB_OUTPUT"
+          gh issue comment "$N" --body "🤖 Взял задачу, работаю в ветке \`$B\`… [ход работы](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+      - name: Build prompt
+        run: |
+          {
+            echo "You are the coding bot of this repository (bare-knuckle boxing browser game). Read CLAUDE.md first and follow it."
+            echo "Do the task from GitHub #$N below (the latest @claude message is the current request; earlier messages are context)."
+            echo "Rules: edit sources in src/ (never index.html by hand), then run 'bash tools/check.sh' and fix until it prints OK."
+            echo "Do not run git commands that change history (no commit/push/checkout) - the workflow commits for you."
+            echo "Finish by writing a short summary IN RUSSIAN to .claude-summary.md: what changed, which functions, how to see it in the game, anything left undone."
+            echo; echo "=== #$N: $(gh issue view "$N" --json title -q .title) ==="
+            gh issue view "$N" --json body -q .body
+            echo; echo "=== Discussion ==="
+            gh api "repos/${{ github.repository }}/issues/$N/comments" --paginate --jq '.[] | select(.user.type != "Bot") | "--- \(.user.login):\n\(.body)\n"'
+          } > /tmp/prompt.md
+      - name: Run Claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          pip install -q claude-agent-sdk
+          python tools/agent.py /tmp/prompt.md
+      - name: Commit, push, PR
+        if: always()
+        run: |
+          B="${{ steps.br.outputs.b }}"
+          RES=$(jq -r 'if .is_error then "❌ Ошибка: " + .result else "" end' .claude-result.json 2>/dev/null || echo "❌ Бот упал, см. лог")
+          COST=$(jq -r '"$" + ((.cost*1000|round)/1000|tostring) + ", ходов: " + (.turns|tostring)' .claude-result.json 2>/dev/null || echo "?")
+          SUM=$(cat .claude-summary.md 2>/dev/null || echo "")
+          rm -f .claude-summary.md .claude-result.json
+          if [ -n "$(git status --porcelain)" ]; then
+            if bash tools/check.sh >/tmp/check.txt 2>&1; then CHK="✅ сборка и проверка синтаксиса прошли"; else CHK="⚠️ tools/check.sh не прошёл: $(tail -3 /tmp/check.txt)"; fi
+            git add -A; git commit -qm "Claude bot: #$N" -m "$(echo "$SUM" | head -20)"; git push -q -u origin "$B"
+            PR=$(gh pr list --head "$B" --state open --json url -q '.[0].url')
+            if [ -z "$PR" ]; then
+              PR=$(gh pr create --head "$B" --base main --title "$(gh issue view "$N" --json title -q .title)" --body "$(printf 'Closes #%s\n\n%s\n\n%s' "$N" "$SUM" "$CHK")")
+            fi
+            MSG=$(printf '%s\n\n%s\n\n**PR:** %s\n%s\nСтоимость: %s' "$RES" "$SUM" "$PR" "$CHK" "$COST")
+          else
+            MSG=$(printf '%s\n\n%s\n\nИзменений в коде нет. Стоимость: %s' "$RES" "$SUM" "$COST")
+          fi
+          gh issue comment "$N" --body "$MSG"
