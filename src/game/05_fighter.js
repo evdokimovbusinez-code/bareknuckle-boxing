@@ -364,7 +364,7 @@ class Fighter {
     const sum = a + (o.adv || 0); if (sum > 0.1 && !(o.rag.on && o.rag.mode === 'ko')) { a -= sum - 0.1; this.advV = Math.min(this.advV, 0); }   // can't walk through him
     // bodies never share space: torso, head, knees and elbows of both men as spheres (from the posed skeleton, so the lunge
     // of a punch animation counts); the overlap along the fight line is taken out — half each, all of it if he can't move
-    if (!(window.__tw || {}).noSep && !o.ko && !o.gu && o.jp[15].y > 1.2) { const pen = bodyOverlap(this, o, fwd); if (pen > 0) { const share = o.rag.on || o.slide ? 1 : 0.5; a -= Math.min(0.08, pen * share); this.advV = Math.min(this.advV, 0); } }
+    if (!(window.__tw || {}).noSep && !o.ko && !o.gu && o.jp[15].y > 1.2) { const pen = BAG.on ? bagBodyPen(this, fwd) : bodyOverlap(this, o, fwd); if (pen > 0) { const share = o.rag.on || o.slide ? 1 : 0.5; a -= Math.min(0.08, pen * share); this.advV = Math.min(this.advV, 0); } }
     const x = this.mark.x + fwd * a;
     if (!inRing(_v5.set(x, 0, this.group.position.z)) && a < (this.adv || 0)) { a = this.adv || 0; this.advV = 0; }   // backed onto the ropes
     this.adv = clamp(a, -2.4, 1.2);
@@ -467,7 +467,7 @@ class Fighter {
       // the punch lands when the knuckles actually touch the face (or ribs); if they never do, it is decided at the end of the window
       if (!this.resolved && t >= P.impact - 0.14) { const c = contactTest(this, this.other); if (c || t >= P.impact + 0.06) { this.resolved = true;
         // no touch by the end of the swing: a graze if the knuckles were within a few cm, otherwise it is thin air
-        if (c || BAG.on || this.other.ko || nearMiss(this, this.other) < (PUNCH[this.cur].type === 'upper' ? 0.1 : 0.06)) resolveHit(this, this.cur, c); else whiffPunch(this); } }
+        if (c || (BAG.on ? bagMiss(this) < 0.14 : this.other.ko || nearMiss(this, this.other) < (PUNCH[this.cur].type === 'upper' ? 0.1 : 0.06))) resolveHit(this, this.cur, c); else whiffPunch(this); } }
       if (this.cur) { if (!this.release && t >= P.impact + (this.whiff ? 0.3 : 0.15)) { this.release = true; this.relN = this.cur; } if (this.release && this.relN === this.cur && t >= P.impact + (this.whiff ? 0.52 : 0.25)) this.cur = null; }
     }
     if (this.daze > 0) { this.daze = Math.max(this.hp < 25 ? 0.5 : 0, this.daze - dt * 0.1);

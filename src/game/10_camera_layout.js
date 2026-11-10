@@ -108,6 +108,7 @@ function armSegs(F) {   // world capsules of both arms, refreshed after posing
 }
 const CLR_T = [[[0, 1], 0.16], [[0], 0.11], [[1], 0.11], [[2], 0.11], [[3], 0.11], [[16], 0.12], [[4], 0.08], [null, 0.17]], _cp1 = new V3(), _cp2 = new V3(), _cp3 = new V3();   // null = mid-torso
 function clearPt(o, p, r, scale, push, noArms) {   // largest displacement that takes point p (radius r) out of o's head ellipsoid and torso spheres
+  if (BAG.on) { if (o === P2) bagClearPt(p, r, scale < 1 ? 0.03 : 0, push); return; }   // the heavy bag stands in for him
   const R = HEAD.R, l = _cp1.copy(p).applyMatrix4(o.headFrameInv), x = l.x / (R.x + r), y = l.y / (R.y + r), z = l.z / (R.z + r), q = x * x + y * y + z * z;
   if (q < scale * scale && q > 1e-6) { l.multiplyScalar(scale / Math.sqrt(q)).applyMatrix4(o.headFrame).sub(p); if (l.lengthSq() > push.lengthSq()) push.copy(l); }
   const mid = _cp3.copy(o.jp[4]).add(o.jp[0]).add(o.jp[1]).multiplyScalar(1 / 3);   // mid-torso
