@@ -52,7 +52,7 @@ function crowdGeo() {
   // legs, shoes
   for (const s of [-1, 1]) {
     add(tube([[0.05, 0.05, 0.06, s * 0.092], [0.48, 0.062, 0.066, s * 0.092, 0.01], [0.9, 0.086, 0.092, s * 0.086]], 6, false, false), 0, 0, 2);
-    add(geoBox(0.1, 0.075, 0.26, s * 0.094, 0.0375, 0.04), 0, 0, 4, '#17171a');
+    add(ball(0.054, 0.066, 0.13, s * 0.094, 0, 0.04, 6, 3, null, PI / 2), 0, 0, 4, '#1c1c20');   // a shoe: a low dome, not a box (boxes read as black crates under the front row)
   }
   // trunk (jacket / hoodie down to the hips), neck, head, nose
   add(tube([[0.82, 0.172, 0.122], [0.98, 0.156, 0.106], [1.2, 0.186, 0.118, 0, 0.005], [1.36, 0.2, 0.106], [1.45, 0.11, 0.078]], 8, true, true), 1, 0, 1, '#000', true);
@@ -101,7 +101,7 @@ vec3 cwRz(vec3 p, float a) { float c = cos(a), s = sin(a); return vec3(p.x * c -
 #endif
 varying vec3 vEm; varying float vFade;
 `;
-/* iVar = (3 + phase, accessory mask, idle arm style 0 hang / 1 hands in front / 2 crossed (+4 = short sleeves), belly);
+/* iVar = (3 + phase, accessory mask, idle arm style 0 hang / 1 hands in front / 2 crossed / 3 hands in the pockets / 4 hands on the hips (+8 = short sleeves), belly);
    iDyn = (excitement, yaw to the action, recoil, fade). A mesh that is not a crowd reads iVar.x = 0 or 1 and is left alone (the AO pass). */
 const CROWD_VS = /* glsl */`
 vec3 cwP = position, cwN = normal; vEm = vec3(0.0); vFade = 1.0;
@@ -109,13 +109,15 @@ vec3 cwP = position, cwN = normal; vEm = vec3(0.0); vFade = 1.0;
 if (iVar.x > 2.5) {
   float ph = iVar.x - 3.0, seg = aP.x, sl = aP.z, ch = smoothstep(0.0, 1.0, iDyn.x), rec = iDyn.z, t = uT;
   float h1 = fract(ph * 7.31), h2 = fract(ph * 13.77), h3 = fract(ph * 29.3);
-  float ss = step(3.5, iVar.z), style = iVar.z - 4.0 * ss, phone = mod(floor(iVar.y / 64.0), 2.0);
+  float ss = step(7.5, iVar.z), style = iVar.z - 8.0 * ss, phone = mod(floor(iVar.y / 64.0), 2.0);
   float show = aP.y < 0.5 ? 1.0 : mod(floor(iVar.y / exp2(aP.y)), 2.0), side = seg > 4.5 ? -1.0 : 1.0;
   cwP.z += aP.w * iVar.w * 0.1; cwP.x *= 1.0 + aP.w * iVar.w * 0.2;
   if (seg > 2.5) {   // arms: elbow, then twist / raise / spread at the shoulder
     vec3 S = vec3(side * 0.205, 1.39, 0.0), E = vec3(side * 0.235, 1.125, 0.0);
     float f = 0.06 + 0.1 * h1 + 0.03 * sin(t * 1.3 + ph * 20.0), e = 0.2 + 0.25 * h2, tw = 0.3, ab = 0.09;
-    if (style > 1.5) { f = 0.45; e = 1.6 + 0.12 * side; tw = 1.2; ab = 0.05; } else if (style > 0.5) { f = 0.1; e = 0.9; tw = 1.1; ab = 0.03; }
+    if (style > 3.5) { f = -0.3; e = 1.25; tw = 1.5; ab = 0.72; }   // hands on the hips
+    else if (style > 2.5) { f = -0.12 + 0.03 * sin(t * 0.8 + ph * 33.0); e = 0.5; tw = 0.6; ab = 0.1; }   // hands in the pockets
+    else if (style > 1.5) { f = 0.45; e = 1.6 + 0.12 * side; tw = 1.2; ab = 0.05; } else if (style > 0.5) { f = 0.1; e = 0.9; tw = 1.1; ab = 0.03; }
     float up = ch * (side > 0.0 || h3 > 0.35 ? 1.0 : 0.25);   // some pump one fist only
     if (phone > 0.5 && side < 0.0) { f = 1.05 + 0.5 * h1 + 0.3 * ch; e = 1.75 - 0.35 * h1; tw = 0.25; ab = -0.12; up = 0.0; }   // filming
     float w = t * (6.0 + 3.0 * h2) + ph * 40.0 + side, fl = rec * (1.0 - up) * 0.8;
@@ -203,7 +205,7 @@ function makeCrowd(o = {}) {
     if (R() < L.phone) mask |= CW_PHONE; if (up) mask |= CW_CRATE;
     const tee = !(mask & CW_HOOD) && R() < L.tee, hat = mask & CW_BALA ? pick(['#0c0c0e', '#17181b', '#101216']) : mask & CW_CAP ? pick(CW_CAPC) : pick(CW_HAIRC), u = R();
     [pick(L.top), pick(CW_BOT), pick(CW_SKIN), hat].forEach((c, k) => col.set(c).toArray(sCol, i * 12 + k * 3));
-    p.ph = R(); sVar.set([3 + p.ph * 0.999, mask, (u < 0.45 ? 0 : u < 0.7 ? 1 : 2) + (tee ? 4 : 0), R() < 0.25 ? 0.5 + R() * 0.8 : R() * 0.3], i * 4);
+    p.ph = R(); sVar.set([3 + p.ph * 0.999, mask, (u < 0.25 ? 0 : u < 0.4 ? 1 : u < 0.55 ? 2 : u < 0.8 ? 3 : 4) + (tee ? 8 : 0), R() < 0.25 ? 0.5 + R() * 0.8 : R() * 0.3], i * 4);
     p.exc = 0.6 + R() * 0.6; p.lag = R() * 0.2; p.f1 = 0.25 + R() * 0.2; p.blob = (up ? 0.62 : 0.95) * sx; p.ex = 0; p.hy = 0; p.rec = 0; p.fade = 1; p.seen = false;
     p.g = Math.min(NG - 1, (p.u * NG) | 0); const G = groups[p.g]; G.c.add(_cwV.set(p.x, 1, p.z)); G.n++;
   });

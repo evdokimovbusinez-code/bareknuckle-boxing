@@ -83,7 +83,7 @@ function shellMesh(F, kind, opt) {
   const mat = new THREE.MeshPhysicalMaterial({ color: opt.c, map: opt.tex ? (GEAR['t_' + opt.tex] || (GEAR['t_' + opt.tex] = fabricTex(opt.tex))) : null, roughness: kind === 'shoes' ? 0.45 : 0.9, sheen: kind === 'shoes' ? 0 : 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color(opt.c), clearcoat: kind === 'shoes' ? 0.4 : 0 });
   if (mat.map) { mat.map = mat.map.clone(); mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping; mat.map.repeat.set(6, 6); mat.map.needsUpdate = true; }
   const U = { uThick: { value: opt.thick }, uTop: { value: opt.top || 0 }, uSl: { value: opt.sleeve || 0 }, uGTop: { value: GEAR.top }, uGNeck: { value: GEAR.neck }, uSole: { value: new THREE.Color(opt.sole || opt.c) }, uHemD: { value: opt.hem || 9 } };
-  const cond = { pants: '(R < 2.5 && h > 5.5 && h < uGTop)', shoes: '(R < 1.5 && h < uTop)', shirt: '((R > 0.5 && R < 2.5 && h > uGTop - uHemD && h < uGNeck) || (R > 2.5 && R < 4.5 && a < uSl))' }[kind];
+  const cond = { pants: '(R < 2.5 && h > 5.5 && h < uGTop)', shoes: '(R < 1.5 && h < uTop)', shirt: '((R > 0.5 && R < 2.5 && h > uGTop - uHemD && h < uGNeck) || (R > 2.5 && R < 4.5 && a < uSl && h < uGNeck + 3.0))' }[kind];   // (the height test keeps the sleeve rule off the neck: R is interpolated 2 → 5 across the trunk/head seam and used to draw a dark ring there)
   mat.onBeforeCompile = s => {
     Object.assign(s.uniforms, U);
     s.vertexShader = 'attribute vec3 aGH; varying vec3 vGH; uniform float uThick;\n' + s.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
