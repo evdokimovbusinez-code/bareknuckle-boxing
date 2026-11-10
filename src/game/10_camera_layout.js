@@ -31,33 +31,43 @@ function camUpdate(dt) {
   camera.position.copy(camP); if (G.shake > 0.0005) { camera.position.x += (rr() - 0.5) * G.shake; camera.position.y += (rr() - 0.5) * G.shake; G.shake *= Math.exp(-dt * 9); }
   camera.lookAt(camL);
 }
+const HUD_BARS = ['h1', 'g1', 'h2', 'g2', 's1', 's2'].map(id => ({ el: $(id), v: -1 }));   // the DOM is touched only when a bar really changes
+function hudBar(i, v) { const b = HUD_BARS[i]; v = Math.round(clamp(v, 0, 1) * 1000); if (b.v !== v) { b.v = v; b.el.style.transform = `scaleX(${(v / 1000).toFixed(3)})`; } }
 function hudUpdate(dt) {
-  const set = (id, v) => { $(id).style.transform = `scaleX(${clamp(v, 0, 1).toFixed(3)})`; };
-  set('h1', P1.hp / 100); set('g1', P1.hp / 100); set('h2', P2.hp / 100); set('g2', P2.hp / 100); set('s1', P1.stamina / 100); set('s2', P2.stamina / 100);
+  hudBar(0, P1.hp / 100); hudBar(1, P1.hp / 100); hudBar(2, P2.hp / 100); hudBar(3, P2.hp / 100); hudBar(4, P1.stamina / 100); hudBar(5, P2.stamina / 100);
   $('cnt').hidden = !(G.state === 'fight' && P1.counterUntil > G.t);
   if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), txt = `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`; if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
-  for (const F of [P1, P2]) { const tg = clamp(1 - F.hp / 100, 0, 1); F.u.uDmg.value += (tg - F.u.uDmg.value) * Math.min(1, dt * 3); }
+  const k = Math.min(1, dt * 3); P1.u.uDmg.value += (clamp(1 - P1.hp / 100, 0, 1) - P1.u.uDmg.value) * k; P2.u.uDmg.value += (clamp(1 - P2.hp / 100, 0, 1) - P2.u.uDmg.value) * k;
 }
 
 /* ───────── layout: always landscape; a portrait phone gets the stage rotated ───────── */
-/* render resolution: a computer renders at a capped height (a 5K retina window would otherwise push ~11 Mpx through AO + bloom),
-   'auto' starts at 1080p and steps down/up with the frame rate; phones keep the old dpr rule */
+/* render resolution: a computer renders at the height of the graphics preset (GFX.h; a 5K retina window would otherwise push ~11 Mpx
+   through AO + bloom); a phone gets a pixel-ratio cap from the preset. In 'auto' the height and then the preset step down with the frame time */
 const TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || (navigator.maxTouchPoints > 0 && !(window.matchMedia && matchMedia('(hover: hover)').matches));
-const QUAL = { auto: 1080, '720': 720, '1080': 1080, '1440': 1440 };
-let qSet = 'auto'; try { qSet = localStorage.getItem('bx_q') || 'auto'; } catch (_) {} if (!QUAL[qSet]) qSet = 'auto';
-let qH = QUAL[qSet]; const DR = { acc: 0, n: 0, good: 0 };
+let qH = GFX.h; const DR = { acc: 0, n: 0, good: 0, bad: 0, wait: 0, upNeed: 6, lastUp: -1e9 };
+const resMax = () => TOUCH ? GFX.h : Math.min(GFX.h, VH * Math.max(1, window.devicePixelRatio || 1));   // the tallest frame this preset gives on this screen
 function applyRes() {
-  const dpr = window.devicePixelRatio || 1, pr = TOUCH ? Math.min(dpr, lowEnd ? 1.5 : 1.75) : clamp(qH / VH, 0.4, Math.max(1, dpr));
+  const dpr = window.devicePixelRatio || 1, pr = TOUCH ? Math.max(0.5, Math.min(dpr, GFX.tpr) * Math.min(1, qH / GFX.h)) : clamp(qH / VH, 0.4, Math.max(1, dpr));
   renderer.setPixelRatio(pr); composer.setPixelRatio(pr); renderer.setSize(VW, VH, false); composer.setSize(VW, VH);
 }
-function setQual(v) { qSet = v; qH = QUAL[v] || 1080; DR.acc = DR.n = DR.good = 0; try { localStorage.setItem('bx_q', v); } catch (_) {} applyRes(); }
-function resTick(dt) {   // dynamic resolution for 'auto': hold ~55+ fps, never above 1080p
-  if (TOUCH || qSet !== 'auto' || dt >= 0.049 || G.state === 'menu') return;
-  DR.acc += dt; DR.n++; if (DR.acc < 2) return;
+/* auto: the average frame stays above 22 ms for 3 s → first the render height goes down (to 75 % of the preset's), then the preset itself.
+   The height may come back when there is headroom (and waits twice as long after every attempt that did not hold); the preset never climbs
+   back on its own, so nothing ping-pongs. The level reached is remembered for the next start (choosing «авто» in the menu again forgets it). */
+function resTick(dt) {
+  if (GFX.set !== 'auto' || G.state === 'menu' || dt > 0.25 || dt <= 0 || document.hidden) return;
+  if (DR.wait > 0) { DR.wait -= dt; return; }   // just changed something: let the shaders compile and the frame time settle
+  DR.acc += dt; DR.n++; if (DR.acc < 1) return;
   const avg = DR.acc / DR.n; DR.acc = DR.n = 0;
-  if (avg > 1 / 48 && qH > 540) { qH = Math.max(540, qH - 180); DR.good = 0; applyRes(); }
-  else if (avg < 1 / 58 && qH < 1080) { if (++DR.good >= 3) { qH = Math.min(1080, qH + 180); DR.good = 0; applyRes(); } }
-  else DR.good = 0;
+  if (avg > 0.022) {
+    DR.good = 0; if (++DR.bad < 3) return; DR.bad = 0;
+    const cur = Math.min(qH, resMax()), floor = Math.max(540, GFX.h * 0.75), li = GFX_ORDER.indexOf(GFX.level);
+    if (G.real - DR.lastUp < 15) DR.upNeed = Math.min(DR.upNeed * 2, 48);   // the last step up did not hold
+    if (cur > floor + 1 && (avg < 0.04 || li === 0)) { qH = Math.max(floor, Math.round(cur * 0.87)); applyRes(); DR.wait = 0.5; }   // under 25 fps: straight to the preset
+    else if (li > 0) { applyGfx(GFX_ORDER[li - 1]); DR.wait = 2; try { localStorage.setItem('bx_gfx_auto', GFX.level); } catch (_) {} }
+  } else if (avg < 1 / 58) {
+    DR.bad = 0; if (++DR.good < DR.upNeed) return; DR.good = 0;
+    const top = resMax(); if (qH < top - 1) { qH = Math.min(top, Math.round(qH / 0.87) + 1); DR.lastUp = G.real; applyRes(); DR.wait = 0.5; }
+  } else { DR.bad = 0; DR.good = 0; }
 }
 function layout() {
   // a phone held upright gets the stage turned on its side; a computer never does — a tall window gets a 16:9 band instead
@@ -71,31 +81,31 @@ function layout() {
   applyRes();
   camera.aspect = VW / VH; camera.fov = VW / VH < 1.45 ? 34 : 28; camera.updateProjectionMatrix();
 }
-window.addEventListener('resize', layout); layout();
+window.addEventListener('resize', layout); layout(); GFX.ready = true;
 
 /* body proxies for fighter-vs-fighter separation: [joint indices (averaged), radius] */
 const SEP_T = [[[0, 1], 0.14], [[2], 0.09], [[3], 0.09], [[4], 0.075], [[15], 0.1], [[16], 0.1], [[9], 0.07], [[12], 0.07]];
 const SEP_E = [[[5], 0.055], [[7], 0.055]];   // elbows: they may touch, never sink in
 const _sa = new V3(), _sb = new V3();
-function sepPt(F, ix, out) { out.set(0, 0, 0); for (const i of ix) out.add(F.jp[i]); return out.multiplyScalar(1 / ix.length); }
+function sepPt(F, ix, out) { out.set(0, 0, 0); const n = ix.length; for (let k = 0; k < n; k++) out.add(F.jp[ix[k]]); return out.multiplyScalar(1 / n); }
 function armSegs(F) {   // world capsules of both arms, refreshed after posing
-  const B = F.bones, S = F.armSeg || (F.armSeg = [0, 1, 2, 3].map(() => [new V3(), new V3(), 0]));
-  ['L', 'R'].forEach((s, i) => { const sh = B[`CC_Base_${s}_Upperarm`], el = B[`CC_Base_${s}_Forearm`], kn = B[`CC_Base_${s}_Mid1`];
-    S[i * 2][0].setFromMatrixPosition(sh.matrixWorld); S[i * 2][1].setFromMatrixPosition(el.matrixWorld); S[i * 2][2] = 0.05;
-    S[i * 2 + 1][0].copy(S[i * 2][1]); S[i * 2 + 1][1].setFromMatrixPosition(kn.matrixWorld); S[i * 2 + 1][2] = 0.045; });
+  const S = F.armSeg || (F.armSeg = [0, 1, 2, 3].map(() => [new V3(), new V3(), 0])), LB = F.limbs();
+  for (let i = 0; i < 2; i++) { const L = i ? LB.R : LB.L;
+    S[i * 2][0].setFromMatrixPosition(L.upper.matrixWorld); S[i * 2][1].setFromMatrixPosition(L.fore.matrixWorld); S[i * 2][2] = 0.05;
+    S[i * 2 + 1][0].copy(S[i * 2][1]); S[i * 2 + 1][1].setFromMatrixPosition(L.mid1.matrixWorld); S[i * 2 + 1][2] = 0.045; }
 }
-const CLR_T = [[[0, 1], 0.16], [[0], 0.11], [[1], 0.11], [[2], 0.11], [[3], 0.11], [[16], 0.12], [[4], 0.08]], _cp1 = new V3(), _cp2 = new V3();
+const CLR_T = [[[0, 1], 0.16], [[0], 0.11], [[1], 0.11], [[2], 0.11], [[3], 0.11], [[16], 0.12], [[4], 0.08], [null, 0.17]], _cp1 = new V3(), _cp2 = new V3(), _cp3 = new V3();   // null = mid-torso
 function clearPt(o, p, r, scale, push, noArms) {   // largest displacement that takes point p (radius r) out of o's head ellipsoid and torso spheres
   const R = HEAD.R, l = _cp1.copy(p).applyMatrix4(o.headFrameInv), x = l.x / (R.x + r), y = l.y / (R.y + r), z = l.z / (R.z + r), q = x * x + y * y + z * z;
   if (q < scale * scale && q > 1e-6) { l.multiplyScalar(scale / Math.sqrt(q)).applyMatrix4(o.headFrame).sub(p); if (l.lengthSq() > push.lengthSq()) push.copy(l); }
-  const mid = _cp2.set(0, 0, 0); for (const i of [4]) mid.add(o.jp[i]); mid.add(o.jp[0]).add(o.jp[1]).multiplyScalar(1 / 3);   // mid-torso
-  for (const [ix, rr0] of [...CLR_T, [null, 0.17]]) {
-    const c = ix ? sepPt(o, ix, _sb) : _sb.copy(mid), d = _cp1.copy(p).sub(c), L = d.length(), need = rr0 + r;
+  const mid = _cp3.copy(o.jp[4]).add(o.jp[0]).add(o.jp[1]).multiplyScalar(1 / 3);   // mid-torso
+  for (let k = 0; k < CLR_T.length; k++) {
+    const ix = CLR_T[k][0], c = ix ? sepPt(o, ix, _sb) : mid, d = _cp1.copy(p).sub(c), L = d.length(), need = CLR_T[k][1] + r;
     if (L < need && L > 1e-6) { d.multiplyScalar((need - L) / L); if (d.lengthSq() > push.lengthSq()) push.copy(d); }
   }
   // his arms: forearm (elbow → knuckles) and upper arm as capsules — a punch into the guard stops on the guard
-  if (o.armSeg && !noArms) for (const [A, B2, rc] of o.armSeg) {
-    const ab = _cp2.subVectors(B2, A), t = clamp(_cp1.subVectors(p, A).dot(ab) / Math.max(1e-6, ab.lengthSq()), 0, 1), c = _cp1.copy(A).addScaledVector(ab, t), d = c.subVectors(p, c), L = d.length(), need = rc + r;
+  if (o.armSeg && !noArms) for (let k = 0; k < o.armSeg.length; k++) {
+    const A = o.armSeg[k][0], rc = o.armSeg[k][2], ab = _cp2.subVectors(o.armSeg[k][1], A), t = clamp(_cp1.subVectors(p, A).dot(ab) / Math.max(1e-6, ab.lengthSq()), 0, 1), c = _cp1.copy(A).addScaledVector(ab, t), d = c.subVectors(p, c), L = d.length(), need = rc + r;
     if (L < need && L > 1e-6) { d.multiplyScalar((need - L) / L); if (d.lengthSq() > push.lengthSq()) push.copy(d); }
   }
 }

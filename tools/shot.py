@@ -15,6 +15,8 @@ async def main():
         logs = []
         pg.on('console', lambda m: logs.append(f'{m.type}: {m.text}') if m.type in ('error', 'warning') else None)
         pg.on('pageerror', lambda e: logs.append(f'PAGEERROR: {e}'))
+        # the graphics preset is pinned to 'high' (auto would pick 'medium' on the software renderer); try applyGfx('low') in a js scenario
+        await pg.add_init_script("try { if (!localStorage.getItem('bx_gfx')) localStorage.setItem('bx_gfx', 'high'); } catch (e) {}")
         await pg.goto('http://localhost:8766/gtest.html')
         await pg.wait_for_function("document.getElementById('loading').hidden || document.querySelector('.err')", timeout=240000)
         if sc == 'menu': await pg.evaluate("__step(2, 1/60)")
