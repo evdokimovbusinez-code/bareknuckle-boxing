@@ -339,7 +339,7 @@ const fill = new THREE.DirectionalLight('#ffffff', 0.5); fill.position.set(-1, 1
 
 /* ───────── arena ───────── */
 /* the ring lives in its own frame: fighters stay on the world x line, circling the ring turns and slides this frame around them */
-const ARENA = new THREE.Group(); scene.add(ARENA)
+const ARENA = new THREE.Group(); scene.add(ARENA);
 // RINGSET = the boxing-ring props (canvas, apron, posts, ropes); a location can hide it and put its own set into ARENA
 const RINGSET = new THREE.Group(); ARENA.add(RINGSET);
 const ROPES = [];
