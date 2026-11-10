@@ -102,7 +102,7 @@ function pantsTex(b, geo) {
     const line = (pts, c, w) => { g.strokeStyle = c; g.lineWidth = w; path(g, pts); g.stroke(); };
     const box = (u0, h1, u1, h0, c) => { g.fillStyle = c; g.fillRect(X(u0), Y(h1), X(u1) - X(u0), Y(h0) - Y(h1)); };
     const fade = (u, h, ru, rh, a, c) => { const gr = g.createRadialGradient(0, 0, 0, 0, 0, 1); gr.addColorStop(0, `rgba(${c || '255,255,255'},${a})`); gr.addColorStop(1, `rgba(${c || '255,255,255'},0)`); g.save(); g.translate(X(u), Y(h)); g.scale(ru * W, rh * cm); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 1, 0, 7); g.fill(); g.restore(); };
-    g.fillStyle = b.c; g.fillRect(0, 0, W, H);
+    g.fillStyle = b.c; g.fillRect(0, 0, W, H); if (b.pat) camoPaint(g, W, H, 1.5);
     if (jeans) for (let y = -W; y < H; y += 3) { g.strokeStyle = `rgba(${rr() < 0.5 ? '255,255,255' : '0,0,0'},${0.02 + rr() * 0.035})`; g.lineWidth = 1.1; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y + W); g.stroke(); }
     if (st === 'cargo') { g.strokeStyle = 'rgba(255,255,255,0.05)'; g.lineWidth = 1; for (let x = 0; x < W; x += 9) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y = 0; y < H; y += 9) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } }
     if (st === 'bball') { g.fillStyle = 'rgba(255,255,255,0.05)'; for (let y = 0; y < H; y += 6) for (let x = (y / 6 % 2) * 3; x < W; x += 6) g.fillRect(x, y, 1.6, 1.6); }
@@ -118,7 +118,8 @@ function pantsTex(b, geo) {
     line([[0.002, C.hem], [0.002, crotch]], 'rgba(0,0,0,0.3)', 3); line([[0.998, C.hem], [0.998, crotch]], 'rgba(0,0,0,0.3)', 3);
     line([[0.15, crotch - 2], [0.15, top]], 'rgba(0,0,0,0.3)', 3); line([[0.85, crotch - 2], [0.85, top]], 'rgba(0,0,0,0.35)', 3.5);
     if (sweat || st === 'bball') {
-      if (b.stripe) { if (st === 'bball') { box(0.44, top - 4.5, 0.56, C.hem, b.stripe); box(0.47, top - 4.5, 0.53, C.hem, b.c); box(0, C.hem + 2.6, 1, C.hem, b.stripe); } else for (const u of [0.462, 0.494, 0.526]) box(u, top - 4.5, u + 0.02, C.hem + (C.cuff || 0), b.stripe); }
+      if (b.logo && b.brand) { if (st === 'cargo') { g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(X(0.44), Y(C.hem + 19), 0.12 * W, 0.12 * W); brandLogo(g, b.brand, X(0.5), Y(C.hem + 19) + 0.06 * W, 0.09 * W, '#d8d6cc', 'mark'); } else brandLogo(g, b.brand, X(0.3), Y(top - 22), 0.2 * W, wInk(b.c), 'stack'); }   // the brand's patch on the pocket / print on the thigh (04e_wardrobe.js)
+    if (b.stripe) { if (st === 'bball') { box(0.44, top - 4.5, 0.56, C.hem, b.stripe); box(0.47, top - 4.5, 0.53, C.hem, b.c); box(0, C.hem + 2.6, 1, C.hem, b.stripe); } else for (const u of [0.462, 0.494, 0.526]) box(u, top - 4.5, u + 0.02, C.hem + (C.cuff || 0), b.stripe); }
       box(0, top, 1, top - 4.6, 'rgba(0,0,0,0.14)'); g.strokeStyle = 'rgba(0,0,0,0.2)'; g.lineWidth = 1.5; for (let x = 0; x < W; x += 5) { g.beginPath(); g.moveTo(x, Y(top)); g.lineTo(x, Y(top - 4.6)); g.stroke(); if (C.cuff) { g.beginPath(); g.moveTo(x, Y(C.hem + C.cuff)); g.lineTo(x, H); g.stroke(); } }
       line([[0, top - 4.6], [1, top - 4.6]], 'rgba(0,0,0,0.4)', 2); if (C.cuff) { box(0, C.hem + C.cuff, 1, C.hem, 'rgba(0,0,0,0.12)'); line([[0, C.hem + C.cuff], [1, C.hem + C.cuff]], 'rgba(0,0,0,0.4)', 2); }
       const cord = dark ? '#d9d6cf' : '#f1efe9'; line([[0.156, top - 2.3], [0.166, top - 8], [0.172, top - 14]], cord, 3.2); line([[0.158, top - 2.3], [0.185, top - 7], [0.2, top - 11.5]], cord, 3.2); g.fillStyle = cord; g.fillRect(X(0.172) - 3, Y(top - 14) - 2, 6, 8); g.fillRect(X(0.2) - 3, Y(top - 11.5) - 2, 6, 8);
@@ -230,7 +231,7 @@ function shoeGeo(F, top) {
 function shoeTex(f) {
   return GEAR['st_' + f.id] || (GEAR['st_' + f.id] = canvasTex(512, 512, (g, W) => {
     const lace = f.lace || '#f2f0ea', sole = f.sole, dk = 'rgba(0,0,0,0.35)';
-    g.fillStyle = f.c; g.fillRect(0, 0, W, W);
+    g.fillStyle = f.c; g.fillRect(0, 0, W, W); if (f.pat) camoPaint(g, W, W, 0.8);
     for (let i = 0; i < 6000; i++) { g.fillStyle = `rgba(${rr() < 0.5 ? '0,0,0' : '255,255,255'},${rr() * (f.canvas ? 0.09 : 0.04)})`; g.fillRect(rr() * W, rr() * W, 1.6, 1.6); }
     // the foot: y 0…256 (sole · inner side · top 128 · outer side · sole)
     g.fillStyle = sole; g.fillRect(0, 0, W, 60); g.fillRect(0, 196, W, 60); g.fillStyle = dk; g.fillRect(0, 59, W, 2); g.fillRect(0, 195, W, 2);
@@ -241,6 +242,7 @@ function shoeTex(f) {
     g.strokeStyle = lace; g.lineWidth = 4; g.lineCap = 'round'; for (let x = 132; x < 340; x += 26) { g.beginPath(); g.moveTo(x, 111); g.lineTo(x + 26, 145); g.moveTo(x, 145); g.lineTo(x + 26, 111); g.stroke(); }
     g.fillStyle = '#c9c9cd'; for (let x = 132; x <= 366; x += 26) for (const y of [110, 146]) { g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill(); }
     if (f.stripe) { g.strokeStyle = f.stripe; g.lineWidth = 7; for (const [ya, yb] of [[176, 150], [80, 106]]) for (const o of [0, 22]) { g.beginPath(); g.moveTo(150 + o, ya); g.lineTo(196 + o, yb); g.stroke(); } }
+    if (f.logo && f.brand) { const ink = wInk(f.c); brandLogo(g, f.brand, 215, 170, 96, ink, 'row'); g.save(); g.translate(215, 86); g.scale(1, -1); brandLogo(g, f.brand, 0, 0, 96, ink, 'row'); g.restore(); g.fillStyle = f.c; g.fillRect(96, 113, 30, 30); brandLogo(g, f.brand, 111, 128, 22, ink, 'mark'); }   // the brand on both sides and on the tongue
     g.fillStyle = f.tab || 'rgba(0,0,0,0.25)'; g.fillRect(0, 62, 56, 132);
     // the collar: y 256…512, front of the ankle at x 128, back at 384
     g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(104, 256, 48, 256);
@@ -258,8 +260,5 @@ function shoeMesh(F, f) {
   return m;
 }
 // a random street outfit (underground fights): the hook for rollOpponent / career opponents; r = a random source
-function streetLook(r = rr) {
-  const pick = a => a[(r() * a.length) | 0];
-  return { street: true, bottom: pick(['jeans', 'jeans', 'jeansB', 'jeansL', 'sweatG', 'pants', 'sweatS', 'cargo', 'bball']), top: pick(['none', 'none', 'none', 'tank', 'tankB', 'teeW', 'teeB', 'teeG', 'hoodie']), shoes: pick(['none', 'sneak', 'sneak', 'sneakB', 'keds', 'keds']) };
-}
+// → streetLook() in 04e_wardrobe.js (it picks from the registry)
 const isStreet = () => G.mode !== 'spar' && G.mode !== 'bag' && !!G.loc && G.loc !== 'gym';   // a street fight = any location but the gym

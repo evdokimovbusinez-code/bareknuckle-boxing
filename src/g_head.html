@@ -232,6 +232,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .cats button:hover,.cats button:focus{color:var(--text);outline:none;border-left-color:rgba(255,255,255,.5)}
 .cats button[aria-pressed="true"]{color:#fff;border-left-color:var(--neon);background:linear-gradient(90deg,rgba(255,59,78,.24),rgba(255,59,78,0))}
 .cats i{position:absolute;top:50%;right:8px;width:7px;height:7px;margin-top:-3px;border-radius:50%;background:var(--gold);display:none}.cats i.on{display:block}
+.sw button.txt img{height:15px;vertical-align:-3px;margin-right:5px;opacity:.9}.sw button.txt small{margin-left:6px;font-size:8px;letter-spacing:.08em;opacity:.55}.sw button{background-size:cover}.wnote{font-size:11px;letter-spacing:.06em;opacity:.6;min-height:14px}
 .cpane{display:flex;flex-direction:column;gap:clamp(8px,1.8vmin,13px)}
 .dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
 .views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
@@ -381,10 +382,10 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
             <div class="fld"><span>борода</span><div class="sw" id="o-beard"></div></div>
           </div>
           <div class="cpane" data-cat="wear" hidden>
-            <div class="fld"><span>верх</span><div class="sw" id="o-top"></div></div>
-            <div class="fld"><span>низ</span><div class="sw" id="o-bottom"></div></div>
-            <div class="fld"><span>цвет шорт</span><div class="sw" id="o-shorts"></div></div>
-            <div class="fld"><span>обувь</span><div class="sw" id="o-shoes"></div></div>
+            <div class="fld"><span>что</span><div class="sw" id="o-wcat"></div></div>
+            <div class="fld"><span>модель</span><div class="sw" id="o-wmodel"></div></div>
+            <div class="fld"><span>цвет</span><div class="sw" id="o-wcolor"></div></div>
+            <div class="wnote" id="o-wnote"></div>
           </div>
           <div class="cpane" data-cat="hands" hidden>
             <div class="fld"><span>бинты</span><div class="sw" id="o-wraps"></div><small class="note">цвета открываются победами в карьере</small></div>

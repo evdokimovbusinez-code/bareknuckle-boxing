@@ -7,12 +7,13 @@ const G = { state: 'load', t: 0, real: 0, hitstop: 0, slow: 1, slowT: 0, shake: 
 let P1, P2, VW = 1, VH = 1, inp = null;
 /* game events other systems listen to (the crowd): EVT.on((type, e) => …); types: 'hit' { pos, power, blocked, replay }, 'kd', 'ko', 'up' { pos }, 'round' */
 const EVT = { subs: [], on(f) { this.subs.push(f); }, emit(type, e) { for (const f of this.subs) f(type, e || {}); } };
-const LOOK = { shorts: 'red', hair: 'brown', skin: 'light', beard: false, bottom: 'shorts', top: 'none', shoes: 'none', guard: 'clear' };
+const LOOK = { hair: 'brown', skin: 'light', beard: false, bottom: { id: 'shorts', color: 'red' }, guard: 'clear' };   // clothes: { id, color } per category of the registry (04e_wardrobe.js)
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { Object.assign(LOOK, s.look || {}); G.diff = DIFFS[s.diff] ? s.diff : 'normal'; G.wins = s.wins | 0; G.losses = s.losses | 0; } } catch (e) {}
 G.mode = 'quick'; G.career = 0; G.bagBest = 0; G.userDiff = G.diff; G.loc = 'gym';
 const OPT = { vol: 1, shake: true, keys: true };   // settings screen: master volume 0..1, camera shake, the key hint bar in a fight
 const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0 };
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
+wearMigrate(LOOK);   // old saves kept plain ids (top: 'teeB', shorts: 'red')
 const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc, opt: OPT })); } catch (e) {} };
 const careerWins = () => G.career + PROF.champ * LADDER.length;   // wraps unlock by career wins ever
 /* career: a ladder of eight men, each tougher than the last — beat one to get the next; the last one holds the belt.
@@ -87,7 +88,7 @@ function startReplay() {
 function nextSeg() {
   RP.seg++; if (RP.seg >= RP.segs.length) return endReplay();
   P1.simReset = P2.simReset = true;   // a cut back in time: hair and shorts start from the pose, not from where they were
-  RP.tau = RP.segs[RP.seg].from; RP.i = 0; FX.clearAir(); P1.simReset = P2.simReset = true; RP.cut = true;
+  RP.tau = RP.segs[RP.seg].from; RP.i = 0; FX.clearAir(); wearSeek(RP.tau); P1.simReset = P2.simReset = true; RP.cut = true;
   stepReplay(0);   // pose the fighters before the camera cuts to them
 }
 function stepReplay(dtReal) {
@@ -98,6 +99,7 @@ function stepReplay(dtReal) {
   if (a.ar && b.ar) { ARENA.position.set(a.ar[0] + (b.ar[0] - a.ar[0]) * k, 0, a.ar[1] + (b.ar[1] - a.ar[1]) * k); ARENA.rotation.y = a.ar[2] + (b.ar[2] - a.ar[2]) * k; }
   if (a.r && b.r) ROPES.forEach((R, i) => { const j = i * 4; R.hit = (R.hit || new V3()).set(a.r[j] + (b.r[j] - a.r[j]) * k, a.r[j + 1] + (b.r[j + 1] - a.r[j + 1]) * k, a.r[j + 2] + (b.r[j + 2] - a.r[j + 2]) * k); R.s = a.r[j + 3] + (b.r[j + 3] - a.r[j + 3]) * k; });
   for (const e of REC.events) if (e.t > prev && e.t <= RP.tau) {
+    if (e.wear) { wearEvent(e); continue; }   // a hat flies off / glasses break again (04e_wardrobe.js)
     const F = e.who ? P2 : P1; FX.spawn(e.pos, e.dir, e.power); if (e.dent) F.flesh.dent(...e.dent); if (e.mist) FX.mist(e.pos, e.dir, e.power, e.mist);
     if (e.spray) F.flesh.spray(e.spray.map(i => F.flesh.wounds[i]).filter(Boolean), e.dir, e.power, F);
     sfx.thud(e.power * 0.7); G.shake = Math.max(G.shake, 0.01 + 0.02 * e.power); EVT.emit('hit', { pos: e.pos, power: e.power, replay: true }); }
@@ -228,6 +230,7 @@ function resolveHit(att, name, contact) {
     } else if (def.hitLog.length >= 3) def.shellT = G.t + 0.45;
   }
   const ev = { t: G.t, pos, dir, power, who: def === P1 ? 0 : 1 };
+  if (!blocked && !body) wearHit(def, pos, dir, power);   // hats fly off, glasses crack (04e_wardrobe.js)
   if (!blocked) {
     const fr = def.flesh.onHit(pos, dir, power, name, body, def); ev.dent = fr.dent; ev.pos = pos = fr.skin;
     // blood comes out of the wounds (an old cut reopens, the nose runs) — never out of thin air

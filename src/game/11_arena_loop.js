@@ -76,7 +76,7 @@ function frame(now) {
   P1.simulate(simDt); P2.simulate(simDt);
   ropeTick(simDt); bagStep(simDt);
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
-  FX.update(simDt); MIST.update(simDt);
+  FX.update(simDt); MIST.update(simDt); wearTick(simDt);
   tq = performance.now(); pm.fx += tq - tp; tp = tq;
   camUpdate(dtReal); locSync(); crowdTick(simDt); hudUpdate(dtReal); resTick(rawDt);   // locSync: the location hides what stands between the camera and the fighters; crowdTick: its crowd (14_crowd.js)
   pm.misc += performance.now() - tp;
