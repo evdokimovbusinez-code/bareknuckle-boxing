@@ -82,7 +82,7 @@ function toMenu() {
 const NAMES = ['Грек', 'Молот', 'Кабан', 'Шрам', 'Лом', 'Бизон', 'Кувалда', 'Седой'];
 function rollOpponent() {
   const sh = SHORTS_LOOKS.filter(s => s.id !== LOOK.shorts), hl = HAIR_LOOKS, pick = a => a[(rr() * a.length) | 0];
-  P2.applyLook({ shorts: pick(sh).id, hair: pick(hl).id, skin: pick(SKIN_LOOKS).id, beard: rr() < 0.6, wraps: rr() < 0.6 ? 'white' : pick(WRAPS_LOOKS).id, guard: pick(GUARDS).id, hands: rr() < 0.3 ? 'mma' : 'wraps' });
+  P2.applyLook({ shorts: pick(sh).id, hair: pick(hl).id, skin: pick(SKIN_LOOKS).id, beard: rr() < 0.6, wraps: rr() < 0.6 ? 'white' : pick(WRAPS_LOOKS).id, guard: pick(GUARDS).id, hands: rr() < 0.3 ? 'mma' : 'wraps', ...(isStreet() ? streetLook() : {}) });   // street locations: a random street outfit (04d_street.js)
   const nm = pick(NAMES), st = { 'Грек': 'counter', 'Молот': 'brawler', 'Кабан': 'brawler', 'Шрам': 'pressure', 'Лом': 'brawler', 'Бизон': 'pressure', 'Кувалда': 'brawler', 'Седой': 'counter' }[nm];
   AI.style = STYLES[st]; $('n2').textContent = nm; const sl = $('st2'); if (sl) sl.textContent = STYLES[st].label;
 }
