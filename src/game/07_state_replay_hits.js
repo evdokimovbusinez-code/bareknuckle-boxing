@@ -10,9 +10,9 @@ const EVT = { subs: [], on(f) { this.subs.push(f); }, emit(type, e) { for (const
 const LOOK = { shorts: 'red', hair: 'brown', skin: 'light', beard: false, bottom: 'shorts', top: 'none', shoes: 'none', guard: 'clear' };
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { Object.assign(LOOK, s.look || {}); G.diff = DIFFS[s.diff] ? s.diff : 'normal'; G.wins = s.wins | 0; G.losses = s.losses | 0; } } catch (e) {}
 G.mode = 'quick'; G.career = 0; G.bagBest = 0; G.userDiff = G.diff; G.loc = 'gym';
-const OPT = { vol: 1, shake: true, keys: true };   // settings screen: master volume 0..1, camera shake, the key hint bar in a fight
+const OPT = { vol: 1, shake: true, keys: true, cine: true };   // settings screen: master volume 0..1, camera shake, the key hint bar in a fight, cutscenes (stare-down, end-of-round close-up + highlights)
 const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0 };
-try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
+try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; OPT.cine = s.opt.cine !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
 const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc, opt: OPT })); } catch (e) {} };
 const careerWins = () => G.career + PROF.champ * LADDER.length;   // wraps unlock by career wins ever
 /* career: a ladder of eight men, each tougher than the last — beat one to get the next; the last one holds the belt.
@@ -68,14 +68,14 @@ function flash() { flashEl.classList.remove('on'); void flashEl.offsetWidth; fla
 const REC = { frames: [], pool: [], events: [], N: 0 };
 function recFrame() {
   const f = REC.pool.pop() || { t: 0, d: [new Float32Array(REC.N), new Float32Array(REC.N)] };
-  f.t = G.t; P1.capture(f.d[0]); P2.capture(f.d[1]); f.ar = [ARENA.position.x, ARENA.position.z, ARENA.rotation.y];
+  f.t = G.t; P1.capture(f.d[0]); P2.capture(f.d[1]); (f.gx || (f.gx = [0, 0]))[0] = P1.group.position.x; f.gx[1] = P2.group.position.x; f.ar =[ARENA.position.x, ARENA.position.z, ARENA.rotation.y];
   const r = f.r || (f.r = new Float32Array(ROPES.length * 4)); ROPES.forEach((R, i) => { r[i * 4] = R.cur.x; r[i * 4 + 1] = R.cur.y; r[i * 4 + 2] = R.cur.z; r[i * 4 + 3] = R.s; });
   REC.frames.push(f); if (REC.frames.length > 640) REC.pool.push(REC.frames.shift());
 }
-const RP = { seg: 0, tau: 0, i: 0, segs: [], cut: false };
+const RP = { seg: 0, tau: 0, i: 0, segs: [], cut: false, hl: false };   // hl: the segments are the end-of-round highlights (09b_cine.js), not the knockout
 function startReplay() {
   if (REC.frames.length < 4) return endReplay();
-  G.state = 'replay'; const F = REC.frames, t0 = F[0].t, t1 = F[F.length - 1].t;
+  G.state = 'replay'; RP.hl = false; const F = REC.frames, t0 = F[0].t, t1 = F[F.length - 1].t;
   // the knockout from several cameras, like a broadcast: tight on the face, from the canvas looking up, straight down from
   // the lighting rig, over the winner's shoulder, then a wide dolly — each a little longer, so the fall is seen to the end
   const S = (a, b, rate, cam) => ({ from: Math.max(t0, G.koT + a), to: Math.min(t1, G.koT + b), rate, cam });
@@ -86,14 +86,16 @@ function startReplay() {
 }
 function nextSeg() {
   RP.seg++; if (RP.seg >= RP.segs.length) return endReplay();
+  if (RP.segs[RP.seg].enter) RP.segs[RP.seg].enter();   // a segment may announce itself (the highlights' plate)
   P1.simReset = P2.simReset = true;   // a cut back in time: hair and shorts start from the pose, not from where they were
   RP.tau = RP.segs[RP.seg].from; RP.i = 0; FX.clearAir(); P1.simReset = P2.simReset = true; RP.cut = true;
   stepReplay(0);   // pose the fighters before the camera cuts to them
 }
 function stepReplay(dtReal) {
-  const s = RP.segs[RP.seg], F = REC.frames, prev = RP.tau; RP.tau = Math.min(s.to, RP.tau + dtReal * s.rate);
+  const s = RP.segs[RP.seg], F = s.F || REC.frames, prev = RP.tau; RP.tau = Math.min(s.to, RP.tau + dtReal * (s.rf ? s.rf(RP.tau) : s.rate));   // s.F: a clip of its own (highlights); s.rf: a rate that follows the replay time (slow motion at the impact)
   while (RP.i < F.length - 2 && F[RP.i + 1].t <= RP.tau) RP.i++;
   const a = F[RP.i], b = F[RP.i + 1], k = clamp((RP.tau - a.t) / Math.max(1e-5, b.t - a.t), 0, 1), sdt = RP.tau - prev;
+  if (s.F && a.gx && b.gx) { P1.group.position.x = a.gx[0] + (b.gx[0] - a.gx[0]) * k; P2.group.position.x = a.gx[1] + (b.gx[1] - a.gx[1]) * k; P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true); }   // a highlight is from earlier in the round: they stood somewhere else then
   P1.restore(a.d[0], b.d[0], k); P2.restore(a.d[1], b.d[1], k); P1.afterPose(sdt); P2.afterPose(sdt);
   if (a.ar && b.ar) { ARENA.position.set(a.ar[0] + (b.ar[0] - a.ar[0]) * k, 0, a.ar[1] + (b.ar[1] - a.ar[1]) * k); ARENA.rotation.y = a.ar[2] + (b.ar[2] - a.ar[2]) * k; }
   if (a.r && b.r) ROPES.forEach((R, i) => { const j = i * 4; R.hit = (R.hit || new V3()).set(a.r[j] + (b.r[j] - a.r[j]) * k, a.r[j + 1] + (b.r[j + 1] - a.r[j + 1]) * k, a.r[j + 2] + (b.r[j + 2] - a.r[j + 2]) * k); R.s = a.r[j + 3] + (b.r[j + 3] - a.r[j + 3]) * k; });
@@ -105,6 +107,7 @@ function stepReplay(dtReal) {
   return sdt;
 }
 function endReplay() {
+  if (RP.hl) return endHighlights();
   const F = REC.frames; if (F.length) { const l = F[F.length - 1]; P1.restore(l.d[0], l.d[0], 0); P2.restore(l.d[1], l.d[1], 0); }
   G.loser.frozen = true; G.loser.rag.on = false; G.winner.simReset = true; G.loser.simReset = true;
   G.state = 'result'; $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true;

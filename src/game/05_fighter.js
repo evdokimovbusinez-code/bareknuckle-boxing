@@ -341,6 +341,10 @@ class Fighter {
     if (this.slide || dt <= 0 || this.rag.on || this.ko || this.gu) return;
     if (BAG.on && this === P2) return;   // the bag hangs where it hangs
     const o = this.other, fight = G.state === 'fight' || (this === P1 && followOK(this) && this.moveDir), fwd = Math.sign(o.mark ? o.mark.x - this.mark.x : -this.mark.x) || 1;
+    if (G.state === 'intro' && G.stareT && G.introT >= 0) {   // the stare-down (09b_cine.js): both walk in face to face, then back to their marks
+      this.hold = null; this.advV = 0; this.adv += (G.stare * STARE_ADV - this.adv) * Math.min(1, dt * 7);
+      this.group.position.x = this.mark.x + fwd * this.adv; this.group.updateMatrixWorld(true); return;
+    }
     const dist = Math.abs(o.group.position.x - this.group.position.x), tiredK = 0.65 + 0.35 * clamp(this.stamina / 40, 0, 1);
     let a = this.adv || 0;
     if (this === P1 && fight && (this.moveDir || 0) !== 0 && !this.blocking) {
@@ -505,11 +509,12 @@ class Fighter {
     }
     // guard: block pulls both fists to the face; a dazed fighter's hands sag
     const tiredSag = clamp((35 - this.stamina) / 35, 0, 1) * (this.cur ? 0 : 1);
-    if (this.blockW > 0.02 || dz > 0.02 || tiredSag > 0.02) for (const S of ['L', 'R']) {
+    const stareDown = G.state === 'intro' ? G.stare || 0 : 0;   // the stare-down: the hands drop from the face (09b_cine.js)
+    if (this.blockW > 0.02 || dz > 0.02 || tiredSag > 0.02 || stareDown > 0.02) for (const S of ['L', 'R']) {
       if (this.aimW > 0.05 && this.aimArm === S) continue;
       const H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), hc = this.group.worldToLocal(_v3.copy(this.headNeutral));
       const g = _v4.set(S === 'L' ? 0.065 : -0.065, -0.075, 0.135).add(hc);
-      hand.lerp(g, this.blockW).add(_v5.set(0, (-0.2 * dz - 0.11 * tiredSag) * (1 - this.blockW), 0.03 * dz - 0.03 * tiredSag));   // dazed or out of breath: the hands come down
+      hand.lerp(g, this.blockW).add(_v5.set(0, (-0.2 * dz - 0.11 * tiredSag - 0.34 * stareDown) * (1 - this.blockW), 0.03 * dz - 0.03 * tiredSag - 0.06 * stareDown));   // dazed or out of breath: the hands come down
       this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, hand);
     }
     if (this.aimW > 0.02 && this.aimTarget) {
@@ -629,6 +634,7 @@ class Fighter {
     this.animate(dt); this.retarget(); this.cc.updateMatrixWorld(true);
     this.headNeutral.setFromMatrixPosition(_m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInvT));
     this.pose(dt);
+    if ((G.stare > 0.001 && G.state === 'intro') || (this.pant > 0.001 && G.state === 'rend')) this.cineLayer();   // stare-down lean / heavy breathing (09b_cine.js)
     if (this.rag.hitOn) this.rag.hitStep(dt);
     this.spreadTwist(); this.cc.updateMatrixWorld(true);
     this.afterPose(dt);

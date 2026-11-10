@@ -7,6 +7,8 @@ function camUpdate(dt) {
   if (window.__camHold) { const h = window.__camHold; camera.position.set(h.p[0], h.p[1], h.p[2]); camera.lookAt(h.l[0], h.l[1], h.l[2]); camP.copy(camera.position); camL.set(h.l[0], h.l[1], h.l[2]); return; }
   const far = VW / VH < 1.45 ? 5.0 : 4.5;
   if (G.state === 'menu') { menuCam(dt, _cp, _cl); k = 1e3; }   // already eased inside menuCam (orbit about P1, 14_screens.js): taken as is
+  else if (G.state === 'replay' && RP.segs[RP.seg].hlc) { k = hlCam(RP.segs[RP.seg]); if (RP.cut) { camCut = true; RP.cut = false; } }   // the highlights of a round (09b_cine.js)
+  else if (G.state === 'rend') k = rendCam();   // the close-up of the faces at the end of a round
   else if (G.state === 'replay') {
     const s = RP.segs[RP.seg], h = G.loser.headNow, side = Math.sign(G.loser.group.position.x) || 1;
     const p = clamp((RP.tau - s.from) / Math.max(0.01, s.to - s.from), 0, 1), c = G.loser.jp[0], w = G.winner.headNow;
@@ -29,6 +31,7 @@ function camUpdate(dt) {
     _cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), z); _cl.set(mx + drift * 0.3, 0.93, 0); k = G.state === 'intro' ? 2.4 : 3.5;
     /* the fly-round before a street fight (G.introT < 0, see startFight): an arc about the centre of the floor — from behind the crowd,
        above its heads, at the angle G.flyA — that comes down into the fight camera; while the opponent's card is up it only creeps */
+    if (G.state === 'intro' && G.stareT && G.introT >= 0 && G.introT < G.stareT - 0.6) k = stareCam(k);   // the stare-down: profile push-in, the eyes of both
     if (G.state === 'intro' && G.introT < 0 && G.flyT) {
       const p = clamp(1 + G.introT / G.flyT, 0, 1), e = p * p * p * (p * (6 * p - 15) + 10), pre = Math.min(0, G.introT + G.flyT);
       const a = lerp(G.flyA * (1 - 0.035 * pre), Math.atan2(_cp.x, _cp.z), e), R = lerp(FLY_R, Math.hypot(_cp.x, _cp.z), e);

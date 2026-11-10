@@ -118,6 +118,10 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .rec i{width:10px;height:10px;border-radius:50%;background:var(--blood);animation:blink 1s steps(2) infinite}
 @keyframes blink{50%{opacity:.2}}
 .rec button,.rb button,.go{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:9px 16px;font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:.06em;text-transform:uppercase;transition:transform .12s cubic-bezier(.3,2.2,.5,1),border-color .15s}
+.hl{position:absolute;left:var(--pl);bottom:calc(9% + 20px);pointer-events:none;font-family:var(--display);text-transform:uppercase;animation:hlin .55s cubic-bezier(.2,1.2,.4,1)}
+.hl b{display:block;font-size:min(5.4vw,42px);font-weight:900;letter-spacing:.08em;color:var(--gold);text-shadow:0 3px 0 rgba(0,0,0,.65),0 0 30px rgba(0,0,0,.5)}
+.hl span{display:block;margin-top:2px;font-size:min(3vw,20px);font-weight:700;letter-spacing:.14em;color:#f1e3c2;text-shadow:0 2px 0 rgba(0,0,0,.7)}
+@keyframes hlin{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
 .rec button{margin-left:8px;font-size:13px;padding:6px 12px}
 .rec button:hover,.rb button:hover{border-color:var(--gold)} .rec button:active,.rb button:active,.go:active{transform:scale(.94)}
 .bars{position:absolute;left:0;right:0;height:9%;background:#000;pointer-events:none}
@@ -317,6 +321,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="kbar" id="kbar"><span><b>WASD</b> ходьба</span><span><b>ЛКМ·J</b> джеб</span><span><b>ПКМ·K</b> кросс</span><span><b>U I</b> хуки</span><span><b>M ,</b> апперы</span><span><b>O·СКМ</b> оверхенд</span><span id="kb-body"><b>Shift</b>+удар = корпус</span><span id="kb-pow"><b>F</b> сила</span><span><b>Q E</b> слипы</span><span><b>C</b> нырок</span><span><b>X</b> отклон</span><span id="kb-blk"><b>Пробел</b> блок</span></div>
   </div>
 
+  <div class="hl" id="hl" hidden><b>Лучшее в раунде</b><span id="hl-s"></span></div>
   <div class="rec" id="rec" hidden><i></i>ПОВТОР<button id="skip">Пропустить</button></div>
 
   <div class="result" id="result" hidden>
@@ -413,6 +418,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
         <div class="fld"><span>графика</span><div class="sw" id="o-gfx"></div><small class="note" id="gfx-note"></small></div>
         <div class="fld row"><span>громкость</span><div class="vol"><input type="range" id="o-vol" min="0" max="100" step="5" aria-label="Громкость"><b id="vol-v"></b></div></div>
         <div class="fld row"><span>тряска камеры</span><div class="sw" id="o-shake"></div></div>
+        <div class="fld row"><span>катсцены: стердаун, итоги раунда</span><div class="sw" id="o-cine"></div></div>
         <div class="fld row"><span>подсказка клавиш в бою</span><div class="sw" id="o-keys"></div></div>
         <div class="fld row"><span>счётчик кадров (F3)</span><div class="sw" id="o-fps"></div></div>
         <div class="fld row" id="reset-row"><span>сброс прогресса</span><div class="sw" id="o-reset"></div></div>
@@ -2850,7 +2856,7 @@ class Face {
   }
   update(dt) {
     const F = this.F; if (G.state === 'replay') return;   // replay plays back the recorded lids and bones
-    this.t += dt; const ko = F.rag.on && F.rag.mode === 'ko' && !F.rag.prof.conscious, dz = F.daze || 0, tired = clamp((40 - F.stamina) / 40, 0, 1);
+    this.t += dt; const ko = F.rag.on && F.rag.mode === 'ko' && !F.rag.prof.conscious, dz = F.daze || 0, tired = Math.max(clamp((40 - F.stamina) / 40, 0, 1), G.state === 'rend' ? F.pant || 0 : 0);   // (the end-of-round close-up: mouth breathing)
     if (ko) this.koT += dt; else this.koT = 0;
     // blinks
     if (!ko) { if ((this.blinkT -= dt) < 0) { this.blink(); this.blinkT = (dz > 0.2 ? 1 : 2) + rr() * 4; } }
@@ -2885,6 +2891,7 @@ class Face {
     if (tired > 0.3) tg[1] = Math.max(tg[1], 0.4 * tired);
     if (ko) tg = [-0.2, 0.15, 0, -0.2, 0, 0.2];
     if (G.state === 'result' && G.winner === F) tg = [0.9, 0, 0.9, 0.3, 0.9, 0.5];   // the roar
+    if (G.state === 'intro' && G.stare > 0.01) tg = tg.map((v, i) => v + ((F === G.smirker ? [0.55, 0, 0.1, 0.6, 0.05, 0] : [0.85, 0, 0.3, -0.05, 0.25, 0])[i] - v) * G.stare);   // the stare-down: one man's jaw set, the other half-smiling
     if (F.gu || (F.rag.on && F.rag.prof && F.rag.prof.conscious)) tg = [0.6, 0.7, 0.8, -0.5, 0.6, 0.3];   // grimace getting up
     for (let i = 0; i < 6; i++) EM[i] += (tg[i] - EM[i]) * Math.min(1, dt * (hurt > 0.5 ? 25 : 8));
     for (let i = 0; i < 6; i++) EM[i] = clamp(EM[i], i === 2 || i === 3 ? -1 : 0, 1);   // expressions stay inside what a face can do
@@ -2892,7 +2899,7 @@ class Face {
     // gaze
     const tgt = _fv2; if (o) { tgt.copy(o.headNow); tgt.y += 0.03; } else tgt.set(0, 1.6, 0);
     F.group.worldToLocal(tgt);
-    if ((this.saccT -= dt) < 0) { this.saccT = 0.2 + rr() * 1.3; const a = 0.015 + 0.04 * dz; this.sacc.set((rr() - 0.5) * a, (rr() - 0.5) * a * 0.6, 0); }
+    if ((this.saccT -= dt) < 0) { this.saccT = 0.2 + rr() * 1.3; const a = (0.015 + 0.04 * dz) * (G.state === 'intro' && G.stare > 0.01 ? 0.25 : 1); this.sacc.set((rr() - 0.5) * a, (rr() - 0.5) * a * 0.6, 0); }
     if (dz > 0) { this.drift.x += (Math.sin(this.t * 0.7 + F.ph) * 0.12 * dz - this.drift.x) * dt * 2; this.drift.y += (Math.sin(this.t * 0.5 + 2 * F.ph) * 0.06 * dz - this.drift.y) * dt * 2; }
     else this.drift.multiplyScalar(Math.exp(-dt * 3));
     if (ko) this.koRoll += ((this.koT > 0.3 ? 0.42 : 0) - this.koRoll) * Math.min(1, dt * 4);
@@ -3856,6 +3863,10 @@ class Fighter {
     if (this.slide || dt <= 0 || this.rag.on || this.ko || this.gu) return;
     if (BAG.on && this === P2) return;   // the bag hangs where it hangs
     const o = this.other, fight = G.state === 'fight' || (this === P1 && followOK(this) && this.moveDir), fwd = Math.sign(o.mark ? o.mark.x - this.mark.x : -this.mark.x) || 1;
+    if (G.state === 'intro' && G.stareT && G.introT >= 0) {   // the stare-down (09b_cine.js): both walk in face to face, then back to their marks
+      this.hold = null; this.advV = 0; this.adv += (G.stare * STARE_ADV - this.adv) * Math.min(1, dt * 7);
+      this.group.position.x = this.mark.x + fwd * this.adv; this.group.updateMatrixWorld(true); return;
+    }
     const dist = Math.abs(o.group.position.x - this.group.position.x), tiredK = 0.65 + 0.35 * clamp(this.stamina / 40, 0, 1);
     let a = this.adv || 0;
     if (this === P1 && fight && (this.moveDir || 0) !== 0 && !this.blocking) {
@@ -4020,11 +4031,12 @@ class Fighter {
     }
     // guard: block pulls both fists to the face; a dazed fighter's hands sag
     const tiredSag = clamp((35 - this.stamina) / 35, 0, 1) * (this.cur ? 0 : 1);
-    if (this.blockW > 0.02 || dz > 0.02 || tiredSag > 0.02) for (const S of ['L', 'R']) {
+    const stareDown = G.state === 'intro' ? G.stare || 0 : 0;   // the stare-down: the hands drop from the face (09b_cine.js)
+    if (this.blockW > 0.02 || dz > 0.02 || tiredSag > 0.02 || stareDown > 0.02) for (const S of ['L', 'R']) {
       if (this.aimW > 0.05 && this.aimArm === S) continue;
       const H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), hc = this.group.worldToLocal(_v3.copy(this.headNeutral));
       const g = _v4.set(S === 'L' ? 0.065 : -0.065, -0.075, 0.135).add(hc);
-      hand.lerp(g, this.blockW).add(_v5.set(0, (-0.2 * dz - 0.11 * tiredSag) * (1 - this.blockW), 0.03 * dz - 0.03 * tiredSag));   // dazed or out of breath: the hands come down
+      hand.lerp(g, this.blockW).add(_v5.set(0, (-0.2 * dz - 0.11 * tiredSag - 0.34 * stareDown) * (1 - this.blockW), 0.03 * dz - 0.03 * tiredSag - 0.06 * stareDown));   // dazed or out of breath: the hands come down
       this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, hand);
     }
     if (this.aimW > 0.02 && this.aimTarget) {
@@ -4144,6 +4156,7 @@ class Fighter {
     this.animate(dt); this.retarget(); this.cc.updateMatrixWorld(true);
     this.headNeutral.setFromMatrixPosition(_m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInvT));
     this.pose(dt);
+    if ((G.stare > 0.001 && G.state === 'intro') || (this.pant > 0.001 && G.state === 'rend')) this.cineLayer();   // stare-down lean / heavy breathing (09b_cine.js)
     if (this.rag.hitOn) this.rag.hitStep(dt);
     this.spreadTwist(); this.cc.updateMatrixWorld(true);
     this.afterPose(dt);
@@ -4401,9 +4414,9 @@ const EVT = { subs: [], on(f) { this.subs.push(f); }, emit(type, e) { for (const
 const LOOK = { shorts: 'red', hair: 'brown', skin: 'light', beard: false, bottom: 'shorts', top: 'none', shoes: 'none', guard: 'clear' };
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { Object.assign(LOOK, s.look || {}); G.diff = DIFFS[s.diff] ? s.diff : 'normal'; G.wins = s.wins | 0; G.losses = s.losses | 0; } } catch (e) {}
 G.mode = 'quick'; G.career = 0; G.bagBest = 0; G.userDiff = G.diff; G.loc = 'gym';
-const OPT = { vol: 1, shake: true, keys: true };   // settings screen: master volume 0..1, camera shake, the key hint bar in a fight
+const OPT = { vol: 1, shake: true, keys: true, cine: true };   // settings screen: master volume 0..1, camera shake, the key hint bar in a fight, cutscenes (stare-down, end-of-round close-up + highlights)
 const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0 };
-try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
+try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; OPT.cine = s.opt.cine !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
 const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc, opt: OPT })); } catch (e) {} };
 const careerWins = () => G.career + PROF.champ * LADDER.length;   // wraps unlock by career wins ever
 /* career: a ladder of eight men, each tougher than the last — beat one to get the next; the last one holds the belt.
@@ -4459,14 +4472,14 @@ function flash() { flashEl.classList.remove('on'); void flashEl.offsetWidth; fla
 const REC = { frames: [], pool: [], events: [], N: 0 };
 function recFrame() {
   const f = REC.pool.pop() || { t: 0, d: [new Float32Array(REC.N), new Float32Array(REC.N)] };
-  f.t = G.t; P1.capture(f.d[0]); P2.capture(f.d[1]); f.ar = [ARENA.position.x, ARENA.position.z, ARENA.rotation.y];
+  f.t = G.t; P1.capture(f.d[0]); P2.capture(f.d[1]); (f.gx || (f.gx = [0, 0]))[0] = P1.group.position.x; f.gx[1] = P2.group.position.x; f.ar =[ARENA.position.x, ARENA.position.z, ARENA.rotation.y];
   const r = f.r || (f.r = new Float32Array(ROPES.length * 4)); ROPES.forEach((R, i) => { r[i * 4] = R.cur.x; r[i * 4 + 1] = R.cur.y; r[i * 4 + 2] = R.cur.z; r[i * 4 + 3] = R.s; });
   REC.frames.push(f); if (REC.frames.length > 640) REC.pool.push(REC.frames.shift());
 }
-const RP = { seg: 0, tau: 0, i: 0, segs: [], cut: false };
+const RP = { seg: 0, tau: 0, i: 0, segs: [], cut: false, hl: false };   // hl: the segments are the end-of-round highlights (09b_cine.js), not the knockout
 function startReplay() {
   if (REC.frames.length < 4) return endReplay();
-  G.state = 'replay'; const F = REC.frames, t0 = F[0].t, t1 = F[F.length - 1].t;
+  G.state = 'replay'; RP.hl = false; const F = REC.frames, t0 = F[0].t, t1 = F[F.length - 1].t;
   // the knockout from several cameras, like a broadcast: tight on the face, from the canvas looking up, straight down from
   // the lighting rig, over the winner's shoulder, then a wide dolly — each a little longer, so the fall is seen to the end
   const S = (a, b, rate, cam) => ({ from: Math.max(t0, G.koT + a), to: Math.min(t1, G.koT + b), rate, cam });
@@ -4477,14 +4490,16 @@ function startReplay() {
 }
 function nextSeg() {
   RP.seg++; if (RP.seg >= RP.segs.length) return endReplay();
+  if (RP.segs[RP.seg].enter) RP.segs[RP.seg].enter();   // a segment may announce itself (the highlights' plate)
   P1.simReset = P2.simReset = true;   // a cut back in time: hair and shorts start from the pose, not from where they were
   RP.tau = RP.segs[RP.seg].from; RP.i = 0; FX.clearAir(); P1.simReset = P2.simReset = true; RP.cut = true;
   stepReplay(0);   // pose the fighters before the camera cuts to them
 }
 function stepReplay(dtReal) {
-  const s = RP.segs[RP.seg], F = REC.frames, prev = RP.tau; RP.tau = Math.min(s.to, RP.tau + dtReal * s.rate);
+  const s = RP.segs[RP.seg], F = s.F || REC.frames, prev = RP.tau; RP.tau = Math.min(s.to, RP.tau + dtReal * (s.rf ? s.rf(RP.tau) : s.rate));   // s.F: a clip of its own (highlights); s.rf: a rate that follows the replay time (slow motion at the impact)
   while (RP.i < F.length - 2 && F[RP.i + 1].t <= RP.tau) RP.i++;
   const a = F[RP.i], b = F[RP.i + 1], k = clamp((RP.tau - a.t) / Math.max(1e-5, b.t - a.t), 0, 1), sdt = RP.tau - prev;
+  if (s.F && a.gx && b.gx) { P1.group.position.x = a.gx[0] + (b.gx[0] - a.gx[0]) * k; P2.group.position.x = a.gx[1] + (b.gx[1] - a.gx[1]) * k; P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true); }   // a highlight is from earlier in the round: they stood somewhere else then
   P1.restore(a.d[0], b.d[0], k); P2.restore(a.d[1], b.d[1], k); P1.afterPose(sdt); P2.afterPose(sdt);
   if (a.ar && b.ar) { ARENA.position.set(a.ar[0] + (b.ar[0] - a.ar[0]) * k, 0, a.ar[1] + (b.ar[1] - a.ar[1]) * k); ARENA.rotation.y = a.ar[2] + (b.ar[2] - a.ar[2]) * k; }
   if (a.r && b.r) ROPES.forEach((R, i) => { const j = i * 4; R.hit = (R.hit || new V3()).set(a.r[j] + (b.r[j] - a.r[j]) * k, a.r[j + 1] + (b.r[j + 1] - a.r[j + 1]) * k, a.r[j + 2] + (b.r[j + 2] - a.r[j + 2]) * k); R.s = a.r[j + 3] + (b.r[j + 3] - a.r[j + 3]) * k; });
@@ -4496,6 +4511,7 @@ function stepReplay(dtReal) {
   return sdt;
 }
 function endReplay() {
+  if (RP.hl) return endHighlights();
   const F = REC.frames; if (F.length) { const l = F[F.length - 1]; P1.restore(l.d[0], l.d[0], 0); P2.restore(l.d[1], l.d[1], 0); }
   G.loser.frozen = true; G.loser.rag.on = false; G.winner.simReset = true; G.loser.simReset = true;
   G.state = 'result'; $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true;
@@ -4805,6 +4821,7 @@ function toMenu() {
   if (G.mode === 'career') G.diff = G.userDiff; BAG.on = false; showP2(true); BAG.g.visible = false; updateMenu(); for (const F of [P1, P2]) F.sparGear(false);
   G.state = 'menu'; G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0;
   P1.resetState(); P2.resetState(); rollOpponent();
+  G.stareOn = false; G.stare = 0; G.rend = null; RP.hl = false; show('hl', false); P1.pant = P2.pant = 0;
   CROWD.fill = 1; UI.from = null; uiShow('main'); show('vs', false); show('hud', false); show('pad', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false);
   camCut = true; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; setLocation(G.loc);
   showP2(false);   // the menu shows the player's man alone (startFight brings the opponent back)
@@ -4914,6 +4931,7 @@ function startFight(fromMode) {
      its crowd (street locations), [0, 1.25) «Готовься», then the referee's clap (the bell in the gym) starts the round */
   { const street = LOC.id !== 'gym' && G.mode !== 'bag' && G.mode !== 'spar';
     G.flyT = street ? INTRO_FLY : 0; G.cardT = G.mode === 'career' ? INTRO_CARD : 0; G.flyA = INTRO_ARC[LOC.id] ?? -2.1; }
+  G.stareT = G.mode !== 'bag' && OPT.cine ? STARE_LEN : 0; G.stare = 0; G.stareOn = false; G.rend = null; RP.hl = false; P1.pant = P2.pant = 0; hlReset(); show('hl', false);   // the stare-down (09b_cine.js): after the card / the fly-round, before «Готовься»
   G.state = 'intro'; G.introT = -(G.flyT + G.cardT); G.introMsg = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; AI.lat = 0; AI.latT = 0;
   // BKFC: five two-minute rounds; between rounds the corner works on him (stamina, the cuts, ice on the eye); no knockout → the judges
   G.round = 1; G.roundT = ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0]; G.cutWarn = false;
@@ -4937,15 +4955,18 @@ function fightCard() {
 }
 /* any key / tap during the card or the fly-round goes straight to the next part; true = the input was used up */
 function introSkip() {
-  if (G.state !== 'intro' || G.paused || G.introT >= 0) return false;
+  if (G.paused) return false;
+  if (G.state === 'rend' || (G.state === 'replay' && RP.hl)) return cineSkip();   // the end-of-round close-up / highlights: any key skips them
+  if (G.state !== 'intro' || G.introT >= (G.stareT || 0)) return false;
   if (G.introT + G.flyT + G.cardT < 0.3) return true;   // the press that started the fight is not a skip
-  G.introT = G.cardT && G.introT < -G.flyT ? -G.flyT : 0; introTick(0); return true;
+  G.introT = G.introT >= 0 ? G.stareT : G.cardT && G.introT < -G.flyT ? -G.flyT : 0; introTick(0); return true;   // (a skipped stare-down: the men walk back on their own)
 }
 function introTick(dt) {
   G.introT += dt;
   if (G.cardT && G.introT >= -G.flyT && !$('vs').hidden) { show('vs', false); show('hud', true); if (G.flyT && G.introT < 0) msg(LOC.label, 'place'); }
-  if (G.introT >= 0 && !G.introMsg) { G.introMsg = true; msg('Готовься'); }
-  if (G.introT > 1.25) { G.state = 'fight'; msg('Раунд ' + G.round); roundSnd(); show('pad', true); EVT.emit('round'); }
+  const st = G.stareT || 0; stareTick(st);
+  if (G.introT >= st && !G.introMsg) { G.introMsg = true; msg('Готовься'); }
+  if (G.introT > st + 1.25) { G.state = 'fight'; msg('Раунд ' + G.round); roundSnd(); show('pad', true); EVT.emit('round'); }
 }
 // the start of a round: the referee claps his hands in a street fight, the bell rings in the gym
 function roundSnd() { if (LOC.id === 'gym') sfx.bell(1); else sfx.clap(); }
@@ -4954,7 +4975,11 @@ function endRound() {
   // judges: 10-9 to whoever did more, a point off for each knockdown suffered
   const a = G.rd[0], b = G.rd[1], c = [10, 10]; if (Math.abs(a - b) > 4) c[a > b ? 1 : 0] = 9; c[0] -= G.rkd[0]; c[1] -= G.rkd[1]; G.cards.push(c); G.rd = [0, 0]; G.rkd = [0, 0];
   sfx.bell(2);
-  if (G.round >= ROUNDS) return decision();
+  for (const F of [P1, P2]) { F.cancelPunch(); F.dodge = null; F.blocking = false; }
+  const after = G.round >= ROUNDS ? decision : () => toBreak(c);
+  if (!roundCine(after)) after();   // the cutscene (09b_cine.js): close-up of the faces, the round's best moments; then the corner / the judges as before
+}
+function toBreak(c) {
   G.state = 'break'; G.breakT = BREAK_LEN; const tot = G.cards.reduce((s, x) => [s[0] + x[0], s[1] + x[1]], [0, 0]);
   msg(`Раунд ${G.round}: ${c[0]}–${c[1]}`); $('pad').hidden = true; Q.length = 0;
   // the corner talks between rounds: one line, from what actually happened in this round
@@ -4992,7 +5017,9 @@ function cutCheck() {
   }
 }
 function stateTick(dtReal) {
+  hlTick();
   if (G.state === 'intro') introTick(dtReal);
+  else if (G.state === 'rend') rendTick(dtReal);
   else if (G.state === 'fight') {
     G.roundT -= dtReal * G.slow; if (G.roundT <= 0) return endRound();
     if ((G.cutT = (G.cutT || 0) + dtReal) > 0.5) { G.cutT = 0; cutCheck(); }
@@ -5008,6 +5035,149 @@ function stateTick(dtReal) {
   }
 }
 
+/* ───────── ring cinematics ─────────
+   1. the stare-down before the first round (G.stareT, state 'intro' while 0 ≤ G.introT < G.stareT): both men walk in until their heads are
+      ~0.35 m apart, lean in, hold each other's eyes (Face), one half-smiles / nods; the camera pushes in on the pair in profile, then the
+      eyes of one, then of the other; the crowd rumbles louder; then they walk back and the usual «Готовься» follows. Any key / tap skips.
+   2. the end of every round (state 'rend', then 'replay' with RP.hl): 2 s on the faces (the worse one first — cuts, swelling, blood, heavy
+      breathing), then a cut of the round's best moments (HL: up to 3 clips by hit power / knockdown / a series of 3+), each seen from two
+      angles with slow motion at the impact and the plate «ЛУЧШЕЕ В РАУНДЕ». Afterwards the corner / the judges exactly as before.
+   OPT.cine switches both off. Debug: __g.HL, __g.endRound() */
+const STARE_LEN = 4.2, STARE_ADV = 0.2;   // s the stare-down lasts, m each man walks toward the other
+const FACE_LEN = 2.0, HL_PRE = 0.7, HL_MAX = 3, HL_CAMS = [['side', 'face'], ['over', 'side'], ['wide', 'over']];   // s of face close-up; s of the clip before the impact; clips shown; camera pairs (angle 1, angle 2) of clip 1, 2, 3
+
+/* ── the stare-down ── */
+function stareTick(st) {
+  const t = G.introT, on = st > 0 && t >= 0 && t < st;
+  if (on && !G.stareOn) {
+    G.stareOn = true; G.stareCamPh = -1; show('hud', false); show('bar-t', true); show('bar-b', true);
+    G.smirker = rr() < 0.5 ? P1 : P2; G.nodder = rr() < 0.7 ? G.smirker : null; G.nodT = 1.6 + rr() * 0.8; sfx.roar(0.45);
+  }
+  if (!on && G.stareOn) { G.stareOn = false; show('bar-t', false); show('bar-b', false); show('hud', true); }
+  G.stare = on ? sstep(0, 1, t / 0.9) * (1 - sstep(0, 1, (t - (st - 0.9)) / 0.8)) : 0;   // 0 → 1 as they close in, back to 0 as they part
+  if (on) CROWD.heat = Math.max(CROWD.heat, 0.34 * Math.min(1, t / 0.8));   // the hall hums louder
+}
+// camera: [0, 1.7) a slow push-in on the pair in profile, [1.7, 2.8) the eyes of the player, [2.8, 3.6) the eyes of the other, then the fight camera
+function stareCam(k) {
+  const t = G.introT, ha = P1.headNow, hb = P2.headNow, mx = (ha.x + hb.x) / 2, hy = (ha.y + hb.y) / 2, ph = t < 1.7 ? 0 : t < 2.8 ? 1 : 2;
+  if (ph !== G.stareCamPh) { G.stareCamPh = ph; if (ph > 0) camCut = true; }
+  if (ph === 0) { const e = sstep(0, 1, t / 1.7); _cp.set(mx, hy - 0.06, lerp(2.6, 1.15, e)); _cl.set(mx, hy - 0.1, 0); return 2.6; }
+  const F = ph === 1 ? P1 : P2, h = F.headNow, f = Math.sign(F.other.headNow.x - h.x) || 1, q = clamp(ph === 1 ? (t - 1.7) / 1.1 : (t - 2.8) / 0.8, 0, 1);
+  _cp.set(h.x + f * 0.16, h.y - 0.05, 0.55 - 0.07 * q); _cl.set(h.x + f * 0.1, h.y - 0.08, 0); return 8;   // near profile (the other head is 0.35 m ahead, a 3/4 from the front would shoot through it)
+}
+/* what the stare-down / the panting adds to a pose (called from Fighter.update after pose()): lean in with the chest, weight sway, the nod;
+   after the bell the chest heaves, the head hangs a little, the shoulders rise and fall */
+Fighter.prototype.cineLayer = function () {
+  const B = this.bones, t = G.t, P = this.ph || 0;
+  if (G.state === 'intro') {
+    const k = G.stare, sw = Math.sin(t * 1.1 + P);
+    this.rot(B.CC_Base_Waist, 0.14 * k, 0, 0.02 * k * sw); this.rot(B.CC_Base_Spine02, 0.1 * k, 0, 0.025 * k * sw);
+    const u = (G.introT - (G.nodT || 0)) / 0.9, nod = G.nodder === this && u > 0 && u < 1 ? Math.sin(Math.PI * u) ** 2 : 0;
+    this.rot(this.head, -0.06 * k + 0.3 * nod, 0.03 * k * Math.sin(t * 0.7 + P), 0);
+  } else {
+    const p = this.pant, br = Math.sin(t * 5.4 + P);
+    this.rot(B.CC_Base_Waist, 0.07 * p, 0, 0); this.rot(B.CC_Base_Spine02, 0.06 * p + 0.045 * p * br, 0, 0.012 * p * Math.sin(t * 1.7 + P));
+    this.rot(this.head, 0.08 * p + 0.03 * p * br, 0, 0);
+    for (const S of ['L', 'R']) this.rot(B[`CC_Base_${S}_Clavicle`] || B[`CC_Base_${S}_Upperarm`], 0, 0, (S === 'L' ? 1 : -1) * 0.06 * p * br);
+  }
+  this.cc.updateMatrixWorld(true);
+};
+
+/* ── end of a round: the faces ── */
+function roundCine(after) {
+  if (!OPT.cine || P1.ko || P2.ko || REC.frames.length < 4) return false;
+  hlFinalize();
+  const dmg = F => { const E = F.flesh.u.uEyeSw.value; return F.flesh.wounds.reduce((s, w) => s + w.sev, 0) + E.x + E.y + (1 - F.hp / 100) * 1.5; };
+  G.rend = { t: 0, t0: G.real, order: dmg(P2) > dmg(P1) ? [P2, P1] : [P1, P2], cut1: 1.2, shot: -1, after, sv: null };   // the more damaged face first
+  G.state = 'rend'; $('pad').hidden = true; Q.length = 0; show('hud', false); show('bar-t', true); show('bar-b', true); camCut = true; return true;
+}
+function rendTick(dt) {
+  const R = G.rend; R.t += dt;
+  for (const F of [P1, P2]) F.pant = clamp(0.55 + 0.45 * (1 - F.stamina / 100), 0, 1);
+  if (R.t >= FACE_LEN) startHighlights();
+}
+function rendCam() {
+  const R = G.rend; if (!R) return 3;
+  const idx = R.t < R.cut1 ? 0 : 1, F = R.order[idx], h = F.headNow, f = Math.sign(F.other.headNow.x - h.x) || 1, q = idx ? (R.t - R.cut1) / (FACE_LEN - R.cut1) : R.t / R.cut1;
+  if (R.shot !== idx) { R.shot = idx; camCut = true; }
+  _cp.set(h.x + f * 0.5, h.y + 0.03, 0.5 - 0.1 * clamp(q, 0, 1)); _cl.set(h.x + f * 0.03, h.y - 0.02, 0); return 4;
+}
+// any key / tap: the whole cutscene is skipped (not in the first moments: the player may still be hammering the punch keys)
+function cineSkip() {
+  const R = G.rend; if (!R || G.real - R.t0 < 0.8) return true;
+  if (G.state === 'replay') endHighlights(); else cineEnd(); return true;
+}
+function cineEnd() {
+  const R = G.rend; G.rend = null; show('bar-t', false); show('bar-b', false); show('hud', true); P1.pant = P2.pant = 0; camCut = true;
+  if (R && R.after) R.after();   // the corner (toBreak) or the judges (decision)
+}
+
+/* ── the round's best moments ──
+   HL.recs: a record per strong hit (power ≥ 0.35, not blocked) or knockdown: { te: when, who: who was hit (0 = P1), power, kd, post: s kept after the impact,
+   frames: a deep copy of the replay frames [te − HL_PRE, te + post] once that time has passed }. Records within 1 s of each other (same man hit) merge.
+   The replay buffer REC holds only ~10 s, so a clip is copied out when it is complete; the buffer of the whole round would be ~30 MB. */
+const HL = { recs: [], hits: [] };
+function hlReset() { HL.recs.length = 0; HL.hits.length = 0; }
+function hlWant(te, who, power, kd) {
+  const r = HL.recs.find(x => x.who === who && Math.abs(x.te - te) < 1.0);
+  if (r && (!r.frames || kd || power > r.power)) { r.kd = r.kd || kd; if (kd) r.post = 1.5; if (power > r.power) { r.power = power; r.te = te; } r.frames = null; return; }   // (re-cut a finished clip around the stronger moment)
+  if (r) return;
+  HL.recs.push({ te, who, power, kd, post: kd ? 1.5 : 0.8, frames: null, t0: 0, t1: 0 });
+  if (HL.recs.length > 10) { const w = HL.recs.filter(x => !x.kd).sort((a, b) => a.power - b.power)[0]; if (w) HL.recs.splice(HL.recs.indexOf(w), 1); }
+}
+EVT.on((type, e) => {
+  if (e.replay) return;
+  if (type === 'round') hlReset();
+  else if (type === 'hit') {
+    const ev = REC.events[REC.events.length - 1]; if (!ev || ev.t !== G.t) return;
+    HL.hits.push({ t: G.t, who: ev.who, power: e.power, blocked: !!e.blocked });
+    if (!e.blocked && e.power >= 0.35) hlWant(G.t, ev.who, e.power, false);
+  } else if (type === 'kd' && G.kd) hlWant(G.t, G.kd.def === P1 ? 0 : 1, 1.5, true);
+});
+function hlCopy(r, t1) {
+  const a = r.te - HL_PRE, F = REC.frames.filter(f => f.t >= a && f.t <= t1);
+  r.frames = F.map(f => ({ t: f.t, d: [f.d[0].slice(), f.d[1].slice()], ar: f.ar && f.ar.slice(), r: f.r && f.r.slice(), gx: f.gx && f.gx.slice() }));
+  r.t0 = r.frames.length ? r.frames[0].t : 0; r.t1 = r.frames.length ? r.frames[r.frames.length - 1].t : 0;
+}
+function hlTick() { for (const r of HL.recs) if (!r.frames && G.t >= r.te + r.post) hlCopy(r, r.te + r.post); }
+function hlFinalize() { for (const r of HL.recs) if (!r.frames) hlCopy(r, G.t); }   // the round ended with the clip still open: what there is
+function hlPick() {
+  const cs = HL.recs.filter(r => r.frames && r.frames.length >= 8 && r.te - r.t0 > 0.15);
+  for (const c of cs) {
+    const near = HL.hits.filter(h => h.who === c.who && !h.blocked && Math.abs(h.t - c.te) < 1.4), series = near.length;
+    c.series = series; c.score = c.power + 0.3 * (near.reduce((s, h) => s + h.power, 0) - c.power) + (series >= 3 ? 0.5 + 0.12 * (series - 3) : 0) + (c.kd ? 2.5 : 0);
+  }
+  const picks = []; for (const c of cs.sort((a, b) => b.score - a.score)) if (picks.length < HL_MAX && picks.every(p => Math.abs(p.te - c.te) > 1.8)) picks.push(c);
+  return picks.sort((a, b) => a.te - b.te);
+}
+function startHighlights() {
+  const picks = hlPick(), R = G.rend; if (!picks.length) return cineEnd();
+  R.sv = { p: ARENA.position.clone(), ry: ARENA.rotation.y, gx: [P1.group.position.x, P2.group.position.x] };
+  RP.hl = true; RP.segs = [];
+  picks.forEach((c, i) => {
+    const cams = HL_CAMS[i % HL_CAMS.length], rf = tau => (0.28 + 0.72 * Math.min(1, Math.abs(tau - c.te) / 0.16));   // slow motion at the impact
+    const seg = (cam, a, b, base, enter) => ({ from: Math.max(c.t0, c.te + a), to: Math.min(c.t1, c.te + b), rf: tau => base * rf(tau), rate: base, cam, hlc: true, F: c.frames, who: c.who, te: c.te, enter });
+    const tag = c.kd ? 'Нокдаун' : c.series >= 3 ? `Серия: ${c.series} ${c.series < 5 ? 'удара' : 'ударов'}` : c.power >= 0.9 ? 'Мощный удар' : 'Точный удар';
+    RP.segs.push(seg(cams[0], -0.5, 0.12, 0.9, () => hlPlate(`${i + 1}/${picks.length} · ${tag} · ${c.who ? 'твой удар' : 'удар соперника'}`)), seg(cams[1], -0.28, c.kd ? 1.0 : 0.45, 0.7));
+  });
+  G.state = 'replay'; RP.seg = -1; nextSeg();
+  $('rec').hidden = false; $('hud').hidden = true; $('pad').hidden = true; $('result').hidden = true;
+}
+function hlPlate(text) { const el = $('hl'); $('hl-s').textContent = text; el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
+function endHighlights() {
+  const R = G.rend; RP.hl = false;
+  if (R && R.sv) { ARENA.position.copy(R.sv.p); ARENA.rotation.y = R.sv.ry; ARENA.updateMatrixWorld(true); P1.group.position.x = R.sv.gx[0]; P2.group.position.x = R.sv.gx[1]; P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true); }
+  $('rec').hidden = true; $('hl').hidden = true; P1.simReset = P2.simReset = true; FX.clearAir(); G.shake = 0;
+  cineEnd();
+}
+// cameras of the highlights: D = the man who is hit, A = the one who hits; the clip's segments pick two of these
+function hlCam(s) {
+  const D = s.who ? P2 : P1, A = D.other, h = D.headNow, a = A.headNow, f = Math.sign(a.x - h.x) || 1, mx = (h.x + a.x) / 2, p = clamp((RP.tau - s.from) / Math.max(0.01, s.to - s.from), 0, 1);
+  if (s.cam === 'side') { _cp.set(mx, h.y - 0.1, 1.9 - 0.4 * p); _cl.set(mx, h.y - 0.12, 0); return 5; }                      // profile of the exchange, creeping in
+  if (s.cam === 'face') { _cp.set(h.x + f * 0.55, h.y + 0.03, 0.85 - 0.15 * p); _cl.set(h.x - f * 0.03, h.y - 0.02, 0); return 6; }   // the face that takes it, from the side in front
+  if (s.cam === 'over') { _cp.set(a.x - f * 0.5, a.y + 0.12, 0.55 + 0.1 * p); _cl.set(h.x, h.y - 0.04, 0); return 6; }                  // over the shoulder of the puncher
+  _cp.set(mx - f * 0.4, 1.45, 3.2); _cl.set(mx, h.y - 0.25, 0); return 4;                                                                // wide
+}
 /* ───────── camera ───────── */
 const camP = new V3(1.2, 1.4, 3), camL = new V3(0, 1, 0), _cp = new V3(), _cl = new V3(); let camCut = true, camClock = 0;
 const FLY_R = 6.3, FLY_H = 2.25;   // m: where the intro fly-round starts — behind the back row of the crowd, over its heads (under the parking's ceiling)
@@ -5017,6 +5187,8 @@ function camUpdate(dt) {
   if (window.__camHold) { const h = window.__camHold; camera.position.set(h.p[0], h.p[1], h.p[2]); camera.lookAt(h.l[0], h.l[1], h.l[2]); camP.copy(camera.position); camL.set(h.l[0], h.l[1], h.l[2]); return; }
   const far = VW / VH < 1.45 ? 5.0 : 4.5;
   if (G.state === 'menu') { menuCam(dt, _cp, _cl); k = 1e3; }   // already eased inside menuCam (orbit about P1, 14_screens.js): taken as is
+  else if (G.state === 'replay' && RP.segs[RP.seg].hlc) { k = hlCam(RP.segs[RP.seg]); if (RP.cut) { camCut = true; RP.cut = false; } }   // the highlights of a round (09b_cine.js)
+  else if (G.state === 'rend') k = rendCam();   // the close-up of the faces at the end of a round
   else if (G.state === 'replay') {
     const s = RP.segs[RP.seg], h = G.loser.headNow, side = Math.sign(G.loser.group.position.x) || 1;
     const p = clamp((RP.tau - s.from) / Math.max(0.01, s.to - s.from), 0, 1), c = G.loser.jp[0], w = G.winner.headNow;
@@ -5039,6 +5211,7 @@ function camUpdate(dt) {
     _cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), z); _cl.set(mx + drift * 0.3, 0.93, 0); k = G.state === 'intro' ? 2.4 : 3.5;
     /* the fly-round before a street fight (G.introT < 0, see startFight): an arc about the centre of the floor — from behind the crowd,
        above its heads, at the angle G.flyA — that comes down into the fight camera; while the opponent's card is up it only creeps */
+    if (G.state === 'intro' && G.stareT && G.introT >= 0 && G.introT < G.stareT - 0.6) k = stareCam(k);   // the stare-down: profile push-in, the eyes of both
     if (G.state === 'intro' && G.introT < 0 && G.flyT) {
       const p = clamp(1 + G.introT / G.flyT, 0, 1), e = p * p * p * (p * (6 * p - 15) + 10), pre = Math.min(0, G.introT + G.flyT);
       const a = lerp(G.flyA * (1 - 0.035 * pre), Math.atan2(_cp.x, _cp.z), e), R = lerp(FLY_R, Math.hypot(_cp.x, _cp.z), e);
@@ -6824,7 +6997,7 @@ function makeCrowd(o = {}) {
    and the level of its murmur */
 function crowdTick(dt) {
   const c = LOC.crowd && LOC.group && LOC.group.visible ? LOC.crowd : null, s = G.state;
-  const tgt = !c ? 0 : s === 'fight' ? 0.42 : s === 'kd' ? 0.7 : s === 'ko' ? 0.85 : s === 'break' ? 0.06 : s === 'replay' ? 0.45 : s === 'intro' || s === 'result' ? 0.3 : 0.14;
+  const tgt = !c ? 0 : s === 'fight' ? 0.42 : s === 'kd' ? 0.7 : s === 'ko' ? 0.85 : s === 'break' ? 0.06 : s === 'replay' ? 0.45 : s === 'rend' ? 0.55 : s === 'intro' || s === 'result' ? 0.3 : 0.14;
   CROWD.heat = Math.max(0, CROWD.heat - dt * 0.25);
   CROWD.mood += (Math.min(1, tgt + CROWD.heat) - CROWD.mood) * (1 - Math.exp(-dt * 1.4));
   CROWD.u.uT.value += dt; CROWD.u.uMood.value = CROWD.mood;
@@ -6884,7 +7057,7 @@ function uiKey(e) {
   return true;   // Enter / Space act on the focused button by themselves
 }
 /* pause */
-const canPause = () => !G.paused && ['intro', 'fight', 'break', 'kd', 'ko'].includes(G.state);
+const canPause = () => !G.paused && ['intro', 'fight', 'break', 'kd', 'ko', 'rend'].includes(G.state);
 function pauseGame() { if (!canPause()) return; G.paused = true; HELD.clear(); mvKeys(); setBlock(false); Q.length = 0; UI.from = 'pause'; uiShow('pause'); }
 function resumeGame() { G.paused = false; UI.from = null; uiShow(null); last = performance.now(); }
 function surrender() { if (!BAG.on && G.state !== 'ko') { G.losses++; save(); } toMenu(); }   // giving up a live fight is a loss (after the knockout the result is already counted)
@@ -6954,6 +7127,7 @@ function gfxNote() { $('gfx-note').textContent = `сейчас: ${GFX_LABEL[GFX.
 function buildSettings() {
   swatches('o-gfx', ['auto', ...GFX_ORDER].map(id => ({ id, label: GFX_LABEL[id] })), () => GFX.set, v => { setGfx(v); gfxNote(); }, true, true); gfxNote();
   swatches('o-shake', ONOFF, () => OPT.shake ? 'on' : 'off', v => { OPT.shake = v === 'on'; }, true, true);
+  swatches('o-cine', ONOFF, () => OPT.cine ? 'on' : 'off', v => { OPT.cine = v === 'on'; }, true, true);
   swatches('o-keys', ONOFF, () => OPT.keys ? 'on' : 'off', v => { OPT.keys = v === 'on'; applyOpt(); }, true, true);
   swatches('o-fps', ONOFF, () => PERF.on ? 'on' : 'off', v => perfToggle(v === 'on'), true, true);
   const vol = $('o-vol'), vv = $('vol-v'); vol.value = Math.round(OPT.vol * 100); vv.textContent = vol.value + '%';

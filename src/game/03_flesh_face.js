@@ -231,7 +231,7 @@ class Face {
   }
   update(dt) {
     const F = this.F; if (G.state === 'replay') return;   // replay plays back the recorded lids and bones
-    this.t += dt; const ko = F.rag.on && F.rag.mode === 'ko' && !F.rag.prof.conscious, dz = F.daze || 0, tired = clamp((40 - F.stamina) / 40, 0, 1);
+    this.t += dt; const ko = F.rag.on && F.rag.mode === 'ko' && !F.rag.prof.conscious, dz = F.daze || 0, tired = Math.max(clamp((40 - F.stamina) / 40, 0, 1), G.state === 'rend' ? F.pant || 0 : 0);   // (the end-of-round close-up: mouth breathing)
     if (ko) this.koT += dt; else this.koT = 0;
     // blinks
     if (!ko) { if ((this.blinkT -= dt) < 0) { this.blink(); this.blinkT = (dz > 0.2 ? 1 : 2) + rr() * 4; } }
@@ -266,6 +266,7 @@ class Face {
     if (tired > 0.3) tg[1] = Math.max(tg[1], 0.4 * tired);
     if (ko) tg = [-0.2, 0.15, 0, -0.2, 0, 0.2];
     if (G.state === 'result' && G.winner === F) tg = [0.9, 0, 0.9, 0.3, 0.9, 0.5];   // the roar
+    if (G.state === 'intro' && G.stare > 0.01) tg = tg.map((v, i) => v + ((F === G.smirker ? [0.55, 0, 0.1, 0.6, 0.05, 0] : [0.85, 0, 0.3, -0.05, 0.25, 0])[i] - v) * G.stare);   // the stare-down: one man's jaw set, the other half-smiling
     if (F.gu || (F.rag.on && F.rag.prof && F.rag.prof.conscious)) tg = [0.6, 0.7, 0.8, -0.5, 0.6, 0.3];   // grimace getting up
     for (let i = 0; i < 6; i++) EM[i] += (tg[i] - EM[i]) * Math.min(1, dt * (hurt > 0.5 ? 25 : 8));
     for (let i = 0; i < 6; i++) EM[i] = clamp(EM[i], i === 2 || i === 3 ? -1 : 0, 1);   // expressions stay inside what a face can do
@@ -273,7 +274,7 @@ class Face {
     // gaze
     const tgt = _fv2; if (o) { tgt.copy(o.headNow); tgt.y += 0.03; } else tgt.set(0, 1.6, 0);
     F.group.worldToLocal(tgt);
-    if ((this.saccT -= dt) < 0) { this.saccT = 0.2 + rr() * 1.3; const a = 0.015 + 0.04 * dz; this.sacc.set((rr() - 0.5) * a, (rr() - 0.5) * a * 0.6, 0); }
+    if ((this.saccT -= dt) < 0) { this.saccT = 0.2 + rr() * 1.3; const a = (0.015 + 0.04 * dz) * (G.state === 'intro' && G.stare > 0.01 ? 0.25 : 1); this.sacc.set((rr() - 0.5) * a, (rr() - 0.5) * a * 0.6, 0); }
     if (dz > 0) { this.drift.x += (Math.sin(this.t * 0.7 + F.ph) * 0.12 * dz - this.drift.x) * dt * 2; this.drift.y += (Math.sin(this.t * 0.5 + 2 * F.ph) * 0.06 * dz - this.drift.y) * dt * 2; }
     else this.drift.multiplyScalar(Math.exp(-dt * 3));
     if (ko) this.koRoll += ((this.koT > 0.3 ? 0.42 : 0) - this.koRoll) * Math.min(1, dt * 4);

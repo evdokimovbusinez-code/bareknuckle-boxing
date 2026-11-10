@@ -96,6 +96,7 @@ function startFight(fromMode) {
      its crowd (street locations), [0, 1.25) «Готовься», then the referee's clap (the bell in the gym) starts the round */
   { const street = LOC.id !== 'gym' && G.mode !== 'bag' && G.mode !== 'spar';
     G.flyT = street ? INTRO_FLY : 0; G.cardT = G.mode === 'career' ? INTRO_CARD : 0; G.flyA = INTRO_ARC[LOC.id] ?? -2.1; }
+  G.stareT = G.mode !== 'bag' && OPT.cine ? STARE_LEN : 0; G.stare = 0; G.stareOn = false; G.rend = null; RP.hl = false; P1.pant = P2.pant = 0; hlReset(); show('hl', false);   // the stare-down (09b_cine.js): after the card / the fly-round, before «Готовься»
   G.state = 'intro'; G.introT = -(G.flyT + G.cardT); G.introMsg = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; AI.lat = 0; AI.latT = 0;
   // BKFC: five two-minute rounds; between rounds the corner works on him (stamina, the cuts, ice on the eye); no knockout → the judges
   G.round = 1; G.roundT = ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0]; G.cutWarn = false;
@@ -119,15 +120,18 @@ function fightCard() {
 }
 /* any key / tap during the card or the fly-round goes straight to the next part; true = the input was used up */
 function introSkip() {
-  if (G.state !== 'intro' || G.paused || G.introT >= 0) return false;
+  if (G.paused) return false;
+  if (G.state === 'rend' || (G.state === 'replay' && RP.hl)) return cineSkip();   // the end-of-round close-up / highlights: any key skips them
+  if (G.state !== 'intro' || G.introT >= (G.stareT || 0)) return false;
   if (G.introT + G.flyT + G.cardT < 0.3) return true;   // the press that started the fight is not a skip
-  G.introT = G.cardT && G.introT < -G.flyT ? -G.flyT : 0; introTick(0); return true;
+  G.introT = G.introT >= 0 ? G.stareT : G.cardT && G.introT < -G.flyT ? -G.flyT : 0; introTick(0); return true;   // (a skipped stare-down: the men walk back on their own)
 }
 function introTick(dt) {
   G.introT += dt;
   if (G.cardT && G.introT >= -G.flyT && !$('vs').hidden) { show('vs', false); show('hud', true); if (G.flyT && G.introT < 0) msg(LOC.label, 'place'); }
-  if (G.introT >= 0 && !G.introMsg) { G.introMsg = true; msg('Готовься'); }
-  if (G.introT > 1.25) { G.state = 'fight'; msg('Раунд ' + G.round); roundSnd(); show('pad', true); EVT.emit('round'); }
+  const st = G.stareT || 0; stareTick(st);
+  if (G.introT >= st && !G.introMsg) { G.introMsg = true; msg('Готовься'); }
+  if (G.introT > st + 1.25) { G.state = 'fight'; msg('Раунд ' + G.round); roundSnd(); show('pad', true); EVT.emit('round'); }
 }
 // the start of a round: the referee claps his hands in a street fight, the bell rings in the gym
 function roundSnd() { if (LOC.id === 'gym') sfx.bell(1); else sfx.clap(); }
@@ -136,7 +140,11 @@ function endRound() {
   // judges: 10-9 to whoever did more, a point off for each knockdown suffered
   const a = G.rd[0], b = G.rd[1], c = [10, 10]; if (Math.abs(a - b) > 4) c[a > b ? 1 : 0] = 9; c[0] -= G.rkd[0]; c[1] -= G.rkd[1]; G.cards.push(c); G.rd = [0, 0]; G.rkd = [0, 0];
   sfx.bell(2);
-  if (G.round >= ROUNDS) return decision();
+  for (const F of [P1, P2]) { F.cancelPunch(); F.dodge = null; F.blocking = false; }
+  const after = G.round >= ROUNDS ? decision : () => toBreak(c);
+  if (!roundCine(after)) after();   // the cutscene (09b_cine.js): close-up of the faces, the round's best moments; then the corner / the judges as before
+}
+function toBreak(c) {
   G.state = 'break'; G.breakT = BREAK_LEN; const tot = G.cards.reduce((s, x) => [s[0] + x[0], s[1] + x[1]], [0, 0]);
   msg(`Раунд ${G.round}: ${c[0]}–${c[1]}`); $('pad').hidden = true; Q.length = 0;
   // the corner talks between rounds: one line, from what actually happened in this round
@@ -174,7 +182,9 @@ function cutCheck() {
   }
 }
 function stateTick(dtReal) {
+  hlTick();
   if (G.state === 'intro') introTick(dtReal);
+  else if (G.state === 'rend') rendTick(dtReal);
   else if (G.state === 'fight') {
     G.roundT -= dtReal * G.slow; if (G.roundT <= 0) return endRound();
     if ((G.cutT = (G.cutT || 0) + dtReal) > 0.5) { G.cutT = 0; cutCheck(); }
