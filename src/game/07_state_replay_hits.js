@@ -5,6 +5,8 @@ const DMG_K = 0.18;
 const DIFFS = { easy: { label: 'Лёгкий', dodge: 0.18, read: 0.5, gap: 1.9, speed: 1.0, toAI: 1.25, toMe: 0.75 }, normal: { label: 'Норм', dodge: 0.4, read: 0.7, gap: 1.35, speed: 1.15, toAI: 1, toMe: 1 }, hard: { label: 'Жёсткий', dodge: 0.6, read: 0.86, gap: 0.95, speed: 1.3, toAI: 0.9, toMe: 1.15 } };
 const G = { state: 'load', t: 0, real: 0, hitstop: 0, slow: 1, slowT: 0, shake: 0, koT: 0, introT: 0, winner: null, loser: null, wins: 0, losses: 0, diff: 'normal', fallSnd: false };
 let P1, P2, VW = 1, VH = 1, inp = null;
+/* game events other systems listen to (the crowd): EVT.on((type, e) => …); types: 'hit' { pos, power, blocked, replay }, 'kd', 'ko', 'up' { pos }, 'round' */
+const EVT = { subs: [], on(f) { this.subs.push(f); }, emit(type, e) { for (const f of this.subs) f(type, e || {}); } };
 const LOOK = { shorts: 'red', hair: 'brown', skin: 'light', beard: false, bottom: 'shorts', top: 'none', shoes: 'none', guard: 'clear' };
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { Object.assign(LOOK, s.look || {}); G.diff = DIFFS[s.diff] ? s.diff : 'normal'; G.wins = s.wins | 0; G.losses = s.losses | 0; } } catch (e) {}
 G.mode = 'quick'; G.career = 0; G.bagBest = 0; G.userDiff = G.diff; G.loc = 'gym';
@@ -76,7 +78,7 @@ function stepReplay(dtReal) {
   for (const e of REC.events) if (e.t > prev && e.t <= RP.tau) {
     const F = e.who ? P2 : P1; FX.spawn(e.pos, e.dir, e.power); if (e.dent) F.flesh.dent(...e.dent); if (e.mist) FX.mist(e.pos, e.dir, e.power, e.mist);
     if (e.spray) F.flesh.spray(e.spray.map(i => F.flesh.wounds[i]).filter(Boolean), e.dir, e.power, F);
-    sfx.thud(e.power * 0.7); G.shake = Math.max(G.shake, 0.01 + 0.02 * e.power); }
+    sfx.thud(e.power * 0.7); G.shake = Math.max(G.shake, 0.01 + 0.02 * e.power); EVT.emit('hit', { pos: e.pos, power: e.power, replay: true }); }
   if (RP.tau >= s.to) nextSeg();
   return sdt;
 }
@@ -148,7 +150,7 @@ function followHit(att, name, contact) {
   const sp = def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.06 * def.flesh.U); if (sp.length || fr.spray.length) { const s2 = fr.spray.length ? fr.spray : sp; def.flesh.spray(s2, dir, power, def); ev.spray = s2.map(w => def.flesh.wounds.indexOf(w)); }
   def.face.hit && def.face.hit(power, true); FX.spawn(fr.skin, dir, power); { const bl = Math.min(1, def.flesh.wounds.reduce((a, x) => a + x.sev, 0) * 0.8); if (bl > 0.12) { FX.mist(fr.skin, dir, power, bl); ev.mist = bl; } } REC.events.push(ev);
   if (att.fs) { att.fs.land++; att.fs.dmg += P.dmg * DMG_K; } if (G.state === 'kd') { def.hp = Math.max(0, def.hp - P.dmg * DMG_K); G.kd.up += 0.8; }
-  att.lastLand = G.t; sfx.thud(power, false); G.shake = Math.max(G.shake, 0.02 + 0.03 * power); G.hitstop = 0.02 + 0.02 * power;
+  att.lastLand = G.t; sfx.thud(power, false); EVT.emit('hit', { pos, power }); G.shake = Math.max(G.shake, 0.02 + 0.03 * power); G.hitstop = 0.02 + 0.02 * power;
   popup(fr.skin.clone().add(_v4.set(0, 0.15, 0)), 'добил', 'crit');
 }
 function resolveHit(att, name, contact) {
@@ -223,7 +225,7 @@ function resolveHit(att, name, contact) {
   FX.spawn(pos, dir, blocked ? power * 0.4 : power); REC.events.push(ev);
   // contact is soft: a very short freeze, then a moment of slow motion while the head travels with the fist
   G.hitstop = 0.012 + 0.022 * power; if (G.slowT <= 0.02) { G.slow = 0.4; G.slowT = 0.05 + 0.06 * power; }
-  G.shake = Math.max(G.shake, 0.012 + 0.03 * power); sfx.thud(power, body);
+  G.shake = Math.max(G.shake, 0.012 + 0.03 * power); sfx.thud(power, body); EVT.emit('hit', { pos, power, blocked });
   popup(pos, String(Math.round(dmg)), counter ? 'crit' : 'hit');
   // feel it: the screen edge flushes red when you are hit, the phone kicks on what you land and harder on what you take
   if (def === P1 && !blocked) { const h = $('hurt'); if (h) { h.style.setProperty('--k', power); h.classList.remove('on'); void h.offsetWidth; h.classList.add('on'); } }
@@ -262,14 +264,14 @@ function knockdown(att, def, dir, power, name, fwd, sev, kind) {
     def.rag.start(imp, def.lastContact, fall, new V3(-fwd, 0, 0), true);
   } else def.takeKnee(type === 'liver' ? 'liver' : 'knee');
   G.slow = 0.5; G.slowT = 0.35; G.shake = 0.04;
-  msg('Нокдаун', 'ko'); sfx.fall();
+  msg('Нокдаун', 'ko'); sfx.fall(); EVT.emit('kd', { pos: def.headNow });
   if (def === P1) setTimeout(() => { if (G.state === 'kd' && G.kd.def === P1 && !P1.gu) msg('Жми удары — вставай!', 'count'); }, 900);
 }
 function kdTick(dt) {
   const K = G.kd, D = K.def;
   if (!K.down) { if (G.t - K.t0 > (K.type === 'knee' ? 0.55 : 0.9)) { K.down = true; K.nT = G.t + 0.4; } return; }
   const rising = (D.gu && D.gu.stage !== 'hold' && D.gu.stage !== 'drop') || (D.rag.on && D.rag.prof && D.rag.prof.getup);
-  if (K.done) { if (!D.gu && G.t > K.done) { G.state = 'fight'; G.kd = null; msg('Бой!'); } return; }
+  if (K.done) { if (!D.gu && G.t > K.done) { G.state = 'fight'; G.kd = null; msg('Бой!'); EVT.emit('up', { pos: D.headNow }); } return; }
   if (rising) return;
   if (G.t >= K.nT) {
     K.n++; K.nT = G.t + 1.0; msg(String(K.n), 'count'); sfx.count(K.n);
@@ -282,7 +284,7 @@ function countOut(K) {
   if (D.rag.on) D.rag.prof.conscious = false;   // he stops trying
   else D.collapse();
   fightOver(A === P1);
-  msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 300); $('pad').hidden = true; Q.length = 0;
+  msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 300); EVT.emit('ko', { pos: D.headNow }); $('pad').hidden = true; Q.length = 0;
 }
 function knockout(att, def, dir, power, name, fwd, forced) {
   // the delayed knockout (rare, but it happens — Barboza–Burgos): still on his feet, he backs up on rubber legs for a second or three and
@@ -308,7 +310,7 @@ function knockout(att, def, dir, power, name, fwd, forced) {
   G.slow = 0.3; G.slowT = 0.75; G.hitstop = 0.09; G.shake = 0.06; flash();
   if (def.flesh.wounds.length) def.flesh.spray(def.flesh.wounds, dir, 1.4, def);
   fightOver(att === P1);
-  msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 500);
+  msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 500); EVT.emit('ko', { pos: def.headNow });
   $('pad').hidden = true; Q.length = 0;
 }
 

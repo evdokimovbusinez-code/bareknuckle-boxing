@@ -136,7 +136,7 @@ function cutCheck() {
   }
 }
 function stateTick(dtReal) {
-  if (G.state === 'intro') { G.introT += dtReal; if (G.introT > 1.25) { G.state = 'fight'; msg('Раунд ' + G.round); sfx.bell(1); show('pad', true); } }
+  if (G.state === 'intro') { G.introT += dtReal; if (G.introT > 1.25) { G.state = 'fight'; msg('Раунд ' + G.round); sfx.bell(1); show('pad', true); EVT.emit('round'); } }
   else if (G.state === 'fight') {
     G.roundT -= dtReal * G.slow; if (G.roundT <= 0) return endRound();
     if ((G.cutT = (G.cutT || 0) + dtReal) > 0.5) { G.cutT = 0; cutCheck(); }
@@ -144,7 +144,7 @@ function stateTick(dtReal) {
   else if (G.state === 'break') {
     G.breakT -= dtReal; if (!G.doc) for (const F of [P1, P2]) corner(F, dtReal / BREAK_LEN);
     if (G.breakT <= 0) { if (!G.doc) { G.round++; G.roundT = ROUND_LEN; for (const F of [P1, P2]) if (F.mark) { F.adv = 0; F.advV = 0; } } G.doc = false;
-      G.state = 'fight'; msg(G.round > 1 && G.roundT === ROUND_LEN ? 'Раунд ' + G.round : 'Бой!'); sfx.bell(1); show('pad', true); }
+      G.state = 'fight'; msg(G.round > 1 && G.roundT === ROUND_LEN ? 'Раунд ' + G.round : 'Бой!'); sfx.bell(1); show('pad', true); EVT.emit('round'); }
   }
   else if (G.state === 'ko') {
     if (!G.fallSnd && G.loser.headNow.y < 0.3) { G.fallSnd = true; sfx.fall(); G.shake = Math.max(G.shake, 0.03); }

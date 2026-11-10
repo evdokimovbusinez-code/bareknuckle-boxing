@@ -211,6 +211,8 @@ class XWorld {
         if (Math.hypot(b.position.x - wl.c.x, b.position.z - wl.c.z) + (b.bound || 0.4) < W.r) continue;
         for (let i = 0; i < b.shapes.length; i++) {
           const c = b.sphere(i, _v5), r = b.shapes[i].radius, dx = c.x - wl.c.x, dz = c.z - wl.c.z, d = Math.hypot(dx, dz); if (d + r <= W.r || d < 1e-6) continue;
+          // the crowd behind the bales (W.back = the line of their chests): what hangs over the top is held there, softly — people give, but nobody is passed through
+          if (W.back && !b.low && d + r > W.back) { const n = _r3.set(-dx / d, 0, -dz / d), rA = _r4.copy(n).multiplyScalar(-r).add(c).sub(b.position), l = xPos(b, null, _r5.copy(n).multiplyScalar(d + r - W.back), rA, null, 2 / W.k, h); RC.push({ b, r: rA.clone(), n: n.clone(), ln: l, mu: W.mu, damp: W.damp }); }
           const y = c.y - wl.c.y, l3 = _r2.copy(c).applyMatrix4(wl.toL), top = b.low ? 1e3 : W.top(l3.x, l3.z), out = b.low ? 1e3 : W.r + W.d;
           // nearest point of the box section to the sphere centre → contact normal (radial part nr, vertical part ny) and depth
           const qr = clamp(d, W.r, out), qy = Math.min(y, top), er = d - qr, ey = y - qy, e = Math.hypot(er, ey); let nr, ny, pen, soft = false;
