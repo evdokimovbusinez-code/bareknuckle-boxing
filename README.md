@@ -43,3 +43,10 @@ python3 -m http.server 8000
 - `src/` — исходники: `g_a.js` (рендер), `g_pre.js` (шейдеры кожи, крови, пота), `g_b.js` (игра: бойцы, физика, ИИ, UI), `g_head.html` (разметка и стили), `boxer.html` (базовые блоки: ринг, ткань, волосы)
 - `src/assemble.py` — сборка: `python3 src/assemble.py` пишет `index.html` и отладочный `gtest.html`
 - `tools/gp.py` — headless-прогоны через Playwright для тестов и бенчмарков
+
+## Бот для задач
+
+- Задачу можно поставить, открыв issue или написав комментарий с `@claude`.
+- Бот работает в ветке `claude/issue-N`, сам собирает игру (`tools/check.sh`) и отчитывается в треде.
+- Изменения попадают в игру после слияния PR в `main`.
+- Модель и бюджет настраиваются в `.github/workflows/claude.yml` (`BOT_MODEL`, `BOT_EFFORT`, `BOT_BUDGET`).
