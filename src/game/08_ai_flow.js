@@ -74,10 +74,11 @@ function playerInput() {
 function show(id, on) { $(id).hidden = !on; }
 function toMenu() {
   if (G.mode === 'career') G.diff = G.userDiff; BAG.on = false; showP2(true); BAG.g.visible = false; updateMenu(); for (const F of [P1, P2]) F.sparGear(false);
-  G.state = 'menu'; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0;
+  G.state = 'menu'; G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0;
   P1.resetState(); P2.resetState(); rollOpponent();
-  show('menu', true); show('hud', false); show('pad', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false);
+  UI.from = null; uiShow('main'); show('hud', false); show('pad', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false);
   camCut = true; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; setLocation(G.loc);
+  showP2(false);   // the menu shows the player's man alone (startFight brings the opponent back)
 }
 const NAMES = ['Грек', 'Молот', 'Кабан', 'Шрам', 'Лом', 'Бизон', 'Кувалда', 'Седой'];
 function rollOpponent() {

@@ -1,46 +1,19 @@
 /* ───────── UI wiring ───────── */
-function swatches(id, list, get, set, txt) {
+/* a row of choices: colour dots (items with .c) or text chips (txt). A look choice is put on P1 at once; noLook = not part of the look */
+function swatches(id, list, get, set, txt, noLook) {
   const box = $(id); box.textContent = '';
   for (const it of list) {
     const b = document.createElement('button'); b.type = 'button';
     if (txt || !it.c) { b.className = 'txt'; b.textContent = it.label; } else { b.style.setProperty('--c', it.sw || it.c); b.setAttribute('aria-label', it.label || it.id); }
     b.setAttribute('aria-pressed', String(get() === it.id));
-    b.addEventListener('click', () => { set(it.id); for (const o of box.children) o.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-pressed', 'true'); P1.applyLook(LOOK); save(); });
+    b.addEventListener('click', () => { set(it.id); for (const o of box.children) o.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-pressed', 'true');
+      if (!noLook) { P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar); } save(); });
     box.appendChild(b);
   }
 }
-function buildMenu() {
-  swatches('o-shorts', SHORTS_LOOKS.map(s => ({ id: s.id, c: s.main, label: s.id })), () => LOOK.shorts, v => { LOOK.shorts = v; });
-  swatches('o-hair', HAIR_LOOKS.map(h => h.id === 'bald' ? { id: 'bald', label: 'под ноль' } : { id: h.id, c: h.c, label: h.id }), () => LOOK.hair, v => { LOOK.hair = v; });
-  swatches('o-skin', SKIN_LOOKS.map(s => ({ id: s.id, c: s.c, sw: s.id === 'light' ? '#e2b79f' : s.id === 'tan' ? '#b98563' : '#6f4630', label: s.id })), () => LOOK.skin, v => { LOOK.skin = v; });
-  swatches('o-beard', [{ id: 'no', label: 'нет' }, { id: 'yes', label: 'есть' }], () => LOOK.beard ? 'yes' : 'no', v => { LOOK.beard = v === 'yes'; }, true);
-  swatches('o-diff', Object.entries(DIFFS).map(([id, d]) => ({ id, label: d.label })), () => G.diff, v => { G.diff = v; }, true);
-  swatches('o-bottom', BOTTOMS.map(b => ({ id: b.id, label: b.label })), () => LOOK.bottom || 'shorts', v => { LOOK.bottom = v; }, true);
-  swatches('o-top', TOPS.map(b => ({ id: b.id, label: b.label })), () => LOOK.top || 'none', v => { LOOK.top = v; }, true);
-  swatches('o-shoes', SHOES.map(b => ({ id: b.id, label: b.label })), () => LOOK.shoes || 'none', v => { LOOK.shoes = v; }, true);
-  swatches('o-guard', GUARDS.map(b => ({ id: b.id, c: b.c, label: b.label })), () => LOOK.guard || 'clear', v => { LOOK.guard = v; });
-  swatches('o-wraps', WRAPS_LOOKS.map(w => ({ id: w.id, c: w.c, label: w.label, need: w.need })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; });
-  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { LOOK.hands = v; }, true);   // street fights: wraps or 4 oz MMA gloves
-  swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; });   // colour of the sparring (and MMA) gloves and the headgear
-  swatches('o-gfx', ['auto', ...GFX_ORDER].map(id => ({ id, label: GFX_LABEL[id] })), () => GFX.set, setGfx, true);
-  swatches('o-loc', Object.values(LOCS).map(L => ({ id: L.id, label: L.label })), () => G.loc, v => { G.loc = v; setLocation(v); }, true);
-  swatches('o-sig', [{ id: 'none', label: 'нет' }, ...SIGS], () => PROF.sig || 'none', v => { PROF.sig = v === 'none' ? null : v; }, true);
-  const nk = $('o-nick'); nk.value = PROF.nick; nk.oninput = () => { PROF.nick = nk.value.replace(/[<>]/g, '').slice(0, 14); save(); };
-  nk.onkeydown = e => e.stopPropagation();
-  for (const b of document.querySelectorAll('#tabs button')) b.onclick = () => { for (const o of document.querySelectorAll('#tabs button')) o.setAttribute('aria-pressed', String(o === b)); for (const t of document.querySelectorAll('.tab')) t.hidden = t.dataset.tab !== b.dataset.tab; };
-  renderStats();
-}
-function renderStats() {
-  const box = $('o-stats'); if (!box) return;
-  box.innerHTML = `<div class="rec-line">очки бойца: <b>${PROF.pts}</b></div>` + STATS.map(S => `<div class="stt"><b>${S.label}<small>${S.d}</small></b><div class="pips">${[0, 1, 2, 3, 4].map(i => `<i class="${i < PROF.stats[S.id] ? 'on' : ''}"></i>`).join('')}</div><button data-st="${S.id}" ${PROF.pts > 0 && PROF.stats[S.id] < 5 ? '' : 'disabled'}>+</button></div>`).join('');
-  for (const b of box.querySelectorAll('[data-st]')) b.onclick = () => { if (PROF.pts <= 0 || PROF.stats[b.dataset.st] >= 5) return; PROF.pts--; PROF.stats[b.dataset.st]++; save(); renderStats(); sfx.thud && sfx.thud(0.3, true); };
-  const rl = $('rec-line'); if (rl) rl.innerHTML = `побед <b>${G.wins}</b> · поражений <b>${G.losses}</b> · карьера <b>${Math.min(G.career, LADDER.length)}/${LADDER.length}</b>${PROF.champ ? ` · пояс ×<b>${PROF.champ}</b>` : ''} · груша <b>${G.bagBest}</b>`;
-  const dot = $('pts-dot'); if (dot) dot.classList.toggle('on', PROF.pts > 0);
-  // locked wraps
-  for (const b of document.querySelectorAll('#o-wraps button')) { const w = WRAPS_LOOKS.find(x => x.label === b.getAttribute('aria-label')); const lock = w && careerWins() < w.need; b.classList.toggle('lock', !!lock); b.disabled = !!lock; b.title = lock ? `откроется после ${w.need} побед в карьере` : ''; }
-}
+/* (the menu screens themselves — buildMenu, creator, settings, pause — are in 14_screens.js) */
 let bodyMod = false;
-const press = (type, name, el, shift) => { if (G.state === 'kd' && G.kd && G.kd.def === P1 && type === 'punch') { G.kd.mash = Math.min(G.kd.mash + 0.3, 6); if (el) { el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 110); } return; } if (G.state !== 'fight' && !(type === 'punch' && followOK(P1))) return; if (type === 'dodge') Q.length = 0; if (Q.length < 3) Q.push({ type, name, at: G.real, body: !!shift || bodyMod, pow: powMod }); if (type === 'punch' && bodyMod) { bodyMod = false; const b = $('body-btn'); b && b.classList.remove('lit'); } if (type === 'punch' && powMod) setPow(false); if (el) { el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 110); } };
+const press = (type, name, el, shift) => { if (G.paused) return; if (G.state === 'kd' && G.kd && G.kd.def === P1 && type === 'punch') { G.kd.mash = Math.min(G.kd.mash + 0.3, 6); if (el) { el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 110); } return; } if (G.state !== 'fight' && !(type === 'punch' && followOK(P1))) return; if (type === 'dodge') Q.length = 0; if (Q.length < 3) Q.push({ type, name, at: G.real, body: !!shift || bodyMod, pow: powMod }); if (type === 'punch' && bodyMod) { bodyMod = false; const b = $('body-btn'); b && b.classList.remove('lit'); } if (type === 'punch' && powMod) setPow(false); if (el) { el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 110); } };
 document.querySelectorAll('[data-punch]').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); press('punch', b.dataset.punch, b); }));
 const setBlock = v => { if (P1) P1.blocking = v && G.state === 'fight'; const b = $('block-btn'); b && b.classList.toggle('on', !!v); };
 // block: hold the button (or space)
@@ -87,6 +60,7 @@ window.addEventListener('keyup', e => {
 window.addEventListener('blur', () => { HELD.clear(); mvKeys(); setBlock(false); kbLit('kb-blk', false); kbLit('kb-body', false); });
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (uiKey(e)) return;   // menu screens / pause: arrows, Enter, Esc
   const live = G.state === 'fight' || G.state === 'ko' || G.state === 'kd';
   if (e.code === 'Space' && G.state === 'fight') { e.preventDefault(); if (!e.repeat) { setBlock(true); kbLit('kb-blk', true); } return; }
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { if (live) kbLit('kb-body', true); return; }
@@ -98,13 +72,12 @@ window.addEventListener('keydown', e => {
 });
 // mouse punches anywhere on the ring (not on menus / buttons)
 stage.addEventListener('pointerdown', e => {
-  if (e.pointerType !== 'mouse' || !(G.state === 'fight' || G.state === 'ko' || G.state === 'kd')) return;
-  if (e.target.closest && e.target.closest('button,input,.card,.result,.rec')) return;
+  if (e.pointerType !== 'mouse' || G.paused || !(G.state === 'fight' || G.state === 'ko' || G.state === 'kd')) return;
+  if (e.target.closest && e.target.closest('button,input,.ui,.result,.rec')) return;
   const n = e.button === 0 ? 'jab' : e.button === 2 ? 'cross' : e.button === 1 ? 'over' : null; if (!n) return;
   e.preventDefault(); press('punch', n, document.querySelector(`[data-punch="${n}"]`), e.shiftKey);
 });
 stage.addEventListener('contextmenu', e => { if (G.state !== 'menu') e.preventDefault(); });
-$('go').addEventListener('click', startQuick); $('go-car').addEventListener('click', () => { if (G.career >= LADDER.length) G.career = 0; startCareer(); }); $('go-bag').addEventListener('click', startBag); $('go-spar').addEventListener('click', startSpar);
 $('r-again').addEventListener('click', startFight);
 $('r-menu').addEventListener('click', toMenu);
 $('r-replay').addEventListener('click', startReplay);

@@ -17,6 +17,9 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
   (`window.__g` exposes `G, P1, P2, camera, scene, ARENA, ...`; `__tick(n, dt)` steps the sim, e.g. `__tick(300, 1/60)`).
   Close-ups: pin the camera with `window.__camHold = { p: [x, y, z], l: [x, y, z] }` (world metres; fighters face each other along x,
   P1 at x≈-0.55, heads at y≈1.65; the default camera looks from +z). `delete window.__camHold` releases it.
+  Several screens in one run: inside CODE `await __shot('tag')` saves `a-tag.jpg`. Menu screens are opened by clicking their buttons
+  (`go-fighter`, `go-set`, `go-quick`, …; `go` starts the quick fight). Small / touch screen: append `WxH [touch]`, e.g.
+  `bash tools/shot.sh /tmp/shots/s.jpg js "CODE" 740x360 touch` (`390x800 touch` = portrait phone, rotated stage).
   Then open the JPG with the Read tool. Software rendering: ~30 s – 3 min per shot. Compare before/after.
 
 ## Map of `src/game/`
@@ -38,9 +41,10 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 | `09_bag.js` | heavy bag training, `startFight` / modes |
 | `10_camera_layout.js` | fight / replay camera, HUD, `layout()`, resolution (`QUAL`, `applyRes`, `resTick`) |
 | `11_arena_loop.js` | ring lights, rope visuals, **main loop `frame()`** (update order) |
-| `12_ui.js` | menu build (`swatches`, `buildMenu`), keyboard/mouse (`MV_KEYS`, `ACT_KEYS`), touch stick, boot |
+| `12_ui.js` | option rows (`swatches`), fight input: keyboard/mouse (`MV_KEYS`, `ACT_KEYS`), touch stick, boot |
 | `13_locations.js` | locations: `LOCS` (`gym`, `parking`), current `LOC`, `setLocation(id)`, `locSync()`; per location: `bound`, `ring`, `wall` (soft wall for the KO ragdoll), `build()` set, `light`. Debug: `__loc.set('parking')` |
 | `14_crowd.js` | crowd around the fighting floor: `makeCrowd({ shape, r \| w,h, rows, density, look })` → `{ group, update, cheer, wall }` (one InstancedMesh, posed in the vertex shader: `crowdGeo`, `CROWD_VS`), `crowdTick(dt)`, reactions via `EVT` (defined in `07`), a location puts its crowd into `LOC.crowd`. Debug: `__crowd.cheer(1, 3)` |
+| `14_screens.js` | menu screens over the scene: `UI` state, `uiShow(scr)` (`main` / `train` / `quick` / `creator` / `settings` / `pause`), `uiKey` (arrows, Enter, Esc), `buildMenu`, fighter creator (`buildCreator`, `setCat`, `randomLook`, `renderStats`), settings (`buildSettings`, `OPT`, `resetProgress`), pause (`pauseGame`, `resumeGame`, `surrender`; `G.paused` → `frame()` runs with dt = 0), menu camera `menuCam` (orbit about P1). Markup + CSS of the screens: `src/g_head.html` |
 
 ## Conventions
 - Units: metres, seconds. Fighters stay on the world x-line; the ring (`ARENA`) rotates/slides around them.

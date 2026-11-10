@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Oswald:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 [hidden]{display:none!important}   /* the hidden attribute must beat every display rule (loading screen, menus, pad) */
 /* Layout: one landscape stage (rotated 90° on a portrait phone). Full-bleed WebGL ring, health bars across the top, dodge pad bottom-left, punch diamond bottom-right. Single dark arena look by design. */
@@ -116,8 +116,6 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .rb .pri,.go{background:linear-gradient(180deg,rgba(194,34,53,.95),rgba(130,18,32,.95));border-color:rgba(255,130,130,.4)}
 
 /* menu */
-.menu{position:absolute;inset:0;display:flex;justify-content:flex-end;align-items:stretch;padding:var(--pt) var(--pr) var(--pb) var(--pl);pointer-events:none}
-.card{pointer-events:auto;width:min(360px,48%);min-width:0;display:flex;flex-direction:column;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow-y:auto}
 .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
 h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5vmin,46px);line-height:.92;text-transform:uppercase;text-wrap:balance}
 .opt{display:flex;align-items:center;gap:10px;min-width:0}
@@ -129,14 +127,11 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .rules{margin:2px 0 0;padding:0 0 0 16px;font-size:12px;line-height:1.4;color:#cfc8ba}
 .rules b{color:var(--text);font-weight:600}
 .go{font-size:22px;padding:11px 16px}
-.modes{margin-top:auto;display:flex;flex-direction:column;gap:8px}.modes .m2{display:flex;gap:8px}.modes .m2 .go{flex:1;font-size:16px;padding:9px 10px}
 .go small{display:block;font-family:var(--mono,monospace);font-size:11px;font-weight:400;letter-spacing:.04em;text-transform:none;opacity:.8;margin-top:2px}
 .go.alt{background:var(--panel);border-color:var(--line)}
 .hurt{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 45%,rgba(150,0,10,.55) 100%);z-index:3}.hurt.on{animation:hurt .45s ease-out}@keyframes hurt{0%{opacity:1}100%{opacity:0}}
 .tabs{display:flex;gap:4px}.tabs button{flex:1;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:5px;padding:5px 4px;font-family:var(--display);font-weight:700;font-size:12px;letter-spacing:.05em;text-transform:uppercase;position:relative}
 .tabs button[aria-pressed="true"]{color:var(--text);border-color:var(--gold);background:rgba(226,177,74,.12)}.tabs i{position:absolute;top:3px;right:5px;width:7px;height:7px;border-radius:50%;background:#e2b14a;display:none}.tabs i.on{display:block}
-.tab{display:flex;flex-direction:column;gap:9px}.tab[hidden]{display:none}
-#o-nick{flex:1;min-width:0;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:5px;color:var(--text);font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.04em;padding:5px 8px;text-transform:uppercase}
 .sw button.lock{opacity:.35;position:relative}.sw button.lock::after{content:'🔒';position:absolute;inset:0;display:grid;place-items:center;font-size:11px}
 .sw button.txt{width:auto;border-radius:5px;padding:0 8px;font-size:11px;background:transparent;color:var(--text)}
 .stats{display:flex;flex-direction:column;gap:6px}.stt{display:grid;grid-template-columns:88px 1fr 28px;align-items:center;gap:8px;font-size:12px}
@@ -156,15 +151,106 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .kbar b{color:var(--text);font-weight:600}.kbar span.lit,.kbar span.lit b{color:var(--gold)}
 .gfx .sw{flex-wrap:wrap}
 
+/* ── menu screens (main menu, quick-fight setup, fighter creator, settings, pause): underground look — raw concrete, a neon sign, poster type ── */
+#stage{--poster:'Oswald','Big Shoulders Display','Arial Narrow',Impact,sans-serif;--neon:#ff3b4e;
+  --grit:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1.4 0 0 0 -.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.ui{position:absolute;inset:0;z-index:4}
+.mm{display:flex;justify-content:space-between;gap:16px;padding:var(--pt) var(--pr) var(--pb) calc(var(--pl) + 14px);background:linear-gradient(90deg,rgba(5,6,9,.95),rgba(5,6,9,.74) 30%,rgba(5,6,9,0) 62%)}
+.mm::before{content:'';position:absolute;inset:0;background:var(--grit);opacity:.5;pointer-events:none;-webkit-mask-image:linear-gradient(90deg,#000 10%,transparent 58%);mask-image:linear-gradient(90deg,#000 10%,transparent 58%)}
+.mm-l{position:relative;display:flex;flex-direction:column;justify-content:space-between;gap:8px;min-width:0;max-width:66%}
+.mm-r{position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-end;gap:6px;text-align:right;min-width:0;animation:mFade .5s .15s both}
+.logo{animation:mFade .45s both}
+.logo .eyebrow{color:var(--neon)}
+.logo h1{display:flex;flex-direction:column;gap:0 .2em;margin:4px 0 0;font-family:var(--poster);font-weight:700;font-size:clamp(40px,14.5vmin,112px);line-height:.92;letter-spacing:.01em}
+.logo h1 span{color:#ece6da;text-shadow:0 3px 0 rgba(0,0,0,.55)}
+.logo h1 b{font-weight:700;color:transparent;-webkit-text-stroke:2px var(--neon);text-shadow:0 0 16px rgba(255,59,78,.8),0 0 56px rgba(255,59,78,.4);animation:neon 6s infinite}
+.logo::after{content:'';display:block;width:min(300px,60%);height:2px;margin-top:clamp(6px,1.6vmin,14px);background:linear-gradient(90deg,#e6f8ff,rgba(230,248,255,0));box-shadow:0 0 14px rgba(190,235,255,.85)}   /* a fluorescent tube */
+@keyframes neon{0%,91%,94%,96%,100%{opacity:1}92.5%{opacity:.5}95%{opacity:.72}}
+@keyframes mFade{from{opacity:0}}
+@keyframes mIn{from{opacity:0;transform:translateX(-18px)}}
+.mnav{display:flex;flex-direction:column;align-items:flex-start;gap:clamp(0px,.7vmin,6px)}
+.mnav button{position:relative;display:flex;align-items:baseline;gap:clamp(8px,1.6vmin,14px);border:0;background:none;padding:1px 16px 1px 0;font-family:var(--poster);font-weight:700;font-size:clamp(21px,5.8vmin,44px);line-height:1.14;
+  letter-spacing:.02em;text-transform:uppercase;text-align:left;color:#b4aea2;outline:none;transition:transform .16s ease-out,color .16s;animation:mIn .34s cubic-bezier(.2,.8,.2,1) both}
+.mnav button:nth-child(2){animation-delay:.04s}.mnav button:nth-child(3){animation-delay:.08s}.mnav button:nth-child(4){animation-delay:.12s}.mnav button:nth-child(5){animation-delay:.16s}
+.mnav button b{font-weight:700;white-space:nowrap}
+.mnav button i{flex:none;width:20px;font:500 11px var(--mono);font-style:normal;letter-spacing:.08em;color:var(--muted);transition:color .16s}
+.mnav button small{font:400 clamp(10px,1.7vmin,12px) var(--mono);letter-spacing:.03em;text-transform:none;color:var(--muted);white-space:nowrap}
+.mnav button small.pt{color:var(--gold)}
+.mnav button::before{content:'';position:absolute;left:-14px;top:16%;bottom:16%;width:4px;background:var(--neon);box-shadow:0 0 12px var(--neon);transform:scaleY(0);transition:transform .16s}
+.mnav button:hover,.mnav button:focus{color:#fff;transform:translateX(10px)}
+.mnav button:hover i,.mnav button:focus i{color:var(--neon)}
+.mnav button:hover::before,.mnav button:focus::before{transform:scaleY(1)}
+.mnav button:active{transform:translateX(10px) scale(.97)}
+.mfoot{display:flex;flex-direction:column;gap:6px;animation:mFade .5s .2s both}
+.who{font-family:var(--poster);font-weight:700;font-size:clamp(16px,3.4vmin,26px);letter-spacing:.04em;text-transform:uppercase;line-height:1}
+.who small{display:block;margin-top:5px;font:400 11px var(--mono);letter-spacing:.06em;text-transform:none;color:var(--muted)}
+.khint{font:400 10.5px var(--mono);letter-spacing:.06em;color:var(--muted)}
+/* docked panel: a slab of concrete along the left edge */
+.scr{pointer-events:none}.scr > *{pointer-events:auto}
+.scr.dim{background:rgba(5,6,9,.72)}
+.panel{position:absolute;left:0;top:0;bottom:0;width:min(400px,46%);display:flex;flex-direction:column;gap:clamp(8px,1.8vmin,14px);padding:var(--pt) 18px var(--pb) var(--pl);
+  background:var(--grit),linear-gradient(180deg,#1b1d22,#0c0d11);background-blend-mode:soft-light,normal;border-right:1px solid rgba(255,59,78,.55);box-shadow:16px 0 46px -22px rgba(255,59,78,.55);animation:pSlide .28s cubic-bezier(.2,.8,.2,1)}
+.panel.wide{width:min(470px,54%)}
+@keyframes pSlide{from{opacity:0;transform:translateX(-24px)}}
+.ptitle{font-family:var(--poster);font-weight:700;font-size:clamp(22px,5.2vmin,38px);line-height:1;letter-spacing:.02em;text-transform:uppercase}
+.ptitle small{display:block;margin-bottom:4px;font:500 10.5px var(--mono);letter-spacing:.14em;color:var(--neon)}
+.pbody{flex:1;min-height:0;min-width:0;overflow-y:auto;display:flex;flex-direction:column;gap:clamp(8px,1.8vmin,13px);padding-right:2px}
+.pfoot{display:flex;gap:8px;justify-content:space-between}
+.btn{border:1px solid rgba(255,255,255,.2);border-radius:2px;background:rgba(255,255,255,.05);padding:clamp(6px,1.4vmin,10px) 18px;font-family:var(--poster);font-weight:700;font-size:clamp(14px,2.8vmin,19px);letter-spacing:.06em;text-transform:uppercase;transition:transform .12s,border-color .15s,background .15s}
+.btn:hover,.btn:focus{border-color:var(--gold);outline:none}.btn:active{transform:scale(.96)}
+.btn.pri{background:linear-gradient(180deg,#d42a3c,#8f1626);border-color:rgba(255,140,140,.5);color:#fff;box-shadow:0 0 22px -6px rgba(255,59,78,.8)}
+.btn.sm{padding:6px 12px;font-size:clamp(12px,2.2vmin,14px);background:rgba(10,12,17,.7)}
+.btn[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.fld{display:flex;flex-direction:column;gap:6px;min-width:0}
+.fld > span{font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.fld.row{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
+.note{font-size:11px;color:var(--muted);line-height:1.35}
+.ui .sw button.txt{height:28px;border-radius:2px;border:1px solid rgba(255,255,255,.18);padding:0 10px;font-size:12px;background:rgba(255,255,255,.04)}
+.ui .sw button.txt[aria-pressed="true"]{border-color:var(--gold);color:var(--gold);background:rgba(226,177,74,.12);transform:none}
+.ui .sw button.txt.warn{border-color:rgba(255,59,78,.7);color:#ff8f9a}
+.ui .sw button:focus{outline:2px solid rgba(255,255,255,.5);outline-offset:1px}
+.inp{box-sizing:border-box;width:100%;min-width:0;background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.18);border-radius:2px;color:var(--text);font-family:var(--poster);font-weight:700;font-size:18px;letter-spacing:.05em;padding:7px 10px;text-transform:uppercase;-webkit-user-select:text;user-select:text}
+.inp:focus{outline:none;border-color:var(--gold)}
+.crb{flex:1;min-height:0;display:flex;gap:14px}
+.cats{flex:none;display:flex;flex-direction:column;gap:4px;width:clamp(84px,25%,112px)}
+.cats button{position:relative;border:0;border-left:3px solid rgba(255,255,255,.14);border-radius:0;background:rgba(255,255,255,.035);padding:clamp(4px,1.3vmin,9px) 8px;text-align:left;font-family:var(--poster);font-weight:700;font-size:clamp(13px,2.6vmin,17px);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);transition:color .15s,border-color .15s}
+.cats button:hover,.cats button:focus{color:var(--text);outline:none;border-left-color:rgba(255,255,255,.5)}
+.cats button[aria-pressed="true"]{color:#fff;border-left-color:var(--neon);background:linear-gradient(90deg,rgba(255,59,78,.24),rgba(255,59,78,0))}
+.cats i{position:absolute;top:50%;right:8px;width:7px;height:7px;margin-top:-3px;border-radius:50%;background:var(--gold);display:none}.cats i.on{display:block}
+.cpane{display:flex;flex-direction:column;gap:clamp(8px,1.8vmin,13px)}
+.dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
+.views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
+.locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.locs button{display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid rgba(255,255,255,.16);border-radius:2px;background:rgba(255,255,255,.04);padding:clamp(7px,1.6vmin,11px) 12px;transition:border-color .15s,background .15s}
+.locs button b{font-family:var(--poster);font-weight:700;font-size:clamp(16px,3.2vmin,21px);letter-spacing:.04em;text-transform:uppercase}
+.locs button small{font-size:11.5px;line-height:1.3;color:var(--muted)}
+.locs button:hover,.locs button:focus{border-color:rgba(255,255,255,.5);outline:none}
+.locs button[aria-pressed="true"]{border-color:var(--gold);background:rgba(226,177,74,.1)}.locs button[aria-pressed="true"] b{color:var(--gold)}
+.tabs2{display:flex;gap:4px}.tabs2 button{flex:1;border:0;border-bottom:2px solid rgba(255,255,255,.14);background:none;padding:5px 4px;font-family:var(--poster);font-weight:700;font-size:clamp(13px,2.4vmin,15px);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tabs2 button[aria-pressed="true"]{color:#fff;border-bottom-color:var(--neon)}.tabs2 button:focus{outline:none;color:var(--text)}
+.vol{display:flex;align-items:center;gap:10px;min-width:0}.vol input{width:clamp(110px,22vmin,170px);accent-color:var(--neon)}.vol b{width:38px;text-align:right;font:500 12px var(--mono)}
+.pause{display:grid;place-items:center;background:rgba(5,6,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.pbox{display:flex;flex-direction:column;align-items:center;gap:clamp(6px,2.4vmin,20px);animation:mFade .2s both}
+.ptitle.big{font-size:clamp(44px,14vmin,104px);color:transparent;-webkit-text-stroke:2px var(--neon);text-shadow:0 0 16px rgba(255,59,78,.8),0 0 56px rgba(255,59,78,.4)}
+.mnav.c{align-items:center}.mnav.c button{flex-direction:column;align-items:center;gap:0;padding:1px 16px;animation:none}
+.mnav.c button::before{display:none}
+.mnav.c button:hover,.mnav.c button:focus{transform:none;text-shadow:0 0 18px rgba(255,59,78,.9)}
+.pz{pointer-events:auto;position:relative;display:block;margin:6px auto 0;width:36px;height:30px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+.pz::before{content:'';position:absolute;left:50%;top:50%;box-sizing:content-box;width:4px;height:12px;margin:-6px 0 0 -6px;border-left:4px solid var(--text);border-right:4px solid var(--text)}
+#stage.desk .pz{display:none}
+#stage.desk.nokeys .pad > .kbar{display:none}
+#stage:not(.desk) .khint{display:none}
+#stage.short .logo h1{flex-direction:row;font-size:40px}
+#stage.short .ladder i{font-size:9px;padding:2px 5px}
+#stage.short .panel{padding-right:12px}
+@media (prefers-reduced-motion:reduce){.mnav button,.panel,.logo,.logo h1 b,.mm-r,.mfoot,.views,.pbox{animation:none}}
+
 .loading{position:absolute;inset:0;display:grid;place-items:center;background:var(--ink)}
 .loading .box{display:flex;flex-direction:column;gap:10px;width:min(320px,70%);font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted)}
 .loading .bar{height:4px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden}
 .loading .bar span{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
 .err{color:#ff9b8a}
 #stage.short .rules,#stage.short .keys{display:none}
-#stage.short .card{gap:7px;padding:10px 14px;width:min(380px,56%)}
-#stage.short h1{font-size:30px}
-#stage.short .go{font-size:19px;padding:9px 14px}
 #stage.short .sw button:not(.txt){width:24px;height:24px}
 @media (hover:none){.db small,.pb small,.keys{display:none}}
 @media (prefers-reduced-motion:reduce){.msg.show,.popn,.rt,.hp.hit,.counter{animation-duration:.01s}}
@@ -184,7 +270,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="st"><i id="s1"></i></div>
       <div class="counter" id="cnt" hidden>КОНТРУДАР ×1.5</div>
     </div>
-    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small></div>
+    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><button class="pz" id="pause-btn" aria-label="Пауза"></button></div>
     <div class="side r">
       <div class="nm"><b id="n2">Соперник</b><span id="w2">побед 0</span><span id="st2" style="opacity:.7"></span></div>
       <div class="hp" id="hpb2"><i class="ghost" id="g2"></i><i class="fill" id="h2"></i></div>
@@ -223,48 +309,115 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
   </div>
 
-  <div class="menu" id="menu" hidden>
-    <div class="card">
-      <div><div class="eyebrow">бой до нокаута</div><h1>Нокаут-ринг</h1></div>
-      <div class="tabs" id="tabs"><button data-tab="look" aria-pressed="true">Вид</button><button data-tab="fighter">Боец<i id="pts-dot"></i></button><button data-tab="rules">Как драться</button></div>
-      <div class="tab" data-tab="look">
-      <div class="opt"><span>имя</span><input id="o-nick" maxlength="14" placeholder="Ты" autocomplete="off" spellcheck="false"></div>
-      <div class="opt"><span>шорты</span><div class="sw" id="o-shorts"></div></div>
-      <div class="opt"><span>низ</span><div class="sw" id="o-bottom"></div></div>
-      <div class="opt"><span>верх</span><div class="sw" id="o-top"></div></div>
-      <div class="opt"><span>обувь</span><div class="sw" id="o-shoes"></div></div>
-      <div class="opt"><span>бинты</span><div class="sw" id="o-wraps"></div></div>
-      <div class="opt"><span>на улице</span><div class="sw" id="o-hands"></div></div>
-      <div class="opt"><span>перчатки</span><div class="sw" id="o-gloves"></div></div>
-      <div class="opt"><span>капа</span><div class="sw" id="o-guard"></div></div>
-      <div class="opt"><span>волосы</span><div class="sw" id="o-hair"></div></div>
-      <div class="opt"><span>кожа</span><div class="sw" id="o-skin"></div></div>
-      <div class="opt"><span>борода</span><div class="sw" id="o-beard"></div></div>
-      <div class="opt"><span>соперник</span><div class="sw" id="o-diff"></div></div>
-      <div class="opt"><span>место</span><div class="sw" id="o-loc"></div></div>
-      <div class="opt gfx"><span>графика</span><div class="sw" id="o-gfx"></div></div>
+  <!-- main menu: logo, the column of modes; the scene (the fighter warming up in the current location) shows through -->
+  <div class="ui mm" id="menu" hidden>
+    <div class="mm-l">
+      <div class="logo"><div class="eyebrow">подпольные бои · голые кулаки</div><h1><span>Нокаут</span><b>ринг</b></h1></div>
+      <nav class="mnav" id="nav-main">
+        <button id="go-car"><i>01</i><b>Карьера</b><small id="car-lbl"></small></button>
+        <button id="go-quick"><i>02</i><b>Быстрый бой</b><small>место и соперник</small></button>
+        <button id="go-train"><i>03</i><b>Тренировка</b><small>груша · спарринг</small></button>
+        <button id="go-fighter"><i>04</i><b>Боец</b><small id="fighter-lbl"></small></button>
+        <button id="go-set"><i>05</i><b>Настройки</b></button>
+      </nav>
+      <nav class="mnav" id="nav-train" hidden>
+        <button id="go-bag"><i>01</i><b>Груша</b><small id="bag-lbl"></small></button>
+        <button id="go-spar"><i>02</i><b>Спарринг</b><small>шлем и перчатки · зал</small></button>
+        <button id="train-back"><i>←</i><b>Назад</b></button>
+      </nav>
+      <div class="mfoot"><div class="ladder" id="ladder"></div><div class="rec-line" id="rec-line"></div></div>
+    </div>
+    <div class="mm-r"><div class="who" id="who"></div><div class="khint">↑ ↓ выбор · Enter · Esc назад</div></div>
+  </div>
+
+  <!-- before a quick fight: the opponent and the place -->
+  <div class="ui scr" id="quick" hidden>
+    <div class="panel">
+      <div class="ptitle"><small>быстрый бой</small>Выбор места</div>
+      <div class="pbody">
+        <div class="fld"><span>место</span><div class="locs" id="o-loc"></div></div>
+        <div class="fld"><span>соперник</span><div class="sw" id="o-diff"></div></div>
       </div>
-      <div class="tab" data-tab="fighter" hidden>
-      <div class="rec-line" id="rec-line"></div>
-      <div class="stats" id="o-stats"></div>
-      <div class="opt"><span>коронный</span><div class="sw" id="o-sig"></div></div>
-      <div class="hint">Очки за победы в карьере (+2, пояс +3), в быстром бою (+1) и за грушу (400+ очков: +1, 800+: ещё +1). Бинты открываются победами в карьере.</div>
+      <div class="pfoot"><button class="btn" id="quick-back">Назад</button><button class="btn pri" id="go">В бой</button></div>
+    </div>
+  </div>
+
+  <!-- fighter creator: categories on the left, the man himself large on the right (drag = turn, wheel / pinch = zoom) -->
+  <div class="ui scr" id="creator" hidden>
+    <div class="dragl" id="cr-drag"></div>
+    <div class="panel wide">
+      <div class="ptitle"><small>боец</small>Создание бойца</div>
+      <div class="crb">
+        <div class="cats" id="cats"><button data-cat="name">Имя</button><button data-cat="body">Тело</button><button data-cat="face">Лицо</button><button data-cat="wear">Одежда</button><button data-cat="hands">Руки</button><button data-cat="style">Стиль<i id="pts-dot"></i></button></div>
+        <div class="pbody">
+          <div class="cpane" data-cat="name">
+            <div class="fld"><span>имя</span><input class="inp" id="o-name" maxlength="16" placeholder="Боец" autocomplete="off" spellcheck="false"></div>
+            <div class="fld"><span>прозвище (в бою над полосой здоровья)</span><input class="inp" id="o-nick" maxlength="14" placeholder="Ты" autocomplete="off" spellcheck="false"></div>
+            <div class="rec-line" id="rec-line2"></div>
+          </div>
+          <div class="cpane" data-cat="body" hidden>
+            <div class="fld"><span>тон кожи</span><div class="sw" id="o-skin"></div></div>
+          </div>
+          <div class="cpane" data-cat="face" hidden>
+            <div class="fld"><span>волосы</span><div class="sw" id="o-hair"></div></div>
+            <div class="fld"><span>борода</span><div class="sw" id="o-beard"></div></div>
+          </div>
+          <div class="cpane" data-cat="wear" hidden>
+            <div class="fld"><span>верх</span><div class="sw" id="o-top"></div></div>
+            <div class="fld"><span>низ</span><div class="sw" id="o-bottom"></div></div>
+            <div class="fld"><span>цвет шорт</span><div class="sw" id="o-shorts"></div></div>
+            <div class="fld"><span>обувь</span><div class="sw" id="o-shoes"></div></div>
+          </div>
+          <div class="cpane" data-cat="hands" hidden>
+            <div class="fld"><span>бинты</span><div class="sw" id="o-wraps"></div><small class="note">цвета открываются победами в карьере</small></div>
+            <div class="fld"><span>на улице</span><div class="sw" id="o-hands"></div></div>
+            <div class="fld"><span>перчатки и шлем (спарринг)</span><div class="sw" id="o-gloves"></div></div>
+            <div class="fld"><span>капа</span><div class="sw" id="o-guard"></div></div>
+          </div>
+          <div class="cpane" data-cat="style" hidden>
+            <div class="fld"><span>коронный удар (+12 % урона)</span><div class="sw" id="o-sig"></div></div>
+            <div class="stats" id="o-stats"></div>
+            <div class="hint">Очки за победы в карьере (+2, пояс +3), в быстром бою (+1) и за грушу (400+ очков: +1, 800+: ещё +1).</div>
+          </div>
+        </div>
       </div>
-      <div class="tab" data-tab="rules" hidden>
-      <ul class="rules">
-        <li><b>Слип</b> уходит от прямых и апперкотов, хук и оверхенд его ловят.</li>
-        <li><b>Нырок</b> уходит от прямых и хуков, апперкот его ловит.</li>
-        <li><b>Отклон</b> уходит почти от всего, но кросс и оверхенд достают.</li>
-        <li><b>Блок</b> держи: снимает большую часть урона, апперкот и корпус проходят. Держи блок и тяни в сторону, будет уклон туда.</li>
-        <li>Удары встают в очередь до трёх. После удачного уклона удар ×1.5.</li>
-      </ul>
-      <div class="keys">WASD / стрелки ходьба · ЛКМ или J джеб · ПКМ или K кросс · U I хуки · M , апперкоты · O или колесо оверхенд · Shift + удар в корпус · F сильный · Q E слипы · C нырок · X отклон · пробел блок</div>
+      <div class="pfoot"><button class="btn" id="cr-rand">Случайно</button><button class="btn pri" id="cr-done">Готово</button></div>
+    </div>
+    <div class="views"><span class="khint" id="cr-hint">тяни — вращать · колесо — зум</span><button class="btn sm" id="v-face">Лицо</button><button class="btn sm" id="v-full">Полный рост</button></div>
+  </div>
+
+  <!-- settings (from the menu and from the pause) -->
+  <div class="ui scr" id="settings" hidden>
+    <div class="panel wide">
+      <div class="ptitle"><small>игра</small>Настройки</div>
+      <div class="tabs2" id="set-tabs"><button data-t="opt" aria-pressed="true">Параметры</button><button data-t="how">Как драться</button></div>
+      <div class="pbody" data-t="opt">
+        <div class="fld"><span>графика</span><div class="sw" id="o-gfx"></div><small class="note" id="gfx-note"></small></div>
+        <div class="fld row"><span>громкость</span><div class="vol"><input type="range" id="o-vol" min="0" max="100" step="5" aria-label="Громкость"><b id="vol-v"></b></div></div>
+        <div class="fld row"><span>тряска камеры</span><div class="sw" id="o-shake"></div></div>
+        <div class="fld row"><span>подсказка клавиш в бою</span><div class="sw" id="o-keys"></div></div>
+        <div class="fld row"><span>счётчик кадров (F3)</span><div class="sw" id="o-fps"></div></div>
+        <div class="fld row" id="reset-row"><span>сброс прогресса</span><div class="sw" id="o-reset"></div></div>
       </div>
-      <div class="ladder" id="ladder"></div>
-      <div class="modes">
-        <button class="go" id="go-car">Карьера<small id="car-lbl"></small></button>
-        <div class="m2"><button class="go alt" id="go">Быстрый бой</button><button class="go alt" id="go-spar">Спарринг<small>шлем, перчатки</small></button><button class="go alt" id="go-bag">Груша<small id="bag-lbl"></small></button></div>
+      <div class="pbody" data-t="how" hidden>
+        <ul class="rules">
+          <li><b>Слип</b> уходит от прямых и апперкотов, хук и оверхенд его ловят.</li>
+          <li><b>Нырок</b> уходит от прямых и хуков, апперкот его ловит.</li>
+          <li><b>Отклон</b> уходит почти от всего, но кросс и оверхенд достают.</li>
+          <li><b>Блок</b> держи: снимает большую часть урона, апперкот и корпус проходят. Держи блок и тяни в сторону, будет уклон туда.</li>
+          <li>Удары встают в очередь до трёх. После удачного уклона удар ×1.5.</li>
+        </ul>
+        <div class="keys">WASD / стрелки ходьба · ЛКМ или J джеб · ПКМ или K кросс · U I хуки · M , апперкоты · O или колесо оверхенд · Shift + удар в корпус · F сильный · Q E слипы · C нырок · X отклон · пробел блок · Esc пауза</div>
       </div>
+      <div class="pfoot"><button class="btn pri" id="set-back">Назад</button></div>
+    </div>
+  </div>
+
+  <!-- pause: the simulation stands still -->
+  <div class="ui pause" id="pause" hidden>
+    <div class="pbox">
+      <div class="ptitle big">Пауза</div>
+      <nav class="mnav c"><button id="p-resume"><b>Продолжить</b></button><button id="p-set"><b>Настройки</b></button><button id="p-quit"><b id="p-quit-l">Сдаться</b><small>выход в меню</small></button></nav>
     </div>
   </div>
 
@@ -4101,18 +4254,19 @@ const FX = (() => {
 
 /* ───────── sound (synthesised) ───────── */
 const sfx = (() => {
-  let ac = null, noise = null, crowdG = null;
-  const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; noise = b; } if (ac.state === 'suspended') ac.resume(); return ac; };
+  let ac = null, noise = null, master = null, crowdG = null;   // master: everything goes through one gain — the volume of the settings screen (OPT.vol)
+  const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } master = ac.createGain(); master.gain.value = OPT.vol; master.connect(ac.destination); const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; noise = b; } if (ac.state === 'suspended') ac.resume(); return ac; };
   const env = (g, t, a, d, peak) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
   return {
     unlock() { ctx(); },
+    vol(v) { if (master) master.gain.value = v; },
     thud(p, body) { const a = ac; if (!a) return; const t = a.currentTime;
-      { const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 0.9; f.frequency.value = body ? 1700 : 2600; env(g, t, 0.002, 0.035, 0.22 + 0.2 * p); n.connect(f).connect(g).connect(a.destination); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // skin slap
-      const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'lowpass'; f.frequency.setValueAtTime(1400 + 900 * p, t); f.frequency.exponentialRampToValueAtTime(180, t + 0.12); env(g, t, 0.004, 0.13, 0.5 + 0.4 * p); n.connect(f).connect(g).connect(a.destination); n.start(t); n.stop(t + 0.2);
-      const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16); env(g2, t, 0.004, 0.18, 0.5 + 0.4 * p); o.connect(g2).connect(a.destination); o.start(t); o.stop(t + 0.25); },
-    whoosh() { const a = ac; if (!a) return; const t = a.currentTime, n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(2200, t + 0.14); env(g, t, 0.03, 0.14, 0.16); n.connect(f).connect(g).connect(a.destination); n.start(t); n.stop(t + 0.25); },
-    bell(count) { const a = ac; if (!a) return; for (let k = 0; k < count; k++) { const t = a.currentTime + k * 0.3; for (const [fq, pk] of [[640, 0.22], [1287, 0.12], [1932, 0.07], [2580, 0.04]]) { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = fq; env(g, t, 0.003, 1.3, pk); o.connect(g).connect(a.destination); o.start(t); o.stop(t + 1.5); } } },
-    count(n) { const a = ac; if (!a) return; const t = a.currentTime; for (const [fq, pk, d] of [[180, 0.5, 0.09], [1200, 0.08, 0.03]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(fq, t); o.frequency.exponentialRampToValueAtTime(fq * 0.6, t + d); env(g, t, 0.002, d, pk); o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + 0.05); } },
+      { const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 0.9; f.frequency.value = body ? 1700 : 2600; env(g, t, 0.002, 0.035, 0.22 + 0.2 * p); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // skin slap
+      const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'lowpass'; f.frequency.setValueAtTime(1400 + 900 * p, t); f.frequency.exponentialRampToValueAtTime(180, t + 0.12); env(g, t, 0.004, 0.13, 0.5 + 0.4 * p); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.2);
+      const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16); env(g2, t, 0.004, 0.18, 0.5 + 0.4 * p); o.connect(g2).connect(master); o.start(t); o.stop(t + 0.25); },
+    whoosh() { const a = ac; if (!a) return; const t = a.currentTime, n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(2200, t + 0.14); env(g, t, 0.03, 0.14, 0.16); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.25); },
+    bell(count) { const a = ac; if (!a) return; for (let k = 0; k < count; k++) { const t = a.currentTime + k * 0.3; for (const [fq, pk] of [[640, 0.22], [1287, 0.12], [1932, 0.07], [2580, 0.04]]) { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = fq; env(g, t, 0.003, 1.3, pk); o.connect(g).connect(master); o.start(t); o.stop(t + 1.5); } } },
+    count(n) { const a = ac; if (!a) return; const t = a.currentTime; for (const [fq, pk, d] of [[180, 0.5, 0.09], [1200, 0.08, 0.03]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(fq, t); o.frequency.exponentialRampToValueAtTime(fq * 0.6, t + d); env(g, t, 0.002, d, pk); o.connect(g).connect(master); o.start(t); o.stop(t + d + 0.05); } },
     /* the crowd. crowd(level): a looped murmur (noise through three voice-band filters, its loudness wandering like many people
        talking) whose level follows the reaction, 0 = nobody there. roar(p): the shout on a big shot — a swell of noise and a few voices */
     crowd(level) { const a = ac; if (!a) return;
@@ -4121,16 +4275,16 @@ const sfx = (() => {
         src.buffer = noise; src.loop = true;
         for (const [fq, q, k] of [[330, 0.7, 1], [760, 1.1, 0.75], [1500, 1.4, 0.3]]) { const f = a.createBiquadFilter(), g = a.createGain(); f.type = 'bandpass'; f.frequency.value = fq; f.Q.value = q; g.gain.value = k; src.connect(f).connect(g).connect(crowdG); }
         lf.buffer = noise; lf.loop = true; lf.playbackRate.value = 0.0004; lp.type = 'lowpass'; lp.frequency.value = 5; dep.gain.value = 0.45; am.gain.value = 0.7;
-        lf.connect(lp).connect(dep).connect(am.gain); crowdG.connect(am).connect(a.destination); src.start(); lf.start(); }
+        lf.connect(lp).connect(dep).connect(am.gain); crowdG.connect(am).connect(master); src.start(); lf.start(); }
       crowdG.gain.setTargetAtTime(0.2 * level, a.currentTime, 0.35); },
     roar(p) { const a = ac; if (!a) return; const t = a.currentTime, d = 0.7 + 1.8 * p;
       const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; n.loop = true; f.type = 'bandpass'; f.Q.value = 0.8;
       f.frequency.setValueAtTime(600, t); f.frequency.linearRampToValueAtTime(1100 + 500 * p, t + 0.25); f.frequency.linearRampToValueAtTime(800, t + d);
-      env(g, t, 0.15, d, 0.12 + 0.3 * p); n.connect(f).connect(g).connect(a.destination); n.start(t, rr() * 0.5); n.stop(t + d + 0.3);
+      env(g, t, 0.15, d, 0.12 + 0.3 * p); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + d + 0.3);
       for (let i = 0, nv = 2 + (p * 5 | 0); i < nv; i++) { const o = a.createOscillator(), bf = a.createBiquadFilter(), og = a.createGain(), t0 = t + rr() * 0.35, f0 = 190 + rr() * 260, len = 0.25 + rr() * 0.5;
         o.type = 'sawtooth'; o.frequency.setValueAtTime(f0, t0); o.frequency.linearRampToValueAtTime(f0 * (1.25 + rr() * 0.4), t0 + len * 0.35); o.frequency.linearRampToValueAtTime(f0 * 0.85, t0 + len);
-        bf.type = 'bandpass'; bf.frequency.value = 700 + rr() * 700; bf.Q.value = 2; env(og, t0, 0.05, len, 0.02 + 0.03 * p); o.connect(bf).connect(og).connect(a.destination); o.start(t0); o.stop(t0 + len + 0.1); } },
-    fall() { const a = ac; if (!a) return; const t = a.currentTime, o = a.createOscillator(), g = a.createGain(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.3); env(g, t, 0.005, 0.35, 0.7); o.connect(g).connect(a.destination); o.start(t); o.stop(t + 0.4); },
+        bf.type = 'bandpass'; bf.frequency.value = 700 + rr() * 700; bf.Q.value = 2; env(og, t0, 0.05, len, 0.02 + 0.03 * p); o.connect(bf).connect(og).connect(master); o.start(t0); o.stop(t0 + len + 0.1); } },
+    fall() { const a = ac; if (!a) return; const t = a.currentTime, o = a.createOscillator(), g = a.createGain(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.3); env(g, t, 0.005, 0.35, 0.7); o.connect(g).connect(master); o.start(t); o.stop(t + 0.4); },
   };
 })();
 
@@ -4146,14 +4300,17 @@ const EVT = { subs: [], on(f) { this.subs.push(f); }, emit(type, e) { for (const
 const LOOK = { shorts: 'red', hair: 'brown', skin: 'light', beard: false, bottom: 'shorts', top: 'none', shoes: 'none', guard: 'clear' };
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { Object.assign(LOOK, s.look || {}); G.diff = DIFFS[s.diff] ? s.diff : 'normal'; G.wins = s.wins | 0; G.losses = s.losses | 0; } } catch (e) {}
 G.mode = 'quick'; G.career = 0; G.bagBest = 0; G.userDiff = G.diff; G.loc = 'gym';
-const PROF = { nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0 };
-try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
-const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc })); } catch (e) {} };
+const OPT = { vol: 1, shake: true, keys: true };   // settings screen: master volume 0..1, camera shake, the key hint bar in a fight
+const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0 };
+try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
+const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc, opt: OPT })); } catch (e) {} };
 const careerWins = () => G.career + PROF.champ * LADDER.length;   // wraps unlock by career wins ever
-/* career: a ladder of eight men, each tougher than the last — beat one to get the next; the last one holds the belt */
+/* career: a ladder of eight men, each tougher than the last — beat one to get the next; the last one holds the belt.
+   loc: the career sets the place — it starts in the underground parking and moves up to the ring in the hall */
 const LADDER = [
-  { nm: 'Лом', st: 'brawler', diff: 'easy' }, { nm: 'Кабан', st: 'brawler', diff: 'easy' }, { nm: 'Грек', st: 'counter', diff: 'normal' }, { nm: 'Шрам', st: 'pressure', diff: 'normal' },
-  { nm: 'Молот', st: 'brawler', diff: 'normal' }, { nm: 'Седой', st: 'counter', diff: 'hard' }, { nm: 'Бизон', st: 'pressure', diff: 'hard' }, { nm: 'Кувалда', st: 'brawler', diff: 'hard', champ: true }];
+  { nm: 'Лом', st: 'brawler', diff: 'easy', loc: 'parking' }, { nm: 'Кабан', st: 'brawler', diff: 'easy', loc: 'parking' }, { nm: 'Грек', st: 'counter', diff: 'normal', loc: 'parking' }, { nm: 'Шрам', st: 'pressure', diff: 'normal', loc: 'parking' },
+  { nm: 'Молот', st: 'brawler', diff: 'normal', loc: 'gym' }, { nm: 'Седой', st: 'counter', diff: 'hard', loc: 'gym' }, { nm: 'Бизон', st: 'pressure', diff: 'hard', loc: 'gym' }, { nm: 'Кувалда', st: 'brawler', diff: 'hard', loc: 'gym', champ: true }];
+const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1)].loc; return LOCS[id] ? id : G.loc; };
 function fightOver(win, draw) {
   fightTable();
   if (draw) return; if (win) G.wins++; else G.losses++;
@@ -4526,10 +4683,11 @@ function playerInput() {
 function show(id, on) { $(id).hidden = !on; }
 function toMenu() {
   if (G.mode === 'career') G.diff = G.userDiff; BAG.on = false; showP2(true); BAG.g.visible = false; updateMenu(); for (const F of [P1, P2]) F.sparGear(false);
-  G.state = 'menu'; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0;
+  G.state = 'menu'; G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0;
   P1.resetState(); P2.resetState(); rollOpponent();
-  show('menu', true); show('hud', false); show('pad', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false);
+  UI.from = null; uiShow('main'); show('hud', false); show('pad', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false);
   camCut = true; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; setLocation(G.loc);
+  showP2(false);   // the menu shows the player's man alone (startFight brings the opponent back)
 }
 const NAMES = ['Грек', 'Молот', 'Кабан', 'Шрам', 'Лом', 'Бизон', 'Кувалда', 'Седой'];
 function rollOpponent() {
@@ -4596,14 +4754,16 @@ function bagEnd() {
 function updateMenu() {
   renderStats();
   const el = $('ladder'); if (el) el.innerHTML = LADDER.map((L, i) => `<i class="${i < G.career ? 'done' : i === G.career ? 'next' : ''}">${L.nm}${L.champ ? ' ★' : ''}</i>`).join('');
-  const c = $('car-lbl'); if (c) c.textContent = G.career >= LADDER.length ? 'ты чемпион — пройти заново' : `бой ${G.career + 1}/${LADDER.length}: ${LADDER[G.career].nm} · ${DIFFS[LADDER[G.career].diff].label.toLowerCase()}`;
+  const c = $('car-lbl'); if (c) c.textContent = G.career >= LADDER.length ? 'ты чемпион — пройти заново' : `бой ${G.career + 1}/${LADDER.length} · ${LADDER[G.career].nm} · ${LOCS[careerLoc()].label.toLowerCase()}`;
+  const f = $('fighter-lbl'); f.textContent = PROF.pts > 0 ? `свободных очков: ${PROF.pts}` : 'внешность · стиль'; f.classList.toggle('pt', PROF.pts > 0);
+  $('who').innerHTML = `${esc(PROF.name || 'Боец')}${PROF.nick ? ` «${esc(PROF.nick)}»` : ''}<small>побед ${G.wins} · поражений ${G.losses}${PROF.champ ? ' · чемпион ×' + PROF.champ : ''}</small>`;
   const b = $('bag-lbl'); if (b) b.textContent = G.bagBest ? 'рекорд ' + G.bagBest : '45 секунд';
 }
 /* the post-fight sheet (CompuBox style): punches thrown / landed, accuracy, power shots, knockdowns, damage */
 function fightTable() {
   const a = P1.fs, b = P2.fs; if (!a || !b) return;
   const acc = f => f.thr ? Math.round(100 * f.land / f.thr) + '%' : '—', row = (x, l, y, hi) => `<tr><td class="${hi && x > y ? 'w' : ''}">${x}</td><td>${l}</td><td class="${hi && y > x ? 'w' : ''}">${y}</td></tr>`;
-  $('r-stats').innerHTML = `<tr><td>${esc(PROF.nick || 'Ты')}</td><td></td><td>${esc($('n2').textContent)}</td></tr>` + row(a.land + '/' + a.thr, 'попал / выбросил', b.land + '/' + b.thr) + row(acc(a), 'точность', acc(b)) +
+  $('r-stats').innerHTML = `<tr><td>${esc(myName())}</td><td></td><td>${esc($('n2').textContent)}</td></tr>` + row(a.land + '/' + a.thr, 'попал / выбросил', b.land + '/' + b.thr) + row(acc(a), 'точность', acc(b)) +
     row(a.pow, 'силовых', b.pow, 1) + row(a.kd, 'нокдаунов', b.kd, 1) + row(Math.round(a.dmg / DMG_K), 'урон', Math.round(b.dmg / DMG_K), 1);
 }
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -4621,17 +4781,18 @@ function startFight(fromMode) {
   for (const F of [P1, P2]) F.sparGear(G.mode === 'spar');
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
   { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none' }) }); }
-  setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'gym' : G.loc);   // sparring and the heavy bag are always in the gym
+  setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'gym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the gym; a career fight is where the ladder says
+  G.paused = false; UI.from = null; uiShow(null);
   BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; }
   sfx.unlock();
   P1.stat = PROF.stats; P1.sig = PROF.sig; P2.stat = lvlStats(G.mode === 'career' ? Math.min(5, Math.floor(G.career * 0.7)) : ({ easy: 0, normal: 1, hard: 2 })[G.diff] || 0); P2.sig = SIGS[(rr() * SIGS.length) | 0].id;
-  $('n1').textContent = PROF.nick || 'Ты';
+  $('n1').textContent = myName();
   P1.resetState(); P2.resetState(); P2.speed = DIFFS[G.diff].speed * (1 + 0.035 * SK(P2, 'spd')); P1.speed = 1.5 * (1 + 0.035 * SK(P1, 'spd'));
   FX.clearAir(); REC.frames.length = 0; REC.events.length = 0; Q.length = 0; AI.blockUntil = 0; AI.t = 1.0 + rr(); AI.combo = 0; AI.dodgeAt = 0;
   G.state = 'intro'; G.introT = 0; G.slow = 1; G.slowT = 0; G.hitstop = 0; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; AI.lat = 0; AI.latT = 0;
   // BKFC: five two-minute rounds; between rounds the corner works on him (stamina, the cuts, ice on the eye); no knockout → the judges
   G.round = 1; G.roundT = ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0]; G.cutWarn = false;
-  show('menu', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', true); show('pad', false);
+  show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', true); show('pad', false);
   $('diffl').textContent = DIFFS[G.diff].label.toUpperCase(); $('w1').textContent = 'побед ' + G.wins; $('w2').textContent = 'побед ' + G.losses;
   msg('Готовься');
 }
@@ -4701,7 +4862,7 @@ function camUpdate(dt) {
   // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
   if (window.__camHold) { const h = window.__camHold; camera.position.set(h.p[0], h.p[1], h.p[2]); camera.lookAt(h.l[0], h.l[1], h.l[2]); camP.copy(camera.position); camL.set(h.l[0], h.l[1], h.l[2]); return; }
   const far = VW / VH < 1.45 ? 5.0 : 4.5;
-  if (G.state === 'menu') { const x = P1.group.position.x; _cp.set(x + 1.15 + 0.12 * Math.sin(camClock * 0.5), 1.28, 2.25); _cl.set(x + 0.42, 1.0, 0); k = 3; }
+  if (G.state === 'menu') { menuCam(dt, _cp, _cl); k = 1e3; }   // already eased inside menuCam (orbit about P1, 14_screens.js): taken as is
   else if (G.state === 'replay') {
     const s = RP.segs[RP.seg], h = G.loser.headNow, side = Math.sign(G.loser.group.position.x) || 1;
     const p = clamp((RP.tau - s.from) / Math.max(0.01, s.to - s.from), 0, 1), c = G.loser.jp[0], w = G.winner.headNow;
@@ -4724,7 +4885,8 @@ function camUpdate(dt) {
     _cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), z); _cl.set(mx + drift * 0.3, 0.93, 0); k = G.state === 'intro' ? 2.4 : 3.5; }
   if (camCut) { camP.copy(_cp); camL.copy(_cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * k); camP.lerp(_cp, a); camL.lerp(_cl, a); }
-  camera.position.copy(camP); if (G.shake > 0.0005) { camera.position.x += (rr() - 0.5) * G.shake; camera.position.y += (rr() - 0.5) * G.shake; G.shake *= Math.exp(-dt * 9); }
+  camera.position.copy(camP); if (!OPT.shake) G.shake = 0;   // settings: camera shake off
+  if (G.shake > 0.0005 && dt > 0) { camera.position.x += (rr() - 0.5) * G.shake; camera.position.y += (rr() - 0.5) * G.shake; G.shake *= Math.exp(-dt * 9); }
   camera.lookAt(camL);
 }
 const HUD_BARS = ['h1', 'g1', 'h2', 'g2', 's1', 's2'].map(id => ({ el: $(id), v: -1 }));   // the DOM is touched only when a bar really changes
@@ -4869,7 +5031,7 @@ let last = performance.now();
 for (const k of ['step', 'hitStep']) { const fn = Ragdoll.prototype[k]; Ragdoll.prototype[k] = function (dt) { const t = performance.now(), r = fn.call(this, dt); PERF.rag += performance.now() - t; return r; }; }
 function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
 function frame(now) {
-  const rawDt = (now - last) / 1000, dtReal = Math.min(0.05, rawDt); last = now; G.real += dtReal;
+  const rawDt = (now - last) / 1000, dtReal = G.paused ? 0 : Math.min(0.05, rawDt); last = now; G.real += dtReal;   // pause: everything below runs with dt = 0 (as in a hit-stop frame)
   const pm = PERF.m; let tp = performance.now(), tq; PERF.rag = 0;   // CPU split for the F3 overlay
   let simDt = 0;
   if (G.state === 'replay') simDt = stepReplay(dtReal);
@@ -4877,7 +5039,8 @@ function frame(now) {
     if (G.slowT > 0) { G.slowT -= dtReal; if (G.slowT <= 0) G.slow = 1; }
     let dt = dtReal * G.slow; if (G.hitstop > 0) { G.hitstop -= dtReal; dt = 0; }
     G.t += dt; simDt = dt;
-    if (G.state === 'fight') { playerInput(); ai(dt); }
+    if (G.paused) {}
+    else if (G.state === 'fight') { playerInput(); ai(dt); }
     else if (G.state === 'ko' || G.state === 'kd') { if (followOK(P1)) playerInput(); aiFollow(); }
     P1.aimTarget = aimFor(P1, P2); P2.aimTarget = aimFor(P2, P1);
     P1.update(dt); P2.update(dt);
@@ -4902,48 +5065,21 @@ function frame(now) {
 }
 
 /* ───────── UI wiring ───────── */
-function swatches(id, list, get, set, txt) {
+/* a row of choices: colour dots (items with .c) or text chips (txt). A look choice is put on P1 at once; noLook = not part of the look */
+function swatches(id, list, get, set, txt, noLook) {
   const box = $(id); box.textContent = '';
   for (const it of list) {
     const b = document.createElement('button'); b.type = 'button';
     if (txt || !it.c) { b.className = 'txt'; b.textContent = it.label; } else { b.style.setProperty('--c', it.sw || it.c); b.setAttribute('aria-label', it.label || it.id); }
     b.setAttribute('aria-pressed', String(get() === it.id));
-    b.addEventListener('click', () => { set(it.id); for (const o of box.children) o.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-pressed', 'true'); P1.applyLook(LOOK); save(); });
+    b.addEventListener('click', () => { set(it.id); for (const o of box.children) o.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-pressed', 'true');
+      if (!noLook) { P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar); } save(); });
     box.appendChild(b);
   }
 }
-function buildMenu() {
-  swatches('o-shorts', SHORTS_LOOKS.map(s => ({ id: s.id, c: s.main, label: s.id })), () => LOOK.shorts, v => { LOOK.shorts = v; });
-  swatches('o-hair', HAIR_LOOKS.map(h => h.id === 'bald' ? { id: 'bald', label: 'под ноль' } : { id: h.id, c: h.c, label: h.id }), () => LOOK.hair, v => { LOOK.hair = v; });
-  swatches('o-skin', SKIN_LOOKS.map(s => ({ id: s.id, c: s.c, sw: s.id === 'light' ? '#e2b79f' : s.id === 'tan' ? '#b98563' : '#6f4630', label: s.id })), () => LOOK.skin, v => { LOOK.skin = v; });
-  swatches('o-beard', [{ id: 'no', label: 'нет' }, { id: 'yes', label: 'есть' }], () => LOOK.beard ? 'yes' : 'no', v => { LOOK.beard = v === 'yes'; }, true);
-  swatches('o-diff', Object.entries(DIFFS).map(([id, d]) => ({ id, label: d.label })), () => G.diff, v => { G.diff = v; }, true);
-  swatches('o-bottom', BOTTOMS.map(b => ({ id: b.id, label: b.label })), () => LOOK.bottom || 'shorts', v => { LOOK.bottom = v; }, true);
-  swatches('o-top', TOPS.map(b => ({ id: b.id, label: b.label })), () => LOOK.top || 'none', v => { LOOK.top = v; }, true);
-  swatches('o-shoes', SHOES.map(b => ({ id: b.id, label: b.label })), () => LOOK.shoes || 'none', v => { LOOK.shoes = v; }, true);
-  swatches('o-guard', GUARDS.map(b => ({ id: b.id, c: b.c, label: b.label })), () => LOOK.guard || 'clear', v => { LOOK.guard = v; });
-  swatches('o-wraps', WRAPS_LOOKS.map(w => ({ id: w.id, c: w.c, label: w.label, need: w.need })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; });
-  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { LOOK.hands = v; }, true);   // street fights: wraps or 4 oz MMA gloves
-  swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; });   // colour of the sparring (and MMA) gloves and the headgear
-  swatches('o-gfx', ['auto', ...GFX_ORDER].map(id => ({ id, label: GFX_LABEL[id] })), () => GFX.set, setGfx, true);
-  swatches('o-loc', Object.values(LOCS).map(L => ({ id: L.id, label: L.label })), () => G.loc, v => { G.loc = v; setLocation(v); }, true);
-  swatches('o-sig', [{ id: 'none', label: 'нет' }, ...SIGS], () => PROF.sig || 'none', v => { PROF.sig = v === 'none' ? null : v; }, true);
-  const nk = $('o-nick'); nk.value = PROF.nick; nk.oninput = () => { PROF.nick = nk.value.replace(/[<>]/g, '').slice(0, 14); save(); };
-  nk.onkeydown = e => e.stopPropagation();
-  for (const b of document.querySelectorAll('#tabs button')) b.onclick = () => { for (const o of document.querySelectorAll('#tabs button')) o.setAttribute('aria-pressed', String(o === b)); for (const t of document.querySelectorAll('.tab')) t.hidden = t.dataset.tab !== b.dataset.tab; };
-  renderStats();
-}
-function renderStats() {
-  const box = $('o-stats'); if (!box) return;
-  box.innerHTML = `<div class="rec-line">очки бойца: <b>${PROF.pts}</b></div>` + STATS.map(S => `<div class="stt"><b>${S.label}<small>${S.d}</small></b><div class="pips">${[0, 1, 2, 3, 4].map(i => `<i class="${i < PROF.stats[S.id] ? 'on' : ''}"></i>`).join('')}</div><button data-st="${S.id}" ${PROF.pts > 0 && PROF.stats[S.id] < 5 ? '' : 'disabled'}>+</button></div>`).join('');
-  for (const b of box.querySelectorAll('[data-st]')) b.onclick = () => { if (PROF.pts <= 0 || PROF.stats[b.dataset.st] >= 5) return; PROF.pts--; PROF.stats[b.dataset.st]++; save(); renderStats(); sfx.thud && sfx.thud(0.3, true); };
-  const rl = $('rec-line'); if (rl) rl.innerHTML = `побед <b>${G.wins}</b> · поражений <b>${G.losses}</b> · карьера <b>${Math.min(G.career, LADDER.length)}/${LADDER.length}</b>${PROF.champ ? ` · пояс ×<b>${PROF.champ}</b>` : ''} · груша <b>${G.bagBest}</b>`;
-  const dot = $('pts-dot'); if (dot) dot.classList.toggle('on', PROF.pts > 0);
-  // locked wraps
-  for (const b of document.querySelectorAll('#o-wraps button')) { const w = WRAPS_LOOKS.find(x => x.label === b.getAttribute('aria-label')); const lock = w && careerWins() < w.need; b.classList.toggle('lock', !!lock); b.disabled = !!lock; b.title = lock ? `откроется после ${w.need} побед в карьере` : ''; }
-}
+/* (the menu screens themselves — buildMenu, creator, settings, pause — are in 14_screens.js) */
 let bodyMod = false;
-const press = (type, name, el, shift) => { if (G.state === 'kd' && G.kd && G.kd.def === P1 && type === 'punch') { G.kd.mash = Math.min(G.kd.mash + 0.3, 6); if (el) { el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 110); } return; } if (G.state !== 'fight' && !(type === 'punch' && followOK(P1))) return; if (type === 'dodge') Q.length = 0; if (Q.length < 3) Q.push({ type, name, at: G.real, body: !!shift || bodyMod, pow: powMod }); if (type === 'punch' && bodyMod) { bodyMod = false; const b = $('body-btn'); b && b.classList.remove('lit'); } if (type === 'punch' && powMod) setPow(false); if (el) { el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 110); } };
+const press = (type, name, el, shift) => { if (G.paused) return; if (G.state === 'kd' && G.kd && G.kd.def === P1 && type === 'punch') { G.kd.mash = Math.min(G.kd.mash + 0.3, 6); if (el) { el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 110); } return; } if (G.state !== 'fight' && !(type === 'punch' && followOK(P1))) return; if (type === 'dodge') Q.length = 0; if (Q.length < 3) Q.push({ type, name, at: G.real, body: !!shift || bodyMod, pow: powMod }); if (type === 'punch' && bodyMod) { bodyMod = false; const b = $('body-btn'); b && b.classList.remove('lit'); } if (type === 'punch' && powMod) setPow(false); if (el) { el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 110); } };
 document.querySelectorAll('[data-punch]').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); press('punch', b.dataset.punch, b); }));
 const setBlock = v => { if (P1) P1.blocking = v && G.state === 'fight'; const b = $('block-btn'); b && b.classList.toggle('on', !!v); };
 // block: hold the button (or space)
@@ -4990,6 +5126,7 @@ window.addEventListener('keyup', e => {
 window.addEventListener('blur', () => { HELD.clear(); mvKeys(); setBlock(false); kbLit('kb-blk', false); kbLit('kb-body', false); });
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (uiKey(e)) return;   // menu screens / pause: arrows, Enter, Esc
   const live = G.state === 'fight' || G.state === 'ko' || G.state === 'kd';
   if (e.code === 'Space' && G.state === 'fight') { e.preventDefault(); if (!e.repeat) { setBlock(true); kbLit('kb-blk', true); } return; }
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { if (live) kbLit('kb-body', true); return; }
@@ -5001,13 +5138,12 @@ window.addEventListener('keydown', e => {
 });
 // mouse punches anywhere on the ring (not on menus / buttons)
 stage.addEventListener('pointerdown', e => {
-  if (e.pointerType !== 'mouse' || !(G.state === 'fight' || G.state === 'ko' || G.state === 'kd')) return;
-  if (e.target.closest && e.target.closest('button,input,.card,.result,.rec')) return;
+  if (e.pointerType !== 'mouse' || G.paused || !(G.state === 'fight' || G.state === 'ko' || G.state === 'kd')) return;
+  if (e.target.closest && e.target.closest('button,input,.ui,.result,.rec')) return;
   const n = e.button === 0 ? 'jab' : e.button === 2 ? 'cross' : e.button === 1 ? 'over' : null; if (!n) return;
   e.preventDefault(); press('punch', n, document.querySelector(`[data-punch="${n}"]`), e.shiftKey);
 });
 stage.addEventListener('contextmenu', e => { if (G.state !== 'menu') e.preventDefault(); });
-$('go').addEventListener('click', startQuick); $('go-car').addEventListener('click', () => { if (G.career >= LADDER.length) G.career = 0; startCareer(); }); $('go-bag').addEventListener('click', startBag); $('go-spar').addEventListener('click', startSpar);
 $('r-again').addEventListener('click', startFight);
 $('r-menu').addEventListener('click', toMenu);
 $('r-replay').addEventListener('click', startReplay);
@@ -5546,4 +5682,174 @@ EVT.on((type, e) => {
   else if (type === 'up') { c.cheer(0.5, e.pos, 0.4); sfx.roar(0.35); }
   else if (type === 'round') { c.cheer(0.4, null, 0.5); sfx.roar(0.3); }
 });
+/* ───────── menu screens: main menu, quick-fight setup (place + opponent), fighter creator, settings, pause ─────────
+   UI.scr is the screen on top: 'main' | 'train' | 'quick' | 'creator' | 'settings' | 'pause' | null (the fight / result).
+   All of them except the pause (and the settings opened from it) live in G.state === 'menu'; the pause sets G.paused, frame() then
+   runs with dt = 0. The menu camera (menuCam) orbits P1: the creator turns it by dragging, the other screens just frame him. */
+const UI = { scr: null, from: null, cat: 'name', spar: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };
+const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', settings: 'settings', pause: 'pause' };
+const VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
+const myName = () => PROF.nick || PROF.name || 'Ты';
+function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [...root.querySelectorAll('button:not([disabled]),input')].filter(b => b.offsetParent !== null) : []; }
+function uiShow(scr, focusId) {
+  UI.scr = scr; const on = scr ? UI_IDS[scr] : null;
+  for (const id of ['menu', 'quick', 'creator', 'settings', 'pause']) $(id).hidden = id !== on;
+  if (on === 'menu') { $('nav-main').hidden = scr !== 'main'; $('nav-train').hidden = scr !== 'train'; }
+  if (scr === 'settings') { const p = UI.from === 'pause'; $('settings').classList.toggle('dim', p); $('reset-row').hidden = p; buildSettings(); setTab('opt'); }
+  if (scr === 'pause') $('p-quit-l').textContent = BAG.on ? 'Выйти' : 'Сдаться';
+  if (scr !== 'creator' && UI.spar) { UI.spar = false; if (G.state === 'menu') P1.sparGear(false); }   // the glove preview of the creator
+  const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur();
+  if (!TOUCH && scr && scr !== 'creator') { const b = (focusId && $(focusId)) || (scr === 'main' || scr === 'train' || scr === 'pause' ? uiItems()[0] : null); b && b.focus({ preventScroll: true }); }
+}
+function uiBack() {
+  if (UI.scr === 'settings' && UI.from === 'pause') return uiShow('pause', 'p-set');
+  if (UI.scr === 'main' || G.state !== 'menu') return;
+  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', settings: 'go-set' }[UI.scr];
+  updateMenu(); uiShow('main', back);
+}
+/* keys of the screens; true = the key is taken (12_ui.js then leaves it alone). Esc: back / pause / skip the replay / leave the result */
+function uiKey(e) {
+  const t = e.target, txt = t && t.tagName === 'INPUT' && t.type !== 'range';
+  if (txt) { if (e.key === 'Escape' || e.key === 'Enter') t.blur(); return true; }
+  if (e.key === 'Escape') {
+    e.preventDefault(); if (e.repeat) return true;
+    if (G.paused) { if (UI.scr === 'settings') uiBack(); else resumeGame(); }
+    else if (G.state === 'menu') uiBack();
+    else if (canPause()) pauseGame();
+    else if (G.state === 'replay') endReplay();
+    else if (G.state === 'result') toMenu();
+    return true;
+  }
+  if (!UI.scr) return false;
+  const rng = t && t.type === 'range', k = e.key, step = k === 'ArrowDown' || (!rng && k === 'ArrowRight') ? 1 : k === 'ArrowUp' || (!rng && k === 'ArrowLeft') ? -1 : 0;
+  if (step) { e.preventDefault(); const L = uiItems(), i = L.indexOf(document.activeElement), n = L[i < 0 ? (step > 0 ? 0 : L.length - 1) : (i + step + L.length) % L.length]; n && n.focus(); }
+  return true;   // Enter / Space act on the focused button by themselves
+}
+/* pause */
+const canPause = () => !G.paused && ['intro', 'fight', 'break', 'kd', 'ko'].includes(G.state);
+function pauseGame() { if (!canPause()) return; G.paused = true; HELD.clear(); mvKeys(); setBlock(false); Q.length = 0; UI.from = 'pause'; uiShow('pause'); }
+function resumeGame() { G.paused = false; UI.from = null; uiShow(null); last = performance.now(); }
+function surrender() { if (!BAG.on && G.state !== 'ko') { G.losses++; save(); } toMenu(); }   // giving up a live fight is a loss (after the knockout the result is already counted)
+
+/* the menu camera: an orbit about P1 (yaw 0 = the fight camera's side, +z; π/2 = straight in front of him), eased here, so camUpdate
+   takes it as is. sh shifts him off the screen centre (fraction of the half-width) to clear the panel on the left */
+const MCAM = { yaw: 0.5, d: 4, tx: 0, ty: 1, tz: 0, sh: 0.36, h: 0.1, init: false };
+function menuCam(dt, cp, cl) {
+  const x = P1.group.position.x, th = Math.tan(camera.fov * Math.PI / 360), asp = VW / VH, dFull = 1.13 / th, hd = P1.headNow, T = { tx: x, tz: 0 };
+  if (UI.scr === 'creator') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1; }
+  else if (UI.scr === 'quick') { T.yaw = 0.2; T.d = dFull * 1.18; T.ty = 1.02; T.sh = 0.4; T.h = 0.32; }
+  else { T.yaw = 0.52 + 0.05 * Math.sin(camClock * 0.4); T.d = dFull * 0.84; T.ty = 1.05; T.sh = UI.scr === 'settings' ? 0.5 : 0.38; T.h = 0.12; }
+  const M = MCAM, a = camCut || !M.init ? 1 : 1 - Math.exp(-dt * (UI.drag ? 16 : 4.2)); M.init = true;
+  for (const k in T) M[k] += (T[k] - M[k]) * a;
+  const s = M.sh * M.d * th * asp, c = Math.cos(M.yaw), sn = Math.sin(M.yaw);
+  cl.set(M.tx - c * s, M.ty, M.tz + sn * s); cp.set(cl.x + sn * M.d, M.ty + M.h, cl.z + c * M.d);
+}
+function setView(v) { const o = UI.orb, tau = 2 * Math.PI; o.yaw = v.yaw + tau * Math.round((o.yaw - v.yaw) / tau); o.zoom = v.zoom; }   // the short way round
+
+/* fighter creator */
+function setCat(c) {
+  UI.cat = c;
+  for (const b of $('cats').children) b.setAttribute('aria-pressed', String(b.dataset.cat === c));
+  for (const p of document.querySelectorAll('.cpane')) p.hidden = p.dataset.cat !== c;
+  if (UI.scr === 'creator') setView(c === 'face' ? VIEW_FACE : c === 'hands' ? VIEW_HANDS : VIEW_FULL);
+  if (c !== 'hands' && UI.spar) { UI.spar = false; P1.sparGear(false); }
+}
+function buildCreator() {
+  const col = (list, f) => list.map(f), spar = v => () => { UI.spar = v; };
+  swatches('o-skin', col(SKIN_LOOKS, s => ({ id: s.id, c: s.c, sw: s.id === 'light' ? '#e2b79f' : s.id === 'tan' ? '#b98563' : '#6f4630', label: s.id })), () => LOOK.skin, v => { LOOK.skin = v; });
+  swatches('o-hair', col(HAIR_LOOKS, h => h.id === 'bald' ? { id: 'bald', label: 'под ноль' } : { id: h.id, c: h.c, label: h.id }), () => LOOK.hair, v => { LOOK.hair = v; });
+  swatches('o-beard', [{ id: 'no', label: 'нет' }, { id: 'yes', label: 'есть' }], () => LOOK.beard ? 'yes' : 'no', v => { LOOK.beard = v === 'yes'; }, true);
+  swatches('o-top', col(TOPS, b => ({ id: b.id, label: b.label })), () => LOOK.top || 'none', v => { LOOK.top = v; }, true);
+  swatches('o-bottom', col(BOTTOMS, b => ({ id: b.id, label: b.label })), () => LOOK.bottom || 'shorts', v => { LOOK.bottom = v; }, true);
+  swatches('o-shorts', col(SHORTS_LOOKS, s => ({ id: s.id, c: s.main, label: s.id })), () => LOOK.shorts, v => { LOOK.shorts = v; });
+  swatches('o-shoes', col(SHOES, b => ({ id: b.id, label: b.label })), () => LOOK.shoes || 'none', v => { LOOK.shoes = v; }, true);
+  swatches('o-wraps', col(WRAPS_LOOKS, w => ({ id: w.id, c: w.c, label: w.label })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; spar(false)(); });
+  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { LOOK.hands = v; spar(false)(); }, true);   // street fights: wraps or 4 oz MMA gloves
+  swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; spar(true)(); });   // sparring (and MMA) gloves + headgear: shown on him while choosing
+  swatches('o-guard', col(GUARDS, b => ({ id: b.id, c: b.c, label: b.label })), () => LOOK.guard || 'clear', v => { LOOK.guard = v; });
+  swatches('o-sig', [{ id: 'none', label: 'нет' }, ...SIGS], () => PROF.sig || 'none', v => { PROF.sig = v === 'none' ? null : v; }, true, true);
+  for (const [id, key, n] of [['o-name', 'name', 16], ['o-nick', 'nick', 14]]) { const el = $(id); el.value = PROF[key] || ''; el.oninput = () => { PROF[key] = el.value.replace(/[<>]/g, '').slice(0, n); save(); }; }
+  renderStats();
+}
+function randomLook() {
+  const pick = a => a[(Math.random() * a.length) | 0], cw = careerWins();
+  Object.assign(LOOK, { shorts: pick(SHORTS_LOOKS).id, hair: pick(HAIR_LOOKS).id, skin: pick(SKIN_LOOKS).id, beard: Math.random() < 0.5, bottom: pick(BOTTOMS).id, top: pick(TOPS).id, shoes: pick(SHOES).id,
+    guard: pick(GUARDS).id, wraps: pick(WRAPS_LOOKS.filter(w => cw >= w.need)).id, hands: pick(HANDS).id, gloves: pick(GLOVES).id });
+  P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar); save(); buildCreator();
+}
+function renderStats() {
+  const box = $('o-stats');
+  box.innerHTML = `<div class="rec-line">свободных очков: <b>${PROF.pts}</b></div>` + STATS.map(S => `<div class="stt"><b>${S.label}<small>${S.d}</small></b><div class="pips">${[0, 1, 2, 3, 4].map(i => `<i class="${i < PROF.stats[S.id] ? 'on' : ''}"></i>`).join('')}</div><button data-st="${S.id}" aria-label="${S.label} +1" ${PROF.pts > 0 && PROF.stats[S.id] < 5 ? '' : 'disabled'}>+</button></div>`).join('');
+  for (const b of box.querySelectorAll('[data-st]')) b.onclick = () => { const id = b.dataset.st; if (PROF.pts <= 0 || PROF.stats[id] >= 5) return; PROF.pts--; PROF.stats[id]++; save(); renderStats(); sfx.thud(0.3, true); const n = box.querySelector(`[data-st="${id}"]:not([disabled])`); n && n.focus(); };
+  const rec = `побед <b>${G.wins}</b> · поражений <b>${G.losses}</b> · карьера <b>${Math.min(G.career, LADDER.length)}/${LADDER.length}</b>${PROF.champ ? ` · пояс ×<b>${PROF.champ}</b>` : ''} · груша <b>${G.bagBest}</b>`;
+  $('rec-line').innerHTML = rec; $('rec-line2').innerHTML = rec;
+  $('pts-dot').classList.toggle('on', PROF.pts > 0);
+  // wraps colours are unlocked by career wins
+  for (const b of $('o-wraps').children) { const w = WRAPS_LOOKS.find(x => x.label === b.getAttribute('aria-label')), lock = !!w && careerWins() < w.need; b.classList.toggle('lock', lock); b.disabled = lock; b.title = lock ? `откроется после ${w.need} побед в карьере` : ''; }
+}
+
+/* settings */
+const ONOFF = [{ id: 'on', label: 'вкл' }, { id: 'off', label: 'выкл' }];
+function applyOpt() { stage.classList.toggle('nokeys', !OPT.keys); sfx.vol(OPT.vol); }
+function setTab(t) { for (const b of $('set-tabs').children) b.setAttribute('aria-pressed', String(b.dataset.t === t)); for (const p of document.querySelectorAll('#settings .pbody')) p.hidden = p.dataset.t !== t; }
+function gfxNote() { $('gfx-note').textContent = `сейчас: ${GFX_LABEL[GFX.level]}, ${GFX.h}p${GFX.set === 'auto' ? ' — авто подстраивает уровень под частоту кадров' : ''}`; }
+function buildSettings() {
+  swatches('o-gfx', ['auto', ...GFX_ORDER].map(id => ({ id, label: GFX_LABEL[id] })), () => GFX.set, v => { setGfx(v); gfxNote(); }, true, true); gfxNote();
+  swatches('o-shake', ONOFF, () => OPT.shake ? 'on' : 'off', v => { OPT.shake = v === 'on'; }, true, true);
+  swatches('o-keys', ONOFF, () => OPT.keys ? 'on' : 'off', v => { OPT.keys = v === 'on'; applyOpt(); }, true, true);
+  swatches('o-fps', ONOFF, () => PERF.on ? 'on' : 'off', v => perfToggle(v === 'on'), true, true);
+  const vol = $('o-vol'), vv = $('vol-v'); vol.value = Math.round(OPT.vol * 100); vv.textContent = vol.value + '%';
+  vol.oninput = () => { OPT.vol = clamp(vol.value / 100, 0, 1); vv.textContent = vol.value + '%'; applyOpt(); save(); };
+  vol.onchange = () => { sfx.unlock(); sfx.vol(OPT.vol); sfx.thud(0.5, false); };   // a punch at the new level
+  resetAsk(false);
+}
+function resetAsk(sure) {   // wiping the progress takes a second, explicit press
+  const box = $('o-reset'); box.textContent = '';
+  const btn = (label, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'txt ' + cls; b.textContent = label; b.onclick = fn; box.appendChild(b); return b; };
+  if (!sure) return btn('сбросить…', '', () => resetAsk(true).focus());
+  const no = btn('отмена', '', () => resetAsk(false).focus()); btn('да, стереть всё', 'warn', () => { resetProgress(); resetAsk(false).focus(); }); return no;
+}
+function resetProgress() {   // record, career, belt, points and stats; the name and the look stay (minus wraps that are locked again)
+  G.wins = G.losses = G.career = G.bagBest = 0; Object.assign(PROF, { sig: null, pts: 1, champ: 0 }); for (const k in PROF.stats) PROF.stats[k] = 0;
+  const w = WRAPS_LOOKS.find(x => x.id === (LOOK.wraps || 'white')); if (w && w.need > 0) { LOOK.wraps = 'white'; P1.applyLook(LOOK); }
+  save(); buildCreator(); updateMenu(); msg('Прогресс сброшен', 'tip');
+}
+
+/* quick-fight setup: the place (cards) and the opponent's level; a career fight takes its place from the ladder */
+function buildQuick() {
+  swatches('o-diff', Object.entries(DIFFS).map(([id, d]) => ({ id, label: d.label })), () => G.diff, v => { G.diff = v; G.userDiff = v; }, true, true);
+  const box = $('o-loc'); box.textContent = '';
+  for (const L of Object.values(LOCS)) {
+    const b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${L.desc || ''}</small>`; b.setAttribute('aria-pressed', String(G.loc === L.id));
+    b.onclick = () => { G.loc = L.id; setLocation(L.id); save(); for (const o of box.children) o.setAttribute('aria-pressed', String(o === b)); };
+    box.appendChild(b);
+  }
+}
+
+function buildMenu() {
+  buildCreator(); buildSettings(); buildQuick(); applyOpt(); setCat(UI.cat);
+  const on = (id, fn) => $(id).addEventListener('click', fn);
+  on('go-car', () => { if (G.career >= LADDER.length) G.career = 0; startCareer(); });
+  on('go-quick', () => { buildQuick(); uiShow('quick', 'go'); });
+  on('go', startQuick); on('quick-back', uiBack);
+  on('go-train', () => uiShow('train')); on('train-back', uiBack); on('go-bag', startBag); on('go-spar', startSpar);
+  on('go-fighter', () => { buildCreator(); uiShow('creator'); setCat(UI.cat); });
+  on('cr-done', uiBack); on('cr-rand', randomLook); on('v-face', () => setView(VIEW_FACE)); on('v-full', () => setView(VIEW_FULL));
+  for (const b of $('cats').children) b.addEventListener('click', () => setCat(b.dataset.cat));
+  on('go-set', () => { UI.from = 'menu'; uiShow('settings'); }); on('set-back', uiBack);
+  for (const b of $('set-tabs').children) b.addEventListener('click', () => setTab(b.dataset.t));
+  on('p-resume', resumeGame); on('p-set', () => uiShow('settings')); on('p-quit', surrender); on('pause-btn', pauseGame);
+  if (TOUCH) $('cr-hint').textContent = 'тяни — вращать · щипок — зум';
+  // the creator: drag turns him (the camera orbits), wheel / pinch zooms between the face and the full figure
+  const el = $('cr-drag'), pts = new Map(); let pinch = 0;
+  el.addEventListener('pointerdown', e => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (_) {} pts.set(e.pointerId, [e.clientX, e.clientY]); pinch = 0; UI.drag = pts.size; });
+  el.addEventListener('pointermove', e => {
+    const p = pts.get(e.pointerId), o = UI.orb; if (!p) return;
+    if (pts.size === 1) o.yaw -= (stage.classList.contains('rot') ? e.clientY - p[1] : e.clientX - p[0]) * 0.009;
+    p[0] = e.clientX; p[1] = e.clientY;
+    if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) o.zoom = clamp(o.zoom - (d - pinch) / 240, 0, 1); pinch = d; }
+  });
+  for (const ev of ['pointerup', 'pointercancel']) el.addEventListener(ev, e => { pts.delete(e.pointerId); pinch = 0; UI.drag = pts.size; });
+  el.addEventListener('wheel', e => { e.preventDefault(); UI.orb.zoom = clamp(UI.orb.zoom + Math.sign(e.deltaY) * 0.14, 0, 1); }, { passive: false });
+}
 </script>
