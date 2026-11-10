@@ -170,7 +170,9 @@ class Ragdoll {
     const plane = (pw, nw) => w.planes.push({ p: pw.clone().applyMatrix4(inv), n: nw.clone().transformDirection(inv) });
     plane(new V3(0, 0, 0), new V3(0, 1, 0)); w.planes[0].k = (window.__tw || {}).ck || CANVAS.k;
     // the ropes: tensioned elastic lines between the corner posts (they give, catch and throw the body back), not walls
-    if (!(window.__tw || {}).noRope) w.ropes = ROPES.map(R => ({ src: R, a: R.a.clone().applyMatrix4(inv), b: R.b.clone().applyMatrix4(inv), n: 0, nPrev: 1, best: 0, s: 0.5, dv: new V3() }));
+    // no ring (a street location): no ropes — the soft round wall of the location instead (XWorld.solve), in this world's frame
+    if (!LOC.ring) { if (LOC.wall) { const toL = new M4().copy(ARENA.matrixWorld).invert().multiply(g.matrixWorld), toM = toL.clone().invert(); w.wall = { W: LOC.wall, toL, toM, c: new V3().applyMatrix4(toM), n: 0, nPrev: 1 }; } }
+    else if (!(window.__tw || {}).noRope) w.ropes = ROPES.map(R => ({ src: R, a: R.a.clone().applyMatrix4(inv), b: R.b.clone().applyMatrix4(inv), n: 0, nPrev: 1, best: 0, s: 0.5, dv: new V3() }));
     this.obstPts = [16, 15, 0]; w.obst = [0.16, 0.11, 0.14].map(r => ({ c: new V3(), r })); this.obst = null;
     for (const d of defs) {
       const org = F.mpos(d.bone, new V3()), q = F.mquat(d.bone, new Quat());

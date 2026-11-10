@@ -7,7 +7,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeVertices, mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import * as CANNON from 'cannon-es';
 window.__boot = true;   // the boot watchdog in the page head checks this
@@ -35,7 +35,7 @@ scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
 const camera = new THREE.PerspectiveCamera(28, 1, 0.05, 40);
 
-scene.add(new THREE.HemisphereLight('#8ea3cc', '#1b1510', 0.42));
+const hemi = new THREE.HemisphereLight('#8ea3cc', '#1b1510', 0.42); scene.add(hemi);
 const key = new THREE.SpotLight('#fff0dc', 52, 14, 0.55, 0.6, 1.7);
 key.position.set(0.6, 4.6, 3.0); key.target.position.set(0, 0.9, 0);
 key.castShadow = true; key.shadow.mapSize.set(lowEnd ? 1024 : 2048, lowEnd ? 1024 : 2048);

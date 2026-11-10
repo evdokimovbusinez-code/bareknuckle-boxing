@@ -1,19 +1,11 @@
-/* ───────── arena light: a ring is lit from a rig straight above it (a big soft top light), the canvas throws a little cool light
-   back up under the chin and the brows; the hall around is dark with a few far lamps that give the background depth */
-{
-  const top = new THREE.SpotLight('#fff6ea', 26, 11, 0.95, 0.9, 1.6); top.position.set(0, 6.2, 0.4); top.target.position.set(0, 0.6, 0); ARENA.add(top, top.target);
-  const bounce = new THREE.DirectionalLight('#6f86c2', 0.32); bounce.position.set(0.2, -1, 0.8); scene.add(bounce);
-  const lampG = new THREE.SphereGeometry(0.035, 6, 4), N = 46, lamps = new THREE.InstancedMesh(lampG, new THREE.MeshBasicMaterial({ color: '#ffe2b0', fog: false }), N), m4 = new M4();
-  for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2 + rr() * 0.1, r = 10 + rr() * 5, y = 1.7 + rr() * 2.9;
-    m4.makeScale(1, 1, 1).setPosition(Math.cos(a) * r, y, Math.sin(a) * r - 2); lamps.setMatrixAt(i, m4); lamps.setColorAt(i, new THREE.Color().setHSL(0.09 + rr() * 0.05, 0.6, 0.35 + rr() * 0.4)); }
-  ARENA.add(lamps);
-}
+/* (the ring's own light rig — top spot, canvas bounce, far hall lamps — lives in LOCS.gym, src/game/13_locations.js) */
 
 /* ───────── rope visuals: while a body is in the rope the drawn line follows the contact (a V from post to post through the
    deepest point); once it is free it rings out as a damped string (~2.5 Hz, a few visible swings) */
 /* the ring frame: keep the ropes' world ends current, hide the side(s) between the camera and the fighters */
 function arenaSync() {
   ARENA.updateMatrixWorld(true); const cam = camera.position;
+  locSync();
   for (const R of ROPES) {
     R.a.copy(R.aL).applyMatrix4(ARENA.matrixWorld); R.b.copy(R.bL).applyMatrix4(ARENA.matrixWorld);
     const nW = _v1.copy(R.n).transformDirection(ARENA.matrixWorld), mid = _v2.addVectors(R.a, R.b).multiplyScalar(0.5);
@@ -22,8 +14,10 @@ function arenaSync() {
 }
 // where a world point is in the ring (ring frame, metres)
 const ringPt = (p, out = new V3()) => out.copy(p).applyMatrix4(_m4a.copy(ARENA.matrixWorld).invert());
-const _m4a = new M4(), RING_IN = 2.2;
-const inRing = (p, m = 0) => { const l = ringPt(p, _v6); return Math.abs(l.x) < RING_IN - m && Math.abs(l.z) < RING_IN - m; };
+const _m4a = new M4();
+// how far a ring-frame point is inside the boundary of the current location (metres; < 0 = outside): the ropes of the square ring or the bale circle
+const edgeDist = l => { const b = LOC.bound; return b.kind === 'circle' ? b.r - Math.hypot(l.x, l.z) : b.half - Math.max(Math.abs(l.x), Math.abs(l.z)); };
+const inRing = (p, m = 0) => edgeDist(ringPt(p, _v6)) > m;
 /* circling: F moves sideways by s metres (s > 0 = away from the camera) around the other man — done by turning the ring frame
    about him the opposite way, so both stay on the world x line facing each other */
 function circleStep(F, s) {
