@@ -8,8 +8,8 @@ set -e
 cd "$(dirname "$0")/.."
 mkdir -p "$(dirname "$1")"
 python3 src/assemble.py >/dev/null
-[ -d node_modules/three ] || npm i --no-save --silent three@0.160.0 cannon-es@0.20.0 >/dev/null
 [ -e node_modules ] || { [ -d /home/claude/cc/node_modules ] && ln -s /home/claude/cc/node_modules node_modules; }
+[ -d node_modules/three ] || npm i --no-save --silent three@0.160.0 cannon-es@0.20.0 >/dev/null
 # one server per checkout (worktrees run side by side): the port comes from this directory's path
 PORT=${SHOT_PORT:-$((8700 + $(pwd | cksum | cut -d' ' -f1) % 200))}
 curl -sf -o /dev/null http://localhost:$PORT/gtest.html || { (python3 -m http.server $PORT >/dev/null 2>&1 &); sleep 1; }
