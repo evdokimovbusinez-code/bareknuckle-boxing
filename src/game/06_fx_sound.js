@@ -7,11 +7,11 @@ const MIST = (() => {
   const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uScale: { value: 900 } },
     vertexShader: 'attribute float aS; attribute float aA; varying float vA; uniform float uScale; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = min( aS * uScale / -mv.z, 14.0 ); vA = aA; gl_Position = projectionMatrix * mv; }',
     fragmentShader: 'varying float vA; void main(){ vec2 c = gl_PointCoord - 0.5; float d = dot(c,c); if (d > 0.25) discard; float a = vA * smoothstep(0.25, 0.05, d); gl_FragColor = vec4(0.36, 0.015, 0.02, a); }' });
-  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts);
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.matrixAutoUpdate = false; pts.visible = false; scene.add(pts);   // drawn only while droplets are in the air
   for (let i = 0; i < N; i++) al[i] = 0;
   return {
     burst(p, dir, power, amt) {
-      const n = (amt * (60 + 140 * power)) | 0;
+      const n = (amt * (60 + 140 * power) * GFX.particles) | 0; if (n > 0) pts.visible = true;
       for (let k = 0; k < n; k++) { const i = head++ % N, j = 3 * i, sp = (1.2 + rr() * 4.5) * (0.6 + 0.6 * power), side = 1.4 * rr();
         pos[j] = p.x + (rr() - 0.5) * 0.03; pos[j + 1] = p.y + (rr() - 0.5) * 0.03; pos[j + 2] = p.z + (rr() - 0.5) * 0.03;
         vel[j] = dir.x * sp + (rr() - 0.5) * side * sp; vel[j + 1] = dir.y * sp + (rr() - 0.35) * side * sp; vel[j + 2] = dir.z * sp + (rr() - 0.5) * side * sp;
@@ -25,47 +25,49 @@ const MIST = (() => {
         pos[j] += vel[j] * dt; pos[j + 1] += vel[j + 1] * dt; pos[j + 2] += vel[j + 2] * dt; lf[i] -= dt; al[i] = Math.min(al[i], lf[i] * 1.6); sz[i] *= 1 + dt * 0.8;
         if (pos[j + 1] < 0.01) lf[i] = 0; }
       if (any) { geo.attributes.position.needsUpdate = true; geo.attributes.aS.needsUpdate = true; geo.attributes.aA.needsUpdate = true; }
+      pts.visible = any;
     },
-    clear() { for (let i = 0; i < N; i++) { lf[i] = 0; al[i] = 0; } geo.attributes.aA.needsUpdate = true; },
+    clear() { for (let i = 0; i < N; i++) { lf[i] = 0; al[i] = 0; } geo.attributes.aA.needsUpdate = true; pts.visible = false; },
   };
 })();
 
 /* ───────── blood, sweat, floor stains ───────── */
 const FX = (() => {
   const N = 380, mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 5), new THREE.MeshStandardMaterial({ roughness: 0.18 }), N);
-  mesh.frustumCulled = false; mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.castShadow = false; scene.add(mesh);
+  mesh.frustumCulled = false; mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.castShadow = false; mesh.matrixAutoUpdate = false; mesh.visible = false; scene.add(mesh);   // hidden while no drop is alive (it was a draw call of 380 empty instances in every pass)
   const P = new Float32Array(N * 3), Vl = new Float32Array(N * 3), life = new Float32Array(N), size = new Float32Array(N), kind = new Uint8Array(N); let head = 0;
   const cB = new THREE.Color('#7d0710'), cS = new THREE.Color('#7f8a99'), m = new M4(), zero = new M4().makeScale(0, 0, 0);
   for (let i = 0; i < N; i++) { mesh.setMatrixAt(i, zero); mesh.setColorAt(i, cB); }
   const DN = 240, dgeo = new THREE.CircleGeometry(1, 14).rotateX(-Math.PI / 2);
   const dmesh = new THREE.InstancedMesh(dgeo, new THREE.MeshStandardMaterial({ color: '#4d0408', roughness: 0.42, envMapIntensity: 0.4, transparent: true, opacity: 0.88, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }), DN);
-  dmesh.frustumCulled = false; dmesh.receiveShadow = true; ARENA.add(dmesh); let dh = 0;
+  dmesh.frustumCulled = false; dmesh.receiveShadow = true; dmesh.matrixAutoUpdate = false; dmesh.visible = false; ARENA.add(dmesh); let dh = 0, live = 0;
   for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero);
   const q = new Quat(), s3 = new V3(), p3 = new V3(), up = new V3(0, 1, 0);
   function decal(x, z, r) {
     p3.set(x, 0, z); ARENA.worldToLocal(p3); if (Math.abs(p3.x) > 2.75 || Math.abs(p3.z) > 2.75) return;
     q.setFromAxisAngle(up, rr() * 6.28); s3.set(r * (2.2 + rr() * 3), 1, r * (1.6 + rr() * 2.4)); p3.y = 0.003 + (dh % DN) * 2e-5;
-    dmesh.setMatrixAt(dh % DN, m.compose(p3, q, s3)); dh++; dmesh.instanceMatrix.needsUpdate = true;
+    dmesh.setMatrixAt(dh % DN, m.compose(p3, q, s3)); dh++; dmesh.instanceMatrix.needsUpdate = true; dmesh.visible = true;
   }
   function emit(pos, dir, sp, spread, k, sz, jit = 0.05) {
     const i = head++ % N, j = 3 * i;
     P[j] = pos.x + (rr() - 0.5) * jit; P[j + 1] = pos.y + (rr() - 0.5) * jit; P[j + 2] = pos.z + (rr() - 0.5) * jit;
     Vl[j] = dir.x * sp + (rr() - 0.5) * spread; Vl[j + 1] = dir.y * sp + (rr() - 0.2) * spread; Vl[j + 2] = dir.z * sp + (rr() - 0.5) * spread;
-    life[i] = 1.2 + rr(); size[i] = sz; kind[i] = k; mesh.setColorAt(i, k ? cB : cS); mesh.instanceColor.needsUpdate = true;
+    life[i] = 1.2 + rr(); size[i] = sz; kind[i] = k; mesh.setColorAt(i, k ? cB : cS); mesh.instanceColor.needsUpdate = true; live = 1;
   }
   return {
     // sweat flicked off the skin at the point of contact
-    spawn(pos, dir, power) { const ns = (6 + power * 12) | 0; for (let i = 0; i < ns; i++) emit(pos, dir, 0.8 + rr() * 2.6 * (0.5 + power), 1.4, 0, 0.0012 + rr() * 0.0018, 0.012); },
+    spawn(pos, dir, power) { const ns = ((6 + power * 12) * GFX.particles) | 0; for (let i = 0; i < ns; i++) emit(pos, dir, 0.8 + rr() * 2.6 * (0.5 + power), 1.4, 0, 0.0012 + rr() * 0.0018, 0.012); },
     // blood mist: a punch on a bleeding face atomises the blood film — a cloud of fine droplets thrown along the punch and
     // sideways off the skin (the red haze in fight photos), plus a few heavy drops
-    mist(pos, dir, power, amt) { MIST.burst(pos, dir, power, amt); const nd = (amt * (4 + power * 10)) | 0; for (let i = 0; i < nd; i++) emit(pos, _xm.copy(dir).add(_xm2.set(rr() - 0.5, rr() * 0.6, rr() - 0.5)).normalize(), 1.5 + rr() * 3.5 * power, 1.2, 1, 0.002 + rr() * 0.004, 0.02); },
+    mist(pos, dir, power, amt) { MIST.burst(pos, dir, power, amt); const nd = (amt * (4 + power * 10) * GFX.particles) | 0; for (let i = 0; i < nd; i++) emit(pos, _xm.copy(dir).add(_xm2.set(rr() - 0.5, rr() * 0.6, rr() - 0.5)).normalize(), 1.5 + rr() * 3.5 * power, 1.2, 1, 0.002 + rr() * 0.004, 0.02); },
     // one drop of blood leaving a wound
     drop(pos, vel, spread, sz) {
       const i = head++ % N, j = 3 * i; P[j] = pos.x; P[j + 1] = pos.y; P[j + 2] = pos.z;
       Vl[j] = vel.x + (rr() - 0.5) * spread; Vl[j + 1] = vel.y + (rr() - 0.3) * spread; Vl[j + 2] = vel.z + (rr() - 0.5) * spread;
-      life[i] = 2.5; size[i] = sz; kind[i] = 1; mesh.setColorAt(i, cB); mesh.instanceColor.needsUpdate = true;
+      life[i] = 2.5; size[i] = sz; kind[i] = 1; mesh.setColorAt(i, cB); mesh.instanceColor.needsUpdate = true; live = 1;
     },
     update(dt) {
+      if (!live) return; live = 0;   // nothing in the air: no loop, no buffer upload, no draw call
       for (let i = 0; i < N; i++) {
         if (life[i] <= 0) continue; const j = 3 * i;
         if (dt > 0) { Vl[j + 1] -= 9.81 * dt; const d = 1 - 0.8 * dt; Vl[j] *= d; Vl[j + 2] *= d; P[j] += Vl[j] * dt; P[j + 1] += Vl[j + 1] * dt; P[j + 2] += Vl[j + 2] * dt; life[i] -= dt; }
@@ -73,12 +75,12 @@ const FX = (() => {
         // drops are drawn stretched along their motion (what the eye sees of a fast droplet), round once they slow down
         const s = size[i] * 0.5, vx = Vl[j], vy = Vl[j + 1], vz = Vl[j + 2], sp = Math.hypot(vx, vy, vz), k = Math.min(1 + sp * 0.006 / s, 7);
         if (sp > 1e-3) q.setFromUnitVectors(up, s3.set(vx / sp, vy / sp, vz / sp)); else q.identity();
-        mesh.setMatrixAt(i, m.compose(p3.set(P[j], P[j + 1], P[j + 2]), q, s3.set(s, s * k, s)));
+        mesh.setMatrixAt(i, m.compose(p3.set(P[j], P[j + 1], P[j + 2]), q, s3.set(s, s * k, s))); live = 1;
       }
-      mesh.instanceMatrix.needsUpdate = true;
+      mesh.instanceMatrix.needsUpdate = true; mesh.visible = !!live;
     },
-    clearAir() { for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); } MIST.clear(); },
-    clearFloor() { for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero); dmesh.instanceMatrix.needsUpdate = true; dh = 0; },
+    clearAir() { for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); } mesh.instanceMatrix.needsUpdate = true; mesh.visible = false; live = 0; MIST.clear(); },
+    clearFloor() { for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero); dmesh.instanceMatrix.needsUpdate = true; dmesh.visible = false; dh = 0; },
   };
 })();
 

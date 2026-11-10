@@ -311,7 +311,7 @@ class Ragdoll {
     });
     for (const d of defs) {   // leash: never further from the animated pose than a fighter would let himself be moved
       if (d.kin) continue; const b = d.body, mx = RAG_MAXDEV[d.key] || 0.3, dot = Math.abs(b.quaternion.dot(d.qa)), ang = 2 * Math.acos(Math.min(1, dot));
-      if (ang > mx) { const qb = b.quaternion.clone(); b.quaternion.copy(d.qa).slerp(qb, mx / ang); b.angularVelocity.multiplyScalar(0.5); }
+      if (ang > mx) { const qb = _hq.copy(b.quaternion); b.quaternion.copy(d.qa).slerp(qb, mx / ang); b.angularVelocity.multiplyScalar(0.5); }
     }
     let rec = 1; for (const d of defs) if (!d.kin) rec = Math.min(rec, d.str);
     if (rec > 0.97 && this.since > 0.4) this.blend -= dt / 0.3;
@@ -342,13 +342,13 @@ class Ragdoll {
       this.muscles();
       if (this.pulses) for (const q of this.pulses) if (q.t < q.T) {
         const h = 1 / 120, a = Math.PI * q.t / q.T, b = Math.PI * Math.min(q.t + h, q.T) / q.T, k = (Math.cos(a) - Math.cos(b)) / 2 / h;   // exact share of the half-sine over this substep
-        q.b.applyForce(new CANNON.Vec3(q.J.x * k, q.J.y * k, q.J.z * k), new CANNON.Vec3(q.r.x, q.r.y, q.r.z)); q.t += h;
+        q.b.applyForce(_cf1.set(q.J.x * k, q.J.y * k, q.J.z * k), _cf2.set(q.r.x, q.r.y, q.r.z)); q.t += h;
       }
       this.world.step(1 / 120); this.acc -= 1 / 120;
       for (const d of defs) {   // hard leash to the animated pose
         if (!d.p) continue; const b = d.body, mx = RAG_MAXDEV[d.key] || 0.3; _qb.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
         const dot = Math.abs(_qb.dot(d.qa)), ang = 2 * Math.acos(Math.min(1, dot));
-        if (ang > mx) { const qb = _qb.clone(); _qb.copy(d.qa).slerp(qb, mx / ang); b.quaternion.set(_qb.x, _qb.y, _qb.z, _qb.w); b.angularVelocity.scale(0.5, b.angularVelocity); }
+        if (ang > mx) { const qb = _hq.copy(_qb); _qb.copy(d.qa).slerp(qb, mx / ang); b.quaternion.set(_qb.x, _qb.y, _qb.z, _qb.w); b.angularVelocity.scale(0.5, b.angularVelocity); }
       }
     }
     let rec = 1; for (const d of defs) rec = Math.min(rec, d.str);
@@ -487,4 +487,4 @@ class Ragdoll {
   }
   stop() { for (const d of this.defs) if (d.bone.userData.pos0) { d.bone.position.copy(d.bone.userData.pos0); d.bone.userData.pos0 = null; } this.pulses = null; for (const S of this.F.shoulder) if (S.clBase) { S.cl.quaternion.copy(S.clBase); S.clBase = null; } this.on = false; this.hitOn = false; this.world = null; this.mode = null; for (const d of this.defs) d.str = 1; }
 }
-const _j1q = new Quat(), _j3q = new Quat(), _j4q = new Quat(), _v7 = new V3(), _v8 = new V3(), _v9 = new V3(), _v10 = new V3();
+const _cf1 = new CANNON.Vec3(), _cf2 = new CANNON.Vec3(), _hq = new Quat(), _j1q = new Quat(), _j3q = new Quat(), _j4q = new Quat(), _v7 = new V3(), _v8 = new V3(), _v9 = new V3(), _v10 = new V3();

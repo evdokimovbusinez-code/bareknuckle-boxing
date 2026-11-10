@@ -1,4 +1,9 @@
 /* ───────── fighter ───────── */
+// scratch for the per-frame fighter code (walk, ik, pose, plantFeet, armClear): nothing there allocates
+const _walkQ = [], _ik1 = new Quat(), _ik2 = new Quat(), _ik3 = new Quat(), _po1 = new V3(), _po2 = new V3(), _po3 = new V3(), _po4 = new V3(), _poq1 = new Quat(), _poq2 = new Quat();
+const _pf1 = new V3(), _pf2 = new V3(), _pf3 = new V3(), _pf4 = new V3(), _pfq = new Quat();
+// pinned points of a cloth / strand set follow their targets (used on the frames where the solver is skipped)
+function simPin(S) { const p = S.p, t = S.t, inv = S.inv; for (let i = 0, n = inv.length; i < n; i++) if (inv[i] === 0) { const k = 3 * i; p[k] = t[k]; p[k + 1] = t[k + 1]; p[k + 2] = t[k + 2]; } }
 class Fighter {
   constructor(isPlayer) {
     this.isPlayer = isPlayer;
@@ -420,10 +425,16 @@ class Fighter {
     this.hipModel.setFromMatrixPosition(this.srcHip.matrixWorld).multiplyScalar(this.hipRatio); this.hipModel.z = Math.min(this.hipModel.z * this.rootZ, 0.36);
     this.setHip(this.hipModel);
   }
-  walk(bone, parentQ) {
-    const p = this.pairBy.get(bone), wq = new Quat();
+  walk(bone, parentQ, depth = 0) {   // one scratch quaternion per tree depth (siblings are walked one after another)
+    const p = this.pairBy.get(bone), wq = _walkQ[depth] || (_walkQ[depth] = new Quat());
     if (p) { wq.copy(p.tw); bone.quaternion.copy(parentQ).invert().multiply(wq); } else wq.copy(parentQ).multiply(bone.quaternion);
-    const ch = bone.children; for (let i = 0; i < ch.length; i++) if (ch[i].isBone) this.walk(ch[i], wq);
+    const ch = bone.children; for (let i = 0; i < ch.length; i++) if (ch[i].isBone) this.walk(ch[i], wq, depth + 1);
+  }
+  /* arm / leg bones by side, looked up once (the per-frame code used to build the bone names every time) */
+  limbs() {
+    if (this.limbB) return this.limbB; const B = this.bones, o = {};
+    for (const S of ['L', 'R']) o[S] = { thigh: B[`CC_Base_${S}_Thigh`], calf: B[`CC_Base_${S}_Calf`], foot: B[`CC_Base_${S}_Foot`], upper: B[`CC_Base_${S}_Upperarm`], fore: B[`CC_Base_${S}_Forearm`], hand: B[`CC_Base_${S}_Hand`], mid1: B[`CC_Base_${S}_Mid1`] };
+    return this.limbB = o;
   }
   rot(bone, pitch, yaw, roll) { _qb.setFromEuler(_e1.set(pitch, yaw, roll, 'YXZ')); this.mquat(bone, _qa); this.setMQuat(bone, _qb.multiply(_qa)); }
   ik(A, Bn, Cn, t) {   // two-bone IK in model space
@@ -434,8 +445,8 @@ class Fighter {
     const ac_ab_1 = acosc((lcb * lcb - lab * lab - lat * lat) / (-2 * lab * lat)), ba_bc_1 = acosc((lat * lat - lab * lab - lcb * lcb) / (-2 * lab * lcb));
     const ax0 = _j1.crossVectors(ac, ab); if (ax0.lengthSq() < 1e-8) ax0.set(1, 0, 0); ax0.normalize();
     const r0 = _qb.setFromAxisAngle(ax0, ac_ab_1 - ac_ab_0), r1 = _qc.setFromAxisAngle(ax0, ba_bc_1 - ba_bc_0);
-    const ax1 = _j2.crossVectors(ac, at), r2 = new Quat(); if (ax1.lengthSq() > 1e-10) r2.setFromAxisAngle(ax1.normalize(), ac_at_0);
-    const Ag = this.mquat(A, new Quat()), Bg = this.mquat(Bn, new Quat());
+    const ax1 = _j2.crossVectors(ac, at), r2 = _ik1.identity(); if (ax1.lengthSq() > 1e-10) r2.setFromAxisAngle(ax1.normalize(), ac_at_0);
+    const Ag = this.mquat(A, _ik2), Bg = this.mquat(Bn, _ik3);
     const base = r2.multiply(r0);            // bend in the limb's own plane, then swing the whole limb onto the target
     this.setMQuat(A, Ag.premultiply(base));
     this.setMQuat(Bn, Bg.premultiply(r1).premultiply(base));
@@ -469,7 +480,7 @@ class Fighter {
     const B = this.bones;
     if (live > 1e-4) {
       const fL = B.CC_Base_L_Foot, fR = B.CC_Base_R_Foot;
-      const tL = this.mpos(fL, new V3()), tR = this.mpos(fR, new V3()), qL = this.mquat(fL, new Quat()), qR = this.mquat(fR, new Quat());
+      const tL = this.mpos(fL, _po1), tR = this.mpos(fR, _po2), qL = this.mquat(fL, _poq1), qR = this.mquat(fR, _poq2);
       this.setHip(_v1.copy(this.hipModel).add(_v2.set(0.09 * slip + 0.03 * sw, -0.26 * duck - 0.04 * lean - 0.05 * Math.abs(slip) - 0.06 * this.blockW - 0.07 * dz + 0.015 * sw2, -0.11 * duck - 0.13 * lean + clamp(s.hz.x, -0.12, 0.12))));
       this.rot(B.CC_Base_Waist, 0.22 * duck - 0.20 * lean + 0.06 * this.blockW + 0.4 * s.sp.x + 0.07 * sw2, 0, 0.4 * s.sr.x - 0.2 * slip - 0.12 * sw);
       this.rot(B.CC_Base_Spine01, 0.16 * duck - 0.18 * lean + 0.08 * this.blockW, 0, -0.14 * slip);
@@ -486,13 +497,13 @@ class Fighter {
     const tiredSag = clamp((35 - this.stamina) / 35, 0, 1) * (this.cur ? 0 : 1);
     if (this.blockW > 0.02 || dz > 0.02 || tiredSag > 0.02) for (const S of ['L', 'R']) {
       if (this.aimW > 0.05 && this.aimArm === S) continue;
-      const H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, new V3()), hc = this.group.worldToLocal(_v3.copy(this.headNeutral));
+      const H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), hc = this.group.worldToLocal(_v3.copy(this.headNeutral));
       const g = _v4.set(S === 'L' ? 0.065 : -0.065, -0.075, 0.135).add(hc);
       hand.lerp(g, this.blockW).add(_v5.set(0, (-0.2 * dz - 0.11 * tiredSag) * (1 - this.blockW), 0.03 * dz - 0.03 * tiredSag));   // dazed or out of breath: the hands come down
       this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, hand);
     }
     if (this.aimW > 0.02 && this.aimTarget) {
-      const S = this.aimArm, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, new V3()), kn = this.mpos(B[`CC_Base_${S}_Mid1`], new V3());
+      const S = this.aimArm, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), kn = this.mpos(B[`CC_Base_${S}_Mid1`], _po4);
       const d = this.group.worldToLocal(_v1.copy(this.aimTarget)).sub(kn).clampLength(0, this.bodyShot ? 0.5 : PUNCH[this.cur] && PUNCH[this.cur].type === 'upper' ? 0.62 : 0.42).multiplyScalar(this.aimW);
       this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, hand.add(d));
     }
@@ -500,7 +511,7 @@ class Fighter {
     // a gesture: the glove goes to the face — wiping the blood from the nose, pushing it out of the eye from a cut on the brow
     if (this.gest && !this.cur) {
       const g = this.gest; g.t += dt; const u = g.t / g.T; if (u >= 1) this.gest = null; else {
-        const wgt = Math.pow(Math.sin(Math.PI * u), 0.6), S = g.S, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, new V3());
+        const wgt = Math.pow(Math.sin(Math.PI * u), 0.6), S = g.S, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3);
         const p = _v1.copy(g.pt).add(_v2.set((S === 'L' ? 1 : -1) * 0.035 * Math.sin(u * Math.PI * 4), 0, 0)).applyMatrix4(this.headFrame);
         const fw = _v2.set(0, 0, 1).transformDirection(this.headFrame); p.addScaledVector(fw, 0.07).add(_v3.set(0, -0.05, 0));
         this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, hand.lerp(this.group.worldToLocal(p), wgt));
@@ -513,22 +524,22 @@ class Fighter {
      (lift ~6 cm, 0.18 s) to catch up — one foot at a time, so walking in and out is a boxer's shuffle, not a skate */
   plantFeet(dt) {
     const B = this.bones;
-    if ((window.__tw || {}).noPlant || !this.ftOff || this.rag.on || this.gu || this.ko || this.slide || dt <= 0 || G.state === 'menu' || G.state === 'replay' || (BAG.on && this === P2)) { this.ftOff = { L: null, R: null, sL: null, sR: null }; return; }
-    const F = this.ftOff, step = 0.18, reach = this === P1 && (this.moveDir || this.moveLat) ? 0.07 : 0.09;
-    for (const S of ['L', 'R']) {
-      const foot = B[`CC_Base_${S}_Foot`], w = this.mpos(foot, new V3()); this.group.localToWorld(w);
-      const natural = ringPt(w, new V3());   // where the animation puts the foot, in the ring frame
+    if ((window.__tw || {}).noPlant || !this.ftOff || this.rag.on || this.gu || this.ko || this.slide || dt <= 0 || G.state === 'menu' || G.state === 'replay' || (BAG.on && this === P2)) { const F0 = this.ftOff; if (F0) F0.L = F0.R = F0.sL = F0.sR = null; else this.ftOff = { L: null, R: null, sL: null, sR: null }; return; }
+    const F = this.ftOff, step = 0.18, reach = this === P1 && (this.moveDir || this.moveLat) ? 0.07 : 0.09, LB = this.limbs();
+    for (let i = 0; i < 2; i++) {   // scratch vectors only: this runs for four feet every frame (a step itself still allocates its start point)
+      const S = i ? 'R' : 'L', sK = i ? 'sR' : 'sL', L = LB[S], foot = L.foot, w = this.mpos(foot, _pf1); this.group.localToWorld(w);
+      const natural = ringPt(w, _pf2);   // where the animation puts the foot, in the ring frame
       if (!F[S]) { F[S] = natural.clone(); continue; }
-      const st = F['s' + S];
+      const st = F[sK];
       let tgt = F[S], lift = 0;
       if (st) {   // stepping: the foot travels from where it stood to where the body wants it, lifting off the canvas on the way
-        st.t += dt / step; const k = sstep(0, 1, Math.min(1, st.t)); tgt = st.from.clone().lerp(natural, k); lift = 0.055 * Math.sin(Math.PI * Math.min(1, st.t));
-        if (st.t >= 1) { F[S] = natural.clone(); F['s' + S] = null; }
-      } else if (Math.hypot(natural.x - F[S].x, natural.z - F[S].z) > reach && !F[S === 'L' ? 'sR' : 'sL']) { F['s' + S] = { t: 0, from: F[S].clone() }; }
+        st.t += dt / step; const k = sstep(0, 1, Math.min(1, st.t)); tgt = _pf3.copy(st.from).lerp(natural, k); lift = 0.055 * Math.sin(Math.PI * Math.min(1, st.t));
+        if (st.t >= 1) { F[S].copy(natural); F[sK] = null; }
+      } else if (Math.hypot(natural.x - F[S].x, natural.z - F[S].z) > reach && !F[i ? 'sL' : 'sR']) { F[sK] = { t: 0, from: F[S].clone() }; }
       const pinned = _v4.copy(tgt); pinned.y = natural.y + lift; pinned.applyMatrix4(ARENA.matrixWorld);
       if (pinned.distanceToSquared(w) < 1e-6) continue;
-      const q = this.mquat(foot, new Quat()), t = this.group.worldToLocal(pinned.clone());
-      this.ik(B[`CC_Base_${S}_Thigh`], B[`CC_Base_${S}_Calf`], foot, t); this.setMQuat(foot, q);
+      const q = this.mquat(foot, _pfq), t = this.group.worldToLocal(_pf4.copy(pinned));   // not a shared _v*: ik() uses those itself
+      this.ik(L.thigh, L.calf, foot, t); this.setMQuat(foot, q);
     }
     this.cc.updateMatrixWorld(true);
   }
@@ -536,15 +547,15 @@ class Fighter {
      spheres push the hand out to the skin; the punching fist may sink a centimetre or two (that is the impact), no deeper */
   armClear() {
     const o = this.other; if (!o || !o.headFrameInv || o.ko || (o.rag.on && o.rag.mode === 'ko') || this.rag.on || G.state === 'menu' || (window.__tw || {}).noClear) return;
-    const B = this.bones; let any = false;
-    for (const S of ['L', 'R']) {
-      const H = B[`CC_Base_${S}_Hand`], kn = _v1.setFromMatrixPosition(B[`CC_Base_${S}_Mid1`].matrixWorld), el = _v2.setFromMatrixPosition(B[`CC_Base_${S}_Forearm`].matrixWorld), hw = _v3.setFromMatrixPosition(H.matrixWorld);
+    const LB = this.limbs();
+    for (let i = 0; i < 2; i++) {
+      const S = i ? 'R' : 'L', L = LB[S], H = L.hand, kn = _v1.setFromMatrixPosition(L.mid1.matrixWorld), el = _v2.setFromMatrixPosition(L.fore.matrixWorld), hw = _v3.setFromMatrixPosition(H.matrixWorld);
       const punching = this.cur && this.aimArm === S, push = _v4.set(0, 0, 0);
       clearPt(o, kn, 0.035, punching ? 0.86 : 1, push, punching && !o.blocking);   // a punch that gets through the guard is not stopped by his forearms
-      for (const f of [0.45, 0.75]) clearPt(o, _v5.lerpVectors(el, hw, f), 0.045, 1, push);
+      clearPt(o, _v5.lerpVectors(el, hw, 0.45), 0.045, 1, push); clearPt(o, _v5.lerpVectors(el, hw, 0.75), 0.045, 1, push);
       if (push.lengthSq() < 1e-6) continue;
       if (window.__acN) window.__acN.push(+push.length().toFixed(3));
-      const t = this.group.worldToLocal(hw.clone().add(push)); this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, t); any = true;
+      const t = this.group.worldToLocal(_pf4.copy(hw).add(push)); this.ik(L.upper, L.fore, H, t);
       this.cc.updateMatrixWorld(true);
     }
   }
@@ -624,8 +635,13 @@ class Fighter {
     if (this.simReset) {
       this.shorts.p.set(this.shorts.t); this.shorts.o.set(this.shorts.t); this.hair.ps.reset(); for (const t of this.tails) t.ps.reset(); this.simReset = false;
     } else if (dt > 0) {
-      const steps = dt > 0.02 ? 2 : 1, h = dt / steps;
-      for (let s = 0; s < steps; s++) { this.shorts.step(h); if (hairOn) this.hair.ps.step(h); for (const t of this.tails) t.ps.step(h); }
+      // GFX.simSkip = 2 (low preset): shorts cloth and hair are solved every other frame (the two men on alternate frames) with one
+      // step of the summed time; in between only the pinned points follow the body and the cloth is kept off the legs
+      this.simAcc = (this.simAcc || 0) + dt; this.simN = (this.simN || 0) + 1;
+      if (GFX.simSkip < 2 || ((this.simN + (this.isPlayer ? 0 : 1)) & 1) === 0) {
+        const sd = Math.min(this.simAcc, 0.05), steps = sd > (GFX.simSkip < 2 ? 0.02 : 0.04) ? 2 : 1, h = sd / steps; this.simAcc = 0;
+        for (let s = 0; s < steps; s++) { this.shorts.step(h); if (hairOn) this.hair.ps.step(h); for (const t of this.tails) t.ps.step(h); }
+      } else { simPin(this.shorts); this.shorts.constrain(); if (hairOn) simPin(this.hair.ps); for (const t of this.tails) simPin(t.ps); }
     }
     this.shorts.render(); if (hairOn) renderHair(this.hair);
     for (const t of this.tails) { t.geo.attributes.position.needsUpdate = true; t.geo.computeVertexNormals(); }

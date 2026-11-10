@@ -6,7 +6,7 @@
   const lampG = new THREE.SphereGeometry(0.035, 6, 4), N = 46, lamps = new THREE.InstancedMesh(lampG, new THREE.MeshBasicMaterial({ color: '#ffe2b0', fog: false }), N), m4 = new M4();
   for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2 + rr() * 0.1, r = 10 + rr() * 5, y = 1.7 + rr() * 2.9;
     m4.makeScale(1, 1, 1).setPosition(Math.cos(a) * r, y, Math.sin(a) * r - 2); lamps.setMatrixAt(i, m4); lamps.setColorAt(i, new THREE.Color().setHSL(0.09 + rr() * 0.05, 0.6, 0.35 + rr() * 0.4)); }
-  ARENA.add(lamps);
+  lamps.matrixAutoUpdate = false; ARENA.add(lamps);
 }
 
 /* ───────── rope visuals: while a body is in the rope the drawn line follows the contact (a V from post to post through the
@@ -22,13 +22,13 @@ function arenaSync() {
 }
 // where a world point is in the ring (ring frame, metres)
 const ringPt = (p, out = new V3()) => out.copy(p).applyMatrix4(_m4a.copy(ARENA.matrixWorld).invert());
-const _m4a = new M4(), RING_IN = 2.2;
+const _m4a = new M4(), _csP = new V3(), RING_IN = 2.2;
 const inRing = (p, m = 0) => { const l = ringPt(p, _v6); return Math.abs(l.x) < RING_IN - m && Math.abs(l.z) < RING_IN - m; };
 /* circling: F moves sideways by s metres (s > 0 = away from the camera) around the other man — done by turning the ring frame
    about him the opposite way, so both stay on the world x line facing each other */
 function circleStep(F, s) {
   const O = F.other.group.position, rx = F.group.position.x - O.x; if (Math.abs(rx) < 0.3) return false;
-  const saveP = ARENA.position.clone(), saveY = ARENA.rotation.y;
+  const saveP = _csP.copy(ARENA.position), saveY = ARENA.rotation.y;
   const ph = (-s) / rx;   // world turn about O that carries F by −s in z
   const d = _v4.copy(ARENA.position).sub(O), c = Math.cos(ph), sn = Math.sin(ph);
   ARENA.position.set(O.x + d.x * c + d.z * sn, 0, O.z - d.x * sn + d.z * c); ARENA.rotation.y += ph; ARENA.updateMatrixWorld(true);
@@ -55,8 +55,12 @@ function ropeTick(dt) {
 
 /* ───────── main loop ───────── */
 let last = performance.now();
+// the ragdoll steps run inside Fighter.update: timed separately so the overlay can show them as physics
+for (const k of ['step', 'hitStep']) { const fn = Ragdoll.prototype[k]; Ragdoll.prototype[k] = function (dt) { const t = performance.now(), r = fn.call(this, dt); PERF.rag += performance.now() - t; return r; }; }
+function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
 function frame(now) {
-  const dtReal = Math.min(0.05, (now - last) / 1000); last = now; G.real += dtReal;
+  const rawDt = (now - last) / 1000, dtReal = Math.min(0.05, rawDt); last = now; G.real += dtReal;
+  const pm = PERF.m; let tp = performance.now(), tq; PERF.rag = 0;   // CPU split for the F3 overlay
   let simDt = 0;
   if (G.state === 'replay') simDt = stepReplay(dtReal);
   if (G.state !== 'replay') {
@@ -68,17 +72,22 @@ function frame(now) {
     P1.aimTarget = aimFor(P1, P2); P2.aimTarget = aimFor(P2, P1);
     P1.update(dt); P2.update(dt);
     // both men are posed: now keep each one's arms out of the other's head and torso (against this frame's head, not last frame's)
-    for (const F of [P1, P2]) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
+    headFrames(P1); headFrames(P2);
     P1.armClear(); P2.armClear(); P1.armClear(); P2.armClear();   // twice: the second pass catches what the first IK left
     if (G.state === 'kd') kdTick(dt);
     if ((G.state === 'fight' || G.state === 'ko' || G.state === 'kd') && dt > 0) recFrame();
     stateTick(dtReal);
   }
+  tq = performance.now(); pm.anim += tq - tp - PERF.rag; pm.phys += PERF.rag; tp = tq;
   P1.simulate(simDt); P2.simulate(simDt);
   ropeTick(simDt); bagStep(simDt);
+  tq = performance.now(); pm.phys += tq - tp; tp = tq;
   FX.update(simDt); MIST.update(simDt);
-  camUpdate(dtReal); hudUpdate(dtReal); resTick(dtReal);
-  composer.render();
+  tq = performance.now(); pm.fx += tq - tp; tp = tq;
+  camUpdate(dtReal); hudUpdate(dtReal); resTick(rawDt);
+  pm.misc += performance.now() - tp;
+  perfTick(rawDt);
+  renderFrame(rawDt);
   requestAnimationFrame(frame);
 }
 

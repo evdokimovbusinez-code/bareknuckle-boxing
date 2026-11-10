@@ -22,6 +22,7 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 ## Map of `src/game/`
 | File | What |
 |---|---|
+| `00_gfx.js` | graphics presets (`GFX`, `GFX_PRESET`, `applyGfx`, `setGfx`), scene render target / FXAA, F3 performance overlay (`PERF`, `perfTick`, `renderFrame`) |
 | `00_looks_templates_punches.js` | look presets (shorts/hair/skin/wraps), FBX template build, small maths (`Jig`, `Spring`), `PUNCH` table |
 | `01_ragdoll.js` | `class Ragdoll` — standing hit reactions (cannon-es), muscle tone |
 | `02_xpbd_ko.js` | `XBody`, `XWorld` — knockout ragdoll, rope + canvas contacts; knockout timeline, get-up poses (`POSES`) |

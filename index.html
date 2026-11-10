@@ -154,7 +154,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 #stage.desk .pad{justify-content:center}
 #stage.desk .pad > .kbar{pointer-events:none;display:flex;flex-wrap:wrap;justify-content:center;gap:3px 14px;max-width:min(980px,92%);font-family:var(--mono);font-size:11px;color:var(--muted);background:rgba(10,12,17,.6);border:1px solid var(--line);border-radius:6px;padding:6px 14px;margin-bottom:6px}
 .kbar b{color:var(--text);font-weight:600}.kbar span.lit,.kbar span.lit b{color:var(--gold)}
-#stage:not(.desk) .gfx{display:none}
+.gfx .sw{flex-wrap:wrap}
 
 .loading{position:absolute;inset:0;display:grid;place-items:center;background:var(--ink)}
 .loading .box{display:flex;flex-direction:column;gap:10px;width:min(320px,70%);font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted)}
@@ -300,6 +300,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import * as CANNON from 'cannon-es';
@@ -1242,6 +1243,117 @@ function makeShorts(body) {
   { const ig = new THREE.BufferGeometry(); ig.setAttribute('position', new THREE.BufferAttribute(P1s, 3)); ig.setIndex(tri); ig.computeVertexNormals(); const N = ig.attributes.normal, No = new Float32Array(m * 3); for (let c = 0; c < m; c++) No.set([N.getX(tri[c]), N.getY(tri[c]), N.getZ(tri[c])], 3 * c); sg.setAttribute('normal', new THREE.BufferAttribute(No, 3)); }
   return sg;
 }
+/* ───────── graphics presets (GFX), auto level, performance overlay (F3) ─────────
+   applyGfx(level) switches on the fly: AO, shadows, MSAA / FXAA, bloom, render height and the budgets of the secondary simulations.
+   Hooks for other systems (locations: crowd, fire, smoke): GFX.particles (0..1, multiply particle counts by it), GFX.crowd (0..1, crowd
+   density), GFX.simSkip (2 = secondary simulations may run every other frame); GFX.onChange.push(fn) is called after every level change. */
+const GFX_ORDER = ['low', 'medium', 'high', 'ultra'];
+const GFX_LABEL = { auto: 'авто', low: 'низкая', medium: 'средняя', high: 'высокая', ultra: 'ультра' };
+const GFX_PRESET = {
+  // h: render height · ao: GTAO samples (0 = off) at aoScale of the frame · msaa: samples of the scene target (0 = FXAA pass instead)
+  // shadow: key light map size, soft = PCFSoft · tpr: pixel-ratio cap on touch devices · simSkip: hair / shorts cloth every Nth frame
+  low:    { h: 720,  ao: 0,  aoScale: 0.5, msaa: 0, bloom: false, shadow: 1024, soft: false, tpr: 1,    simSkip: 2, particles: 0.5, crowd: 0.3 },
+  medium: { h: 900,  ao: 8,  aoScale: 0.5, msaa: 2, bloom: true,  shadow: 1024, soft: true,  tpr: 1.5,  simSkip: 1, particles: 0.8, crowd: 0.6 },
+  high:   { h: 1080, ao: 12, aoScale: 1,   msaa: 4, bloom: true,  shadow: 2048, soft: true,  tpr: 1.75, simSkip: 1, particles: 1,   crowd: 1 },
+  ultra:  { h: 1440, ao: 16, aoScale: 1,   msaa: 4, bloom: true,  shadow: 2048, soft: true,  tpr: 2,    simSkip: 1, particles: 1,   crowd: 1 },
+};
+const GFX = { level: 'high', set: 'auto', detect: 'high', gpu: '', h: 1080, tpr: 1.75, aoScale: 1, simSkip: 1, particles: 1, crowd: 1, onChange: [], ready: false };
+
+/* the scene is drawn into its own multisampled target; the composer's ping-pong buffers are plain — before, every full-screen pass
+   (NaN scrub, AO blend, bloom) was rasterised into a 4× MSAA half-float buffer and resolved again */
+const sceneRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: rt.samples });
+const fxaa = new ShaderPass(FXAAShader); fxaa.enabled = false; composer.addPass(fxaa);   // after OutputPass; only when MSAA is off
+{
+  const rp = composer.passes[0], scrub = composer.passes[1], rpRender = rp.render.bind(rp), scrubRender = scrub.render.bind(scrub);
+  rp.render = (r, wb, rb, dt, mask) => rpRender(r, wb, sceneRT, dt, mask);
+  rp.setSize = (w, h) => sceneRT.setSize(w, h);
+  scrub.render = (r, wb, rb, dt, mask) => scrubRender(r, wb, sceneRT, dt, mask);
+  for (const t of [composer.renderTarget1, composer.renderTarget2]) { t.samples = 0; t.depthBuffer = false; t.dispose(); }
+  fxaa.setSize = (w, h) => fxaa.material.uniforms.resolution.value.set(1 / w, 1 / h);
+  if (gtao) {
+    const aoSize = gtao.setSize.bind(gtao), aoRender = gtao.render.bind(gtao);
+    gtao.setSize = (w, h) => aoSize(Math.max(1, Math.round(w * GFX.aoScale)), Math.max(1, Math.round(h * GFX.aoScale)));
+    // the AO normal pass is a second renderer.render() of the scene: without this it redrew the whole shadow map every frame
+    gtao.render = (r, wb, rb, dt, mask) => { const sm = r.shadowMap, au = sm.autoUpdate; sm.autoUpdate = false; aoRender(r, wb, rb, dt, mask); sm.autoUpdate = au; };
+  }
+  renderer.info.autoReset = false;   // counted per frame over all passes (renderFrame resets it)
+  // ring props never move inside the ring frame: no per-frame matrix recompose
+  RINGSET.traverse(o => { if (o !== RINGSET) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
+}
+
+function applyGfx(level) {
+  if (!GFX_PRESET[level]) level = 'high';
+  const P = GFX_PRESET[level]; GFX.level = level;
+  GFX.h = P.h; GFX.tpr = P.tpr; GFX.simSkip = P.simSkip; GFX.particles = P.particles; GFX.crowd = P.crowd; GFX.aoScale = P.aoScale;
+  if (gtao) { gtao.enabled = P.ao > 0; if (P.ao > 0) { gtao.updateGtaoMaterial({ samples: P.ao }); gtao.updatePdMaterial({ samples: P.ao }); } }
+  bloom.enabled = P.bloom;
+  const msaa = lowEnd ? Math.min(P.msaa, 2) : P.msaa;
+  if (sceneRT.samples !== msaa) { sceneRT.samples = msaa; sceneRT.dispose(); }
+  fxaa.enabled = msaa === 0;
+  const type = P.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+  if (renderer.shadowMap.type !== type) {   // the filter is compiled into every lit material
+    renderer.shadowMap.type = type;
+    scene.traverse(o => { const m = o.material; if (!m) return; if (Array.isArray(m)) for (const x of m) x.needsUpdate = true; else m.needsUpdate = true; });
+  }
+  if (key.shadow.mapSize.x !== P.shadow) { key.shadow.mapSize.set(P.shadow, P.shadow); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
+  if (GFX.ready) { qH = GFX.h; applyRes(); }
+  for (const f of GFX.onChange) f(GFX);
+}
+/* menu choice: 'auto' or a fixed level (saved) */
+function setGfx(v) {
+  if (v !== 'auto' && !GFX_PRESET[v]) v = 'auto';
+  GFX.set = v; try { localStorage.setItem('bx_gfx', v); if (v === 'auto') localStorage.removeItem('bx_gfx_auto'); } catch (_) {}
+  DR.acc = DR.n = DR.good = DR.bad = 0; DR.wait = 1; DR.upNeed = 6;
+  applyGfx(v === 'auto' ? GFX.detect : v);
+}
+{
+  // auto starts from 'medium' on integrated / weak / mobile GPUs, otherwise from 'high'; a level the auto mode stepped down to is remembered
+  let name = '';
+  try { const gl = renderer.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); name = String((e && gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || ''); } catch (_) {}
+  GFX.gpu = name;
+  const weak = lowEnd || /intel(?!.*\barc\b)|swiftshader|llvmpipe|software|basic render|mali|adreno|powervr|videocore|radeon(\(tm\))? (r[2-7]|hd|vega [3-8]\b)|geforce (mx|gt |[0-9]{3}m)/i.test(name);
+  GFX.detect = weak ? 'medium' : 'high';
+  let set = 'auto', start = GFX.detect;
+  try {
+    const old = localStorage.getItem('bx_q'); set = localStorage.getItem('bx_gfx') || (old === '720' ? 'low' : old === '1440' ? 'ultra' : 'auto');
+    const was = localStorage.getItem('bx_gfx_auto'); if (GFX_PRESET[was] && GFX_ORDER.indexOf(was) < GFX_ORDER.indexOf(start)) start = was;
+  } catch (_) {}
+  if (set !== 'auto' && !GFX_PRESET[set]) set = 'auto';
+  GFX.set = set; applyGfx(set === 'auto' ? start : set);
+}
+
+/* ───────── performance overlay: F3 on a keyboard, a three-finger tap on a phone ───────── */
+const PERF = { on: false, el: null, m: { anim: 0, phys: 0, fx: 0, misc: 0, render: 0 }, rag: 0, frames: 0, dt: 0, max: 0, calls: 0, tris: 0, t0: 0, last: null };
+function perfToggle(v) {
+  PERF.on = v === undefined ? !PERF.on : !!v;
+  if (!PERF.el) {
+    const el = PERF.el = document.createElement('pre'); el.id = 'perf';
+    el.style.cssText = 'position:absolute;left:8px;top:76px;margin:0;z-index:60;padding:7px 10px;border-radius:6px;background:rgba(6,8,12,.72);color:#cfe9c4;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;pointer-events:none;text-align:left';
+    stage.appendChild(el);
+  }
+  PERF.el.hidden = !PERF.on; PERF.t0 = 0;
+}
+/* called once per frame by frame(): rawDt = the real time between frames; the CPU parts are summed into PERF.m by frame() / renderFrame()
+   (render = CPU time of submitting the frame; what the GPU needs on top shows as the gap between «кадр» and «CPU») */
+function perfTick(rawDt) {
+  const P = PERF, m = P.m; P.frames++; P.dt += rawDt; if (rawDt > P.max) P.max = rawDt;
+  P.calls += renderer.info.render.calls; P.tris += renderer.info.render.triangles;
+  const now = performance.now(); if (now - P.t0 < 500 && P.t0) return;
+  const n = P.frames, f = v => (v / n).toFixed(1);
+  P.last = { fps: n / Math.max(1e-6, P.dt), ms: P.dt / n * 1000, max: P.max * 1000, anim: m.anim / n, phys: m.phys / n, fx: m.fx / n, misc: m.misc / n, render: m.render / n, calls: Math.round(P.calls / n), tris: Math.round(P.tris / n) };
+  if (P.on && P.el) {
+    const cpu = m.anim + m.phys + m.fx + m.misc + m.render;
+    P.el.textContent = `${P.last.fps.toFixed(0)} FPS · кадр ${P.last.ms.toFixed(1)} мс (макс ${P.last.max.toFixed(1)})\n`
+      + `CPU ${f(cpu)} мс: анимация ${f(m.anim)} · физика ${f(m.phys)} · FX ${f(m.fx)} · рендер ${f(m.render)} · прочее ${f(m.misc)}\n`
+      + `draw calls ${P.last.calls} · треугольники ${(P.last.tris / 1000).toFixed(0)} тыс.\n`
+      + `${canvas.width}×${canvas.height} · графика: ${GFX.set === 'auto' ? 'авто → ' : ''}${GFX_LABEL[GFX.level]}\n`
+      + `GPU: ${GFX.gpu.replace(/^ANGLE \((.*)\)$/, '$1').slice(0, 64) || '—'}`;
+  }
+  m.anim = m.phys = m.fx = m.misc = m.render = 0; P.frames = 0; P.dt = 0; P.max = 0; P.calls = 0; P.tris = 0; P.t0 = now;
+}
+function renderFrame() { const t = performance.now(); renderer.info.reset(); composer.render(); PERF.m.render += performance.now() - t; }
+window.addEventListener('keydown', e => { if (e.code === 'F3') { e.preventDefault(); if (!e.repeat) perfToggle(); } });
+window.addEventListener('touchstart', e => { if (e.touches.length === 3) perfToggle(); }, { passive: true });
 
 /* ───────── looks ───────── */
 const SHORTS_LOOKS = [
@@ -1756,7 +1868,7 @@ class Ragdoll {
     });
     for (const d of defs) {   // leash: never further from the animated pose than a fighter would let himself be moved
       if (d.kin) continue; const b = d.body, mx = RAG_MAXDEV[d.key] || 0.3, dot = Math.abs(b.quaternion.dot(d.qa)), ang = 2 * Math.acos(Math.min(1, dot));
-      if (ang > mx) { const qb = b.quaternion.clone(); b.quaternion.copy(d.qa).slerp(qb, mx / ang); b.angularVelocity.multiplyScalar(0.5); }
+      if (ang > mx) { const qb = _hq.copy(b.quaternion); b.quaternion.copy(d.qa).slerp(qb, mx / ang); b.angularVelocity.multiplyScalar(0.5); }
     }
     let rec = 1; for (const d of defs) if (!d.kin) rec = Math.min(rec, d.str);
     if (rec > 0.97 && this.since > 0.4) this.blend -= dt / 0.3;
@@ -1787,13 +1899,13 @@ class Ragdoll {
       this.muscles();
       if (this.pulses) for (const q of this.pulses) if (q.t < q.T) {
         const h = 1 / 120, a = Math.PI * q.t / q.T, b = Math.PI * Math.min(q.t + h, q.T) / q.T, k = (Math.cos(a) - Math.cos(b)) / 2 / h;   // exact share of the half-sine over this substep
-        q.b.applyForce(new CANNON.Vec3(q.J.x * k, q.J.y * k, q.J.z * k), new CANNON.Vec3(q.r.x, q.r.y, q.r.z)); q.t += h;
+        q.b.applyForce(_cf1.set(q.J.x * k, q.J.y * k, q.J.z * k), _cf2.set(q.r.x, q.r.y, q.r.z)); q.t += h;
       }
       this.world.step(1 / 120); this.acc -= 1 / 120;
       for (const d of defs) {   // hard leash to the animated pose
         if (!d.p) continue; const b = d.body, mx = RAG_MAXDEV[d.key] || 0.3; _qb.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
         const dot = Math.abs(_qb.dot(d.qa)), ang = 2 * Math.acos(Math.min(1, dot));
-        if (ang > mx) { const qb = _qb.clone(); _qb.copy(d.qa).slerp(qb, mx / ang); b.quaternion.set(_qb.x, _qb.y, _qb.z, _qb.w); b.angularVelocity.scale(0.5, b.angularVelocity); }
+        if (ang > mx) { const qb = _hq.copy(_qb); _qb.copy(d.qa).slerp(qb, mx / ang); b.quaternion.set(_qb.x, _qb.y, _qb.z, _qb.w); b.angularVelocity.scale(0.5, b.angularVelocity); }
       }
     }
     let rec = 1; for (const d of defs) rec = Math.min(rec, d.str);
@@ -1932,7 +2044,7 @@ class Ragdoll {
   }
   stop() { for (const d of this.defs) if (d.bone.userData.pos0) { d.bone.position.copy(d.bone.userData.pos0); d.bone.userData.pos0 = null; } this.pulses = null; for (const S of this.F.shoulder) if (S.clBase) { S.cl.quaternion.copy(S.clBase); S.clBase = null; } this.on = false; this.hitOn = false; this.world = null; this.mode = null; for (const d of this.defs) d.str = 1; }
 }
-const _j1q = new Quat(), _j3q = new Quat(), _j4q = new Quat(), _v7 = new V3(), _v8 = new V3(), _v9 = new V3(), _v10 = new V3();
+const _cf1 = new CANNON.Vec3(), _cf2 = new CANNON.Vec3(), _hq = new Quat(), _j1q = new Quat(), _j3q = new Quat(), _j4q = new Quat(), _v7 = new V3(), _v8 = new V3(), _v9 = new V3(), _v10 = new V3();
 /* ───────── XPBD rigid bodies for the knockout ragdoll (Müller et al. 2020, "Detailed Rigid Body Simulation with XPBD") ─────────
    Why not the sequential-impulse solver: a 14-joint chain with 1:10 mass ratios (foot vs thigh), hard anatomical stops and dozens of
    floor contacts does not converge in a few Gauss–Seidel sweeps — joints drift apart, stops get pushed through, feet pop off the floor.
@@ -2697,6 +2809,11 @@ function guardMesh() {   // gum shield: an arch over the upper teeth, in the hea
 }
 
 /* ───────── fighter ───────── */
+// scratch for the per-frame fighter code (walk, ik, pose, plantFeet, armClear): nothing there allocates
+const _walkQ = [], _ik1 = new Quat(), _ik2 = new Quat(), _ik3 = new Quat(), _po1 = new V3(), _po2 = new V3(), _po3 = new V3(), _po4 = new V3(), _poq1 = new Quat(), _poq2 = new Quat();
+const _pf1 = new V3(), _pf2 = new V3(), _pf3 = new V3(), _pf4 = new V3(), _pfq = new Quat();
+// pinned points of a cloth / strand set follow their targets (used on the frames where the solver is skipped)
+function simPin(S) { const p = S.p, t = S.t, inv = S.inv; for (let i = 0, n = inv.length; i < n; i++) if (inv[i] === 0) { const k = 3 * i; p[k] = t[k]; p[k + 1] = t[k + 1]; p[k + 2] = t[k + 2]; } }
 class Fighter {
   constructor(isPlayer) {
     this.isPlayer = isPlayer;
@@ -3118,10 +3235,16 @@ class Fighter {
     this.hipModel.setFromMatrixPosition(this.srcHip.matrixWorld).multiplyScalar(this.hipRatio); this.hipModel.z = Math.min(this.hipModel.z * this.rootZ, 0.36);
     this.setHip(this.hipModel);
   }
-  walk(bone, parentQ) {
-    const p = this.pairBy.get(bone), wq = new Quat();
+  walk(bone, parentQ, depth = 0) {   // one scratch quaternion per tree depth (siblings are walked one after another)
+    const p = this.pairBy.get(bone), wq = _walkQ[depth] || (_walkQ[depth] = new Quat());
     if (p) { wq.copy(p.tw); bone.quaternion.copy(parentQ).invert().multiply(wq); } else wq.copy(parentQ).multiply(bone.quaternion);
-    const ch = bone.children; for (let i = 0; i < ch.length; i++) if (ch[i].isBone) this.walk(ch[i], wq);
+    const ch = bone.children; for (let i = 0; i < ch.length; i++) if (ch[i].isBone) this.walk(ch[i], wq, depth + 1);
+  }
+  /* arm / leg bones by side, looked up once (the per-frame code used to build the bone names every time) */
+  limbs() {
+    if (this.limbB) return this.limbB; const B = this.bones, o = {};
+    for (const S of ['L', 'R']) o[S] = { thigh: B[`CC_Base_${S}_Thigh`], calf: B[`CC_Base_${S}_Calf`], foot: B[`CC_Base_${S}_Foot`], upper: B[`CC_Base_${S}_Upperarm`], fore: B[`CC_Base_${S}_Forearm`], hand: B[`CC_Base_${S}_Hand`], mid1: B[`CC_Base_${S}_Mid1`] };
+    return this.limbB = o;
   }
   rot(bone, pitch, yaw, roll) { _qb.setFromEuler(_e1.set(pitch, yaw, roll, 'YXZ')); this.mquat(bone, _qa); this.setMQuat(bone, _qb.multiply(_qa)); }
   ik(A, Bn, Cn, t) {   // two-bone IK in model space
@@ -3132,8 +3255,8 @@ class Fighter {
     const ac_ab_1 = acosc((lcb * lcb - lab * lab - lat * lat) / (-2 * lab * lat)), ba_bc_1 = acosc((lat * lat - lab * lab - lcb * lcb) / (-2 * lab * lcb));
     const ax0 = _j1.crossVectors(ac, ab); if (ax0.lengthSq() < 1e-8) ax0.set(1, 0, 0); ax0.normalize();
     const r0 = _qb.setFromAxisAngle(ax0, ac_ab_1 - ac_ab_0), r1 = _qc.setFromAxisAngle(ax0, ba_bc_1 - ba_bc_0);
-    const ax1 = _j2.crossVectors(ac, at), r2 = new Quat(); if (ax1.lengthSq() > 1e-10) r2.setFromAxisAngle(ax1.normalize(), ac_at_0);
-    const Ag = this.mquat(A, new Quat()), Bg = this.mquat(Bn, new Quat());
+    const ax1 = _j2.crossVectors(ac, at), r2 = _ik1.identity(); if (ax1.lengthSq() > 1e-10) r2.setFromAxisAngle(ax1.normalize(), ac_at_0);
+    const Ag = this.mquat(A, _ik2), Bg = this.mquat(Bn, _ik3);
     const base = r2.multiply(r0);            // bend in the limb's own plane, then swing the whole limb onto the target
     this.setMQuat(A, Ag.premultiply(base));
     this.setMQuat(Bn, Bg.premultiply(r1).premultiply(base));
@@ -3167,7 +3290,7 @@ class Fighter {
     const B = this.bones;
     if (live > 1e-4) {
       const fL = B.CC_Base_L_Foot, fR = B.CC_Base_R_Foot;
-      const tL = this.mpos(fL, new V3()), tR = this.mpos(fR, new V3()), qL = this.mquat(fL, new Quat()), qR = this.mquat(fR, new Quat());
+      const tL = this.mpos(fL, _po1), tR = this.mpos(fR, _po2), qL = this.mquat(fL, _poq1), qR = this.mquat(fR, _poq2);
       this.setHip(_v1.copy(this.hipModel).add(_v2.set(0.09 * slip + 0.03 * sw, -0.26 * duck - 0.04 * lean - 0.05 * Math.abs(slip) - 0.06 * this.blockW - 0.07 * dz + 0.015 * sw2, -0.11 * duck - 0.13 * lean + clamp(s.hz.x, -0.12, 0.12))));
       this.rot(B.CC_Base_Waist, 0.22 * duck - 0.20 * lean + 0.06 * this.blockW + 0.4 * s.sp.x + 0.07 * sw2, 0, 0.4 * s.sr.x - 0.2 * slip - 0.12 * sw);
       this.rot(B.CC_Base_Spine01, 0.16 * duck - 0.18 * lean + 0.08 * this.blockW, 0, -0.14 * slip);
@@ -3184,13 +3307,13 @@ class Fighter {
     const tiredSag = clamp((35 - this.stamina) / 35, 0, 1) * (this.cur ? 0 : 1);
     if (this.blockW > 0.02 || dz > 0.02 || tiredSag > 0.02) for (const S of ['L', 'R']) {
       if (this.aimW > 0.05 && this.aimArm === S) continue;
-      const H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, new V3()), hc = this.group.worldToLocal(_v3.copy(this.headNeutral));
+      const H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), hc = this.group.worldToLocal(_v3.copy(this.headNeutral));
       const g = _v4.set(S === 'L' ? 0.065 : -0.065, -0.075, 0.135).add(hc);
       hand.lerp(g, this.blockW).add(_v5.set(0, (-0.2 * dz - 0.11 * tiredSag) * (1 - this.blockW), 0.03 * dz - 0.03 * tiredSag));   // dazed or out of breath: the hands come down
       this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, hand);
     }
     if (this.aimW > 0.02 && this.aimTarget) {
-      const S = this.aimArm, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, new V3()), kn = this.mpos(B[`CC_Base_${S}_Mid1`], new V3());
+      const S = this.aimArm, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), kn = this.mpos(B[`CC_Base_${S}_Mid1`], _po4);
       const d = this.group.worldToLocal(_v1.copy(this.aimTarget)).sub(kn).clampLength(0, this.bodyShot ? 0.5 : PUNCH[this.cur] && PUNCH[this.cur].type === 'upper' ? 0.62 : 0.42).multiplyScalar(this.aimW);
       this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, hand.add(d));
     }
@@ -3198,7 +3321,7 @@ class Fighter {
     // a gesture: the glove goes to the face — wiping the blood from the nose, pushing it out of the eye from a cut on the brow
     if (this.gest && !this.cur) {
       const g = this.gest; g.t += dt; const u = g.t / g.T; if (u >= 1) this.gest = null; else {
-        const wgt = Math.pow(Math.sin(Math.PI * u), 0.6), S = g.S, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, new V3());
+        const wgt = Math.pow(Math.sin(Math.PI * u), 0.6), S = g.S, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3);
         const p = _v1.copy(g.pt).add(_v2.set((S === 'L' ? 1 : -1) * 0.035 * Math.sin(u * Math.PI * 4), 0, 0)).applyMatrix4(this.headFrame);
         const fw = _v2.set(0, 0, 1).transformDirection(this.headFrame); p.addScaledVector(fw, 0.07).add(_v3.set(0, -0.05, 0));
         this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, hand.lerp(this.group.worldToLocal(p), wgt));
@@ -3211,22 +3334,22 @@ class Fighter {
      (lift ~6 cm, 0.18 s) to catch up — one foot at a time, so walking in and out is a boxer's shuffle, not a skate */
   plantFeet(dt) {
     const B = this.bones;
-    if ((window.__tw || {}).noPlant || !this.ftOff || this.rag.on || this.gu || this.ko || this.slide || dt <= 0 || G.state === 'menu' || G.state === 'replay' || (BAG.on && this === P2)) { this.ftOff = { L: null, R: null, sL: null, sR: null }; return; }
-    const F = this.ftOff, step = 0.18, reach = this === P1 && (this.moveDir || this.moveLat) ? 0.07 : 0.09;
-    for (const S of ['L', 'R']) {
-      const foot = B[`CC_Base_${S}_Foot`], w = this.mpos(foot, new V3()); this.group.localToWorld(w);
-      const natural = ringPt(w, new V3());   // where the animation puts the foot, in the ring frame
+    if ((window.__tw || {}).noPlant || !this.ftOff || this.rag.on || this.gu || this.ko || this.slide || dt <= 0 || G.state === 'menu' || G.state === 'replay' || (BAG.on && this === P2)) { const F0 = this.ftOff; if (F0) F0.L = F0.R = F0.sL = F0.sR = null; else this.ftOff = { L: null, R: null, sL: null, sR: null }; return; }
+    const F = this.ftOff, step = 0.18, reach = this === P1 && (this.moveDir || this.moveLat) ? 0.07 : 0.09, LB = this.limbs();
+    for (let i = 0; i < 2; i++) {   // scratch vectors only: this runs for four feet every frame (a step itself still allocates its start point)
+      const S = i ? 'R' : 'L', sK = i ? 'sR' : 'sL', L = LB[S], foot = L.foot, w = this.mpos(foot, _pf1); this.group.localToWorld(w);
+      const natural = ringPt(w, _pf2);   // where the animation puts the foot, in the ring frame
       if (!F[S]) { F[S] = natural.clone(); continue; }
-      const st = F['s' + S];
+      const st = F[sK];
       let tgt = F[S], lift = 0;
       if (st) {   // stepping: the foot travels from where it stood to where the body wants it, lifting off the canvas on the way
-        st.t += dt / step; const k = sstep(0, 1, Math.min(1, st.t)); tgt = st.from.clone().lerp(natural, k); lift = 0.055 * Math.sin(Math.PI * Math.min(1, st.t));
-        if (st.t >= 1) { F[S] = natural.clone(); F['s' + S] = null; }
-      } else if (Math.hypot(natural.x - F[S].x, natural.z - F[S].z) > reach && !F[S === 'L' ? 'sR' : 'sL']) { F['s' + S] = { t: 0, from: F[S].clone() }; }
+        st.t += dt / step; const k = sstep(0, 1, Math.min(1, st.t)); tgt = _pf3.copy(st.from).lerp(natural, k); lift = 0.055 * Math.sin(Math.PI * Math.min(1, st.t));
+        if (st.t >= 1) { F[S].copy(natural); F[sK] = null; }
+      } else if (Math.hypot(natural.x - F[S].x, natural.z - F[S].z) > reach && !F[i ? 'sL' : 'sR']) { F[sK] = { t: 0, from: F[S].clone() }; }
       const pinned = _v4.copy(tgt); pinned.y = natural.y + lift; pinned.applyMatrix4(ARENA.matrixWorld);
       if (pinned.distanceToSquared(w) < 1e-6) continue;
-      const q = this.mquat(foot, new Quat()), t = this.group.worldToLocal(pinned.clone());
-      this.ik(B[`CC_Base_${S}_Thigh`], B[`CC_Base_${S}_Calf`], foot, t); this.setMQuat(foot, q);
+      const q = this.mquat(foot, _pfq), t = this.group.worldToLocal(_pf4.copy(pinned));   // not a shared _v*: ik() uses those itself
+      this.ik(L.thigh, L.calf, foot, t); this.setMQuat(foot, q);
     }
     this.cc.updateMatrixWorld(true);
   }
@@ -3234,15 +3357,15 @@ class Fighter {
      spheres push the hand out to the skin; the punching fist may sink a centimetre or two (that is the impact), no deeper */
   armClear() {
     const o = this.other; if (!o || !o.headFrameInv || o.ko || (o.rag.on && o.rag.mode === 'ko') || this.rag.on || G.state === 'menu' || (window.__tw || {}).noClear) return;
-    const B = this.bones; let any = false;
-    for (const S of ['L', 'R']) {
-      const H = B[`CC_Base_${S}_Hand`], kn = _v1.setFromMatrixPosition(B[`CC_Base_${S}_Mid1`].matrixWorld), el = _v2.setFromMatrixPosition(B[`CC_Base_${S}_Forearm`].matrixWorld), hw = _v3.setFromMatrixPosition(H.matrixWorld);
+    const LB = this.limbs();
+    for (let i = 0; i < 2; i++) {
+      const S = i ? 'R' : 'L', L = LB[S], H = L.hand, kn = _v1.setFromMatrixPosition(L.mid1.matrixWorld), el = _v2.setFromMatrixPosition(L.fore.matrixWorld), hw = _v3.setFromMatrixPosition(H.matrixWorld);
       const punching = this.cur && this.aimArm === S, push = _v4.set(0, 0, 0);
       clearPt(o, kn, 0.035, punching ? 0.86 : 1, push, punching && !o.blocking);   // a punch that gets through the guard is not stopped by his forearms
-      for (const f of [0.45, 0.75]) clearPt(o, _v5.lerpVectors(el, hw, f), 0.045, 1, push);
+      clearPt(o, _v5.lerpVectors(el, hw, 0.45), 0.045, 1, push); clearPt(o, _v5.lerpVectors(el, hw, 0.75), 0.045, 1, push);
       if (push.lengthSq() < 1e-6) continue;
       if (window.__acN) window.__acN.push(+push.length().toFixed(3));
-      const t = this.group.worldToLocal(hw.clone().add(push)); this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, t); any = true;
+      const t = this.group.worldToLocal(_pf4.copy(hw).add(push)); this.ik(L.upper, L.fore, H, t);
       this.cc.updateMatrixWorld(true);
     }
   }
@@ -3322,8 +3445,13 @@ class Fighter {
     if (this.simReset) {
       this.shorts.p.set(this.shorts.t); this.shorts.o.set(this.shorts.t); this.hair.ps.reset(); for (const t of this.tails) t.ps.reset(); this.simReset = false;
     } else if (dt > 0) {
-      const steps = dt > 0.02 ? 2 : 1, h = dt / steps;
-      for (let s = 0; s < steps; s++) { this.shorts.step(h); if (hairOn) this.hair.ps.step(h); for (const t of this.tails) t.ps.step(h); }
+      // GFX.simSkip = 2 (low preset): shorts cloth and hair are solved every other frame (the two men on alternate frames) with one
+      // step of the summed time; in between only the pinned points follow the body and the cloth is kept off the legs
+      this.simAcc = (this.simAcc || 0) + dt; this.simN = (this.simN || 0) + 1;
+      if (GFX.simSkip < 2 || ((this.simN + (this.isPlayer ? 0 : 1)) & 1) === 0) {
+        const sd = Math.min(this.simAcc, 0.05), steps = sd > (GFX.simSkip < 2 ? 0.02 : 0.04) ? 2 : 1, h = sd / steps; this.simAcc = 0;
+        for (let s = 0; s < steps; s++) { this.shorts.step(h); if (hairOn) this.hair.ps.step(h); for (const t of this.tails) t.ps.step(h); }
+      } else { simPin(this.shorts); this.shorts.constrain(); if (hairOn) simPin(this.hair.ps); for (const t of this.tails) simPin(t.ps); }
     }
     this.shorts.render(); if (hairOn) renderHair(this.hair);
     for (const t of this.tails) { t.geo.attributes.position.needsUpdate = true; t.geo.computeVertexNormals(); }
@@ -3354,11 +3482,11 @@ const MIST = (() => {
   const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uScale: { value: 900 } },
     vertexShader: 'attribute float aS; attribute float aA; varying float vA; uniform float uScale; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = min( aS * uScale / -mv.z, 14.0 ); vA = aA; gl_Position = projectionMatrix * mv; }',
     fragmentShader: 'varying float vA; void main(){ vec2 c = gl_PointCoord - 0.5; float d = dot(c,c); if (d > 0.25) discard; float a = vA * smoothstep(0.25, 0.05, d); gl_FragColor = vec4(0.36, 0.015, 0.02, a); }' });
-  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts);
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.matrixAutoUpdate = false; pts.visible = false; scene.add(pts);   // drawn only while droplets are in the air
   for (let i = 0; i < N; i++) al[i] = 0;
   return {
     burst(p, dir, power, amt) {
-      const n = (amt * (60 + 140 * power)) | 0;
+      const n = (amt * (60 + 140 * power) * GFX.particles) | 0; if (n > 0) pts.visible = true;
       for (let k = 0; k < n; k++) { const i = head++ % N, j = 3 * i, sp = (1.2 + rr() * 4.5) * (0.6 + 0.6 * power), side = 1.4 * rr();
         pos[j] = p.x + (rr() - 0.5) * 0.03; pos[j + 1] = p.y + (rr() - 0.5) * 0.03; pos[j + 2] = p.z + (rr() - 0.5) * 0.03;
         vel[j] = dir.x * sp + (rr() - 0.5) * side * sp; vel[j + 1] = dir.y * sp + (rr() - 0.35) * side * sp; vel[j + 2] = dir.z * sp + (rr() - 0.5) * side * sp;
@@ -3372,47 +3500,49 @@ const MIST = (() => {
         pos[j] += vel[j] * dt; pos[j + 1] += vel[j + 1] * dt; pos[j + 2] += vel[j + 2] * dt; lf[i] -= dt; al[i] = Math.min(al[i], lf[i] * 1.6); sz[i] *= 1 + dt * 0.8;
         if (pos[j + 1] < 0.01) lf[i] = 0; }
       if (any) { geo.attributes.position.needsUpdate = true; geo.attributes.aS.needsUpdate = true; geo.attributes.aA.needsUpdate = true; }
+      pts.visible = any;
     },
-    clear() { for (let i = 0; i < N; i++) { lf[i] = 0; al[i] = 0; } geo.attributes.aA.needsUpdate = true; },
+    clear() { for (let i = 0; i < N; i++) { lf[i] = 0; al[i] = 0; } geo.attributes.aA.needsUpdate = true; pts.visible = false; },
   };
 })();
 
 /* ───────── blood, sweat, floor stains ───────── */
 const FX = (() => {
   const N = 380, mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 5), new THREE.MeshStandardMaterial({ roughness: 0.18 }), N);
-  mesh.frustumCulled = false; mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.castShadow = false; scene.add(mesh);
+  mesh.frustumCulled = false; mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.castShadow = false; mesh.matrixAutoUpdate = false; mesh.visible = false; scene.add(mesh);   // hidden while no drop is alive (it was a draw call of 380 empty instances in every pass)
   const P = new Float32Array(N * 3), Vl = new Float32Array(N * 3), life = new Float32Array(N), size = new Float32Array(N), kind = new Uint8Array(N); let head = 0;
   const cB = new THREE.Color('#7d0710'), cS = new THREE.Color('#7f8a99'), m = new M4(), zero = new M4().makeScale(0, 0, 0);
   for (let i = 0; i < N; i++) { mesh.setMatrixAt(i, zero); mesh.setColorAt(i, cB); }
   const DN = 240, dgeo = new THREE.CircleGeometry(1, 14).rotateX(-Math.PI / 2);
   const dmesh = new THREE.InstancedMesh(dgeo, new THREE.MeshStandardMaterial({ color: '#4d0408', roughness: 0.42, envMapIntensity: 0.4, transparent: true, opacity: 0.88, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }), DN);
-  dmesh.frustumCulled = false; dmesh.receiveShadow = true; ARENA.add(dmesh); let dh = 0;
+  dmesh.frustumCulled = false; dmesh.receiveShadow = true; dmesh.matrixAutoUpdate = false; dmesh.visible = false; ARENA.add(dmesh); let dh = 0, live = 0;
   for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero);
   const q = new Quat(), s3 = new V3(), p3 = new V3(), up = new V3(0, 1, 0);
   function decal(x, z, r) {
     p3.set(x, 0, z); ARENA.worldToLocal(p3); if (Math.abs(p3.x) > 2.75 || Math.abs(p3.z) > 2.75) return;
     q.setFromAxisAngle(up, rr() * 6.28); s3.set(r * (2.2 + rr() * 3), 1, r * (1.6 + rr() * 2.4)); p3.y = 0.003 + (dh % DN) * 2e-5;
-    dmesh.setMatrixAt(dh % DN, m.compose(p3, q, s3)); dh++; dmesh.instanceMatrix.needsUpdate = true;
+    dmesh.setMatrixAt(dh % DN, m.compose(p3, q, s3)); dh++; dmesh.instanceMatrix.needsUpdate = true; dmesh.visible = true;
   }
   function emit(pos, dir, sp, spread, k, sz, jit = 0.05) {
     const i = head++ % N, j = 3 * i;
     P[j] = pos.x + (rr() - 0.5) * jit; P[j + 1] = pos.y + (rr() - 0.5) * jit; P[j + 2] = pos.z + (rr() - 0.5) * jit;
     Vl[j] = dir.x * sp + (rr() - 0.5) * spread; Vl[j + 1] = dir.y * sp + (rr() - 0.2) * spread; Vl[j + 2] = dir.z * sp + (rr() - 0.5) * spread;
-    life[i] = 1.2 + rr(); size[i] = sz; kind[i] = k; mesh.setColorAt(i, k ? cB : cS); mesh.instanceColor.needsUpdate = true;
+    life[i] = 1.2 + rr(); size[i] = sz; kind[i] = k; mesh.setColorAt(i, k ? cB : cS); mesh.instanceColor.needsUpdate = true; live = 1;
   }
   return {
     // sweat flicked off the skin at the point of contact
-    spawn(pos, dir, power) { const ns = (6 + power * 12) | 0; for (let i = 0; i < ns; i++) emit(pos, dir, 0.8 + rr() * 2.6 * (0.5 + power), 1.4, 0, 0.0012 + rr() * 0.0018, 0.012); },
+    spawn(pos, dir, power) { const ns = ((6 + power * 12) * GFX.particles) | 0; for (let i = 0; i < ns; i++) emit(pos, dir, 0.8 + rr() * 2.6 * (0.5 + power), 1.4, 0, 0.0012 + rr() * 0.0018, 0.012); },
     // blood mist: a punch on a bleeding face atomises the blood film — a cloud of fine droplets thrown along the punch and
     // sideways off the skin (the red haze in fight photos), plus a few heavy drops
-    mist(pos, dir, power, amt) { MIST.burst(pos, dir, power, amt); const nd = (amt * (4 + power * 10)) | 0; for (let i = 0; i < nd; i++) emit(pos, _xm.copy(dir).add(_xm2.set(rr() - 0.5, rr() * 0.6, rr() - 0.5)).normalize(), 1.5 + rr() * 3.5 * power, 1.2, 1, 0.002 + rr() * 0.004, 0.02); },
+    mist(pos, dir, power, amt) { MIST.burst(pos, dir, power, amt); const nd = (amt * (4 + power * 10) * GFX.particles) | 0; for (let i = 0; i < nd; i++) emit(pos, _xm.copy(dir).add(_xm2.set(rr() - 0.5, rr() * 0.6, rr() - 0.5)).normalize(), 1.5 + rr() * 3.5 * power, 1.2, 1, 0.002 + rr() * 0.004, 0.02); },
     // one drop of blood leaving a wound
     drop(pos, vel, spread, sz) {
       const i = head++ % N, j = 3 * i; P[j] = pos.x; P[j + 1] = pos.y; P[j + 2] = pos.z;
       Vl[j] = vel.x + (rr() - 0.5) * spread; Vl[j + 1] = vel.y + (rr() - 0.3) * spread; Vl[j + 2] = vel.z + (rr() - 0.5) * spread;
-      life[i] = 2.5; size[i] = sz; kind[i] = 1; mesh.setColorAt(i, cB); mesh.instanceColor.needsUpdate = true;
+      life[i] = 2.5; size[i] = sz; kind[i] = 1; mesh.setColorAt(i, cB); mesh.instanceColor.needsUpdate = true; live = 1;
     },
     update(dt) {
+      if (!live) return; live = 0;   // nothing in the air: no loop, no buffer upload, no draw call
       for (let i = 0; i < N; i++) {
         if (life[i] <= 0) continue; const j = 3 * i;
         if (dt > 0) { Vl[j + 1] -= 9.81 * dt; const d = 1 - 0.8 * dt; Vl[j] *= d; Vl[j + 2] *= d; P[j] += Vl[j] * dt; P[j + 1] += Vl[j + 1] * dt; P[j + 2] += Vl[j + 2] * dt; life[i] -= dt; }
@@ -3420,12 +3550,12 @@ const FX = (() => {
         // drops are drawn stretched along their motion (what the eye sees of a fast droplet), round once they slow down
         const s = size[i] * 0.5, vx = Vl[j], vy = Vl[j + 1], vz = Vl[j + 2], sp = Math.hypot(vx, vy, vz), k = Math.min(1 + sp * 0.006 / s, 7);
         if (sp > 1e-3) q.setFromUnitVectors(up, s3.set(vx / sp, vy / sp, vz / sp)); else q.identity();
-        mesh.setMatrixAt(i, m.compose(p3.set(P[j], P[j + 1], P[j + 2]), q, s3.set(s, s * k, s)));
+        mesh.setMatrixAt(i, m.compose(p3.set(P[j], P[j + 1], P[j + 2]), q, s3.set(s, s * k, s))); live = 1;
       }
-      mesh.instanceMatrix.needsUpdate = true;
+      mesh.instanceMatrix.needsUpdate = true; mesh.visible = !!live;
     },
-    clearAir() { for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); } MIST.clear(); },
-    clearFloor() { for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero); dmesh.instanceMatrix.needsUpdate = true; dh = 0; },
+    clearAir() { for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); } mesh.instanceMatrix.needsUpdate = true; mesh.visible = false; live = 0; MIST.clear(); },
+    clearFloor() { for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero); dmesh.instanceMatrix.needsUpdate = true; dmesh.visible = false; dh = 0; },
   };
 })();
 
@@ -4034,33 +4164,43 @@ function camUpdate(dt) {
   camera.position.copy(camP); if (G.shake > 0.0005) { camera.position.x += (rr() - 0.5) * G.shake; camera.position.y += (rr() - 0.5) * G.shake; G.shake *= Math.exp(-dt * 9); }
   camera.lookAt(camL);
 }
+const HUD_BARS = ['h1', 'g1', 'h2', 'g2', 's1', 's2'].map(id => ({ el: $(id), v: -1 }));   // the DOM is touched only when a bar really changes
+function hudBar(i, v) { const b = HUD_BARS[i]; v = Math.round(clamp(v, 0, 1) * 1000); if (b.v !== v) { b.v = v; b.el.style.transform = `scaleX(${(v / 1000).toFixed(3)})`; } }
 function hudUpdate(dt) {
-  const set = (id, v) => { $(id).style.transform = `scaleX(${clamp(v, 0, 1).toFixed(3)})`; };
-  set('h1', P1.hp / 100); set('g1', P1.hp / 100); set('h2', P2.hp / 100); set('g2', P2.hp / 100); set('s1', P1.stamina / 100); set('s2', P2.stamina / 100);
+  hudBar(0, P1.hp / 100); hudBar(1, P1.hp / 100); hudBar(2, P2.hp / 100); hudBar(3, P2.hp / 100); hudBar(4, P1.stamina / 100); hudBar(5, P2.stamina / 100);
   $('cnt').hidden = !(G.state === 'fight' && P1.counterUntil > G.t);
   if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), txt = `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`; if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
-  for (const F of [P1, P2]) { const tg = clamp(1 - F.hp / 100, 0, 1); F.u.uDmg.value += (tg - F.u.uDmg.value) * Math.min(1, dt * 3); }
+  const k = Math.min(1, dt * 3); P1.u.uDmg.value += (clamp(1 - P1.hp / 100, 0, 1) - P1.u.uDmg.value) * k; P2.u.uDmg.value += (clamp(1 - P2.hp / 100, 0, 1) - P2.u.uDmg.value) * k;
 }
 
 /* ───────── layout: always landscape; a portrait phone gets the stage rotated ───────── */
-/* render resolution: a computer renders at a capped height (a 5K retina window would otherwise push ~11 Mpx through AO + bloom),
-   'auto' starts at 1080p and steps down/up with the frame rate; phones keep the old dpr rule */
+/* render resolution: a computer renders at the height of the graphics preset (GFX.h; a 5K retina window would otherwise push ~11 Mpx
+   through AO + bloom); a phone gets a pixel-ratio cap from the preset. In 'auto' the height and then the preset step down with the frame time */
 const TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || (navigator.maxTouchPoints > 0 && !(window.matchMedia && matchMedia('(hover: hover)').matches));
-const QUAL = { auto: 1080, '720': 720, '1080': 1080, '1440': 1440 };
-let qSet = 'auto'; try { qSet = localStorage.getItem('bx_q') || 'auto'; } catch (_) {} if (!QUAL[qSet]) qSet = 'auto';
-let qH = QUAL[qSet]; const DR = { acc: 0, n: 0, good: 0 };
+let qH = GFX.h; const DR = { acc: 0, n: 0, good: 0, bad: 0, wait: 0, upNeed: 6, lastUp: -1e9 };
+const resMax = () => TOUCH ? GFX.h : Math.min(GFX.h, VH * Math.max(1, window.devicePixelRatio || 1));   // the tallest frame this preset gives on this screen
 function applyRes() {
-  const dpr = window.devicePixelRatio || 1, pr = TOUCH ? Math.min(dpr, lowEnd ? 1.5 : 1.75) : clamp(qH / VH, 0.4, Math.max(1, dpr));
+  const dpr = window.devicePixelRatio || 1, pr = TOUCH ? Math.max(0.5, Math.min(dpr, GFX.tpr) * Math.min(1, qH / GFX.h)) : clamp(qH / VH, 0.4, Math.max(1, dpr));
   renderer.setPixelRatio(pr); composer.setPixelRatio(pr); renderer.setSize(VW, VH, false); composer.setSize(VW, VH);
 }
-function setQual(v) { qSet = v; qH = QUAL[v] || 1080; DR.acc = DR.n = DR.good = 0; try { localStorage.setItem('bx_q', v); } catch (_) {} applyRes(); }
-function resTick(dt) {   // dynamic resolution for 'auto': hold ~55+ fps, never above 1080p
-  if (TOUCH || qSet !== 'auto' || dt >= 0.049 || G.state === 'menu') return;
-  DR.acc += dt; DR.n++; if (DR.acc < 2) return;
+/* auto: the average frame stays above 22 ms for 3 s → first the render height goes down (to 75 % of the preset's), then the preset itself.
+   The height may come back when there is headroom (and waits twice as long after every attempt that did not hold); the preset never climbs
+   back on its own, so nothing ping-pongs. The level reached is remembered for the next start (choosing «авто» in the menu again forgets it). */
+function resTick(dt) {
+  if (GFX.set !== 'auto' || G.state === 'menu' || dt > 0.25 || dt <= 0 || document.hidden) return;
+  if (DR.wait > 0) { DR.wait -= dt; return; }   // just changed something: let the shaders compile and the frame time settle
+  DR.acc += dt; DR.n++; if (DR.acc < 1) return;
   const avg = DR.acc / DR.n; DR.acc = DR.n = 0;
-  if (avg > 1 / 48 && qH > 540) { qH = Math.max(540, qH - 180); DR.good = 0; applyRes(); }
-  else if (avg < 1 / 58 && qH < 1080) { if (++DR.good >= 3) { qH = Math.min(1080, qH + 180); DR.good = 0; applyRes(); } }
-  else DR.good = 0;
+  if (avg > 0.022) {
+    DR.good = 0; if (++DR.bad < 3) return; DR.bad = 0;
+    const cur = Math.min(qH, resMax()), floor = Math.max(540, GFX.h * 0.75), li = GFX_ORDER.indexOf(GFX.level);
+    if (G.real - DR.lastUp < 15) DR.upNeed = Math.min(DR.upNeed * 2, 48);   // the last step up did not hold
+    if (cur > floor + 1 && (avg < 0.04 || li === 0)) { qH = Math.max(floor, Math.round(cur * 0.87)); applyRes(); DR.wait = 0.5; }   // under 25 fps: straight to the preset
+    else if (li > 0) { applyGfx(GFX_ORDER[li - 1]); DR.wait = 2; try { localStorage.setItem('bx_gfx_auto', GFX.level); } catch (_) {} }
+  } else if (avg < 1 / 58) {
+    DR.bad = 0; if (++DR.good < DR.upNeed) return; DR.good = 0;
+    const top = resMax(); if (qH < top - 1) { qH = Math.min(top, Math.round(qH / 0.87) + 1); DR.lastUp = G.real; applyRes(); DR.wait = 0.5; }
+  } else { DR.bad = 0; DR.good = 0; }
 }
 function layout() {
   // a phone held upright gets the stage turned on its side; a computer never does — a tall window gets a 16:9 band instead
@@ -4074,31 +4214,31 @@ function layout() {
   applyRes();
   camera.aspect = VW / VH; camera.fov = VW / VH < 1.45 ? 34 : 28; camera.updateProjectionMatrix();
 }
-window.addEventListener('resize', layout); layout();
+window.addEventListener('resize', layout); layout(); GFX.ready = true;
 
 /* body proxies for fighter-vs-fighter separation: [joint indices (averaged), radius] */
 const SEP_T = [[[0, 1], 0.14], [[2], 0.09], [[3], 0.09], [[4], 0.075], [[15], 0.1], [[16], 0.1], [[9], 0.07], [[12], 0.07]];
 const SEP_E = [[[5], 0.055], [[7], 0.055]];   // elbows: they may touch, never sink in
 const _sa = new V3(), _sb = new V3();
-function sepPt(F, ix, out) { out.set(0, 0, 0); for (const i of ix) out.add(F.jp[i]); return out.multiplyScalar(1 / ix.length); }
+function sepPt(F, ix, out) { out.set(0, 0, 0); const n = ix.length; for (let k = 0; k < n; k++) out.add(F.jp[ix[k]]); return out.multiplyScalar(1 / n); }
 function armSegs(F) {   // world capsules of both arms, refreshed after posing
-  const B = F.bones, S = F.armSeg || (F.armSeg = [0, 1, 2, 3].map(() => [new V3(), new V3(), 0]));
-  ['L', 'R'].forEach((s, i) => { const sh = B[`CC_Base_${s}_Upperarm`], el = B[`CC_Base_${s}_Forearm`], kn = B[`CC_Base_${s}_Mid1`];
-    S[i * 2][0].setFromMatrixPosition(sh.matrixWorld); S[i * 2][1].setFromMatrixPosition(el.matrixWorld); S[i * 2][2] = 0.05;
-    S[i * 2 + 1][0].copy(S[i * 2][1]); S[i * 2 + 1][1].setFromMatrixPosition(kn.matrixWorld); S[i * 2 + 1][2] = 0.045; });
+  const S = F.armSeg || (F.armSeg = [0, 1, 2, 3].map(() => [new V3(), new V3(), 0])), LB = F.limbs();
+  for (let i = 0; i < 2; i++) { const L = i ? LB.R : LB.L;
+    S[i * 2][0].setFromMatrixPosition(L.upper.matrixWorld); S[i * 2][1].setFromMatrixPosition(L.fore.matrixWorld); S[i * 2][2] = 0.05;
+    S[i * 2 + 1][0].copy(S[i * 2][1]); S[i * 2 + 1][1].setFromMatrixPosition(L.mid1.matrixWorld); S[i * 2 + 1][2] = 0.045; }
 }
-const CLR_T = [[[0, 1], 0.16], [[0], 0.11], [[1], 0.11], [[2], 0.11], [[3], 0.11], [[16], 0.12], [[4], 0.08]], _cp1 = new V3(), _cp2 = new V3();
+const CLR_T = [[[0, 1], 0.16], [[0], 0.11], [[1], 0.11], [[2], 0.11], [[3], 0.11], [[16], 0.12], [[4], 0.08], [null, 0.17]], _cp1 = new V3(), _cp2 = new V3(), _cp3 = new V3();   // null = mid-torso
 function clearPt(o, p, r, scale, push, noArms) {   // largest displacement that takes point p (radius r) out of o's head ellipsoid and torso spheres
   const R = HEAD.R, l = _cp1.copy(p).applyMatrix4(o.headFrameInv), x = l.x / (R.x + r), y = l.y / (R.y + r), z = l.z / (R.z + r), q = x * x + y * y + z * z;
   if (q < scale * scale && q > 1e-6) { l.multiplyScalar(scale / Math.sqrt(q)).applyMatrix4(o.headFrame).sub(p); if (l.lengthSq() > push.lengthSq()) push.copy(l); }
-  const mid = _cp2.set(0, 0, 0); for (const i of [4]) mid.add(o.jp[i]); mid.add(o.jp[0]).add(o.jp[1]).multiplyScalar(1 / 3);   // mid-torso
-  for (const [ix, rr0] of [...CLR_T, [null, 0.17]]) {
-    const c = ix ? sepPt(o, ix, _sb) : _sb.copy(mid), d = _cp1.copy(p).sub(c), L = d.length(), need = rr0 + r;
+  const mid = _cp3.copy(o.jp[4]).add(o.jp[0]).add(o.jp[1]).multiplyScalar(1 / 3);   // mid-torso
+  for (let k = 0; k < CLR_T.length; k++) {
+    const ix = CLR_T[k][0], c = ix ? sepPt(o, ix, _sb) : mid, d = _cp1.copy(p).sub(c), L = d.length(), need = CLR_T[k][1] + r;
     if (L < need && L > 1e-6) { d.multiplyScalar((need - L) / L); if (d.lengthSq() > push.lengthSq()) push.copy(d); }
   }
   // his arms: forearm (elbow → knuckles) and upper arm as capsules — a punch into the guard stops on the guard
-  if (o.armSeg && !noArms) for (const [A, B2, rc] of o.armSeg) {
-    const ab = _cp2.subVectors(B2, A), t = clamp(_cp1.subVectors(p, A).dot(ab) / Math.max(1e-6, ab.lengthSq()), 0, 1), c = _cp1.copy(A).addScaledVector(ab, t), d = c.subVectors(p, c), L = d.length(), need = rc + r;
+  if (o.armSeg && !noArms) for (let k = 0; k < o.armSeg.length; k++) {
+    const A = o.armSeg[k][0], rc = o.armSeg[k][2], ab = _cp2.subVectors(o.armSeg[k][1], A), t = clamp(_cp1.subVectors(p, A).dot(ab) / Math.max(1e-6, ab.lengthSq()), 0, 1), c = _cp1.copy(A).addScaledVector(ab, t), d = c.subVectors(p, c), L = d.length(), need = rc + r;
     if (L < need && L > 1e-6) { d.multiplyScalar((need - L) / L); if (d.lengthSq() > push.lengthSq()) push.copy(d); }
   }
 }
@@ -4120,7 +4260,7 @@ function bodyOverlap(A, B, fwd) {
   const lampG = new THREE.SphereGeometry(0.035, 6, 4), N = 46, lamps = new THREE.InstancedMesh(lampG, new THREE.MeshBasicMaterial({ color: '#ffe2b0', fog: false }), N), m4 = new M4();
   for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2 + rr() * 0.1, r = 10 + rr() * 5, y = 1.7 + rr() * 2.9;
     m4.makeScale(1, 1, 1).setPosition(Math.cos(a) * r, y, Math.sin(a) * r - 2); lamps.setMatrixAt(i, m4); lamps.setColorAt(i, new THREE.Color().setHSL(0.09 + rr() * 0.05, 0.6, 0.35 + rr() * 0.4)); }
-  ARENA.add(lamps);
+  lamps.matrixAutoUpdate = false; ARENA.add(lamps);
 }
 
 /* ───────── rope visuals: while a body is in the rope the drawn line follows the contact (a V from post to post through the
@@ -4136,13 +4276,13 @@ function arenaSync() {
 }
 // where a world point is in the ring (ring frame, metres)
 const ringPt = (p, out = new V3()) => out.copy(p).applyMatrix4(_m4a.copy(ARENA.matrixWorld).invert());
-const _m4a = new M4(), RING_IN = 2.2;
+const _m4a = new M4(), _csP = new V3(), RING_IN = 2.2;
 const inRing = (p, m = 0) => { const l = ringPt(p, _v6); return Math.abs(l.x) < RING_IN - m && Math.abs(l.z) < RING_IN - m; };
 /* circling: F moves sideways by s metres (s > 0 = away from the camera) around the other man — done by turning the ring frame
    about him the opposite way, so both stay on the world x line facing each other */
 function circleStep(F, s) {
   const O = F.other.group.position, rx = F.group.position.x - O.x; if (Math.abs(rx) < 0.3) return false;
-  const saveP = ARENA.position.clone(), saveY = ARENA.rotation.y;
+  const saveP = _csP.copy(ARENA.position), saveY = ARENA.rotation.y;
   const ph = (-s) / rx;   // world turn about O that carries F by −s in z
   const d = _v4.copy(ARENA.position).sub(O), c = Math.cos(ph), sn = Math.sin(ph);
   ARENA.position.set(O.x + d.x * c + d.z * sn, 0, O.z - d.x * sn + d.z * c); ARENA.rotation.y += ph; ARENA.updateMatrixWorld(true);
@@ -4169,8 +4309,12 @@ function ropeTick(dt) {
 
 /* ───────── main loop ───────── */
 let last = performance.now();
+// the ragdoll steps run inside Fighter.update: timed separately so the overlay can show them as physics
+for (const k of ['step', 'hitStep']) { const fn = Ragdoll.prototype[k]; Ragdoll.prototype[k] = function (dt) { const t = performance.now(), r = fn.call(this, dt); PERF.rag += performance.now() - t; return r; }; }
+function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
 function frame(now) {
-  const dtReal = Math.min(0.05, (now - last) / 1000); last = now; G.real += dtReal;
+  const rawDt = (now - last) / 1000, dtReal = Math.min(0.05, rawDt); last = now; G.real += dtReal;
+  const pm = PERF.m; let tp = performance.now(), tq; PERF.rag = 0;   // CPU split for the F3 overlay
   let simDt = 0;
   if (G.state === 'replay') simDt = stepReplay(dtReal);
   if (G.state !== 'replay') {
@@ -4182,17 +4326,22 @@ function frame(now) {
     P1.aimTarget = aimFor(P1, P2); P2.aimTarget = aimFor(P2, P1);
     P1.update(dt); P2.update(dt);
     // both men are posed: now keep each one's arms out of the other's head and torso (against this frame's head, not last frame's)
-    for (const F of [P1, P2]) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
+    headFrames(P1); headFrames(P2);
     P1.armClear(); P2.armClear(); P1.armClear(); P2.armClear();   // twice: the second pass catches what the first IK left
     if (G.state === 'kd') kdTick(dt);
     if ((G.state === 'fight' || G.state === 'ko' || G.state === 'kd') && dt > 0) recFrame();
     stateTick(dtReal);
   }
+  tq = performance.now(); pm.anim += tq - tp - PERF.rag; pm.phys += PERF.rag; tp = tq;
   P1.simulate(simDt); P2.simulate(simDt);
   ropeTick(simDt); bagStep(simDt);
+  tq = performance.now(); pm.phys += tq - tp; tp = tq;
   FX.update(simDt); MIST.update(simDt);
-  camUpdate(dtReal); hudUpdate(dtReal); resTick(dtReal);
-  composer.render();
+  tq = performance.now(); pm.fx += tq - tp; tp = tq;
+  camUpdate(dtReal); hudUpdate(dtReal); resTick(rawDt);
+  pm.misc += performance.now() - tp;
+  perfTick(rawDt);
+  renderFrame(rawDt);
   requestAnimationFrame(frame);
 }
 
@@ -4218,7 +4367,7 @@ function buildMenu() {
   swatches('o-shoes', SHOES.map(b => ({ id: b.id, label: b.label })), () => LOOK.shoes || 'none', v => { LOOK.shoes = v; }, true);
   swatches('o-guard', GUARDS.map(b => ({ id: b.id, c: b.c, label: b.label })), () => LOOK.guard || 'clear', v => { LOOK.guard = v; });
   swatches('o-wraps', WRAPS_LOOKS.map(w => ({ id: w.id, c: w.c, label: w.label, need: w.need })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; });
-  swatches('o-gfx', [{ id: 'auto', label: 'авто' }, { id: '720', label: '720p' }, { id: '1080', label: '1080p' }, { id: '1440', label: '1440p' }], () => qSet, setQual, true);
+  swatches('o-gfx', ['auto', ...GFX_ORDER].map(id => ({ id, label: GFX_LABEL[id] })), () => GFX.set, setGfx, true);
   swatches('o-sig', [{ id: 'none', label: 'нет' }, ...SIGS], () => PROF.sig || 'none', v => { PROF.sig = v === 'none' ? null : v; }, true);
   const nk = $('o-nick'); nk.value = PROF.nick; nk.oninput = () => { PROF.nick = nk.value.replace(/[<>]/g, '').slice(0, 14); save(); };
   nk.onkeydown = e => e.stopPropagation();
