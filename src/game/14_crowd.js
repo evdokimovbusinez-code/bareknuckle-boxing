@@ -257,7 +257,9 @@ function makeCrowd(o = {}) {
         const p = ppl[i]; if (!groups[p.g].vis) { p.seen = false; continue; }
         const px = e[0] * p.x + e[8] * p.z + e[12] - cam.x, pz = e[2] * p.x + e[10] * p.z + e[14] - cam.z, s = px * ux + pz * uz;
         const ft = s > -0.6 && s < len - 0.6 ? clamp((Math.abs(px * uz - pz * ux) - 0.7 - Math.max(s, 0) * tH) / 0.4, 0, 1) : 1;
-        p.fade = p.seen ? p.fade + (ft - p.fade) * kF : ft; p.seen = true;
+        // anyone within reach of the lens is gone at once: a half-dissolved body right in front of the camera dithers the whole screen
+        const near = s > -1.2 && s < 1.6 && Math.abs(px * uz - pz * ux) < 1.3;
+        p.fade = near ? 0 : p.seen ? p.fade + (ft - p.fade) * kF : ft; p.seen = true;
         let ex = 0;
         for (const c of pulses) { const dist = Math.hypot(p.x - c.x, p.z - c.z), tau = t - c.t - dist / 6 - p.lag; if (tau <= 0) continue;
           ex = Math.max(ex, c.p * p.exc * (0.5 + 0.5 * Math.exp(-dist / 3.5)) * (tau < 0.18 ? tau / 0.18 : tau < 0.18 + c.hold ? 1 : Math.exp(-(tau - 0.18 - c.hold) / 0.8))); }
