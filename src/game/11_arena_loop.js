@@ -5,7 +5,6 @@
 /* the ring frame: keep the ropes' world ends current, hide the side(s) between the camera and the fighters */
 function arenaSync() {
   ARENA.updateMatrixWorld(true); const cam = camera.position;
-  locSync();
   for (const R of ROPES) {
     R.a.copy(R.aL).applyMatrix4(ARENA.matrixWorld); R.b.copy(R.bL).applyMatrix4(ARENA.matrixWorld);
     const nW = _v1.copy(R.n).transformDirection(ARENA.matrixWorld), mid = _v2.addVectors(R.a, R.b).multiplyScalar(0.5);
@@ -71,7 +70,7 @@ function frame(now) {
   P1.simulate(simDt); P2.simulate(simDt);
   ropeTick(simDt); bagStep(simDt);
   FX.update(simDt); MIST.update(simDt);
-  camUpdate(dtReal); hudUpdate(dtReal); resTick(dtReal);
+  camUpdate(dtReal); locSync(); hudUpdate(dtReal); resTick(dtReal);   // locSync: the location hides what stands between the camera and the fighters
   composer.render();
   requestAnimationFrame(frame);
 }

@@ -201,6 +201,29 @@ class XWorld {
       }
       if (rp.best > 0) { const S = rp.src; S.hit = S.hit || new V3(); S.hit.copy(rp.dv).transformDirection(this.R.F.group.matrixWorld).multiplyScalar(-rp.best); S.s = rp.s; }
     }
+    /* the soft round wall of a street location (a circle of hay bales, LOC.wall). In the (radial, height) plane the bales are a box
+       [W.r, W.r + W.d] × [0, top]. Legs and pelvis never pass its inner face at any height (the man stays in the circle); the trunk,
+       head and arms can fold over the top and hang outside. The inner face gives like the ropes (compliant, k shared by the
+       contacts, hard past W.give); friction and hay damping are applied in solveVel through the rope contact list */
+    if (this.wall) { const wl = this.wall, W = wl.W; wl.nPrev = Math.max(1, wl.n); wl.n = 0;
+      if (!wl.init) { wl.init = 1; for (const d of R.defs) d.body.low = d.leg || d.key === 'pelvis'; }
+      for (const b of this.bodies) { if (!b.invMass) continue;
+        if (Math.hypot(b.position.x - wl.c.x, b.position.z - wl.c.z) + (b.bound || 0.4) < W.r) continue;
+        for (let i = 0; i < b.shapes.length; i++) {
+          const c = b.sphere(i, _v5), r = b.shapes[i].radius, dx = c.x - wl.c.x, dz = c.z - wl.c.z, d = Math.hypot(dx, dz); if (d + r <= W.r || d < 1e-6) continue;
+          const y = c.y - wl.c.y, l3 = _r2.copy(c).applyMatrix4(wl.toL), top = b.low ? 1e3 : W.top(l3.x, l3.z), out = b.low ? 1e3 : W.r + W.d;
+          // nearest point of the box section to the sphere centre → contact normal (radial part nr, vertical part ny) and depth
+          const qr = clamp(d, W.r, out), qy = Math.min(y, top), er = d - qr, ey = y - qy, e = Math.hypot(er, ey); let nr, ny, pen, soft = false;
+          if (e > 1e-6) { if (e >= r) continue; nr = er / e; ny = ey / e; pen = r - e; soft = ey === 0 && er < 0; }
+          else { const pi = d - W.r, pu = top - y, po = out - d; if (pi <= pu && pi <= po) { nr = -1; ny = 0; pen = pi + r; soft = true; } else if (pu <= po) { nr = 0; ny = 1; pen = pu + r; } else { nr = 1; ny = 0; pen = po + r; } }
+          const n = _r3.set(dx / d * nr, ny, dz / d * nr), rA = _r4.copy(n).multiplyScalar(-r).add(c).sub(b.position); let l = 0;
+          if (soft && pen > W.give) l += xPos(b, null, _r5.copy(n).multiplyScalar(pen - W.give), rA, null, 0, h);
+          l += xPos(b, null, _r5.copy(n).multiplyScalar(soft ? Math.min(pen, W.give) : pen), rA, null, (soft ? wl.nPrev : 0.25) / W.k, h);
+          if (soft) wl.n++; else if (ny > 0.5) b.contact = 1;
+          RC.push({ b, r: rA.clone(), n: n.clone(), ln: l, mu: W.mu, damp: W.damp });
+        }
+      }
+    }
     // self-collision and the opponent (frictionless)
     for (const [A, Bb] of (TW.noSelf ? [] : this.pairs)) {
       if (A.position.distanceTo(Bb.position) > A.bound + Bb.bound) continue;
@@ -234,8 +257,8 @@ class XWorld {
     if (this.ropeC) for (const k of this.ropeC) {
       const b = k.b, v = _v1.copy(b.angularVelocity).cross(k.r).add(b.velocity), vn = v.dot(k.n), vt = _v2.copy(v).addScaledVector(k.n, -vn), lt = vt.length();
       const dv = _v3.set(0, 0, 0);
-      if (lt > 1e-6) dv.addScaledVector(vt, -Math.min(ROPE.mu * Math.abs(k.ln) / h, lt) / lt);
-      dv.addScaledVector(k.n, -vn * (1 - Math.exp(-ROPE.damp * h)));
+      if (lt > 1e-6) dv.addScaledVector(vt, -Math.min((k.mu ?? ROPE.mu) * Math.abs(k.ln) / h, lt) / lt);   // k.mu / k.damp: a bale-wall contact brings its own
+      dv.addScaledVector(k.n, -vn * (1 - Math.exp(-(k.damp ?? ROPE.damp) * h)));
       const L = dv.length(); if (L < 1e-9) continue;
       const n = _v4.copy(dv).multiplyScalar(1 / L), w = b.genW(k.r, n);
       b.applyImpulse(n.multiplyScalar(L / w), k.r);

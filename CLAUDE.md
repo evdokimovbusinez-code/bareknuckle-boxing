@@ -13,11 +13,11 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 - `src/bench.js` / `src/dbg_extra.js` only go into the debug build `gtest.html` (git-ignored).
 
 ## Looking at the game (do this for every visual change)
-- `bash tools/shot.sh /tmp/shots/a.png fight 4` — quick fight, 4 s in. `... menu` — the menu. `... js "CODE"` — run CODE first
+- `bash tools/shot.sh /tmp/shots/a.jpg fight 4` — quick fight, 4 s in. `... menu` — the menu. `... js "CODE"` — run CODE first
   (`window.__g` exposes `G, P1, P2, camera, scene, ARENA, ...`; `__tick(n, dt)` steps the sim, e.g. `__tick(300, 1/60)`).
   Close-ups: pin the camera with `window.__camHold = { p: [x, y, z], l: [x, y, z] }` (world metres; fighters face each other along x,
   P1 at x≈-0.55, heads at y≈1.65; the default camera looks from +z). `delete window.__camHold` releases it.
-  Then open the PNG with the Read tool. Software rendering: ~30 s – 3 min per shot. Compare before/after.
+  Then open the JPG with the Read tool. Software rendering: ~30 s – 3 min per shot. Compare before/after.
 
 ## Map of `src/game/`
 | File | What |
@@ -35,6 +35,7 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 | `10_camera_layout.js` | fight / replay camera, HUD, `layout()`, resolution (`QUAL`, `applyRes`, `resTick`) |
 | `11_arena_loop.js` | ring lights, rope visuals, **main loop `frame()`** (update order) |
 | `12_ui.js` | menu build (`swatches`, `buildMenu`), keyboard/mouse (`MV_KEYS`, `ACT_KEYS`), touch stick, boot |
+| `13_locations.js` | locations: `LOCS` (`gym`, `parking`), current `LOC`, `setLocation(id)`, `locSync()`; per location: `bound`, `ring`, `wall` (soft wall for the KO ragdoll), `build()` set, `light`. Debug: `__loc.set('parking')` |
 
 ## Conventions
 - Units: metres, seconds. Fighters stay on the world x-line; the ring (`ARENA`) rotates/slides around them.

@@ -1,9 +1,9 @@
 #!/bin/bash
 # Rebuild, serve the debug build and take a screenshot.  Examples:
-#   bash tools/shot.sh /tmp/shots/menu.png menu
-#   bash tools/shot.sh /tmp/shots/fight.png fight 6
-#   bash tools/shot.sh /tmp/shots/x.png js "document.getElementById('go').click(); __tick(400, 1/60);"
-# then look at the PNG with the Read tool.  Takes 1-4 minutes (software rendering).
+#   bash tools/shot.sh /tmp/shots/menu.jpg menu
+#   bash tools/shot.sh /tmp/shots/fight.jpg fight 6
+#   bash tools/shot.sh /tmp/shots/x.jpg js "document.getElementById('go').click(); __tick(400, 1/60);"
+# then look at the JPG with the Read tool.  Takes 1-4 minutes (software rendering).
 set -e
 cd "$(dirname "$0")/.."
 mkdir -p "$(dirname "$1")"
