@@ -29,7 +29,8 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 | `00_looks_templates_punches.js` | look presets (shorts/hair/skin/wraps), FBX template build, small maths (`Jig`, `Spring`), `PUNCH` table |
 | `01_ragdoll.js` | `class Ragdoll` — standing hit reactions (cannon-es), muscle tone |
 | `02_xpbd_ko.js` | `XBody`, `XWorld` — knockout ragdoll, rope + canvas contacts; knockout timeline, get-up poses (`POSES`) |
-| `03_flesh_face.js` | `class Flesh` (swelling, cuts, nose bleeds), `class Face` (gaze, blinks, jaw) |
+| `03_flesh_face.js` | `class Flesh` (swelling, cuts, nose bleeds), `class Face` (gaze, blinks, jaw, expression moods `Face.x`) |
+| `03b_face_shapes.js` | face blend shapes: `fbxShapes` reads the CC shapes straight from the FBX (three r160's FBXLoader bakes them misaligned — don't use its morphs), `faceShapes` → `T.fm` (`aFM` slot attribute + half-float delta texture, applied in the skin vertex shader `FACE_MORPH_V`, weights `Flesh.u.uFW`; kept shapes: `FACE_SHAPES` in `g_pre.js`), `faceWeights` = moods (focus, effort, pain + side, daze, tired, smirk, mean, roar, sad, slack, show) → weights. Debug: `__g.faceWeights`, `__g.FACE_SHAPES` |
 | `04_gear.js` | clothes shells (`shellMesh`; prints on tops: uniforms `uDecal`, `uDecF`, `uDecB`), `GUARDS`, `gearSetup` (the items themselves are in `04e_wardrobe.js`) |
 | `04b_gloves_headgear.js` | boxing gloves (`gloveMesh`, cuff, thumb, piping), MMA glove shell (`mmaShell`), training headgear (`headgearGeo`, `headMap`), gum shield; `HANDS`, `GLOVES` options |
 | `04c_mma_pads.js` | rigid MMA-glove pads on the hand bones (`mmaPadGeo`, `mmaPads`) |

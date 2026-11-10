@@ -10,6 +10,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { mergeVertices, mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { unzlibSync } from 'three/addons/libs/fflate.module.js';   // FBX arrays (face blend shapes, 03b_face_shapes.js)
 import * as CANNON from 'cannon-es';
 window.__boot = true;   // the boot watchdog in the page head checks this
 

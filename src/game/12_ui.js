@@ -88,7 +88,7 @@ document.addEventListener('contextmenu', e => e.preventDefault());
 
 buildTemplates().then(() => {
   P1 = new Fighter(true); const nSc = scene.children.length; P2 = new Fighter(false); P2.sceneObjs = scene.children.slice(nSc).filter(o => o !== P2.group); P1.other = P2; P2.other = P1;
-  REC.N = P1.allBones.length * 4 + 5;
+  REC.N = P1.allBones.length * 4 + 5 + FACE_SHAPES.length;   // bones, hip, lids, face shape weights
   P1.place(-D_SEP / 2, Math.PI / 2, false); P2.place(D_SEP / 2, -Math.PI / 2, true);
   P1.applyLook(LOOK); buildMenu(); toMenu();
   /*DBG*/

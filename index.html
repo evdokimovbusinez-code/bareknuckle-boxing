@@ -548,6 +548,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { mergeVertices, mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { unzlibSync } from 'three/addons/libs/fflate.module.js';   // FBX arrays (face blend shapes, 03b_face_shapes.js)
 import * as CANNON from 'cannon-es';
 window.__boot = true;   // the boot watchdog in the page head checks this
 
@@ -753,8 +754,18 @@ const HEAD_FRAG = `#include <map_fragment>
  gDrop = sweatBeads( vMapUv, uSweat * ( 1.0 - hairCover ) ); gH += gDrop * 0.00016 * ( 1.0 - WW.x );
  float bWet = clamp( max( WW.x * ( 1.0 - 0.85 * WW.z ), gFilm * 0.7 ) + WW.y + mWet, 0.0, 1.0 );
 `;
+/* face blend shapes kept from the CC export (character's Left / Right; read from the FBX by faceShapes, 03b_face_shapes.js) */
+const FACE_SHAPES = ['A01_Brow_Inner_Up', 'A02_Brow_Down_Left', 'A03_Brow_Down_Right', 'A04_Brow_Outer_Up_Left', 'A05_Brow_Outer_Up_Right',
+  'A16_Eye_Squint_Left', 'A17_Eye_Squint_Right', 'A18_Eye_Wide_Left', 'A19_Eye_Wide_Right', 'A21_Cheek_Squint_Left', 'A22_Cheek_Squint_Right',
+  'A23_Nose_Sneer_Left', 'A24_Nose_Sneer_Right', 'Cheek_Blow_L', 'Cheek_Blow_R', 'A29_Mouth_Funnel', 'A31_Mouth_Left', 'A32_Mouth_Right', 'A36_Mouth_Shrug_Lower',
+  'A38_Mouth_Smile_Left', 'A39_Mouth_Smile_Right', 'A40_Mouth_Frown_Left', 'A41_Mouth_Frown_Right', 'A44_Mouth_Upper_Up_Left', 'A45_Mouth_Upper_Up_Right',
+  'A46_Mouth_Lower_Down_Left', 'A47_Mouth_Lower_Down_Right', 'A48_Mouth_Press_Left', 'A49_Mouth_Press_Right', 'A50_Mouth_Stretch_Left', 'A51_Mouth_Stretch_Right'];
 /* ───────── flesh: soft-tissue impact (dent + surface wave) and swelling, displaced in bind space before skinning ───────── */
-const FLESH_VDECL = `uniform float uFT;
+const FLESH_VDECL = `attribute float aFM;
+uniform highp sampler2D uFMT;
+uniform float uFW[${FACE_SHAPES.length}];
+uniform int uFMN;
+uniform float uFT;
 uniform float uU;
 uniform float uFleshOn;
 uniform vec4 uImp[2];
@@ -800,14 +811,7 @@ vec3 fleshOff( vec3 p, vec3 n ) {
 const FLESH_NORMAL = `#include <beginnormal_vertex>
  vBP = position; vBN = objectNormal;
  vec3 fOff = vec3( 0.0 ); vEyeSw = 0.0;
- // expression (the rig has no face bones or blend shapes): brows, mouth corners and lips are moved by painted weights
- if ( dot( abs( aFace ), vec4( 1.0 ) ) > 0.0 ) {
-   float cm = uU * 0.01, sd = sign( dot( position - uFMid, uLidAx ) );
-   fOff += uFUp * ( -uEmo.x * 0.42 * aFace.x + uEmo.y * 0.8 * aFace.y ) * cm - uLidAx * sd * uEmo.x * 0.18 * aFace.y * cm;   // brows down + together / inner brows up
-   float c = abs( aFace.z ), cs = sign( aFace.z );
-   fOff += ( uLidAx * cs * 0.28 * uEmo.z - uFFw * 0.18 * uEmo.z + uFUp * 0.32 * uEmo.w ) * c * cm;                              // mouth corners: pulled back / up or down
-   fOff += uFUp * ( max( aFace.w, 0.0 ) * uEmo2.x * 0.28 - max( -aFace.w, 0.0 ) * uEmo2.y * 0.24 ) * cm;                      // upper lip up (teeth bared) / lower lip down
- }
+/*EXPR*/
  if ( aLid.x + aLid.y > 0.0 ) {
    bool left = distance( position, uEyeL ) < distance( position, uEyeR ); vec3 c = left ? uEyeL : uEyeR;
    float esw = left ? uEyeSw.x : uEyeSw.y; vEyeSw = ( aLid.x + aLid.y * 1.2 ) * esw;
@@ -818,12 +822,32 @@ const FLESH_NORMAL = `#include <beginnormal_vertex>
    objectNormal = normalize( mix( lidRot( objectNormal, a ), normalize( rp ) * length( objectNormal ), k * 0.85 ) );
    fOff += normalize( rp ) * vEyeSw * 0.0075 * uU;   // haematoma: the lids and the cheek under the eye puff up
  } else vLidK = 0.0;
+/*EXPR2*/
  if ( uFleshOn > 0.5 ) {
    vec3 n0 = normalize( objectNormal );
    fOff += fleshOff( position, n0 );
    vec3 t1 = normalize( cross( n0, abs( n0.y ) < 0.9 ? vec3( 0.0, 1.0, 0.0 ) : vec3( 1.0, 0.0, 0.0 ) ) ), t2 = cross( n0, t1 ); float e = 0.004 * uU;
    float hx = dot( fleshOff( position + t1 * e, n0 ) - fleshOff( position - t1 * e, n0 ), n0 ), hy = dot( fleshOff( position + t2 * e, n0 ) - fleshOff( position - t2 * e, n0 ), n0 );
    objectNormal = normalize( n0 - ( t1 * hx + t2 * hy ) / ( 2.0 * e ) );
+ }`;
+// expression, fallback (no blend shapes loaded): brows, mouth corners and lips are moved by painted weights (aFace, uEmo / uEmo2)
+const FACE_APPROX_V = ` if ( dot( abs( aFace ), vec4( 1.0 ) ) > 0.0 ) {
+   float cm = uU * 0.01, sd = sign( dot( position - uFMid, uLidAx ) );
+   fOff += uFUp * ( -uEmo.x * 0.42 * aFace.x + uEmo.y * 0.8 * aFace.y ) * cm - uLidAx * sd * uEmo.x * 0.18 * aFace.y * cm;   // brows down + together / inner brows up
+   float c = abs( aFace.z ), cs = sign( aFace.z );
+   fOff += ( uLidAx * cs * 0.28 * uEmo.z - uFFw * 0.18 * uEmo.z + uFUp * 0.32 * uEmo.w ) * c * cm;                              // mouth corners: pulled back / up or down
+   fOff += uFUp * ( max( aFace.w, 0.0 ) * uEmo2.x * 0.28 - max( -aFace.w, 0.0 ) * uEmo2.y * 0.24 ) * cm;                      // upper lip up (teeth bared) / lower lip down
+ }`;
+// expression from the real blend shapes: aFM = the vertex's slot among the face vertices (-1: not in any shape); uFMT holds, per shape,
+// uFMN position deltas then uFMN normal deltas (bind units), 2048 texels a row; uFW = the shape weights. Added after the lids (they rotate the lid skin)
+const FACE_MORPH_V = ` vec3 fM = vec3( 0.0 );
+ if ( aFM > -0.5 ) {
+   int k = int( aFM + 0.5 );
+   for ( int s = 0; s < ${FACE_SHAPES.length}; s++ ) {
+     float w = uFW[s]; if ( w == 0.0 ) continue;
+     int t = 2 * s * uFMN + k; fM += texelFetch( uFMT, ivec2( t & 2047, t >> 11 ), 0 ).xyz * w;
+     t += uFMN; objectNormal += texelFetch( uFMT, ivec2( t & 2047, t >> 11 ), 0 ).xyz * w;
+   }
  }`;
 /* wounds (head only): cuts and nose bleeds as decals projected on the skin around each source, with a rivulet that runs along gravity */
 const SKIN_FDECL = `uniform float uFT;
@@ -958,7 +982,8 @@ function skinify(mat, u, fu) {
  { float h = vGH.x, R = vGH.y, a = vGH.z;
    if ( ( uGear.x > 0.5 && R < 2.5 && h > uGear.x && h < ${(0).toFixed(1)} + GEAR_TOP ) || ( uGear.y > 0.0 && R < 1.5 && h < uGear.y - 1.0 ) || ( uGear.z > 0.5 && ( ( R > 1.5 && R < 2.5 && h > max( GEAR_TOP - 7.0, uGearT ) && h < uGear.z ) || ( R > 2.5 && R < 4.5 && a < uGear.w - 0.05 && h < GEAR_NECK + 3.0 ) ) ) || ( R > 3.5 && ( uGlv > 1.5 ? a > 1.81 && a < 2.53 : uGlv > 0.5 && a > 1.635 ) ) ) discard; }   // hands: inside a boxing glove (up to the cuff's rim) / under an MMA glove`).replace(/GEAR_TOP/g, GEAR.top.toFixed(2)).replace(/GEAR_NECK/g, GEAR.neck.toFixed(2));
     Object.assign(s.uniforms, fu); s.uniforms.uDropS = { value: u ? 190 : 300 };
-    s.vertexShader = 'attribute vec3 aGH;\nvarying vec3 vGH;\n' + FLESH_VDECL + s.vertexShader.replace('#include <beginnormal_vertex>', FLESH_NORMAL + '\n vGH = aGH;').replace('#include <begin_vertex>', '#include <begin_vertex>\n transformed += fOff' + (u ? ' * ( 1.0 - 0.92 * clamp( aScalp, 0.0, 1.0 ) );' : ';') + (u ? '\n vScalp = aScalp; vStub = aStub; vHairUV = aHairUV;' : ''));
+    const fn = FLESH_NORMAL.replace('/*EXPR*/', T.fm ? FACE_MORPH_V : FACE_APPROX_V).replace('/*EXPR2*/', T.fm ? ' fOff += fM;' : '');
+    s.vertexShader = 'attribute vec3 aGH;\nvarying vec3 vGH;\n' + FLESH_VDECL + s.vertexShader.replace('#include <beginnormal_vertex>', fn + '\n vGH = aGH;').replace('#include <begin_vertex>', '#include <begin_vertex>\n transformed += fOff' + (u ? ' * ( 1.0 - 0.92 * clamp( aScalp, 0.0, 1.0 ) );' : ';') + (u ? '\n vScalp = aScalp; vStub = aStub; vHairUV = aHairUV;' : ''));
     if (u) {
       Object.assign(s.uniforms, u);
       s.vertexShader = 'attribute float aScalp;\nattribute float aStub;\nattribute vec2 aHairUV;\nvarying float vScalp;\nvarying float vStub;\nvarying vec2 vHairUV;\n' + s.vertexShader;
@@ -1745,6 +1770,8 @@ async function buildTemplates() {
     sample(tris.hair, 3600, HEAD.hairRoots); sample(tris.beard, 2400, HEAD.beardRoots);
   }
 
+  // face blend shapes, read from the FBX itself (the loader's morphs are broken and were dropped above): 03b_face_shapes.js
+  try { T.fm = faceShapes(bufs.boxer, body.geometry); } catch (e) { console.warn('face shapes:', e); T.fm = null; }
   T.cc = cc;
   T.shortsGeo = makeShorts(body);
   T.shortsNormal = shortsNormal();
@@ -2707,7 +2734,8 @@ class Flesh {
     this.u = { uFT: { value: 0 }, uU: { value: this.U }, uFleshOn: { value: 0 }, uSweat: { value: 0 }, uImp: { value: v4(2, -1) }, uImpD: { value: v4(2, 0) }, uSw: { value: v4(6, 0) },
       uWP: { value: v4(8, -1e4) }, uWD: { value: v4(8, 0) }, uWN: { value: v4(8, 0) }, uWT: { value: v4(8, 0) }, uNB: { value: new V4() }, uNBD: { value: new V4() },
       uEyeL: { value: new V3() }, uEyeR: { value: new V3() }, uLidAx: { value: new V3(1, 0, 0) }, uLid: { value: new V4() },
-      uEyeSw: { value: new THREE.Vector2() }, uEmo: { value: new V4() }, uEmo2: { value: new V4() }, uFUp: { value: new V3() }, uFFw: { value: new V3() }, uFMid: { value: new V3() }, uBr: { value: v4(10, 0) }, uBrT: { value: v4(10, 0) }, uSm: { value: v4(28, 0) }, uGear: { value: new V4() }, uGearT: { value: 0 }, uGlv: { value: 0 }, uSmD: { value: v4(28, 0) } };
+      uEyeSw: { value: new THREE.Vector2() }, uEmo: { value: new V4() }, uEmo2: { value: new V4() }, uFUp: { value: new V3() }, uFFw: { value: new V3() }, uFMid: { value: new V3() }, uBr: { value: v4(10, 0) }, uBrT: { value: v4(10, 0) }, uSm: { value: v4(28, 0) }, uGear: { value: new V4() }, uGearT: { value: 0 }, uGlv: { value: 0 }, uSmD: { value: v4(28, 0) },
+      uFMT: { value: T.fm ? T.fm.tex : null }, uFMN: { value: T.fm ? T.fm.n : 0 }, uFW: { value: new Float32Array(FACE_SHAPES.length) } };   // face blend shapes (03b_face_shapes.js)
     this.eyeSwell = [0, 0]; this.brI = 0; this.smI = 0; this.lipBleed = 0;
     this.M = new M4(); this.Mi = new M4(); this.t = 0; this.ii = 0; this.wounds = []; this.vel = new V3();
     if (!T.headV) { T.headV = skinVerts(body.geometry, T.matNames.indexOf('Std_Skin_Head')); T.bodyV = skinVerts(body.geometry, T.matNames.indexOf('Std_Skin_Body')); }
@@ -2737,7 +2765,7 @@ class Flesh {
     // expression weights: brows (whole / inner half), mouth corners (signed by side), upper and lower lip
     this.u.uFUp.value.copy(this.up); this.u.uFFw.value.copy(fw); this.u.uFMid.value.addVectors(this.u.uEyeL.value, this.u.uEyeR.value).multiplyScalar(0.5);
     this.lips = this.snap(T.headV, this.nose.tip.clone().addScaledVector(this.up, -0.024 * this.U));
-    if (!T.faceAttr) {
+    if (!T.faceAttr && !T.fm) {   // (only for the fallback expressions: with the blend shapes loaded the shader does not use them)
       const geo = body.geometry, A = new Float32Array(geo.attributes.position.count * 4), H = T.headV, s = this.U / 100, mid = this.u.uFMid.value, L = this.lips.p;
       for (let k = 0; k < H.n; k++) {
         const p = _f3.fromArray(H.P, 3 * k), j = 4 * H.I[k];
@@ -2911,10 +2939,16 @@ class Face {
     this.t = 0; this.blinkT = 1 + rr() * 3; this.bl = -1; this.jawA = 0; this.jawV = 0; this.squint = 0; this.droop = 0;
     this.jolt = new V3(); this.sacc = new V3(); this.saccT = 0; this.drift = new V3(); this.koRoll = 0; this.koLid = 0.4 + rr() * 0.4; this.lids = [0, 0];
     this.breath = rr() * 6; this.koT = 0;
+    // blend-shape moods (faceWeights): smoothed in update; asym = this man's own lopsidedness, smSide = the corner he smirks with
+    this.x = { focus: 0, effort: 0, arm: 0, pain: 0, side: 0, daze: 0, tired: 0, smirk: 0, mean: 0, roar: 0, sad: 0, slack: 0, show: 0 };
+    this.asym = (rr() - 0.5) * 0.3; this.smSide = rr() < 0.5 ? 1 : -1; this.hitSide = 0;
   }
   blink(now) { if (this.bl < 0 || this.bl > 0.09 || now) this.bl = 0; }
-  hit(power, onJaw) {
+  hit(power, onJaw, at) {
     this.hitT = this.t; this.hitP = Math.min(1, power);
+    // which side of his face took it (+ = his left): the pain grimace screws up that side
+    if (at) { const g = this.F.group, l = g.worldToLocal(_fv1.copy(at)).x - g.worldToLocal(_fv3.copy(this.F.headNow)).x; this.hitSide = clamp(l / 0.05, -1, 1); }
+    else this.hitSide = (rr() - 0.5) * 0.6;
     this.blink(true); this.squint = Math.max(this.squint, 0.25 + 0.3 * power);
     this.jolt.set((rr() - 0.5) * 0.4 * power, (rr() - 0.3) * 0.25 * power, 0);
     this.jawV += (onJaw ? 9 : 4) * power;
@@ -2940,14 +2974,31 @@ class Face {
     // jaw: spring toward the target opening
     const D = _fq1.copy(F.mquat(F.head, _fq2)).multiply(_fq3.copy(this.head0).invert());
     let jt = F.cur ? 0 : 0.012;   // clenched when punching
-    if (tired > 0 && !ko) { this.breath += dt * (5 + 3 * tired); jt = 0.035 * tired + 0.05 * tired * (0.5 + 0.5 * Math.sin(this.breath)); }
+    if (tired > 0 && !ko) { this.breath += dt * (5 + 3 * tired); jt = T.fm ? tired * (0.012 + 0.085 * Math.max(0, Math.sin(this.breath))) : 0.035 * tired + 0.05 * tired * (0.5 + 0.5 * Math.sin(this.breath)); }   // (with the shapes: lips close to blow out, cheeks puffed)
     if (dz > 0.3 && !ko) jt = Math.max(jt, 0.05 * dz);
+    const roar = G.state === 'result' && G.winner === F && !BAG.on, show = G.state === 'menu' && F === P1 && UI.mouth && UI.scr === 'creator';
+    if (T.fm && roar) jt = Math.max(jt, 0.24 + 0.04 * Math.sin(this.t * 3.1));   // the roar: mouth wide
+    if (show) jt = 0.045;   // teeth just apart on the gum shield
     if (ko) { const gl = _fv1.set(0, -1, 0).applyQuaternion(_fq2.copy(D).invert()); jt = 0.07 + 0.22 * clamp(-gl.y * 0.8 - gl.z * 0.6, 0, 1); }
     this.jawV += ((jt - this.jawA) * 260 - this.jawV * 26) * dt; this.jawA = clamp(this.jawA + this.jawV * dt, -0.02, 0.4);
     F.setMQuat(this.jaw, _fq2.setFromAxisAngle(_fv1.set(1, 0, 0), this.jawA).premultiply(D).multiply(this.jaw0));
     // expression: focus by default (brows a little down), effort when throwing (brows down, lips back over clenched teeth),
     // pain on being hit (inner brows up, corners down, mouth open), dazed and tired (brows up and slack, mouth open)
     const hurt = Math.max(0, 1 - (this.t - (this.hitT || -9)) / 0.9) * (this.hitP || 0), EM = this.emo || (this.emo = [0, 0, 0, 0, 0, 0]);
+    if (T.fm) {   // the real blend shapes: moods → weights (faceWeights, 03b_face_shapes.js)
+      const X = this.x, up = !ko && !(F.rag.on && F.rag.mode === 'ko'), grit = F.gu || (F.rag.on && F.rag.prof && F.rag.prof.conscious), menu = G.state === 'menu';
+      const stare = G.state === 'intro' && G.stare > 0.01 ? G.stare : 0, punch = F.cur && !F.release, P = punch ? PUNCH[F.cur] : null;
+      const tgt = this.xt || (this.xt = {});   // the moods' targets this frame (reused: no garbage per frame)
+      tgt.focus = up && !menu ? (F.blockW > 0.5 ? 0.9 : 0.6) * (1 - stare) : menu ? 0.12 : 0;
+      tgt.effort = up ? Math.max(punch ? 1 : 0, F.blockW > 0.5 ? 0.25 : 0, grit ? 0.5 : 0) : 0;
+      tgt.pain = Math.max(hurt * 1.2, grit ? 0.6 : 0); tgt.daze = up && dz > 0.3 ? dz : 0; tgt.tired = up && tired > 0.2 ? tired : 0;
+      tgt.smirk = F === G.smirker ? stare : 0; tgt.mean = F !== G.smirker ? stare : 0; tgt.roar = roar ? 1 : 0;
+      tgt.sad = G.state === 'result' && G.loser === F && !ko && !BAG.on ? 1 : 0; tgt.slack = ko ? 1 : 0; tgt.show = show ? 1 : 0;
+      if (P) X.arm = P.arm === 'L' ? 0.35 : -0.35;
+      if (hurt > 0.05) X.side = this.hitSide;
+      for (const k in tgt) { const v = tgt[k], r = k === 'pain' ? (v > X[k] ? 30 : 5) : k === 'effort' ? (v > X[k] ? 16 : 6) : k === 'slack' ? 2.5 : 5; X[k] += (v - X[k]) * Math.min(1, dt * r); }
+      faceWeights(F.flesh.u.uFW.value, X, this);
+    } else {
     let tg = [0.35, 0, 0, 0, 0, 0];
     if (F.cur && !F.release) tg = [0.9, 0, 0.75, -0.1, 0.7, 0];
     if (F.blockW > 0.5) tg = [0.8, 0, 0.3, -0.2, 0.2, 0];
@@ -2961,6 +3012,7 @@ class Face {
     for (let i = 0; i < 6; i++) EM[i] += (tg[i] - EM[i]) * Math.min(1, dt * (hurt > 0.5 ? 25 : 8));
     for (let i = 0; i < 6; i++) EM[i] = clamp(EM[i], i === 2 || i === 3 ? -1 : 0, 1);   // expressions stay inside what a face can do
     F.flesh.u.uEmo.value.set(EM[0], EM[1], EM[2], EM[3]); F.flesh.u.uEmo2.value.set(EM[4], EM[5], 0, 0);
+    }
     // gaze
     const tgt = _fv2; if (o) { tgt.copy(o.headNow); tgt.y += 0.03; } else tgt.set(0, 1.6, 0);
     F.group.worldToLocal(tgt);
@@ -2981,6 +3033,138 @@ class Face {
   }
 }
 
+/* ───────── face blend shapes ─────────
+   The CC export carries ~120 shapes on CC_Base_Body (ARKit A01…A52, CC expressions, visemes). three r160's FBXLoader bakes them wrong:
+   genMorphGeometry triangulates every quad by earcut on the shape's *deltas* (mostly zero → degenerate), so each morph buffer comes out
+   shorter than the mesh and out of step with its corners — read against the welded mesh that gives garbage and NaN deltas, and every
+   triangle with a NaN vertex vanishes on the GPU as soon as an influence is set (torso, half the head). So buildTemplates drops the loader's
+   morphs and the shapes the expressions use (FACE_SHAPES, g_pre.js) are read here straight from the FBX: sparse per control point
+   (Indexes + Vertices), matched to the welded vertices by position (the base mesh is the control points as they are). Deltas under
+   0.1 mm are dropped; only the control points some kept shape moves get a slot. Position and normal deltas of the slots go into one small
+   half-float texture, applied in the skin vertex shader (FACE_MORPH_V) with per-fighter weights (Flesh.u.uFW) — no three.js morph
+   targets, so the depth / shadow / AO passes and the clothing shells that share the body's attributes are untouched. */
+// a minimal reader of the binary FBX: the mesh's control points and its shapes, by name
+function fbxShapes(buf, meshName, want) {
+  const u8 = new Uint8Array(buf), dv = new DataView(buf), big = dv.getUint32(23, true) >= 7500, w = big ? 8 : 4;
+  const num = o => big ? Number(dv.getBigUint64(o, true)) : dv.getUint32(o, true);
+  const str = (o, n) => { let s = ''; for (let i = 0; i < n; i++) s += String.fromCharCode(u8[o + i]); return s; };
+  const node = o => { const nl = u8[o + 3 * w], p = o + 3 * w + 1 + nl; return { end: num(o), np: num(o + w), p, k: p + num(o + 2 * w), name: str(o + 3 * w + 1, nl) }; };
+  const each = (o, end, f) => { while (o < end) { const c = node(o); if (!c.end) break; f(c); o = c.end; } };
+  const child = (n, nm) => { let r = null; each(n.k, n.end, c => { if (!r && c.name === nm) r = c; }); return r; };
+  const props = n => {
+    const out = []; let p = n.p;
+    for (let i = 0; i < n.np; i++) {
+      const t = String.fromCharCode(u8[p++]);
+      if (t === 'L') { out.push(dv.getBigInt64(p, true).toString()); p += 8; }
+      else if (t === 'I') { out.push(dv.getInt32(p, true)); p += 4; }
+      else if (t === 'D') { out.push(dv.getFloat64(p, true)); p += 8; }
+      else if (t === 'F') { out.push(dv.getFloat32(p, true)); p += 4; }
+      else if (t === 'Y') { out.push(dv.getInt16(p, true)); p += 2; }
+      else if (t === 'C') { out.push(u8[p]); p += 1; }
+      else if (t === 'S' || t === 'R') { const l = dv.getUint32(p, true); out.push(t === 'S' ? str(p + 4, l) : null); p += 4 + l; }
+      else {   // arrays: f d l i b, raw or zlib
+        const len = dv.getUint32(p, true), enc = dv.getUint32(p + 4, true), cl = dv.getUint32(p + 8, true), sz = t === 'd' || t === 'l' ? 8 : t === 'b' ? 1 : 4; p += 12;
+        const raw = u8.subarray(p, p + cl), b = new Uint8Array(len * sz); b.set((enc ? unzlibSync(raw) : raw).subarray(0, len * sz)); p += cl;
+        out.push(t === 'd' ? new Float64Array(b.buffer) : t === 'f' ? new Float32Array(b.buffer) : t === 'i' ? new Int32Array(b.buffer) : b);
+      }
+    }
+    return out;
+  };
+  let objs = null, cons = null; each(27, u8.length, n => { if (n.name === 'Objects') objs = n; else if (n.name === 'Connections') cons = n; });
+  const par = new Map(); each(cons.k, cons.end, c => { const [, a, b] = props(c); if (!par.has(a)) par.set(a, []); par.get(a).push(b); });
+  let mesh = null; const cand = [];
+  each(objs.k, objs.end, n => {
+    if (n.name !== 'Geometry') return;
+    const [id, nm, cls] = props(n), name = nm.split('\0')[0];
+    if (cls === 'Mesh' && name === meshName) mesh = { id, n }; else if (cls === 'Shape' && want.includes(name)) cand.push({ id, name, n });
+  });
+  // a shape belongs to the mesh through shape → blend-shape channel → blend shape → geometry (the eyelashes, tear lines… carry the same names)
+  const up = id => par.get(id) || [], owns = id => up(id).some(a => up(a).some(b => up(b).includes(mesh.id)));
+  const shapes = {};
+  for (const s of cand) if (!shapes[s.name] && owns(s.id)) shapes[s.name] = { I: props(child(s.n, 'Indexes'))[0], V: props(child(s.n, 'Vertices'))[0] };
+  return { cp: props(child(mesh.n, 'Vertices'))[0], shapes };
+}
+// the face rig of the welded body geometry: aFM (slot per vertex) + the delta texture; null when the file has none of the shapes
+function faceShapes(buf, geo) {
+  const t0 = performance.now(), S = fbxShapes(buf, 'CC_Base_Body', FACE_SHAPES), NS = FACE_SHAPES.length, cp = new Float32Array(S.cp), ncp = cp.length / 3, MIN = 0.01;   // cm
+  const slot = new Int32Array(ncp).fill(-1); let n = 0;
+  const big = (V, j) => Math.hypot(V[3 * j], V[3 * j + 1], V[3 * j + 2]) >= MIN;
+  for (const nm of FACE_SHAPES) { const s = S.shapes[nm]; if (s) for (let j = 0; j < s.I.length; j++) if (slot[s.I[j]] < 0 && big(s.V, j)) slot[s.I[j]] = n++; }
+  if (!n) return null;
+  const D = new Float32Array(NS * n * 3);
+  FACE_SHAPES.forEach((nm, si) => { const s = S.shapes[nm]; if (s) for (let j = 0; j < s.I.length; j++) { const k = slot[s.I[j]]; if (k >= 0 && big(s.V, j)) for (let c = 0; c < 3; c++) D[(si * n + k) * 3 + c] = s.V[3 * j + c]; } });
+  // welded vertex → slot, by position (several welded vertices share a control point along the UV seams: they share its slot)
+  const key = (a, i) => Math.round(a[3 * i] * 1000) + ',' + Math.round(a[3 * i + 1] * 1000) + ',' + Math.round(a[3 * i + 2] * 1000);
+  const at = new Map(); for (let i = 0; i < ncp; i++) if (slot[i] >= 0) at.set(key(cp, i), slot[i]);
+  const P = geo.attributes.position.array, nv = P.length / 3, fm = new Float32Array(nv).fill(-1); let hit = 0;
+  for (let j = 0; j < nv; j++) { const k = at.get(key(P, j)); if (k !== undefined) { fm[j] = k; hit++; } }
+  // normal deltas: area-weighted normals per slot (smooth across the seams), shape at full weight minus base
+  const ix = geo.index.array, tris = []; for (let t = 0; t < ix.length; t += 3) if (fm[ix[t]] >= 0 || fm[ix[t + 1]] >= 0 || fm[ix[t + 2]] >= 0) tris.push(t);
+  const q = new Float32Array(9), acc = (si, out) => {
+    out.fill(0);
+    for (const t of tris) {
+      for (let c = 0; c < 3; c++) { const v = ix[t + c], k = fm[v]; for (let e = 0; e < 3; e++) q[3 * c + e] = P[3 * v + e] + (si >= 0 && k >= 0 ? D[(si * n + k) * 3 + e] : 0); }
+      const ax = q[3] - q[0], ay = q[4] - q[1], az = q[5] - q[2], bx = q[6] - q[0], by = q[7] - q[1], bz = q[8] - q[2];
+      const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+      for (let c = 0; c < 3; c++) { const k = fm[ix[t + c]]; if (k >= 0) { out[3 * k] += nx; out[3 * k + 1] += ny; out[3 * k + 2] += nz; } }
+    }
+    for (let k = 0; k < n; k++) { const l = Math.hypot(out[3 * k], out[3 * k + 1], out[3 * k + 2]) || 1; out[3 * k] /= l; out[3 * k + 1] /= l; out[3 * k + 2] /= l; }
+  };
+  const N0 = new Float32Array(n * 3), N1 = new Float32Array(n * 3); acc(-1, N0);
+  const W = 2048, H = Math.ceil(NS * 2 * n / W), data = new Uint16Array(W * H * 4), h = THREE.DataUtils.toHalfFloat;
+  for (let si = 0; si < NS; si++) {
+    if (!S.shapes[FACE_SHAPES[si]]) continue;
+    acc(si, N1);
+    for (let k = 0; k < n; k++) {
+      const a = 4 * (2 * si * n + k), b = a + 4 * n, d = 3 * (si * n + k);
+      for (let c = 0; c < 3; c++) { data[a + c] = h(D[d + c]); const dn = N1[3 * k + c] - N0[3 * k + c]; data[b + c] = h(Math.abs(dn) < 1e-3 ? 0 : dn); }
+    }
+  }
+  const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat, THREE.HalfFloatType); tex.needsUpdate = true;
+  geo.setAttribute('aFM', new THREE.BufferAttribute(fm, 1));
+  return { tex, n, verts: hit, missing: FACE_SHAPES.filter(x => !S.shapes[x]), ms: Math.round(performance.now() - t0) };
+}
+
+/* ───────── expressions → shape weights ─────────
+   Face.update keeps a few smoothed moods (X) and this turns them into the weights of FACE_SHAPES. Moods add up (pain on top of effort…);
+   each weight is clamped to what the shape can do. L/R = the character's own left / right; `s` > 0 leans a mood onto his left side. */
+const [F_BI, F_BDL, F_BDR, F_BOL, F_BOR, F_SQL, F_SQR, F_WL, F_WR, F_CSL, F_CSR, F_NSL, F_NSR, F_CBL, F_CBR, F_FUN, F_ML, F_MR, F_SHL,
+  F_SML, F_SMR, F_FRL, F_FRR, F_UUL, F_UUR, F_LDL, F_LDR, F_PRL, F_PRR, F_STL, F_STR] = FACE_SHAPES.map((_, i) => i);   // (in FACE_SHAPES order)
+function faceWeights(W, X, f) {
+  W.fill(0);
+  const LR = (l, r, v, s = 0) => { if (v > 0) { W[l] += v * clamp(1 + s, 0, 2); W[r] += v * clamp(1 - s, 0, 2); } };
+  const a = f.asym, e = X.effort, p = X.pain, ps = X.side;
+  // focus: brows a little down, eyes narrowed, lips set
+  LR(F_BDL, F_BDR, 0.35 * X.focus, a); LR(F_SQL, F_SQR, 0.18 * X.focus, -a); LR(F_PRL, F_PRR, 0.25 * X.focus * (1 - e) * (1 - p));
+  // effort (throwing): breath hissed out through clenched teeth — brows down, squint, nose up, lips pulled back; the punching side harder
+  LR(F_BDL, F_BDR, 0.6 * e, X.arm); LR(F_SQL, F_SQR, 0.45 * e, X.arm); LR(F_CSL, F_CSR, 0.35 * e, X.arm); LR(F_NSL, F_NSR, 0.4 * e, X.arm);
+  LR(F_UUL, F_UUR, 0.4 * e, X.arm); LR(F_LDL, F_LDR, 0.3 * e, X.arm); LR(F_STL, F_STR, 0.6 * e, X.arm);
+  // pain: the brows knot (inner up, pulled down), the face screws up toward the side that was hit, the mouth is dragged that way
+  W[F_BI] += 0.75 * p; LR(F_BDL, F_BDR, 0.5 * p, 0.6 * ps); LR(F_SQL, F_SQR, 0.85 * p, 0.6 * ps); LR(F_CSL, F_CSR, 0.7 * p, 0.6 * ps); LR(F_NSL, F_NSR, 0.55 * p, 0.6 * ps);
+  LR(F_UUL, F_UUR, 0.45 * p, 0.6 * ps); LR(F_LDL, F_LDR, 0.4 * p, 0.4 * ps); LR(F_STL, F_STR, 0.7 * p, 0.5 * ps); LR(F_FRL, F_FRR, 0.3 * p);
+  W[F_ML] += 0.35 * p * Math.max(0, ps); W[F_MR] += 0.35 * p * Math.max(0, -ps);
+  // dazed: brows up (lopsided), lips slack and parted, the mouth drifts
+  const d = X.daze, dr = Math.sin(f.t * 0.6 + f.F.ph);
+  W[F_BI] += 0.45 * d; LR(F_BOL, F_BOR, 0.4 * d, 0.5 + a); LR(F_LDL, F_LDR, 0.3 * d, a); LR(F_FRL, F_FRR, 0.25 * d, -a); W[F_ML] += 0.18 * d * Math.max(0, dr); W[F_MR] += 0.18 * d * Math.max(0, -dr);
+  // tired: inner brows up; breathing in through the open mouth, blowing out through pursed lips with the cheeks puffed
+  const k = X.tired, b = Math.sin(f.breath), inh = Math.max(0, b), exh = Math.max(0, -b);
+  W[F_BI] += 0.35 * k; LR(F_LDL, F_LDR, 0.35 * k * inh); LR(F_STL, F_STR, 0.15 * k * inh); LR(F_CBL, F_CBR, 1.1 * k * exh, 2 * a); W[F_FUN] += 0.4 * k * exh; LR(F_PRL, F_PRR, 0.3 * k * exh);
+  // smirk (stare-down): one corner up, that cheek bunched, the mouth pulled over, the other brow down, chin up a touch
+  const m = X.smirk, sL = f.smSide > 0;
+  W[sL ? F_SML : F_SMR] += 0.8 * m; W[sL ? F_CSL : F_CSR] += 0.4 * m; W[sL ? F_ML : F_MR] += 0.25 * m; W[sL ? F_BDR : F_BDL] += 0.35 * m; W[sL ? F_BOL : F_BOR] += 0.2 * m;
+  LR(F_SQL, F_SQR, 0.25 * m); W[F_SHL] += 0.2 * m;
+  // the other man's stare: jaw set, lips pressed, brows down
+  const mm = X.mean; LR(F_BDL, F_BDR, 0.75 * mm, a); LR(F_SQL, F_SQR, 0.35 * mm); LR(F_PRL, F_PRR, 0.5 * mm); LR(F_NSL, F_NSR, 0.2 * mm); LR(F_FRL, F_FRR, 0.15 * mm); W[F_SHL] += 0.3 * mm;
+  // the winner's roar: teeth bared, nose wrinkled, eyes screwed up (the jaw opens wide in Face.update)
+  const r = X.roar; LR(F_BDL, F_BDR, 0.85 * r); LR(F_SQL, F_SQR, 0.5 * r); LR(F_CSL, F_CSR, 0.6 * r); LR(F_NSL, F_NSR, 0.75 * r); LR(F_UUL, F_UUR, 0.9 * r); LR(F_LDL, F_LDR, 0.85 * r); LR(F_STL, F_STR, 0.55 * r);
+  // the loser on his feet: inner brows up, corners down, chin pushed up
+  const sd = X.sad; W[F_BI] += 0.6 * sd; LR(F_FRL, F_FRR, 0.45 * sd, a); W[F_SHL] += 0.45 * sd; LR(F_PRL, F_PRR, 0.2 * sd);
+  // knocked out: everything lets go; the lower lip hangs, the mouth sags to one side
+  const sl = X.slack; LR(F_LDL, F_LDR, 0.25 * sl, 2 * a); LR(F_FRL, F_FRR, 0.15 * sl); W[a > 0 ? F_ML : F_MR] += 0.15 * sl;
+  // the creator's gum-shield view: a wide grimace that shows the teeth (and the guard on them)
+  const g = X.show; LR(F_SML, F_SMR, 0.35 * g); LR(F_UUL, F_UUR, 0.95 * g); LR(F_LDL, F_LDR, 0.85 * g); LR(F_STL, F_STR, 0.6 * g); LR(F_CSL, F_CSR, 0.3 * g); LR(F_BOL, F_BOR, 0.2 * g);
+  for (let i = 0; i < W.length; i++) W[i] = clamp(W[i], 0, 1);
+}
 /* ───────── clothes & gear ─────────
    Clothes are shells grown out of the body mesh itself: the same skinned triangles (same skeleton, same weights), pushed out along
    the normal by the fabric's thickness and clipped to a band of the body (ankle → waist for trousers, …). The skin under them is
@@ -4610,7 +4794,7 @@ class Fighter {
   knuckle(v) { return v.setFromMatrixPosition(this.bones[`CC_Base_${this.aimArm}_Mid1`].matrixWorld); }
   takeHit(dirWorld, power, name, contact, body, blocked) {
     const g = this.group, hp = contact;
-    this.face.hit(body ? power * 0.4 : power, !body && (PUNCH[name].type === 'hook' || PUNCH[name].type === 'upper'));
+    this.face.hit(body ? power * 0.4 : power, !body && (PUNCH[name].type === 'hook' || PUNCH[name].type === 'upper'), hp);
     const dm = _v1.copy(hp).add(dirWorld); g.worldToLocal(dm); dm.sub(g.worldToLocal(_v2.copy(hp)));
     // the upper body takes the real impulse at the contact point (muscles let go there and pull back)
     const cm = g.worldToLocal(contact.clone()), speed = (body ? 0.8 : 1.1) + 1.6 * Math.min(power, 1.3);
@@ -4874,7 +5058,7 @@ class Fighter {
       if (G2.pants) pantsTick(this, G2.pants, 1 / 60); if (G2.top) topTick(this, G2.top, 1 / 60);
       if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
   }
-  capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; }
+  capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; arr.set(this.flesh.u.uFW.value, 4 * n + 5); }   // + the face shape weights
   restore(a, b2, t) {
     const b = this.allBones, n = b.length;
     for (let i = 0; i < n; i++) {
@@ -4882,6 +5066,7 @@ class Fighter {
       b[i].quaternion.set(a[k] + (b2[k] * s - a[k]) * t, a[k + 1] + (b2[k + 1] * s - a[k + 1]) * t, a[k + 2] + (b2[k + 2] * s - a[k + 2]) * t, a[k + 3] + (b2[k + 3] * s - a[k + 3]) * t).normalize();
     }
     const k = 4 * n; { const L = this.flesh.u.uLid.value; L.x = a[k + 3] + (b2[k + 3] - a[k + 3]) * t; L.y = a[k + 4] + (b2[k + 4] - a[k + 4]) * t; L.z = L.x * 0.6; L.w = L.y * 0.6; }
+    { const W = this.flesh.u.uFW.value; for (let i = 0, j = k + 5; i < W.length; i++, j++) W[i] = a[j] + (b2[j] - a[j]) * t; }
     this.hip.position.set(a[k] + (b2[k] - a[k]) * t, a[k + 1] + (b2[k + 1] - a[k + 1]) * t, a[k + 2] + (b2[k + 2] - a[k + 2]) * t);
     this.cc.updateMatrixWorld(true);
   }
@@ -5266,7 +5451,7 @@ function followHit(att, name, contact) {
     const b = d.body, Jl = _v2.copy(dir).applyQuaternion(qi).multiplyScalar(J), r = _v3.set(pl.x - b.position.x, pl.y - b.position.y, pl.z - b.position.z).multiplyScalar(k === 'head' ? 1 : 0); b.applyImpulse(Jl, r); }
   const fr = def.flesh.onHit(pos, dir, power, name, false, def), ev = { t: G.t, pos: fr.skin, dir, power, who: def === P1 ? 0 : 1, dent: fr.dent };
   const sp = def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.06 * def.flesh.U); if (sp.length || fr.spray.length) { const s2 = fr.spray.length ? fr.spray : sp; def.flesh.spray(s2, dir, power, def); ev.spray = s2.map(w => def.flesh.wounds.indexOf(w)); }
-  def.face.hit && def.face.hit(power, true); FX.spawn(fr.skin, dir, power); { const bl = Math.min(1, def.flesh.wounds.reduce((a, x) => a + x.sev, 0) * 0.8); if (bl > 0.12) { FX.mist(fr.skin, dir, power, bl); ev.mist = bl; } } REC.events.push(ev);
+  def.face.hit && def.face.hit(power, true, fr.skin); FX.spawn(fr.skin, dir, power); { const bl = Math.min(1, def.flesh.wounds.reduce((a, x) => a + x.sev, 0) * 0.8); if (bl > 0.12) { FX.mist(fr.skin, dir, power, bl); ev.mist = bl; } } REC.events.push(ev);
   if (att.fs) { att.fs.land++; att.fs.dmg += P.dmg * DMG_K; } if (G.state === 'kd') { def.hp = Math.max(0, def.hp - P.dmg * DMG_K); G.kd.up += 0.8; }
   att.lastLand = G.t; sfx.thud(power, false); EVT.emit('hit', { pos, power }); G.shake = Math.max(G.shake, 0.02 + 0.03 * power); G.hitstop = 0.02 + 0.02 * power;
   popup(fr.skin.clone().add(_v4.set(0, 0.15, 0)), 'добил', 'crit');
@@ -6238,7 +6423,7 @@ document.addEventListener('contextmenu', e => e.preventDefault());
 
 buildTemplates().then(() => {
   P1 = new Fighter(true); const nSc = scene.children.length; P2 = new Fighter(false); P2.sceneObjs = scene.children.slice(nSc).filter(o => o !== P2.group); P1.other = P2; P2.other = P1;
-  REC.N = P1.allBones.length * 4 + 5;
+  REC.N = P1.allBones.length * 4 + 5 + FACE_SHAPES.length;   // bones, hip, lids, face shape weights
   P1.place(-D_SEP / 2, Math.PI / 2, false); P2.place(D_SEP / 2, -Math.PI / 2, true);
   P1.applyLook(LOOK); buildMenu(); toMenu();
   /*DBG*/
@@ -8240,9 +8425,9 @@ EVT.on((type, e) => {
    UI.scr is the screen on top: 'main' | 'train' | 'quick' | 'creator' | 'settings' | 'pause' | null (the fight / result).
    All of them except the pause (and the settings opened from it) live in G.state === 'menu'; the pause sets G.paused, frame() then
    runs with dt = 0. The menu camera (menuCam) orbits P1: the creator turns it by dragging, the other screens just frame him. */
-const UI = { scr: null, from: null, cat: 'name', spar: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };
+const UI = { scr: null, from: null, cat: 'name', spar: false, mouth: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };   // mouth: the gum-shield close-up of the creator (he bares his teeth: Face.update)
 const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', pause: 'pause' };
-const VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
+const VIEW_MOUTH = { yaw: 1.38, zoom: 0 }, _mouthP = new V3(), VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
 const myName = () => PROF.nick || PROF.name || 'Ты';
 function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [...root.querySelectorAll('button:not([disabled]),input')].filter(b => b.offsetParent !== null) : []; }
 function uiShow(scr, focusId) {
@@ -8254,6 +8439,7 @@ function uiShow(scr, focusId) {
   if (scr === 'pause') $('p-quit-l').textContent = BAG.on ? 'Выйти' : 'Сдаться';
   if (scr === 'shop') shopEnter();
   if (scr === 'social') socEnter();
+  if (scr !== 'creator') UI.mouth = false;
   if (scr !== 'creator' && UI.spar) { UI.spar = false; if (G.state === 'menu') P1.sparGear(false); }   // the glove preview of the creator
   const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur();
   if (!TOUCH && scr && scr !== 'creator') { const b = (focusId && $(focusId)) || (scr === 'main' || scr === 'train' || scr === 'pause' ? uiItems()[0] : null); b && b.focus({ preventScroll: true }); }
@@ -8293,7 +8479,8 @@ function surrender() { if (!BAG.on && G.state !== 'ko') { G.losses++; save(); } 
 const MCAM = { yaw: 0.5, d: 4, tx: 0, ty: 1, tz: 0, sh: 0.36, h: 0.1, init: false };
 function menuCam(dt, cp, cl) {
   const x = P1.group.position.x, th = Math.tan(camera.fov * Math.PI / 360), asp = VW / VH, dFull = 1.13 / th, hd = P1.headNow, T = { tx: x, tz: 0 };
-  if (UI.scr === 'creator' || UI.scr === 'shop') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1; }
+  if (UI.scr === 'creator' || UI.scr === 'shop') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1;
+    if (UI.mouth && UI.scr === 'creator') { const m = _mouthP.set(0, -0.08, 0.075).applyMatrix4(P1.gear.guard.matrix); T.d = 0.13 / th; T.tx = m.x; T.ty = m.y; T.tz = m.z; T.h = 0.012; } }   // the gum shield, close
   else if (UI.scr === 'quick') { T.yaw = 0.2; T.d = dFull * 1.18; T.ty = 1.02; T.sh = 0.4; T.h = 0.32; }
   else { T.yaw = 0.52 + 0.05 * Math.sin(camClock * 0.4); T.d = dFull * 0.84; T.ty = 1.05; T.sh = UI.scr === 'settings' || UI.scr === 'social' ? 0.5 : 0.38; T.h = 0.12; }
   const M = MCAM, a = camCut || !M.init ? 1 : 1 - Math.exp(-dt * (UI.drag ? 16 : 4.2)); M.init = true;
@@ -8304,8 +8491,9 @@ function menuCam(dt, cp, cl) {
 function setView(v) { const o = UI.orb, tau = 2 * Math.PI; o.yaw = v.yaw + tau * Math.round((o.yaw - v.yaw) / tau); o.zoom = v.zoom; }   // the short way round
 
 /* fighter creator */
+function mouthOff() { if (UI.mouth) { UI.mouth = false; setView(VIEW_HANDS); } }   // back from the gum-shield close-up to the hands
 function setCat(c) {
-  UI.cat = c;
+  UI.cat = c; UI.mouth = false;
   for (const b of $('cats').children) b.setAttribute('aria-pressed', String(b.dataset.cat === c));
   for (const p of document.querySelectorAll('.cpane')) p.hidden = p.dataset.cat !== c;
   if (UI.scr === 'creator') setView(c === 'face' || (c === 'wear' && (UI.wcat === 'head' || UI.wcat === 'eyes')) ? VIEW_FACE : c === 'hands' ? VIEW_HANDS : VIEW_FULL);
@@ -8317,11 +8505,11 @@ function buildCreator() {
   swatches('o-hair', col(HAIR_LOOKS, h => h.id === 'bald' ? { id: 'bald', label: 'под ноль' } : { id: h.id, c: h.c, label: h.id }), () => LOOK.hair, v => { LOOK.hair = v; });
   swatches('o-beard', [{ id: 'no', label: 'нет' }, { id: 'yes', label: 'есть' }], () => LOOK.beard ? 'yes' : 'no', v => { LOOK.beard = v === 'yes'; }, true);
   wearUI();   // clothes: category → model → the colours of that model (04e_wardrobe.js)
-  swatches('o-wraps', col(WRAPS_LOOKS, w => ({ id: w.id, c: w.c, label: w.label })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; spar(false)(); });
-  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { if (!itemOwned(v)) { setTimeout(() => { buildCreator(); shopOpen('hands', v); }, 0); return; } LOOK.hands = v; spar(false)(); }, true);   // street fights: wraps or 4 oz MMA gloves (bought)
+  swatches('o-wraps', col(WRAPS_LOOKS, w => ({ id: w.id, c: w.c, label: w.label })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; spar(false)(); mouthOff(); });
+  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { if (!itemOwned(v)) { setTimeout(() => { buildCreator(); shopOpen('hands', v); }, 0); return; } LOOK.hands = v; spar(false)(); mouthOff(); }, true);   // street fights: wraps or 4 oz MMA gloves (bought)
   [...$('o-hands').children].forEach((b, i) => { const it = ITEMS[HANDS[i].id]; if (it && !itemOwned(it.id)) { b.classList.add('lock'); b.title = 'купить в магазине'; const s = document.createElement('small'); s.className = 'pr'; s.textContent = '🔒 ' + cash(it.price); b.append(s); } });
-  swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; spar(true)(); });   // sparring (and MMA) gloves + headgear: shown on him while choosing
-  swatches('o-guard', col(GUARDS, b => ({ id: b.id, c: b.c, label: b.label })), () => LOOK.guard || 'clear', v => { LOOK.guard = v; });
+  swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; spar(true)(); mouthOff(); });   // sparring (and MMA) gloves + headgear: shown on him while choosing
+  swatches('o-guard', col(GUARDS, b => ({ id: b.id, c: b.c, label: b.label })), () => LOOK.guard || 'clear', v => { LOOK.guard = v; spar(false)(); UI.mouth = true; setView(VIEW_MOUTH); });   // choosing a gum shield: he shows it, the camera goes to his mouth
   swatches('o-sig', [{ id: 'none', label: 'нет' }, ...SIGS], () => PROF.sig || 'none', v => { PROF.sig = v === 'none' ? null : v; }, true, true);
   for (const [id, key, n] of [['o-name', 'name', 16], ['o-nick', 'nick', 14]]) { const el = $(id); el.value = PROF[key] || ''; el.oninput = () => { PROF[key] = el.value.replace(/[<>]/g, '').slice(0, n); save(); }; }
   renderStats();
@@ -8411,10 +8599,10 @@ function dragView(el) {
     const p = pts.get(e.pointerId), o = UI.orb; if (!p) return;
     if (pts.size === 1) o.yaw -= (stage.classList.contains('rot') ? e.clientY - p[1] : e.clientX - p[0]) * 0.009;
     p[0] = e.clientX; p[1] = e.clientY;
-    if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) o.zoom = clamp(o.zoom - (d - pinch) / 240, 0, 1); pinch = d; }
+    if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) { o.zoom = clamp(o.zoom - (d - pinch) / 240, 0, 1); UI.mouth = false; } pinch = d; }
   });
   for (const ev of ['pointerup', 'pointercancel']) el.addEventListener(ev, e => { pts.delete(e.pointerId); pinch = 0; UI.drag = pts.size; });
-  el.addEventListener('wheel', e => { e.preventDefault(); UI.orb.zoom = clamp(UI.orb.zoom + Math.sign(e.deltaY) * 0.14, 0, 1); }, { passive: false });
+  el.addEventListener('wheel', e => { e.preventDefault(); UI.mouth = false; UI.orb.zoom = clamp(UI.orb.zoom + Math.sign(e.deltaY) * 0.14, 0, 1); }, { passive: false });
 }
 /* ───────── the shop («Магазин», menu screen 'shop') ─────────
    Category → cards of the items (price / «есть» / «награда · бой N») → colours. A click on a card puts the thing on the man
