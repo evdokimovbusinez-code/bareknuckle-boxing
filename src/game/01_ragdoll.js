@@ -342,7 +342,7 @@ class Ragdoll {
       this.muscles();
       if (this.pulses) for (const q of this.pulses) if (q.t < q.T) {
         const h = 1 / 120, a = Math.PI * q.t / q.T, b = Math.PI * Math.min(q.t + h, q.T) / q.T, k = (Math.cos(a) - Math.cos(b)) / 2 / h;   // exact share of the half-sine over this substep
-        q.b.applyForce(new CANNON.Vec3(q.J.x * k, q.J.y * k, q.J.z * k), new CANNON.Vec3(q.r.x, q.r.y, q.r.z)); q.t += h;
+        q.b.applyForce(_cf1.set(q.J.x * k, q.J.y * k, q.J.z * k), _cf2.set(q.r.x, q.r.y, q.r.z)); q.t += h;
       }
       this.world.step(1 / 120); this.acc -= 1 / 120;
       for (const d of defs) {   // hard leash to the animated pose
@@ -487,4 +487,4 @@ class Ragdoll {
   }
   stop() { for (const d of this.defs) if (d.bone.userData.pos0) { d.bone.position.copy(d.bone.userData.pos0); d.bone.userData.pos0 = null; } this.pulses = null; for (const S of this.F.shoulder) if (S.clBase) { S.cl.quaternion.copy(S.clBase); S.clBase = null; } this.on = false; this.hitOn = false; this.world = null; this.mode = null; for (const d of this.defs) d.str = 1; }
 }
-const _hq = new Quat(), _j1q = new Quat(), _j3q = new Quat(), _j4q = new Quat(), _v7 = new V3(), _v8 = new V3(), _v9 = new V3(), _v10 = new V3();
+const _cf1 = new CANNON.Vec3(), _cf2 = new CANNON.Vec3(), _hq = new Quat(), _j1q = new Quat(), _j3q = new Quat(), _j4q = new Quat(), _v7 = new V3(), _v8 = new V3(), _v9 = new V3(), _v10 = new V3();

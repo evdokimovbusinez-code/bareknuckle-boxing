@@ -25,7 +25,12 @@ const fxaa = new ShaderPass(FXAAShader); fxaa.enabled = false; composer.addPass(
   scrub.render = (r, wb, rb, dt, mask) => scrubRender(r, wb, sceneRT, dt, mask);
   for (const t of [composer.renderTarget1, composer.renderTarget2]) { t.samples = 0; t.depthBuffer = false; t.dispose(); }
   fxaa.setSize = (w, h) => fxaa.material.uniforms.resolution.value.set(1 / w, 1 / h);
-  if (gtao) { const aoSize = gtao.setSize.bind(gtao); gtao.setSize = (w, h) => aoSize(Math.max(1, Math.round(w * GFX.aoScale)), Math.max(1, Math.round(h * GFX.aoScale))); }
+  if (gtao) {
+    const aoSize = gtao.setSize.bind(gtao), aoRender = gtao.render.bind(gtao);
+    gtao.setSize = (w, h) => aoSize(Math.max(1, Math.round(w * GFX.aoScale)), Math.max(1, Math.round(h * GFX.aoScale)));
+    // the AO normal pass is a second renderer.render() of the scene: without this it redrew the whole shadow map every frame
+    gtao.render = (r, wb, rb, dt, mask) => { const sm = r.shadowMap, au = sm.autoUpdate; sm.autoUpdate = false; aoRender(r, wb, rb, dt, mask); sm.autoUpdate = au; };
+  }
   renderer.info.autoReset = false;   // counted per frame over all passes (renderFrame resets it)
   // ring props never move inside the ring frame: no per-frame matrix recompose
   RINGSET.traverse(o => { if (o !== RINGSET) { o.updateMatrix(); o.matrixAutoUpdate = false; } });

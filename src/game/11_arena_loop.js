@@ -22,13 +22,13 @@ function arenaSync() {
 }
 // where a world point is in the ring (ring frame, metres)
 const ringPt = (p, out = new V3()) => out.copy(p).applyMatrix4(_m4a.copy(ARENA.matrixWorld).invert());
-const _m4a = new M4(), RING_IN = 2.2;
+const _m4a = new M4(), _csP = new V3(), RING_IN = 2.2;
 const inRing = (p, m = 0) => { const l = ringPt(p, _v6); return Math.abs(l.x) < RING_IN - m && Math.abs(l.z) < RING_IN - m; };
 /* circling: F moves sideways by s metres (s > 0 = away from the camera) around the other man — done by turning the ring frame
    about him the opposite way, so both stay on the world x line facing each other */
 function circleStep(F, s) {
   const O = F.other.group.position, rx = F.group.position.x - O.x; if (Math.abs(rx) < 0.3) return false;
-  const saveP = ARENA.position.clone(), saveY = ARENA.rotation.y;
+  const saveP = _csP.copy(ARENA.position), saveY = ARENA.rotation.y;
   const ph = (-s) / rx;   // world turn about O that carries F by −s in z
   const d = _v4.copy(ARENA.position).sub(O), c = Math.cos(ph), sn = Math.sin(ph);
   ARENA.position.set(O.x + d.x * c + d.z * sn, 0, O.z - d.x * sn + d.z * c); ARENA.rotation.y += ph; ARENA.updateMatrixWorld(true);

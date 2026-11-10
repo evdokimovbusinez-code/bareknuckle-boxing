@@ -4,6 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
+[hidden]{display:none!important}   /* the hidden attribute must beat every display rule (loading screen, menus, pad) */
 /* Layout: one landscape stage (rotated 90° on a portrait phone). Full-bleed WebGL ring, health bars across the top, dodge pad bottom-left, punch diamond bottom-right. Single dark arena look by design. */
 :root{
   --ink:#0a0c11;
@@ -1269,7 +1270,12 @@ const fxaa = new ShaderPass(FXAAShader); fxaa.enabled = false; composer.addPass(
   scrub.render = (r, wb, rb, dt, mask) => scrubRender(r, wb, sceneRT, dt, mask);
   for (const t of [composer.renderTarget1, composer.renderTarget2]) { t.samples = 0; t.depthBuffer = false; t.dispose(); }
   fxaa.setSize = (w, h) => fxaa.material.uniforms.resolution.value.set(1 / w, 1 / h);
-  if (gtao) { const aoSize = gtao.setSize.bind(gtao); gtao.setSize = (w, h) => aoSize(Math.max(1, Math.round(w * GFX.aoScale)), Math.max(1, Math.round(h * GFX.aoScale))); }
+  if (gtao) {
+    const aoSize = gtao.setSize.bind(gtao), aoRender = gtao.render.bind(gtao);
+    gtao.setSize = (w, h) => aoSize(Math.max(1, Math.round(w * GFX.aoScale)), Math.max(1, Math.round(h * GFX.aoScale)));
+    // the AO normal pass is a second renderer.render() of the scene: without this it redrew the whole shadow map every frame
+    gtao.render = (r, wb, rb, dt, mask) => { const sm = r.shadowMap, au = sm.autoUpdate; sm.autoUpdate = false; aoRender(r, wb, rb, dt, mask); sm.autoUpdate = au; };
+  }
   renderer.info.autoReset = false;   // counted per frame over all passes (renderFrame resets it)
   // ring props never move inside the ring frame: no per-frame matrix recompose
   RINGSET.traverse(o => { if (o !== RINGSET) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
@@ -1893,7 +1899,7 @@ class Ragdoll {
       this.muscles();
       if (this.pulses) for (const q of this.pulses) if (q.t < q.T) {
         const h = 1 / 120, a = Math.PI * q.t / q.T, b = Math.PI * Math.min(q.t + h, q.T) / q.T, k = (Math.cos(a) - Math.cos(b)) / 2 / h;   // exact share of the half-sine over this substep
-        q.b.applyForce(new CANNON.Vec3(q.J.x * k, q.J.y * k, q.J.z * k), new CANNON.Vec3(q.r.x, q.r.y, q.r.z)); q.t += h;
+        q.b.applyForce(_cf1.set(q.J.x * k, q.J.y * k, q.J.z * k), _cf2.set(q.r.x, q.r.y, q.r.z)); q.t += h;
       }
       this.world.step(1 / 120); this.acc -= 1 / 120;
       for (const d of defs) {   // hard leash to the animated pose
@@ -2038,7 +2044,7 @@ class Ragdoll {
   }
   stop() { for (const d of this.defs) if (d.bone.userData.pos0) { d.bone.position.copy(d.bone.userData.pos0); d.bone.userData.pos0 = null; } this.pulses = null; for (const S of this.F.shoulder) if (S.clBase) { S.cl.quaternion.copy(S.clBase); S.clBase = null; } this.on = false; this.hitOn = false; this.world = null; this.mode = null; for (const d of this.defs) d.str = 1; }
 }
-const _hq = new Quat(), _j1q = new Quat(), _j3q = new Quat(), _j4q = new Quat(), _v7 = new V3(), _v8 = new V3(), _v9 = new V3(), _v10 = new V3();
+const _cf1 = new CANNON.Vec3(), _cf2 = new CANNON.Vec3(), _hq = new Quat(), _j1q = new Quat(), _j3q = new Quat(), _j4q = new Quat(), _v7 = new V3(), _v8 = new V3(), _v9 = new V3(), _v10 = new V3();
 /* ───────── XPBD rigid bodies for the knockout ragdoll (Müller et al. 2020, "Detailed Rigid Body Simulation with XPBD") ─────────
    Why not the sequential-impulse solver: a 14-joint chain with 1:10 mass ratios (foot vs thigh), hard anatomical stops and dozens of
    floor contacts does not converge in a few Gauss–Seidel sweeps — joints drift apart, stops get pushed through, feet pop off the floor.
@@ -4270,13 +4276,13 @@ function arenaSync() {
 }
 // where a world point is in the ring (ring frame, metres)
 const ringPt = (p, out = new V3()) => out.copy(p).applyMatrix4(_m4a.copy(ARENA.matrixWorld).invert());
-const _m4a = new M4(), RING_IN = 2.2;
+const _m4a = new M4(), _csP = new V3(), RING_IN = 2.2;
 const inRing = (p, m = 0) => { const l = ringPt(p, _v6); return Math.abs(l.x) < RING_IN - m && Math.abs(l.z) < RING_IN - m; };
 /* circling: F moves sideways by s metres (s > 0 = away from the camera) around the other man — done by turning the ring frame
    about him the opposite way, so both stay on the world x line facing each other */
 function circleStep(F, s) {
   const O = F.other.group.position, rx = F.group.position.x - O.x; if (Math.abs(rx) < 0.3) return false;
-  const saveP = ARENA.position.clone(), saveY = ARENA.rotation.y;
+  const saveP = _csP.copy(ARENA.position), saveY = ARENA.rotation.y;
   const ph = (-s) / rx;   // world turn about O that carries F by −s in z
   const d = _v4.copy(ARENA.position).sub(O), c = Math.cos(ph), sn = Math.sin(ph);
   ARENA.position.set(O.x + d.x * c + d.z * sn, 0, O.z - d.x * sn + d.z * c); ARENA.rotation.y += ph; ARENA.updateMatrixWorld(true);
