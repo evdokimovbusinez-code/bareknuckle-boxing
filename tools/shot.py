@@ -26,7 +26,8 @@ async def main():
             r = await pg.evaluate(f"(async () => {{ {arg}\n }})()")
             if r is not None: print('JS RESULT:', r)
             await pg.evaluate("__step(1, 1/60)")
-        await pg.screenshot(path=out)
+        # JPEG keeps a shot ~150 KB (a 1280x720 PNG is >1 MB, too big for the bot to read back)
+        await pg.screenshot(path=out, **({'type': 'jpeg', 'quality': 80} if out.lower().endswith(('.jpg', '.jpeg')) else {}))
         print('saved', out)
         for l in dict.fromkeys(logs):
             if not any(k in l for k in ('GL Driver', 'Failed to load resource', 'FBXLoader')): print(l[:400])

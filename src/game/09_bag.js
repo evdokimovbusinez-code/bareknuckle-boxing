@@ -12,7 +12,7 @@ const BAG = { on: false, th: new V3(), om: new V3(), yaw: 0, yawV: 0, sq: 0, sco
   g.visible = false; scene.add(g);
 }
 function showP2(v) { if (!P2) return; P2.group.visible = v; for (const o of P2.sceneObjs || []) o.visible = v;
-  if (v) P2.handGear(); else if (P2.gear.gloves) { for (const gl of P2.gear.gloves) gl.g.visible = false; P2.gear.hg.visible = false; } }   // (his gear decides what of the wraps / hair shows)
+  if (v) P2.handGear(); else { const g = P2.gear; if (g.gloves) { for (const gl of g.gloves) gl.g.visible = false; g.hg.visible = false; } if (g.mma) { g.mma.visible = false; for (const pd of g.mmaPads) pd.m.visible = false; } } }   // (his gear decides what of the wraps / hair shows)
 function startBag() {
   G.mode = 'bag'; if (G.diff !== G.userDiff && G.userDiff) G.diff = G.userDiff;
   startFight(true); BAG.on = true; showP2(false); BAG.g.visible = true;

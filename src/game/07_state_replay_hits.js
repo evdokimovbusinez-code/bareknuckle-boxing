@@ -97,7 +97,7 @@ function aimFor(att, def) {
   const ev = d && d.t > 0.03 && evades(att, n, d), c = ev ? def.headNeutral : def.headNow, kn = att.knuckle(_v5);
   // a point 2 cm inside the face on the side the fist comes from (uppercut: under the chin)
   const dir = _v6.copy(kn).sub(c); dir.y *= 0.35; dir.normalize();
-  const P = PUNCH[n], gp = att.gear.spar ? 0.04 : 0;   // boxing gloves: the padding is in front of the knuckles, so the hand stops that much earlier (bare fists: 0)
+  const P = PUNCH[n], gp = att.gear.spar ? 0.06 : 0;   // boxing gloves: the padding is in front of the knuckles, so the hand stops that much earlier (bare fists: 0)
   if (P.type === 'upper') return att.aimV.copy(c).addScaledVector(dir, 0.04 + gp).add(_v4.set(0, -0.1, 0));
   if (P.type === 'over') { const k = clamp((att.act[n].time - P.impact + 0.16) / 0.16, 0, 1); return att.aimV.copy(c).addScaledVector(dir, 0.07 + gp).add(_v4.set(0, 0.26 * (1 - k), 0)); }   // loops over the top
   att.aimV.copy(c).addScaledVector(dir, 0.07 + gp);
@@ -121,7 +121,7 @@ function whiffPunch(att) {
 function contactTest(att, def) {
   const kn = att.knuckle(_v5);
   if (att.bodyShot) { const r = def.ribs[att.ribIdx].w; return kn.distanceTo(r) < 0.1 ? r.clone() : null; }
-  const l = _v6.copy(kn).applyMatrix4(def.headFrameInv), R = HEAD.R, gm = att.gear.spar ? 0.055 : 0,   /* boxing glove: ≈ 4 cm of padding in front of the knuckles + his headgear */ x = l.x / (R.x + 0.032 + gm), y = l.y / (R.y + 0.028 + gm), z = l.z / (R.z + 0.032 + gm), q = x * x + y * y + z * z;   // the knuckle bone sits ~3 cm inside the fist's skin
+  const l = _v6.copy(kn).applyMatrix4(def.headFrameInv), R = HEAD.R, gm = att.gear.spar ? 0.07 : 0,   /* boxing glove: ≈ 4 cm of padding in front of the knuckles + his headgear */ x = l.x / (R.x + 0.032 + gm), y = l.y / (R.y + 0.028 + gm), z = l.z / (R.z + 0.032 + gm), q = x * x + y * y + z * z;   // the knuckle bone sits ~3 cm inside the fist's skin
   if (q >= 1) {   // the jaw hangs below the skull ellipsoid: a hook or uppercut finds it there
     const dj = l.distanceTo(JAW.c); if (dj > JAW.r + 0.032) return null;
     return l.sub(JAW.c).setLength(JAW.r).add(JAW.c).applyMatrix4(def.headFrame);

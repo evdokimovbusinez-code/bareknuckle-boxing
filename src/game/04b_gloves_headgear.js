@@ -58,9 +58,9 @@ function thumbPt(d, o) {   // attached thumb: its own pad, lying along the body,
   const k = sqK(d, 2.3); let x = d.x * k * 1.95, y = d.y * k * 5.0, z = d.z * k * 2.15; const t = (y / 5 + 1) / 2, s = lerp(1.08, 0.78, t);
   x = x * s - 0.7 * t * t; z *= s; return o.copy(TH_C).addScaledVector(TH_X, x).addScaledVector(TH_A, y).addScaledVector(TH_Z, z);
 }
-function cuffPt(ang, y, lift, o) {   // cuff surface: oval, waisted at the wrist
-  const rx = 4.0 + 0.5 * ((y + 3) / 6) ** 2 + lift, k = (2.2 - y) / 11.4;
-  return o.set(-0.6 + 0.9 * k + rx * Math.cos(ang), y, -0.2 + 0.5 * k + (rx - lift) * 0.85 * Math.sin(ang) + lift * Math.sin(ang));
+function cuffPt(ang, y, lift, o) {   // cuff surface: oval, waisted at the wrist, flared to the rim and leaning with the forearm (which is hidden up to the rim)
+  const rx = 4.0 + (y < -3 ? 0.95 : 0.5) * ((y + 3) / 6) ** 2 + lift, k = (2.2 - y) / 11.4, e = gsm(-4, -9, y);
+  return o.set(-0.6 + 0.9 * k + 0.8 * e + rx * Math.cos(ang), y, -0.2 + 0.5 * k - 0.5 * e + (rx - lift) * 0.85 * Math.sin(ang) + lift * Math.sin(ang));
 }
 function gloveGeo() {
   if (GEAR.glove) return GEAR.glove;
@@ -95,26 +95,27 @@ function gloveMesh(F, S, mat, trim) {
   scene.add(g); return { g, h, rel };
 }
 
-/* —— MMA gloves, 4 oz: a shell over the back of the hand, the wrist and the first phalanges (finger loops), a thick pad over the
-   knuckles, open palm, open fingers and thumb, a strap on the wrist. Same skinned triangles as the hand → follows the fingers. —— */
+/* —— MMA gloves, 4 oz. Two layers:
+   • a thin leather shell grown out of the hand's own skin (like the clothes): the back of the hand, the heel of the palm, loops around the
+     first phalanges, a strap around the wrist; open palm, open fingers and thumb. The skin under it is not drawn (uGlv = 2, aGH.z).
+   • rigid pads on top, carried by the bones (04c_mma_pads.js): one over the back of the hand, a ≈ 2.5 cm roll over each first phalanx. —— */
 function mmaShell(F, mat) {
-  const gv = GEAR.gv, gh = GEAR.gh, tr = GEAR.tris, idx = [], src = F.body.geometry, geo = new THREE.BufferGeometry();
-  const ok = v => gh[v * 3 + 1] === 4 && gv[v * 4 + 2] < 1.5 && gv[v * 4] > -4.6 && !(gv[v * 4 + 2] < 0.5 && gv[v * 4 + 1] < -0.25 && gv[v * 4] > 2.4);
+  const gh = GEAR.gh, tr = GEAR.tris, idx = [], src = F.body.geometry, geo = new THREE.BufferGeometry();
+  const ok = v => { const a = gh[v * 3 + 2]; return gh[v * 3 + 1] === 4 && a > 1.78 && a < 2.6; };
   for (let t = 0; t < tr.length; t += 3) if (ok(tr[t]) || ok(tr[t + 1]) || ok(tr[t + 2])) idx.push(tr[t], tr[t + 1], tr[t + 2]);
   for (const k of ['position', 'normal', 'uv', 'skinIndex', 'skinWeight', 'aGH', 'aGlv']) geo.setAttribute(k, src.attributes[k]);
   geo.setIndex(idx); mat = mat.clone(); mat.vertexColors = false; mat.normalMap = mat.normalMap.clone(); mat.normalMap.repeat.set(30, 30); mat.normalMap.needsUpdate = true;
   const U = { uThick: { value: GEAR.HF.R.u } };
   mat.onBeforeCompile = s => {
     Object.assign(s.uniforms, U);
-    s.vertexShader = 'attribute vec3 aGH; attribute vec4 aGlv; varying vec4 vGlv; varying float vGR; varying float vPad; uniform float uThick;\n' + s.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-      vGlv = aGlv; vGR = aGH.y;
-      { float pad = smoothstep( 0.2, 0.55, aGlv.y ) * smoothstep( 5.0, 6.4, aGlv.x ) * ( 1.0 - smoothstep( 1.2, 1.6, aGlv.z ) ); vPad = pad;
-        float strap = smoothstep( -3.9, -3.6, aGlv.x ) * ( 1.0 - smoothstep( -0.9, -0.6, aGlv.x ) );
-        transformed += objectNormal * uThick * ( 0.22 + 1.6 * pad + 0.28 * strap ); }`);
-    s.fragmentShader = 'varying vec4 vGlv; varying float vGR; varying float vPad;\n' + s.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-      if ( vGR < 3.5 || vGlv.z > 1.5 || vGlv.x < -4.6 || ( vGlv.z < 0.5 && vGlv.y < -0.25 && vGlv.x > 2.4 ) ) discard;`)
+    s.vertexShader = 'attribute vec3 aGH; attribute vec4 aGlv; varying vec3 vGH; varying float vStrap; uniform float uThick;\n' + s.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      vGH = aGH; vStrap = aGlv.x;
+      transformed += objectNormal * uThick * ( 0.16 + 0.3 * smoothstep( -4.4, -4.1, aGlv.x ) * ( 1.0 - smoothstep( -0.9, -0.6, aGlv.x ) ) );`);
+    s.fragmentShader = 'varying vec3 vGH; varying float vStrap;\n' + s.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+      if ( vGH.y < 3.5 || vGH.z < 1.8 || vGH.z > 2.56 ) discard;`)
       .replace('#include <map_fragment>', `#include <map_fragment>
-      diffuseColor.rgb *= mix( 0.14, 1.0, smoothstep( 0.35, 0.65, vPad ) ) * ( 1.0 + 1.6 * smoothstep( -3.9, -3.6, vGlv.x ) * ( 1.0 - smoothstep( -0.9, -0.6, vGlv.x ) ) );   // dark leather, the knuckle pad and the strap in the glove's colour`);
+      { float st = smoothstep( -4.3, -4.2, vStrap ) * ( 1.0 - smoothstep( -0.8, -0.7, vStrap ) ), seam = 1.0 - 0.6 * ( exp( -pow( ( vStrap + 4.25 ) / 0.07, 2.0 ) ) + exp( -pow( ( vStrap + 0.75 ) / 0.07, 2.0 ) ) );
+        diffuseColor.rgb *= mix( 0.42, 1.0, st ) * seam; }   // the strap in the glove's colour, the rest a darker shade of it`);
   };
   mat.customProgramCacheKey = () => 'mma-glove';
   const m = new THREE.SkinnedMesh(geo, mat); m.bind(F.body.skeleton, F.body.bindMatrix); m.frustumCulled = false; m.castShadow = m.receiveShadow = true;
@@ -133,17 +134,21 @@ function headMap(F) {
   let m = raw.slice(); const at = (A, e, a) => A[clamp(e, 0, NE - 1) * NA + (a + NA) % NA];
   for (let it = 0; it < 24; it++) { const o = m.slice(); for (let e = 0; e < NE; e++) for (let a = 0; a < NA; a++) if (!m[e * NA + a]) { let s = 0, c = 0; for (const [de, da] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) { const v = at(m, e + de, a + da); if (v) { s += v; c++; } } if (c) o[e * NA + a] = s / c; } m = o; }
   for (let it = 0; it < 2; it++) { const o = m.slice(); for (let e = 0; e < NE; e++) for (let a = 0; a < NA; a++) { let s = 0; for (let de = -1; de <= 1; de++) for (let da = -1; da <= 1; da++) s += at(m, e + de, a + da); o[e * NA + a] = Math.max(s / 9, raw[e * NA + a] - 0.25); } m = o; }
-  return GEAR.hmap = d => { const fe = clamp((Math.asin(clamp(d.y, -1, 1)) / PI + 0.5) * NE - 0.5, 0, NE - 1), fa = (Math.atan2(d.x, d.z) / (2 * PI) + 1) * NA - 0.5, e0 = Math.floor(fe), a0 = Math.floor(fa), te = fe - e0, ta = fa - a0;
-    return lerp(lerp(at(m, e0, a0), at(m, e0, a0 + 1), ta), lerp(at(m, e0 + 1, a0), at(m, e0 + 1, a0 + 1), ta), te); };
+  // a second, smooth map that bridges over the ear (max over ±10°, then blurred): the ear pad lies on it, not on the ear's folds
+  let m2 = m.slice(); for (let e = 0; e < NE; e++) for (let a = 0; a < NA; a++) { let v = 0; for (let de = -2; de <= 2; de++) for (let da = -2; da <= 2; da++) v = Math.max(v, at(m, e + de, a + da)); m2[e * NA + a] = v; }
+  for (let it = 0; it < 3; it++) { const o = m2.slice(); for (let e = 0; e < NE; e++) for (let a = 0; a < NA; a++) { let s = 0; for (let de = -1; de <= 1; de++) for (let da = -1; da <= 1; da++) s += at(m2, e + de, a + da); o[e * NA + a] = s / 9; } m2 = o; }
+  const samp = A => d => { const fe = clamp((Math.asin(clamp(d.y, -1, 1)) / PI + 0.5) * NE - 0.5, 0, NE - 1), fa = (Math.atan2(d.x, d.z) / (2 * PI) + 1) * NA - 0.5, e0 = Math.floor(fe), a0 = Math.floor(fa), te = fe - e0, ta = fa - a0;
+    return lerp(lerp(at(A, e0, a0), at(A, e0, a0 + 1), ta), lerp(at(A, e0 + 1, a0), at(A, e0 + 1, a0 + 1), ta), te); };
+  GEAR.hmap = samp(m); GEAR.hmap.s = samp(m2); return GEAR.hmap;
 }
 function headgearGeo(F) {
   if (GEAR.hg) return GEAR.hg;
   const hr = headMap(F), D = Math.PI / 180, O = new V3(), d = new V3(), t1 = new V3(), t2 = new V3(), gap = 0.35, parts = [];
-  const dirAY = (a, y, o) => { let r = 9.5; for (let k = 0; k < 5; k++) { const el = Math.asin(clamp(y / r, -0.98, 0.98)); o.set(Math.sin(a) * Math.cos(el), Math.sin(el), Math.cos(a) * Math.cos(el)); r = hr(o); } return o; };   // direction to the skin at azimuth a (0 = face), height y
+  const dirAY = (a, y, o, R = hr) => { let r = 9.5; for (let k = 0; k < 5; k++) { const el = Math.asin(clamp(y / r, -0.98, 0.98)); o.set(Math.sin(a) * Math.cos(el), Math.sin(el), Math.cos(a) * Math.cos(el)); r = R(o); } return o; };   // direction to the skin at azimuth a (0 = face), height y
   const pe = t => Math.sqrt(Math.max(0, 1 - Math.abs(2 * t - 1) ** 3));   // pillow edge
-  const pad = (dir, th, nu, nv, ku, kv, col) => {   // a pillow: outer sheet at the padding's thickness, inner sheet on the head
-    parts.push(gridGeo((u, v, o) => { dir(u, v, o); return o.multiplyScalar(hr(o) + gap + th(u, v)); }, nu, nv, { c: O, ku, kv, col }));
-    parts.push(gridGeo((u, v, o) => { dir(u, v, o); return o.multiplyScalar(hr(o) + gap - 0.12); }, nu, nv, { c: O, inv: true, ku, kv, col: () => 0.25 }));
+  const pad = (dir, th, nu, nv, ku, kv, col, rf = hr) => {   // a pillow: outer sheet at the padding's thickness, inner sheet on the head (rf: the surface it lies on)
+    parts.push(gridGeo((u, v, o) => { dir(u, v, o); return o.multiplyScalar(rf(o, u, v) + gap + th(u, v)); }, nu, nv, { c: O, ku, kv, col }));
+    parts.push(gridGeo((u, v, o) => { dir(u, v, o); return o.multiplyScalar(rf(o, u, v) + gap - 0.12); }, nu, nv, { c: O, inv: true, ku, kv, col: () => 0.25 }));
   };
   // brow band all the way round: ~4.5 cm over the forehead (face open from the brows down), drops over the temples, deep at the back
   const az = u => { let a = ((u * 360) % 360 + 360) % 360; return a > 180 ? 360 - a : a; };
@@ -155,7 +160,9 @@ function headgearGeo(F) {
     pad((u, v, o) => dirAY(sg * lerp(88, 19, u) * D, lerp(lerp(-7.0, -5.8, u), lerp(0.8, -1.9, u), v), o), (u, v) => (2.0 + 0.7 * u) * pe(v) * Math.sqrt(Math.max(0, 1 - Math.max(0, 2 * u - 1) ** 3)), 22, 8, 4, 1.5);
     // ear pad with a hearing hole
     const eq = (u, v) => Math.hypot((lerp(68, 134, u) - 101) * 0.166, lerp(-7.2, 3.8, v) + 1.7);
-    pad((u, v, o) => dirAY(sg * lerp(68, 134, u) * D, lerp(-7.2, 3.8, v), o), (u, v) => 1.9 * pe(u) * pe(v) * (0.1 + 0.9 * gsm(0.8, 1.9, eq(u, v))), 18, 16, 3, 3, (u, v) => eq(u, v) < 1.1 ? 0.05 : 1);
+    // (lies on the smooth map that bridges the ear; its rim comes back down to the head)
+    pad((u, v, o) => dirAY(sg * lerp(68, 134, u) * D, lerp(-7.2, 3.8, v), o, hr.s), (u, v) => 1.3 * pe(u) * pe(v) * (0.12 + 0.88 * gsm(0.7, 1.7, eq(u, v))), 26, 24, 3, 3, (u, v) => eq(u, v) < 0.95 ? 0.05 : 1,
+      (o, u, v) => lerp(hr(o), hr.s(o), gsm(0, 0.22, Math.min(u, 1 - u, v, 1 - v))));
   }
   // open crown: one padded strip front to back, one ear to ear
   pad((u, v, o) => { const b = lerp(38, 150, u) * D; return o.set((v - 0.5) * 4.8, Math.sin(b) * 10, Math.cos(b) * 10).normalize(); }, (u, v) => 1.2 * pe(v), 30, 6, 6, 1);
@@ -187,6 +194,6 @@ function nailMatFor(fu) {
   const m = T.nailMat.clone();
   m.onBeforeCompile = s => { s.uniforms.uGlv = fu.uGlv;
     s.vertexShader = 'attribute vec3 aGH; varying vec3 vGH;\n' + s.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vGH = aGH;');
-    s.fragmentShader = 'varying vec3 vGH; uniform float uGlv;\n' + s.fragmentShader.replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if ( uGlv > 0.5 && vGH.y > 3.5 ) discard;'); };
+    s.fragmentShader = 'varying vec3 vGH; uniform float uGlv;\n' + s.fragmentShader.replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if ( uGlv > 0.5 && uGlv < 1.5 && vGH.y > 3.5 ) discard;'); };
   m.customProgramCacheKey = () => 'nails-glove'; return m;
 }

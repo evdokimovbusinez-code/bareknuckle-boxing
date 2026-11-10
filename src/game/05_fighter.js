@@ -315,11 +315,11 @@ class Fighter {
     const gc = GLOVES.find(x => x.id === (this.isPlayer ? mine : L.gloves || (mine === 'blue' ? 'red' : 'blue'))) || GLOVES[0];   // the opponent never wears the player's colour
     if ((box || mma) && !G2.mat) { G2.mat = leatherMat(gc.c); G2.trim = new THREE.MeshPhysicalMaterial({ color: gc.trim, roughness: 0.6 }); }
     if (box && !G2.gloves) { G2.gloves = ['L', 'R'].map(S => gloveMesh(this, S, G2.mat, G2.trim)); G2.hg = headgearMesh(this, G2.mat, G2.trim); }
-    if (mma && !G2.mma) G2.mma = mmaShell(this, G2.mat);
+    if (mma && !G2.mma) { G2.mma = mmaShell(this, G2.mat); G2.mmaPads = mmaPads(this, G2.mat); }
     if (G2.mat) { G2.mat.color.set(gc.c); G2.trim.color.set(gc.trim); }
     if (G2.gloves) { for (const gl of G2.gloves) gl.g.visible = box; G2.hg.visible = box; }
-    if (G2.mma) { G2.mma.visible = mma; G2.mma.material.color.set(gc.c); }
-    this.flesh.u.uGlv.value = box ? 1 : 0;   // the hand inside a boxing glove is not drawn
+    if (G2.mma) { G2.mma.visible = mma; G2.mma.material.color.set(gc.c); for (const pd of G2.mmaPads) pd.m.visible = mma; }
+    this.flesh.u.uGlv.value = box ? 1 : mma ? 2 : 0;   // the hand inside a boxing glove / the skin under an MMA glove is not drawn
     this.wrapMesh.visible = !box && !mma; for (const t of this.tails) t.mesh.visible = !box && !mma;
     this.hair.mesh.visible = !this.bald && !box; this.baseMesh.visible = !this.bald;   // long hair is tucked under the headgear, the short layer shows through the open crown
   }
@@ -641,7 +641,8 @@ class Fighter {
     _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInv);
     this.baseMesh.matrix.copy(_m1); this.beardMesh.matrix.copy(_m1); this.baseMesh.matrixWorldNeedsUpdate = this.beardMesh.matrixWorldNeedsUpdate = true;
     { const G2 = this.gear, hf = _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInvT); G2.guard.matrix.copy(hf); G2.guard.matrixWorldNeedsUpdate = true;
-      if (G2.spar && G2.gloves) { G2.hg.matrix.copy(hf); G2.hg.matrixWorldNeedsUpdate = true; for (const gl of G2.gloves) { gl.g.matrix.multiplyMatrices(gl.h.matrixWorld, gl.rel); gl.g.matrixWorldNeedsUpdate = true; } } }
+      if (G2.spar && G2.gloves) { G2.hg.matrix.copy(hf); G2.hg.matrixWorldNeedsUpdate = true; for (const gl of G2.gloves) { gl.g.matrix.multiplyMatrices(gl.h.matrixWorld, gl.rel); gl.g.matrixWorldNeedsUpdate = true; } }
+      if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
   }
   capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; }
   restore(a, b2, t) {

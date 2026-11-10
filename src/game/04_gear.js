@@ -40,6 +40,7 @@ function gearSetup(F) {
   const HF = GEAR.HF = {}, gv = new Float32Array(n * 4), nr = geo.attributes.normal;
   for (const S of ['L', 'R']) { const Hp = bpos(S + '_Hand'), Y = bpos(S + '_Mid1').sub(Hp), u = Y.length() / 10.3; Y.normalize(); const X = bpos(S + '_Index1').sub(bpos(S + '_Pinky1')); X.addScaledVector(Y, -X.dot(Y)).normalize();
     HF[S] = { H: Hp, Y, X, Z: new V3().crossVectors(X, Y).multiplyScalar(S === 'R' ? 1 : -1), u }; }
+  GEAR.bpos = bpos; GEAR.dom = dom; GEAR.names = names;
   for (let i = 0; i < n; i++) {
     const nm = names[dom[i]]; p.fromBufferAttribute(pos, i); const h = H(p);
     let R = 0, a = 0;
@@ -47,8 +48,10 @@ function gearSetup(F) {
     else if (/Upperarm|Shoulder|Clavicle/.test(nm) && !/Clavicle/.test(nm)) { R = 3; const S = /_L_/.test(nm) ? 'L' : 'R', ab = _v2.copy(el[S]).sub(sh[S]); a = clamp(0.25 + _v3.copy(p).sub(sh[S]).dot(ab) / ab.lengthSq() * 0.5, 0, 1); }
     else if (/Forearm|Hand|Finger|Thumb|Index|Mid|Ring|Pinky|Elbow/.test(nm)) { R = 4;
       const f = HF[/_L_/.test(nm) ? 'L' : 'R'], q = _v2.copy(p).sub(f.H), ya = q.dot(f.Y) / f.u;
-      a = /Forearm|Elbow/.test(nm) ? 1 + 0.99 * clamp(1 + ya / 24, 0, 1) : 2;   // forearm: 1 (elbow) … 1.99 (wrist); hand: 2
-      gv[i * 4] = ya; gv[i * 4 + 1] = -_v3.fromBufferAttribute(nr, i).dot(f.Z); gv[i * 4 + 2] = /Thumb/.test(nm) ? 3 : /(Index|Mid|Ring|Pinky)1/.test(nm) ? 1 : /(Index|Mid|Ring|Pinky)[23]/.test(nm) ? 2 : 0; gv[i * 4 + 3] = q.dot(f.X) / f.u; }
+      const nb = -_v3.fromBufferAttribute(nr, i).dot(f.Z), seg = /Thumb/.test(nm) ? 3 : /(Index|Mid|Ring|Pinky)1/.test(nm) ? 1 : /(Index|Mid|Ring|Pinky)[23]/.test(nm) ? 2 : 0;
+      // forearm: 1 (elbow) … 1.99 (wrist); hand: 2 where an MMA glove covers it (the back of the hand, the heel of the palm, the first phalanges, the base of the thumb) … 3 where it is bare
+      a = /Forearm|Elbow/.test(nm) ? 1 + 0.99 * clamp(1 + ya / 24, 0, 1) : 3 - (seg === 1 || /Thumb1/.test(nm) ? 1 : seg ? 0 : Math.max(gsm(-0.45, -0.05, nb), 1 - gsm(2.0, 2.8, ya)));
+      gv[i * 4] = ya; gv[i * 4 + 1] = nb; gv[i * 4 + 2] = seg; gv[i * 4 + 3] = q.dot(f.X) / f.u; }
     else if (/Head|Jaw|Eye|Teeth|Tongue|Facial|NeckTwist02/.test(nm)) R = 5;
     else R = 2;
     gh[i * 3] = h; gh[i * 3 + 1] = R; gh[i * 3 + 2] = a;
