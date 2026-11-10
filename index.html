@@ -190,7 +190,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .mnav{display:flex;flex-direction:column;align-items:flex-start;gap:clamp(0px,.7vmin,6px)}
 .mnav button{position:relative;display:flex;align-items:baseline;gap:clamp(8px,1.6vmin,14px);border:0;background:none;padding:1px 16px 1px 0;font-family:var(--poster);font-weight:700;font-size:clamp(21px,5.8vmin,44px);line-height:1.14;
   letter-spacing:.02em;text-transform:uppercase;text-align:left;color:#b4aea2;outline:none;transition:transform .16s ease-out,color .16s;animation:mIn .34s cubic-bezier(.2,.8,.2,1) both}
-.mnav button:nth-child(2){animation-delay:.04s}.mnav button:nth-child(3){animation-delay:.08s}.mnav button:nth-child(4){animation-delay:.12s}.mnav button:nth-child(5){animation-delay:.16s}.mnav button:nth-child(6){animation-delay:.2s}
+.mnav button:nth-child(2){animation-delay:.04s}.mnav button:nth-child(3){animation-delay:.08s}.mnav button:nth-child(4){animation-delay:.12s}.mnav button:nth-child(5){animation-delay:.16s}.mnav button:nth-child(6){animation-delay:.2s}.mnav button:nth-child(7){animation-delay:.24s}
 .mnav button b{font-weight:700;white-space:nowrap}
 .mnav button i{flex:none;width:20px;font:500 11px var(--mono);font-style:normal;letter-spacing:.08em;color:var(--muted);transition:color .16s}
 .mnav button small{font:400 clamp(10px,1.7vmin,12px) var(--mono);letter-spacing:.03em;text-transform:none;color:var(--muted);white-space:nowrap}
@@ -256,6 +256,23 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .fstats.pay td:nth-child(2){color:#9fdca8;font-size:12px;letter-spacing:0;text-transform:none}.fstats.pay td.l{font-size:12px}
 .fstats.pay tr:last-of-type td:nth-child(2){color:var(--text)}
 .fstats.pay tr.tot td,.fstats.pay tr.tot td:nth-child(2){color:#e2b14a;border-top:1px solid rgba(255,255,255,.2);padding-top:3px;font-weight:600}.fstats.pay td.new{text-align:left;color:#8fd49a;font-size:11px}
+/* social networks: the chart, hype bar, posts / direct / sponsors cards */
+.fstats.pay td.neg,.fstats.pay td.neg:nth-child(2){color:#e58a8a}
+.locs button:disabled{opacity:.45;cursor:default}
+.so-top{display:flex;gap:12px;align-items:stretch}.so-chart{position:relative;flex:1.6;min-width:0;height:clamp(46px,11vmin,70px);border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.035)}
+.so-chart svg{position:absolute;inset:0;width:100%;height:100%}.so-chart span{position:absolute;right:4px;font:500 9px var(--mono);color:var(--muted)}.so-chart .hi{top:2px}.so-chart .lo{bottom:2px}
+.so-hype{flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px;font:500 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.so-hype i{display:block;height:7px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}.so-hype b{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--neon))}
+.so-list{gap:8px}
+.so-post{position:relative;display:flex;flex-direction:column;gap:5px;border:1px solid rgba(255,255,255,.14);border-radius:2px;background:rgba(10,12,17,.62);padding:8px 10px}
+.so-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.so-h b{font-family:var(--poster);font-size:15px;letter-spacing:.04em;text-transform:uppercase}.so-h small{font:400 9px var(--mono);letter-spacing:.08em;color:var(--muted);text-align:right}
+.so-img{position:relative;aspect-ratio:16/9;background:linear-gradient(135deg,#1a1d26,#0c0e14);overflow:hidden}.so-img img{display:block;width:100%;height:100%;object-fit:cover}
+.so-tag{position:absolute;left:6px;bottom:6px;padding:2px 7px;background:rgba(10,12,17,.8);border-left:3px solid var(--muted);font:700 11px var(--poster);letter-spacing:.08em;text-transform:uppercase}.so-tag.w{border-color:var(--gold);color:var(--gold)}.so-tag.l{border-color:var(--neon)}
+.so-cap{font-size:12.5px;line-height:1.35}.so-m{display:flex;gap:12px;font:500 11px var(--mono);color:var(--muted)}.so-m .d{margin-left:auto;color:#8fd49a}.so-m .d.neg{color:#e58a8a}
+.so-c{font-size:11px;color:#c9c3b6}.so-c b{color:var(--muted);font-weight:600;margin-right:8px}
+.so-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.so-n{font:400 9px var(--mono);letter-spacing:.04em;color:var(--muted)}
+.so-empty{padding:18px 4px;font-size:12px;color:var(--muted);line-height:1.4}
+.so-sp .so-logo{width:120px;height:36px;image-rendering:auto}.so-sp.lock{opacity:.62}.so-lock{font:500 10.5px var(--mono);letter-spacing:.06em;color:var(--muted)}.so-lock.on{color:#8fd49a}
 .dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
 .views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
 .locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -347,7 +364,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="rt" id="r-title">Победа</div>
     <div class="rs" id="r-sub"></div>
     <div class="rs car" id="r-car"></div>
-    <div class="rtabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table></div>
+    <div class="rtabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table><table class="fstats pay" id="r-soc"></table></div>
     <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
   </div>
 
@@ -361,7 +378,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
         <button id="go-train"><i>03</i><b>Тренировка</b><small>груша · спарринг</small></button>
         <button id="go-fighter"><i>04</i><b>Боец</b><small id="fighter-lbl"></small></button>
         <button id="go-shop"><i>05</i><b>Магазин</b><small id="shop-lbl"></small></button>
-        <button id="go-set"><i>06</i><b>Настройки</b></button>
+        <button id="go-social"><i>06</i><b>Соцсети</b><small id="soc-lbl"></small></button>
+        <button id="go-set"><i>07</i><b>Настройки</b></button>
       </nav>
       <nav class="mnav" id="nav-train" hidden>
         <button id="go-bag"><i>01</i><b>Груша</b><small id="bag-lbl"></small></button>
@@ -443,6 +461,17 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="pfoot"><button class="btn" id="shop-back">Назад</button><button class="btn pri" id="sh-buy">Купить</button></div>
     </div>
     <div class="views"><span class="khint">примерка на бойце · тяни — вращать</span><button class="btn sm" id="sh-face">Лицо</button><button class="btn sm" id="sh-full">Полный рост</button></div>
+  </div>
+
+  <!-- social networks: followers + chart, hype, tabs: the feed of posts / the direct (challenges) / sponsors -->
+  <div class="ui scr" id="social" hidden>
+    <div class="panel wide">
+      <div class="ptitle"><small>слава · хайп · контракты</small>Соцсети<b class="cash" id="so-fans"></b></div>
+      <div class="so-top"><div class="so-chart" id="so-chart"></div><div class="so-hype" id="so-hype"></div></div>
+      <div class="sw" id="so-tabs"></div>
+      <div class="pbody so-list" id="so-list"></div>
+      <div class="pfoot"><button class="btn" id="so-back">Назад</button></div>
+    </div>
   </div>
 
   <!-- settings (from the menu and from the pause) -->
@@ -1567,7 +1596,7 @@ function perfTick(rawDt) {
   }
   m.anim = m.phys = m.fx = m.misc = m.render = 0; P.frames = 0; P.dt = 0; P.max = 0; P.calls = 0; P.tris = 0; P.t0 = now;
 }
-function renderFrame() { const t = performance.now(); renderer.info.reset(); composer.render(); PERF.m.render += performance.now() - t; }
+function renderFrame() { const t = performance.now(); renderer.info.reset(); composer.render(); socSnap(); PERF.m.render += performance.now() - t; }
 window.addEventListener('keydown', e => { if (e.code === 'F3') { e.preventDefault(); if (!e.repeat) perfToggle(); } });
 window.addEventListener('touchstart', e => { if (e.touches.length === 3) perfToggle(); }, { passive: true });
 
@@ -4075,7 +4104,7 @@ class Fighter {
     this.resetState();
   }
   resetState() {
-    this.fs = { thr: 0, land: 0, pow: 0, blk: 0, dmg: 0, kd: 0 }; this.hold = null; this.ftOff = null; this.gest = null; this.shellT = 0; this.shakeT = -9; this.hitLog = []; this.heavy = false; this.powerNext = false; this.fatK = 1; this.punchK = 1;
+    this.fs = { thr: 0, land: 0, pow: 0, blk: 0, dmg: 0, kd: 0, eva: 0, sig: 0 }; this.hold = null; this.ftOff = null; this.gest = null; this.shellT = 0; this.shakeT = -9; this.hitLog = []; this.heavy = false; this.powerNext = false; this.fatK = 1; this.punchK = 1;
     this.hp = 100; this.hpCap = 100; this.hitT = -9; this.stamina = 100; this.staT = 0; this.cur = null; this.release = false; this.resolved = false; this.whiff = false; this.punchId = 0;
     if (this.wrapU) this.wrapU.uWB.value.set(0, 0);
     this.gu = null; this.wobble = 0; this.kdCount = 0; this.cutLook = false; this.doomed = null; this.liver = null; this.wind = 0; this.adv = 0; this.advV = 0; this.knock = 0; this.dmgMul = 1; if (this.mark) { this.group.position.copy(this.mark); this.slide = null; }
@@ -4264,7 +4293,7 @@ class Fighter {
     const G2 = this.gear, U = this.flesh.u.uGear.value, W = wearDress(this, L), bt = W.bottom, tp = W.top, sh = W.shoes;   // 04e_wardrobe.js: the meshes of what he wears (model + colour from the registry)
     // loose trousers / long shorts are their own mesh (04d_street.js) and cover the hips completely: the boxing trunks (cloth) are hidden under them
     G2.pants = bt.cut ? G2.shells.bottom.m : null; this.shorts.mesh.visible = !bt.cut;
-    if (!bt.cut) { const S0 = wearShorts(bt); paintShorts(this.shortsCanvas, S0); this.shortsTex.needsUpdate = true; this.shortsMat.sheenColor.set(S0.sheen); }
+    if (!bt.cut) { const S0 = wearShorts(bt); paintShorts(this.shortsCanvas, S0); if (this.isPlayer) socPatch(this.shortsCanvas); this.shortsTex.needsUpdate = true; this.shortsMat.sheenColor.set(S0.sheen); }
     U.set(bt.cut ? PANT_CUTS[bt.cut].skin : 0, sh.top || 0,   /* x: the legs' skin is not drawn above this height (cm) */ tp.tex ? 1 : 0, tp.sleeve || 0);
     G2.guard.material.color.set((GUARDS.find(x => x.id === L.guard) || GUARDS[0]).c);
     { const c = (GUARDS.find(x => x.id === L.guard) || GUARDS[0]).c; G2.guard.material.emissive.set(c); }
@@ -4849,10 +4878,10 @@ const LOOK = { hair: 'brown', skin: 'light', beard: false, bottom: { id: 'shorts
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { Object.assign(LOOK, s.look || {}); G.diff = DIFFS[s.diff] ? s.diff : 'normal'; G.wins = s.wins | 0; G.losses = s.losses | 0; } } catch (e) {}
 G.mode = 'quick'; G.career = 0; G.bagBest = 0; G.userDiff = G.diff; G.loc = 'gym';
 const OPT = { vol: 1, shake: true, keys: true, cine: true };   // settings screen: master volume 0..1, camera shake, the key hint bar in a fight, cutscenes (stare-down, end-of-round close-up + highlights)
-const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0, cash: 0, own: {}, eco: 0 };   // cash, own (bought items), eco (the money system has seen this save): 07b_economy.js
+const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0, cash: 0, own: {}, eco: 0, soc: null };   // cash, own (bought items), eco (the money system has seen this save): 07b_economy.js
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; OPT.cine = s.opt.cine !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
 wearMigrate(LOOK);   // old saves kept plain ids (top: 'teeB', shorts: 'red')
-const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc, opt: OPT })); } catch (e) {} };
+const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' || G.prev ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.prev ? G.prev.loc : G.loc, opt: OPT })); } catch (e) {} };
 const careerWins = () => G.career + PROF.champ * LADDER.length;   // wraps unlock by career wins ever
 /* career: a ladder of eight men, each tougher than the last — beat one to get the next; the last one holds the belt.
    The road of a street fighter: the yard (1–2) → tyres and fire (3–4) → the underground parking (5–6) → the warehouse cage (7),
@@ -4882,7 +4911,7 @@ const careerPlace = (i = G.career) => { const L = LADDER[Math.min(i, LADDER.leng
 function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | 'tko' (the doctor stops it) — the purse depends on it
   fightTable();
   const stage = Math.min(G.career, LADDER.length - 1), before = careerWins();
-  if (draw) { payShow(payOut(false, true, how, stage, before)); save(); return; }
+  if (draw) { const p = payOut(false, true, how, stage, before); p.soc = socFight(false, true, how, stage); payShow(p); save(); return; }
   if (win) G.wins++; else G.losses++;
   let t = '', pts = 0;
   if (G.mode === 'career') {
@@ -4890,7 +4919,7 @@ function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | '
     else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути — ${careerPlace()}`;
   } else if (win) pts = 1;
   if (pts) { PROF.pts += pts; t += (t ? ' · ' : '') + `+${pts} ${pts === 1 ? 'очко' : 'очка'} бойцу`; }
-  payShow(payOut(win, false, how, stage, before));   // the purse (07b_economy.js) onto the result screen
+  { const p = payOut(win, false, how, stage, before); p.soc = socFight(win, false, how, stage); payShow(p); }   // the purse (07b_economy.js) and the followers (15_social.js) onto the result screen
   save(); const c = $('r-car'); if (c) c.textContent = t;
   const a = $('r-again'); if (a) a.textContent = G.mode === 'career' && win && G.career < LADDER.length ? 'Следующий бой' : G.mode === 'career' && !win ? 'Ещё раз' : 'Реванш';
 }
@@ -5028,7 +5057,7 @@ function resolveHit(att, name, contact) {
   const evaded = evading && evades(att, name, d);
   let pos = contact || (body ? def.ribs[att.ribIdx].w.clone() : def.headNow.clone().add(_v3.copy(att.knuckle(_v4)).sub(def.headNow).setLength(0.1)));
   if (evaded) {
-    att.whiff = true; def.counterUntil = G.t + 1.0; popup(pos, 'уклон', 'dodge'); sfx.whoosh();
+    att.whiff = true; def.counterUntil = G.t + 1.0; popup(pos, 'уклон', 'dodge'); sfx.whoosh(); if (def.fs) def.fs.eva++;
     if (def === P1) { G.slow = 0.4; G.slowT = 0.3; }
     return;
   }
@@ -5041,7 +5070,7 @@ function resolveHit(att, name, contact) {
   if (blocked) { dmg *= body ? 0.6 : P.type === 'upper' ? 0.55 : 0.18; def.stamina = Math.max(0, def.stamina - 7); }
   dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (G.mode === 'spar' ? 0.6 : 1);   // 16 oz and a helmet
   if (window.__dmgLog) window.__dmgLog.push([def === P1 ? 1 : 2, +dmg.toFixed(1), name, counter ? 'C' : '', caught ? 'K' : '', blocked ? 'B' : '', evading ? 'E' : '', +G.t.toFixed(1)]);
-  if (att.fs) { if (blocked) att.fs.blk++; else { att.fs.land++; if (P.type !== 'straight' || name === 'cross') att.fs.pow++; } att.fs.dmg += dmg; }
+  if (att.fs) { if (blocked) att.fs.blk++; else { att.fs.land++; if (P.type !== 'straight' || name === 'cross') att.fs.pow++; if (att.sig && sigOf(name) === att.sig) att.fs.sig++; } att.fs.dmg += dmg; }
   def.hp = Math.max(0, def.hp - dmg); def.hpCap = Math.max(def.hp, def.hpCap - dmg * (blocked ? 0.15 : 0.4)); def.hitT = G.t; if (G.rd) G.rd[att === P1 ? 0 : 1] += blocked ? dmg * 0.3 : dmg;
   const fwd = Math.sign(def.group.position.x - att.group.position.x), dir = new V3(fwd, 0.15, 0);
   if (P.type === 'hook') { dir.copy(_v1.set(P.arm === 'L' ? -1 : 1, 0.1, 0.35).transformDirection(att.group.matrixWorld)); }
@@ -5219,6 +5248,7 @@ function purse(win, draw, how, stage) {
   const a = P1.fs, b = P2.fs;
   if (a && b && a.land + b.land + 15 * (a.kd + b.kd) >= FOTN_MIN) lines.push(['Бой вечера', r10(T.fotn)]);
   if (car && win && stage === LADDER.length - 1) lines.push(['Титул — пояс', T.title]);
+  const sp = socSponsorLine(win); if (sp) lines.push(sp);   // the sponsor's contract (15_social.js)
   return { lines, total: lines.reduce((s, l) => s + l[1], 0) };
 }
 // pays it out and returns what to draw: the purse + the items that a career step has just opened
@@ -5228,6 +5258,7 @@ function payOut(win, draw, how, stage, before) {
   p.opened = opened.map(i => i.label + (i.brand ? ' · ' + i.brand : '')); return p;
 }
 function payShow(p) {
+  socShow(p && p.soc);
   const el = $('r-pay'); if (!el) return;
   if (!p || (!p.lines.length && !p.note)) { el.innerHTML = ''; return; }
   el.innerHTML = '<tr><td colspan="2" class="h">выплата</td></tr>' + (p.note ? `<tr><td colspan="2">${p.note}</td></tr>` : p.lines.map(l => `<tr><td class="l">${l[0]}</td><td>+${cash(l[1])}</td></tr>`).join('') +
@@ -5309,6 +5340,7 @@ function playerInput() {
 /* ───────── flow ───────── */
 function show(id, on) { $(id).hidden = !on; }
 function toMenu() {
+  socFlush(); socLeave();   // the frame of the last post; a challenge's place and level go back (15_social.js)
   if (G.mode === 'career') G.diff = G.userDiff; BAG.on = false; showP2(true); BAG.g.visible = false; updateMenu(); for (const F of [P1, P2]) F.sparGear(false);
   G.state = 'menu'; G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0; wearReset();
   P1.resetState(); P2.resetState(); rollOpponent();
@@ -5387,6 +5419,7 @@ function updateMenu() {
   const f = $('fighter-lbl'); f.textContent = PROF.pts > 0 ? `свободных очков: ${PROF.pts}` : 'внешность · стиль'; f.classList.toggle('pt', PROF.pts > 0);
   $('who').innerHTML = `${esc(PROF.name || 'Боец')}${PROF.nick ? ` «${esc(PROF.nick)}»` : ''}<small>побед ${G.wins} · поражений ${G.losses}${PROF.champ ? ' · чемпион ×' + PROF.champ : ''} · ${cash(PROF.cash)}</small>`;
   const sh = $('shop-lbl'); if (sh) sh.textContent = cash(PROF.cash);
+  socMenu();
   const b = $('bag-lbl'); if (b) b.textContent = G.bagBest ? 'рекорд ' + G.bagBest : '45 секунд';
 }
 /* the post-fight sheet (CompuBox style): punches thrown / landed, accuracy, power shots, knockdowns, damage */
@@ -5414,7 +5447,7 @@ function startFight(fromMode) {
   setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'gym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the gym; a career fight is where the ladder says
   G.paused = false; UI.from = null; uiShow(null);
   BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; payShow(null); }
-  sfx.unlock();
+  sfx.unlock(); socStart();   // the hype cools down (15_social.js)
   P1.stat = PROF.stats; P1.sig = PROF.sig; P2.stat = lvlStats(G.mode === 'career' ? Math.min(5, Math.floor(G.career * 0.7)) : ({ easy: 0, normal: 1, hard: 2 })[G.diff] || 0); P2.sig = SIGS[(rr() * SIGS.length) | 0].id;
   $('n1').textContent = myName();
   P1.resetState(); P2.resetState(); P2.speed = DIFFS[G.diff].speed * (1 + 0.035 * SK(P2, 'spd')); P1.speed = 1.5 * (1 + 0.035 * SK(P1, 'spd'));
@@ -7510,18 +7543,19 @@ EVT.on((type, e) => {
    All of them except the pause (and the settings opened from it) live in G.state === 'menu'; the pause sets G.paused, frame() then
    runs with dt = 0. The menu camera (menuCam) orbits P1: the creator turns it by dragging, the other screens just frame him. */
 const UI = { scr: null, from: null, cat: 'name', spar: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };
-const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', settings: 'settings', pause: 'pause' };
+const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', pause: 'pause' };
 const VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
 const myName = () => PROF.nick || PROF.name || 'Ты';
 function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [...root.querySelectorAll('button:not([disabled]),input')].filter(b => b.offsetParent !== null) : []; }
 function uiShow(scr, focusId) {
   if (UI.scr === 'shop' && scr !== 'shop') shopLeave();   // a try-on that was not bought comes off (14b_shop.js)
   UI.scr = scr; const on = scr ? UI_IDS[scr] : null;
-  for (const id of ['menu', 'quick', 'creator', 'shop', 'settings', 'pause']) $(id).hidden = id !== on;
+  for (const id of ['menu', 'quick', 'creator', 'shop', 'social', 'settings', 'pause']) $(id).hidden = id !== on;
   if (on === 'menu') { $('nav-main').hidden = scr !== 'main'; $('nav-train').hidden = scr !== 'train'; }
   if (scr === 'settings') { const p = UI.from === 'pause'; $('settings').classList.toggle('dim', p); $('reset-row').hidden = p; buildSettings(); setTab('opt'); }
   if (scr === 'pause') $('p-quit-l').textContent = BAG.on ? 'Выйти' : 'Сдаться';
   if (scr === 'shop') shopEnter();
+  if (scr === 'social') socEnter();
   if (scr !== 'creator' && UI.spar) { UI.spar = false; if (G.state === 'menu') P1.sparGear(false); }   // the glove preview of the creator
   const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur();
   if (!TOUCH && scr && scr !== 'creator') { const b = (focusId && $(focusId)) || (scr === 'main' || scr === 'train' || scr === 'pause' ? uiItems()[0] : null); b && b.focus({ preventScroll: true }); }
@@ -7529,7 +7563,7 @@ function uiShow(scr, focusId) {
 function uiBack() {
   if (UI.scr === 'settings' && UI.from === 'pause') return uiShow('pause', 'p-set');
   if (UI.scr === 'main' || G.state !== 'menu') return;
-  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', settings: 'go-set' }[UI.scr];
+  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', social: 'go-social', settings: 'go-set' }[UI.scr];
   updateMenu(); uiShow('main', back);
 }
 /* keys of the screens; true = the key is taken (12_ui.js then leaves it alone). Esc: back / pause / skip the replay / leave the result */
@@ -7563,7 +7597,7 @@ function menuCam(dt, cp, cl) {
   const x = P1.group.position.x, th = Math.tan(camera.fov * Math.PI / 360), asp = VW / VH, dFull = 1.13 / th, hd = P1.headNow, T = { tx: x, tz: 0 };
   if (UI.scr === 'creator' || UI.scr === 'shop') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1; }
   else if (UI.scr === 'quick') { T.yaw = 0.2; T.d = dFull * 1.18; T.ty = 1.02; T.sh = 0.4; T.h = 0.32; }
-  else { T.yaw = 0.52 + 0.05 * Math.sin(camClock * 0.4); T.d = dFull * 0.84; T.ty = 1.05; T.sh = UI.scr === 'settings' ? 0.5 : 0.38; T.h = 0.12; }
+  else { T.yaw = 0.52 + 0.05 * Math.sin(camClock * 0.4); T.d = dFull * 0.84; T.ty = 1.05; T.sh = UI.scr === 'settings' || UI.scr === 'social' ? 0.5 : 0.38; T.h = 0.12; }
   const M = MCAM, a = camCut || !M.init ? 1 : 1 - Math.exp(-dt * (UI.drag ? 16 : 4.2)); M.init = true;
   for (const k in T) M[k] += (T[k] - M[k]) * a;
   const s = M.sh * M.d * th * asp, c = Math.cos(M.yaw), sn = Math.sin(M.yaw);
@@ -7635,7 +7669,7 @@ function resetAsk(sure) {   // wiping the progress takes a second, explicit pres
   const no = btn('отмена', '', () => resetAsk(false).focus()); btn('да, стереть всё', 'warn', () => { resetProgress(); resetAsk(false).focus(); }); return no;
 }
 function resetProgress() {   // record, career, belt, points and stats; the name and the look stay (minus wraps that are locked again)
-  G.wins = G.losses = G.career = G.bagBest = 0; Object.assign(PROF, { sig: null, pts: 1, champ: 0, cash: 0, own: {} }); for (const k in PROF.stats) PROF.stats[k] = 0;
+  G.wins = G.losses = G.career = G.bagBest = 0; Object.assign(PROF, { sig: null, pts: 1, champ: 0, cash: 0, own: {} }); socReset(); for (const k in PROF.stats) PROF.stats[k] = 0;
   wearSanitize(); const w = WRAPS_LOOKS.find(x => x.id === (LOOK.wraps || 'white')); if (w && w.need > 0) LOOK.wraps = 'white'; P1.applyLook(LOOK);   // bought and career clothes go away with the money
   save(); buildCreator(); updateMenu(); msg('Прогресс сброшен', 'tip');
 }
@@ -7644,8 +7678,9 @@ function resetProgress() {   // record, career, belt, points and stats; the name
 function buildQuick() {
   swatches('o-diff', Object.entries(DIFFS).map(([id, d]) => ({ id, label: d.label })), () => G.diff, v => { G.diff = v; G.userDiff = v; }, true, true);
   const box = $('o-loc'); box.textContent = '';
-  for (const L of Object.values(LOCS)) {
-    const b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${L.desc || ''}</small>`; b.setAttribute('aria-pressed', String(G.loc === L.id));
+  if (!locOpen(G.loc)) G.loc = 'gym';
+  for (const L of Object.values(LOCS)) {   // a place can wait for followers (LOC_FANS, 15_social.js)
+    const open = locOpen(L.id), b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${open ? L.desc || '' : '🔒 от ' + numF(LOC_FANS[L.id]) + ' подписчиков'}</small>`; b.setAttribute('aria-pressed', String(G.loc === L.id)); b.disabled = !open;
     b.onclick = () => { G.loc = L.id; setLocation(L.id); save(); for (const o of box.children) o.setAttribute('aria-pressed', String(o === b)); };
     box.appendChild(b);
   }
@@ -7661,6 +7696,7 @@ function buildMenu() {
   on('go-fighter', () => { buildCreator(); uiShow('creator'); setCat(UI.cat); });
   buildShop(); on('go-shop', () => uiShow('shop', 'sh-buy')); on('shop-back', uiBack); on('sh-face', () => setView(VIEW_FACE)); on('sh-full', () => setView(VIEW_FULL));
   on('sh-buy', shopBuy);
+  on('go-social', () => uiShow('social', 'so-back')); on('so-back', uiBack);
   on('cr-done', uiBack); on('cr-rand', randomLook); on('v-face', () => setView(VIEW_FACE)); on('v-full', () => setView(VIEW_FULL));
   for (const b of $('cats').children) b.addEventListener('click', () => setCat(b.dataset.cat));
   on('go-set', () => { UI.from = 'menu'; uiShow('settings'); }); on('set-back', uiBack);
@@ -7745,4 +7781,230 @@ function shopBuy() {
 function buildShop() { shopRender(); }
 // debug: __shop.PROF.cash = 5000; __shop.open('top', 'hoodie'); __shop.fightOver(true, false, 'ko')
 window.__shop = { PROF, LOOK, ITEMS, SHOP, cash, itemOwned, purse, open: shopOpen, buy: shopBuy, tryOn: shopTry, save, fightOver, careerWins, LADDER };
+/* ───────── fame: followers, hype, posts, challenges in the direct, sponsors («Соцсети», menu screen 'social') ─────────
+   PROF.soc = { fans, hype, hist, n, dm, deal }: fans = followers, hype 0..100 (decays ×0.7 when the next fight starts, so it is the glow
+   of the last fights only), hist = followers after each fight (the chart), n = fights posted, dm = challenges in the direct
+   [{ id, i (LADDER man), loc }], deal = the sponsor contract { id, left } or null. The feed (posts with a frame from the fight) is kept in
+   its own key `ko-feed` — the frames are JPEG data URLs and would bloat the main save.
+   After every career / quick fight fightOver() calls socFight(): the growth is built line by line like the purse (socGain), a post is made
+   (a frame of the best moment: socWant on hits / knockdown / knockout → socSnap, called by renderFrame right after the scene is drawn),
+   a new challenge may come, the sponsor pays (socSponsorLine, added to the purse). Fame opens places (LOC_FANS) and sponsors (SPONSORS).
+   Everything is made up: nobody real, no real brands. Debug: __soc */
+const SOC = { feed: [], tab: 'feed', cand: null, want: null, pend: null, cv: null, sp: {} };
+const SOC_KEY = 'ko-feed', SOC_FEED_MAX = 14, SOC_HIST = 24, SOC_W = 480, SOC_DM_MAX = 3;
+const LOC_FANS = { parking: 500, warehouse: 1500 };   // followers needed for a place in the quick fight (the career opens its places by itself)
+const numF = n => String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ' ');
+const SPONSORS = [
+  { id: 'fox', name: 'ЛИСИЙ ХВОСТ', what: 'энергетик', need: 300, pay: 60, fights: 5, c: '#e8742a', ink: '#1b120a', mark: 'tri' },
+  { id: 'ladle', name: 'КОВШ', what: 'пункт приёма металла', need: 800, pay: 130, fights: 5, c: '#c9ccd2', ink: '#1a1c20', mark: 'sq' },
+  { id: 'north', name: 'СЕВЕР-МОТОРС', what: 'автосервис', need: 2000, pay: 240, fights: 6, c: '#2f7fd0', ink: '#f2f6fb', mark: 'bolt' },
+  { id: 'brick', name: 'ГРАНИТ-ДОМ', what: 'стройматериалы', need: 4500, pay: 400, fights: 6, c: '#b8352f', ink: '#f6eee4', mark: 'ring' }];
+const spById = id => SPONSORS.find(s => s.id === id);
+const socOn = () => (G.mode === 'career' || G.mode === 'quick') && !BAG.on;
+const locOpen = id => PROF.soc.fans >= (LOC_FANS[id] || 0);
+const hypeTier = h => h < 15 ? 'тишина' : h < 40 ? 'теплеет' : h < 70 ? 'горячо' : 'вирусный';
+
+function socInit() {   // a fresh save, or the first start with the feature: the fame of the wins already won
+  if (!PROF.soc) PROF.soc = { fans: 100 + Math.min(G.wins, 40) * 55 + Math.min(careerWins(), 40) * 40, hype: 0, hist: [], n: 0, dm: [], deal: null };
+  const S = PROF.soc; if (!S.hist.length) S.hist.push(Math.round(S.fans));
+  if (!locOpen(G.loc) && LOCS[G.loc]) G.loc = 'gym';   // a place that the followers have not opened yet
+  if (S.deal && !spById(S.deal.id)) S.deal = null;
+}
+function socLoad() { try { const f = JSON.parse(localStorage.getItem(SOC_KEY) || '[]'); SOC.feed = Array.isArray(f) ? f.slice(0, SOC_FEED_MAX) : []; } catch (e) { SOC.feed = []; } }
+function socSaveFeed() {
+  for (let k = SOC.feed.length; k > 0; k--) { try { localStorage.setItem(SOC_KEY, JSON.stringify(SOC.feed.slice(0, k))); return; } catch (e) { SOC.feed.forEach((p, i) => { if (i >= 4) p.img = null; }); } }   // no room: the old frames go first
+}
+function socReset() { PROF.soc = null; SOC.feed = []; SOC.cand = SOC.want = SOC.pend = null; try { localStorage.removeItem(SOC_KEY); } catch (e) {} socInit(); }
+socLoad(); socInit();
+
+/* ── the frame of a post: the canvas is copied right after the scene is drawn (renderFrame calls socSnap) ── */
+function socWant(sc, delay) { if (socOn() && (!SOC.want || sc > SOC.want.sc)) SOC.want = { sc, at: G.t + delay }; }
+EVT.on((type, e) => {
+  if (e.replay || !socOn()) return;
+  if (type === 'hit' && !e.blocked) socWant(Math.min(2.4, e.power * 1.5), 0.05);   // the head is at the end of the punch
+  else if (type === 'kd') socWant(3.5, 0.4);                                         // going down
+  else if (type === 'ko') socWant(6, 0.35);
+});
+function socShoot(sc) {
+  const cv = SOC.cv || (SOC.cv = document.createElement('canvas')), cw = canvas.width, ch = canvas.height, ar = 16 / 9;
+  let sw = cw, sh = ch; if (cw / ch > ar) sw = ch * ar; else sh = cw / ar;   // a 16:9 window out of the middle
+  cv.width = SOC_W; cv.height = Math.round(SOC_W / ar); cv.getContext('2d').drawImage(canvas, (cw - sw) / 2, (ch - sh) / 2, sw, sh, 0, 0, cv.width, cv.height);
+  SOC.cand = { sc };
+}
+function socFinish() {
+  const p = SOC.pend; SOC.pend = null; if (!p) return;
+  try { if (SOC.cand) p.img = SOC.cv.toDataURL('image/jpeg', 0.7); } catch (e) {}
+  SOC.cand = null; socSaveFeed();
+}
+function socSnap() {   // after composer.render()
+  const w = SOC.want; if (w && G.t >= w.at) { SOC.want = null; if (!SOC.cand || w.sc > SOC.cand.sc) socShoot(w.sc); }
+  if (SOC.pend && !SOC.want) { if (!SOC.cand) socShoot(0); socFinish(); }   // a fight that ended without a big moment: the last frame
+}
+
+/* ── the text: captions and comments are templates, the names of the commenters are made of words ── */
+const pickOf = a => a[(rr() * a.length) | 0];
+const CAP = {
+  kd: ['{opp} вставал — я добивал. {r}-й раунд: нокдаун, и дальше тишина.', 'Сначала он упал и встал. Потом упал и остался. {opp}, без обид.', 'Нокдаун, добивание, нокаут. Так выглядит {r}-й раунд {place}.'],
+  ko: ['{opp} лёг в {r}-м раунде. Спасибо всем, кто пришёл.', 'Один точный — и вопросов нет. {place}, {r}-й раунд.', 'Нокаут. {opp} ещё считает звёзды. Увидимся на следующем.'],
+  tko: ['Врач остановил бой: рассечение у {opp} — моя работа.', '{opp} уже не видел из-под бровей. Бой остановлен.'],
+  dec: ['Все раунды, кровь и пот. По очкам — мой. {opp}, уважение.', 'Дистанцию вытянули до конца. Судьи на моей стороне.', 'Долго, грязно, честно. {place}, победа по очкам.'],
+  draw: ['Ничья с {opp}. Судьи смотрели какой-то свой бой.'],
+  lko: ['Прилетело — не увидел. Голова гудит, гордость тоже. Реванш будет.', '{opp} был быстрее. Один раз зазевался — и вот. Работаем.'],
+  lose: ['Не мой вечер. {opp} был лучше. Разберу ошибки и вернусь.', 'Проиграл по очкам. Спасибо за поддержку — это не конец.'],
+  chal: ['Принял вызов от {opp}. Подписчики просили — получили.', 'Вызов принят. {opp} сам написал в директ — пришёл и получил.']
+};
+const TAGS = ['#подвал', '#голыекулаки', '#ринг', '#бой', '#наконец', '#двор'];
+const CMT_UP = ['Огонь! 🔥', 'Вот это был вечер', 'Лови подписку', 'Красиво закрыл', 'Когда следующий?', 'Такого давно не видели', 'Зал стоял на ушах', 'Слушай, это было сильно', '{opp} теперь будет сниться'];
+const CMT_DOWN = ['Держись, чемпион', 'Бывает, главное — вставать', 'Реванш обязательно!', 'Судьи, конечно…', 'Голову береги', 'Вышел и дрался — уважение', 'Мы с тобой'];
+const HW1 = ['хук', 'подвал', 'бетон', 'ринг', 'тень', 'гвоздь', 'север', 'лом', 'двор', 'ангар', 'кулак', 'рингсайд'], HW2 = ['фан', 'боец', 'дядя', 'номер', 'профи', 'ночной', 'левша', 'сосед'];
+const handle = () => pickOf(HW1) + '_' + pickOf(HW2) + (rr() < 0.7 ? ((rr() * 90 + 7) | 0) : '');
+const tpl = (t, o) => t.replace(/\{(\w+)\}/g, (_, k) => o[k]);
+
+/* ── the growth of followers: lines [label, n] like the purse; hype at the start of the fight scales them ── */
+function socGain(win, draw, how, stage) {
+  const S = PROF.soc, a = P1.fs, b = P2.fs, car = G.mode === 'career', ch = G.chal, L = [], lost = !win && !draw, ko = how === 'ko';
+  const add = (l, n) => { if (n) L.push([l, n]); };
+  const rounds = how === 'dec' ? ROUNDS : G.round, bl = [P1, P2].reduce((s, F) => s + F.flesh.wounds.reduce((q, w) => q + w.sev, 0), 0), fotn = a.land + b.land + 15 * (a.kd + b.kd) >= FOTN_MIN, eva = a.eva | 0, sig = a.sig | 0;
+  add(win ? 'Победа' : draw ? 'Ничья' : 'Бой', win ? 80 : draw ? 30 : 20);
+  if (win && ko) add('Нокаут', 110); else if (win && how === 'tko') add('Бой остановлен', 60);
+  if (win && ko && a.kd > 0) add('Нокдаун и добивание', 80); else if (a.kd > 0) add('Нокдауны ×' + a.kd, 40 * a.kd);
+  add('Длина боя · ' + rounds + ' р.', 12 * rounds);
+  if (bl >= 0.3) add('Кровь', Math.min(70, bl * 28));
+  if (fotn) add('Бой вечера', 90);
+  if (eva >= 3) add('Уклоны ×' + eva, Math.min(50, 5 * eva));
+  if (PROF.sig && sig >= 1) add('Коронный удар ×' + sig, Math.min(48, 12 * sig));
+  if (ch) add('Принятый вызов', win ? 120 : 40);
+  const lv = car ? 1 + 0.25 * stage : PAY_DIFF[G.diff] || 1, k = lv * (lost ? 0.55 : 1) * (1 + S.hype / 200);
+  const lines = L.map(l => [l[0], Math.max(5, Math.round(l[1] * k / 5) * 5)]);
+  if (lost && ko) lines.push(['Нокаут от соперника', -50]);
+  let total = lines.reduce((s, l) => s + l[1], 0); total = Math.max(total, -Math.round(S.fans * 0.05));
+  let dh = win ? 12 : draw ? 5 : 3; if (win && ko) dh += 20; else if (win && how === 'tko') dh += 10; if (lost && ko) dh = -12;
+  dh += 8 * a.kd + (fotn ? 15 : 0) + (bl >= 0.6 ? 5 : 0) + (ch && win ? 20 : 0);
+  return { lines, total, dh, k, kd: a.kd, ko, rounds, ch };
+}
+/* the sponsor's line of the purse (07b_economy.js: purse): a fixed sum per fight, half as much again for a win */
+function socSponsorLine(win) { const S = PROF.soc, sp = S.deal && spById(S.deal.id); return sp ? ['Спонсор «' + sp.name + '»', Math.round(sp.pay * (win ? 1.5 : 1))] : null; }
+function socFight(win, draw, how, stage) {   // fightOver calls it once per fight; returns what the result screen shows
+  if (!socOn() || !P1.fs || !P2.fs) return null;
+  const S = PROF.soc, before = { fans: S.fans, locs: Object.keys(LOC_FANS).filter(locOpen), sp: SPONSORS.filter(s => S.fans >= s.need).length };
+  const g = socGain(win, draw, how, stage), opp = $('n2').textContent.replace(' ★', ''), place = LOC.label, ch = G.chal; G.chal = null;
+  S.fans = Math.max(50, S.fans + g.total); S.hype = clamp(S.hype + g.dh, 0, 100); S.hist.push(Math.round(S.fans)); if (S.hist.length > SOC_HIST) S.hist.shift(); S.n++;
+  const lost = !win && !draw, kind = ch && win ? 'chal' : win ? (how === 'ko' ? (g.kd ? 'kd' : 'ko') : how === 'tko' ? 'tko' : 'dec') : draw ? 'draw' : how === 'ko' ? 'lko' : 'lose';
+  const cap = tpl(pickOf(CAP[kind]), { opp, place, r: g.rounds }) + ' ' + pickOf(TAGS), up = !lost, likes = Math.round(S.fans * (0.05 + S.hype / 900) + Math.max(0, g.total) * 0.9 + rr() * 30), nc = Math.max(2, Math.round(likes / (up ? 16 : 24)));
+  const post = { n: S.n, win, draw, how, kind, opp, place, cap, img: null, likes, nc, d: g.total, fans: S.fans, hype: Math.round(S.hype), cm: [0, 1, 2].map(() => [handle(), tpl(pickOf(up ? CMT_UP : CMT_DOWN), { opp })]) };
+  SOC.feed.unshift(post); if (SOC.feed.length > SOC_FEED_MAX) SOC.feed.length = SOC_FEED_MAX; SOC.pend = post;
+  const sum = { total: g.total, lines: g.lines, k: g.k, fans: S.fans, hype: Math.round(S.hype), notes: [] };
+  if (S.deal) { S.deal.left--; if (S.deal.left <= 0) { sum.notes.push('контракт «' + spById(S.deal.id).name + '» закончился'); S.deal = null; P1.applyLook(LOOK); } }
+  for (const id of Object.keys(LOC_FANS)) if (locOpen(id) && !before.locs.includes(id)) sum.notes.push('открыто место: ' + LOCS[id].label);
+  const ns = SPONSORS.filter(s => S.fans >= s.need).length; if (ns > before.sp) sum.notes.push('новый спонсор: ' + SPONSORS[ns - 1].name);
+  S.dm = S.dm.filter(d => ++d.age < 5); if (S.dm.length < SOC_DM_MAX && rr() < (S.dm.length ? 0.5 : 0.9)) socDM();   // (rivals are the men of the ladder up to the next one)
+  if (S.dm.length) sum.notes.push('в директе: вызов' + (S.dm.length > 1 ? 'ы ×' + S.dm.length : ''));
+  return sum;
+}
+function socShow(s) {
+  const el = $('r-soc'); if (!el) return;
+  if (!s) { el.innerHTML = ''; return; }
+  el.innerHTML = '<tr><td colspan="2" class="h">подписчики</td></tr>' + s.lines.map(l => `<tr><td class="l">${l[0]}</td><td class="${l[1] < 0 ? 'neg' : ''}">${l[1] < 0 ? '−' : '+'}${numF(Math.abs(l[1]))}</td></tr>`).join('') +
+    `<tr class="tot"><td class="l">Итого</td><td>${s.total < 0 ? '−' : '+'}${numF(Math.abs(s.total))}</td></tr><tr><td class="l">Всего</td><td>${numF(s.fans)}</td></tr><tr><td class="l">Хайп</td><td>${s.hype} · ${hypeTier(s.hype)}</td></tr>` +
+    s.notes.map(n => `<tr><td colspan="2" class="new">${esc(n)}</td></tr>`).join('');
+}
+// the next fight starts: the hype of the old ones cools down; an accepted challenge adds to it
+function socStart() {
+  if (!socOn()) return; const S = PROF.soc; S.hype = Math.round(S.hype * 0.7); if (G.chal) S.hype = Math.min(100, S.hype + 20);
+  SOC.cand = SOC.want = null; SOC.pend = null; socShow(null);
+}
+function socFlush() { if (SOC.pend) socFinish(); }   // left to the menu before the frame was taken
+
+/* ── the direct: rivals challenge you ── */
+const DM_TXT = {
+  brawler: ['Видел твой последний бой — сыровато. Приходи в {place}, покажу, как это делается.', 'Слышал, ты себя уже чемпионом считаешь. {place}, один раунд хватит.'],
+  counter: ['Ты много машешь. Я не буду — просто подожду. {place}, когда скажешь.', 'Любопытно, как ты бьёшь, когда не попадаешь. Проверим в {place}?'],
+  pressure: ['Без разговоров. {place}. Зажму тебя в угол, а там — как повезёт.', 'Подписчики хотят увидеть нас вместе. Я готов хоть сегодня — {place}.']
+};
+function socDM() {
+  const S = PROF.soc, top = Math.min(G.career + 1, LADDER.length - 1), free = [...Array(top + 1).keys()].filter(i => !S.dm.some(d => d.i === i));
+  if (!free.length) return null;
+  const i = pickOf(free), L = LADDER[i], loc = locOpen(L.loc) && LOCS[L.loc] ? L.loc : 'yard', d = { id: Date.now() % 1e9 + S.n, i, loc, age: 0, t: ((rr() * 3) | 0) };
+  S.dm.push(d); return d;
+}
+function socAccept(id) {
+  const S = PROF.soc, d = S.dm.find(x => x.id === id); if (!d || G.state !== 'menu') return;
+  S.dm = S.dm.filter(x => x !== d); const L = LADDER[d.i];
+  if (G.mode === 'career') { G.diff = G.userDiff; }
+  G.prev = { diff: G.userDiff, loc: G.loc }; G.mode = 'quick'; G.diff = L.diff; G.loc = d.loc; setLocation(d.loc);   // the fight is on his ground; the quick-fight settings come back at the menu (socLeave)
+  P2.applyLook({ ...L.look, street: true }); AI.style = STYLES[L.st]; $('n2').textContent = L.nm; const sl = $('st2'); if (sl) sl.textContent = STYLES[L.st].label;
+  G.chal = { id, i: d.i, nm: L.nm }; save(); startFight(true);
+}
+function socLeave() { if (G.prev) { G.diff = G.userDiff; G.loc = G.prev.loc; G.prev = null; } G.chal = null; }
+
+/* ── sponsors: a contract of N fights, a patch on the shorts ── */
+function sponsorPatch(g, sp, cx, cy, w, h) {   // a placeholder logo: a plate with a sign and the name
+  g.save(); g.translate(cx, cy); g.fillStyle = sp.c; g.fillRect(-w / 2, -h / 2, w, h); g.strokeStyle = sp.ink; g.lineWidth = h * 0.05; g.strokeRect(-w / 2 + h * 0.07, -h / 2 + h * 0.07, w - h * 0.14, h - h * 0.14);
+  const s = h * 0.3, mx = -w / 2 + h * 0.5; g.fillStyle = g.strokeStyle = sp.ink; g.lineWidth = h * 0.07; g.lineJoin = 'round'; g.beginPath();
+  if (sp.mark === 'tri') { g.moveTo(mx, -s); g.lineTo(mx + s, s); g.lineTo(mx - s, s); g.closePath(); g.fill(); }
+  else if (sp.mark === 'sq') { g.fillRect(mx - s * 0.8, -s * 0.8, s * 1.6, s * 1.6); }
+  else if (sp.mark === 'bolt') { g.moveTo(mx + s * 0.3, -s); g.lineTo(mx - s * 0.6, s * 0.1); g.lineTo(mx - s * 0.05, s * 0.1); g.lineTo(mx - s * 0.3, s); g.lineTo(mx + s * 0.6, -s * 0.2); g.lineTo(mx + s * 0.05, -s * 0.2); g.closePath(); g.fill(); }
+  else { g.arc(mx, 0, s * 0.85, 0, 7); g.stroke(); g.beginPath(); g.arc(mx, 0, s * 0.3, 0, 7); g.fill(); }
+  let px = h * 0.34; g.font = `900 ${px}px "Arial Narrow", Arial, sans-serif`; const room = w - h * 1.15, tw = g.measureText(sp.name).width; if (tw > room) { px *= room / tw; g.font = `900 ${px}px "Arial Narrow", Arial, sans-serif`; }
+  g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(sp.name, -w / 2 + h * 0.95, h * 0.02); g.restore();
+}
+function sponsorIcon(sp) { const c = document.createElement('canvas'); c.width = 240; c.height = 72; sponsorPatch(c.getContext('2d'), sp, 120, 36, 236, 68); return c.toDataURL(); }
+// painted on the player's trunks, on the outside of both thighs (called by Fighter.dress after paintShorts). The trunks' texture is wrapped round
+// the waist (u: one leg in 0..0.5, the other in 0.5..1) and a pixel is ~5× longer across than along (≈4 mm × 0.8 mm), so the patch is squeezed in x
+function socPatch(c) {
+  const S = PROF.soc, sp = S && S.deal && spById(S.deal.id); if (!sp) return;
+  const g = c.getContext('2d'), W = c.width, H = c.height;
+  for (const x of [0.31, 0.81]) { g.save(); g.translate(W * x, H * 0.46); g.scale(0.19, 1); sponsorPatch(g, sp, 0, 0, 250, 74); g.restore(); }
+}
+function socSign(id) {
+  const S = PROF.soc, sp = spById(id); if (!sp || S.deal || S.fans < sp.need) return;
+  S.deal = { id, left: sp.fights }; P1.applyLook(LOOK); save(); sfx.thud(0.4, true); msg('Контракт: ' + sp.name, 'tip'); socRender(); updateMenu();
+}
+function socCancel() { const S = PROF.soc; if (!S.deal) return; S.deal = null; P1.applyLook(LOOK); save(); socRender(); }
+
+/* ── the screen ── */
+function socChart() {
+  const h = PROF.soc.hist.slice(), W = 300, H = 64, p = 6; if (h.length < 2) h.unshift(h[0] * 0.8);
+  const lo = Math.min(...h), hi = Math.max(...h), y = v => H - p - (hi > lo ? (v - lo) / (hi - lo) : 0.5) * (H - 2 * p), x = i => p + i * (W - 2 * p) / (h.length - 1), pts = h.map((v, i) => x(i).toFixed(1) + ',' + y(v).toFixed(1)).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon points="${p},${H - p} ${pts} ${x(h.length - 1).toFixed(1)},${H - p}" fill="rgba(255,59,78,.14)"/><polyline points="${pts}" fill="none" stroke="#ff3b4e" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg><span class="lo">${numF(lo)}</span><span class="hi">${numF(hi)}</span>`;
+}
+function socRender() {
+  const S = PROF.soc; if (!$('social')) return;
+  $('so-fans').textContent = numF(S.fans) + ' подп.';
+  $('so-chart').innerHTML = socChart();
+  $('so-hype').innerHTML = `<span>хайп · ${hypeTier(S.hype)}</span><i><b style="width:${Math.round(S.hype)}%"></b></i>`;
+  const open = SPONSORS.filter(s => S.fans >= s.need).length, tabs = [{ id: 'feed', label: 'Лента' }, { id: 'dm', label: 'Директ' + (S.dm.length ? ' · ' + S.dm.length : '') }, { id: 'spons', label: 'Спонсоры' + (!S.deal && open ? ' ●' : '') }];
+  swatches('so-tabs', tabs, () => SOC.tab, v => { SOC.tab = v; socList(); }, true, true);
+  socList();
+}
+function socList() {
+  const S = PROF.soc, box = $('so-list'), me = esc(myName());
+  if (SOC.tab === 'feed') {
+    box.innerHTML = SOC.feed.length ? SOC.feed.map(p => `<div class="so-post"><div class="so-h"><b>${me}</b><small>бой ${p.n} · ${esc(p.place)}</small></div>` +
+      `<div class="so-img">${p.img ? `<img alt="" src="${p.img}">` : ''}<span class="so-tag ${p.win ? 'w' : p.draw ? '' : 'l'}">${{ kd: 'нокдаун и нокаут', ko: 'нокаут', tko: 'бой остановлен', dec: 'победа по очкам', draw: 'ничья', lko: 'нокаут от соперника', lose: 'поражение', chal: 'вызов принят' }[p.kind]}</span></div>` +
+      `<div class="so-cap">${esc(p.cap)}</div><div class="so-m"><span>♥ ${numF(p.likes)}</span><span>💬 ${numF(p.nc)}</span><span class="d ${p.d < 0 ? 'neg' : ''}">${p.d < 0 ? '−' : '+'}${numF(Math.abs(p.d))} подп.</span></div>` +
+      p.cm.slice(0, 2).map(c => `<div class="so-c"><b>${esc(c[0])}</b> ${esc(c[1])}</div>`).join('') + '</div>').join('') : '<div class="so-empty">Пока пусто. После каждого боя здесь появится пост — с кадром из боя.</div>';
+  } else if (SOC.tab === 'dm') {
+    box.innerHTML = S.dm.length ? S.dm.map(d => { const L = LADDER[d.i], tx = tpl(DM_TXT[L.st][d.t % DM_TXT[L.st].length], { place: LOCS[d.loc].label });
+      return `<div class="so-post so-dm"><div class="so-h"><b>${esc(L.name)} «${esc(L.nm)}»</b><small>${STYLES[L.st].label} · ${DIFFS[L.diff].label.toLowerCase()} · ${esc(LOCS[d.loc].label)}</small></div><div class="so-cap">${esc(tx)}</div>` +
+        `<div class="so-acts"><button class="btn pri sm" data-acc="${d.id}">Принять вызов</button><button class="btn sm" data-dec="${d.id}">Отклонить</button></div><small class="so-n">принять — быстрый бой на его месте, хайп +20; победа даст больше подписчиков</small></div>`; }).join('')
+      : '<div class="so-empty">В директе тихо. Выигрывай бои — соперники сами напишут и позовут на бой.</div>';
+    for (const b of box.querySelectorAll('[data-acc]')) b.onclick = () => socAccept(+b.dataset.acc);
+    for (const b of box.querySelectorAll('[data-dec]')) b.onclick = () => { S.dm = S.dm.filter(d => d.id !== +b.dataset.dec); save(); socRender(); };
+  } else {
+    box.innerHTML = SPONSORS.map(sp => { const lock = S.fans < sp.need, mine = S.deal && S.deal.id === sp.id, other = S.deal && !mine;
+      SOC.sp[sp.id] = SOC.sp[sp.id] || sponsorIcon(sp);
+      return `<div class="so-post so-sp${lock ? ' lock' : ''}"><img class="so-logo" alt="" src="${SOC.sp[sp.id]}"><div class="so-h"><b>${sp.name}</b><small>${sp.what}</small></div>` +
+        `<div class="so-cap">${cash(sp.pay)} за бой, за победу ×1,5 · контракт на ${sp.fights} боёв · нашивка на трусах</div>` +
+        `<div class="so-acts">${lock ? `<span class="so-lock">🔒 от ${numF(sp.need)} подписчиков</span>` : mine ? `<span class="so-lock on">контракт: осталось ${S.deal.left} ${S.deal.left === 1 ? 'бой' : 'боёв'}</span><button class="btn sm" data-cx="1">Расторгнуть</button>` : `<button class="btn pri sm" data-sg="${sp.id}"${other ? ' disabled' : ''}>${other ? 'Уже есть спонсор' : 'Подписать'}</button>`}</div></div>`; }).join('');
+    for (const b of box.querySelectorAll('[data-sg]')) b.onclick = () => socSign(b.dataset.sg);
+    for (const b of box.querySelectorAll('[data-cx]')) b.onclick = socCancel;
+  }
+}
+function socEnter() { if (!PROF.soc.dm.length && G.wins + G.losses > 0 && rr() < 0.5) socDM(); socRender(); }
+function socMenu() { const l = $('soc-lbl'), S = PROF.soc; if (l) l.textContent = numF(S.fans) + ' подп.' + (S.dm.length ? ' · вызов ×' + S.dm.length : ''); }
+// debug: __soc.sim(true, 'ko') plays the books of a fight without fighting; __soc.fans(2000) sets the followers; __soc.dm() adds a challenge
+window.__soc = { get S() { return PROF.soc; }, SOC, SPONSORS, LOC_FANS, socGain, socDM, socSign, socAccept, socRender,
+  sim(win, how = 'dec', kd = 0) { P1.fs.land = 40; P1.fs.thr = 90; P1.fs.eva = 6; P1.fs.kd = kd; P2.fs.land = 30; P2.fs.thr = 80; if (G.mode !== 'career') G.mode = 'quick'; if (how !== 'dec') G.round = 2; fightOver(win, false, how); },
+  fans(n) { PROF.soc.fans = n; PROF.soc.hist.push(n); save(); socMenu(); }, dm: socDM };
 </script>

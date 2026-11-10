@@ -113,7 +113,7 @@ class Fighter {
     this.resetState();
   }
   resetState() {
-    this.fs = { thr: 0, land: 0, pow: 0, blk: 0, dmg: 0, kd: 0 }; this.hold = null; this.ftOff = null; this.gest = null; this.shellT = 0; this.shakeT = -9; this.hitLog = []; this.heavy = false; this.powerNext = false; this.fatK = 1; this.punchK = 1;
+    this.fs = { thr: 0, land: 0, pow: 0, blk: 0, dmg: 0, kd: 0, eva: 0, sig: 0 }; this.hold = null; this.ftOff = null; this.gest = null; this.shellT = 0; this.shakeT = -9; this.hitLog = []; this.heavy = false; this.powerNext = false; this.fatK = 1; this.punchK = 1;
     this.hp = 100; this.hpCap = 100; this.hitT = -9; this.stamina = 100; this.staT = 0; this.cur = null; this.release = false; this.resolved = false; this.whiff = false; this.punchId = 0;
     if (this.wrapU) this.wrapU.uWB.value.set(0, 0);
     this.gu = null; this.wobble = 0; this.kdCount = 0; this.cutLook = false; this.doomed = null; this.liver = null; this.wind = 0; this.adv = 0; this.advV = 0; this.knock = 0; this.dmgMul = 1; if (this.mark) { this.group.position.copy(this.mark); this.slide = null; }
@@ -302,7 +302,7 @@ class Fighter {
     const G2 = this.gear, U = this.flesh.u.uGear.value, W = wearDress(this, L), bt = W.bottom, tp = W.top, sh = W.shoes;   // 04e_wardrobe.js: the meshes of what he wears (model + colour from the registry)
     // loose trousers / long shorts are their own mesh (04d_street.js) and cover the hips completely: the boxing trunks (cloth) are hidden under them
     G2.pants = bt.cut ? G2.shells.bottom.m : null; this.shorts.mesh.visible = !bt.cut;
-    if (!bt.cut) { const S0 = wearShorts(bt); paintShorts(this.shortsCanvas, S0); this.shortsTex.needsUpdate = true; this.shortsMat.sheenColor.set(S0.sheen); }
+    if (!bt.cut) { const S0 = wearShorts(bt); paintShorts(this.shortsCanvas, S0); if (this.isPlayer) socPatch(this.shortsCanvas); this.shortsTex.needsUpdate = true; this.shortsMat.sheenColor.set(S0.sheen); }
     U.set(bt.cut ? PANT_CUTS[bt.cut].skin : 0, sh.top || 0,   /* x: the legs' skin is not drawn above this height (cm) */ tp.tex ? 1 : 0, tp.sleeve || 0);
     G2.guard.material.color.set((GUARDS.find(x => x.id === L.guard) || GUARDS[0]).c);
     { const c = (GUARDS.find(x => x.id === L.guard) || GUARDS[0]).c; G2.guard.material.emissive.set(c); }

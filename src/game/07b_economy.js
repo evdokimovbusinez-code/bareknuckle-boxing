@@ -34,6 +34,7 @@ function purse(win, draw, how, stage) {
   const a = P1.fs, b = P2.fs;
   if (a && b && a.land + b.land + 15 * (a.kd + b.kd) >= FOTN_MIN) lines.push(['Бой вечера', r10(T.fotn)]);
   if (car && win && stage === LADDER.length - 1) lines.push(['Титул — пояс', T.title]);
+  const sp = socSponsorLine(win); if (sp) lines.push(sp);   // the sponsor's contract (15_social.js)
   return { lines, total: lines.reduce((s, l) => s + l[1], 0) };
 }
 // pays it out and returns what to draw: the purse + the items that a career step has just opened
@@ -43,6 +44,7 @@ function payOut(win, draw, how, stage, before) {
   p.opened = opened.map(i => i.label + (i.brand ? ' · ' + i.brand : '')); return p;
 }
 function payShow(p) {
+  socShow(p && p.soc);
   const el = $('r-pay'); if (!el) return;
   if (!p || (!p.lines.length && !p.note)) { el.innerHTML = ''; return; }
   el.innerHTML = '<tr><td colspan="2" class="h">выплата</td></tr>' + (p.note ? `<tr><td colspan="2">${p.note}</td></tr>` : p.lines.map(l => `<tr><td class="l">${l[0]}</td><td>+${cash(l[1])}</td></tr>`).join('') +
