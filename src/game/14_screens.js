@@ -3,16 +3,18 @@
    All of them except the pause (and the settings opened from it) live in G.state === 'menu'; the pause sets G.paused, frame() then
    runs with dt = 0. The menu camera (menuCam) orbits P1: the creator turns it by dragging, the other screens just frame him. */
 const UI = { scr: null, from: null, cat: 'name', spar: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };
-const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', settings: 'settings', pause: 'pause' };
+const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', settings: 'settings', pause: 'pause' };
 const VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
 const myName = () => PROF.nick || PROF.name || 'Ты';
 function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [...root.querySelectorAll('button:not([disabled]),input')].filter(b => b.offsetParent !== null) : []; }
 function uiShow(scr, focusId) {
+  if (UI.scr === 'shop' && scr !== 'shop') shopLeave();   // a try-on that was not bought comes off (14b_shop.js)
   UI.scr = scr; const on = scr ? UI_IDS[scr] : null;
-  for (const id of ['menu', 'quick', 'creator', 'settings', 'pause']) $(id).hidden = id !== on;
+  for (const id of ['menu', 'quick', 'creator', 'shop', 'settings', 'pause']) $(id).hidden = id !== on;
   if (on === 'menu') { $('nav-main').hidden = scr !== 'main'; $('nav-train').hidden = scr !== 'train'; }
   if (scr === 'settings') { const p = UI.from === 'pause'; $('settings').classList.toggle('dim', p); $('reset-row').hidden = p; buildSettings(); setTab('opt'); }
   if (scr === 'pause') $('p-quit-l').textContent = BAG.on ? 'Выйти' : 'Сдаться';
+  if (scr === 'shop') shopEnter();
   if (scr !== 'creator' && UI.spar) { UI.spar = false; if (G.state === 'menu') P1.sparGear(false); }   // the glove preview of the creator
   const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur();
   if (!TOUCH && scr && scr !== 'creator') { const b = (focusId && $(focusId)) || (scr === 'main' || scr === 'train' || scr === 'pause' ? uiItems()[0] : null); b && b.focus({ preventScroll: true }); }
@@ -20,7 +22,7 @@ function uiShow(scr, focusId) {
 function uiBack() {
   if (UI.scr === 'settings' && UI.from === 'pause') return uiShow('pause', 'p-set');
   if (UI.scr === 'main' || G.state !== 'menu') return;
-  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', settings: 'go-set' }[UI.scr];
+  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', settings: 'go-set' }[UI.scr];
   updateMenu(); uiShow('main', back);
 }
 /* keys of the screens; true = the key is taken (12_ui.js then leaves it alone). Esc: back / pause / skip the replay / leave the result */
@@ -52,7 +54,7 @@ function surrender() { if (!BAG.on && G.state !== 'ko') { G.losses++; save(); } 
 const MCAM = { yaw: 0.5, d: 4, tx: 0, ty: 1, tz: 0, sh: 0.36, h: 0.1, init: false };
 function menuCam(dt, cp, cl) {
   const x = P1.group.position.x, th = Math.tan(camera.fov * Math.PI / 360), asp = VW / VH, dFull = 1.13 / th, hd = P1.headNow, T = { tx: x, tz: 0 };
-  if (UI.scr === 'creator') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1; }
+  if (UI.scr === 'creator' || UI.scr === 'shop') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1; }
   else if (UI.scr === 'quick') { T.yaw = 0.2; T.d = dFull * 1.18; T.ty = 1.02; T.sh = 0.4; T.h = 0.32; }
   else { T.yaw = 0.52 + 0.05 * Math.sin(camClock * 0.4); T.d = dFull * 0.84; T.ty = 1.05; T.sh = UI.scr === 'settings' ? 0.5 : 0.38; T.h = 0.12; }
   const M = MCAM, a = camCut || !M.init ? 1 : 1 - Math.exp(-dt * (UI.drag ? 16 : 4.2)); M.init = true;
@@ -77,7 +79,8 @@ function buildCreator() {
   swatches('o-beard', [{ id: 'no', label: 'нет' }, { id: 'yes', label: 'есть' }], () => LOOK.beard ? 'yes' : 'no', v => { LOOK.beard = v === 'yes'; }, true);
   wearUI();   // clothes: category → model → the colours of that model (04e_wardrobe.js)
   swatches('o-wraps', col(WRAPS_LOOKS, w => ({ id: w.id, c: w.c, label: w.label })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; spar(false)(); });
-  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { LOOK.hands = v; spar(false)(); }, true);   // street fights: wraps or 4 oz MMA gloves
+  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { if (!itemOwned(v)) { setTimeout(() => { buildCreator(); shopOpen('hands', v); }, 0); return; } LOOK.hands = v; spar(false)(); }, true);   // street fights: wraps or 4 oz MMA gloves (bought)
+  [...$('o-hands').children].forEach((b, i) => { const it = ITEMS[HANDS[i].id]; if (it && !itemOwned(it.id)) { b.classList.add('lock'); b.title = 'купить в магазине'; const s = document.createElement('small'); s.className = 'pr'; s.textContent = '🔒 ' + cash(it.price); b.append(s); } });
   swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; spar(true)(); });   // sparring (and MMA) gloves + headgear: shown on him while choosing
   swatches('o-guard', col(GUARDS, b => ({ id: b.id, c: b.c, label: b.label })), () => LOOK.guard || 'clear', v => { LOOK.guard = v; });
   swatches('o-sig', [{ id: 'none', label: 'нет' }, ...SIGS], () => PROF.sig || 'none', v => { PROF.sig = v === 'none' ? null : v; }, true, true);
@@ -86,9 +89,9 @@ function buildCreator() {
 }
 function randomLook() {
   const pick = a => a[(Math.random() * a.length) | 0], cw = careerWins();
-  const of = (cat, pNone) => { if (Math.random() < pNone) return { id: 'none' }; const it = pick(wearItems(cat)); return { id: it.id, color: pick(Math.random() < 0.7 ? it.colors : wearColors(it)) }; };
+  const of = (cat, pNone) => { if (Math.random() < pNone) return { id: 'none' }; const it = pick(wearItems(cat).filter(i => itemOwned(i.id))); return { id: it.id, color: pick(Math.random() < 0.7 ? it.colors : wearColors(it)) }; };   // only what he owns
   Object.assign(LOOK, { hair: pick(HAIR_LOOKS).id, skin: pick(SKIN_LOOKS).id, beard: Math.random() < 0.5, bottom: of('bottom', 0), top: of('top', 0.3), shoes: of('shoes', 0.25), head: of('head', 0.6), eyes: of('eyes', 0.7), belt: of('belt', 0.4),
-    guard: pick(GUARDS).id, wraps: pick(WRAPS_LOOKS.filter(w => cw >= w.need)).id, hands: pick(HANDS).id, gloves: pick(GLOVES).id });
+    guard: pick(GUARDS).id, wraps: pick(WRAPS_LOOKS.filter(w => cw >= w.need)).id, hands: pick(HANDS.filter(h => itemOwned(h.id))).id, gloves: pick(GLOVES).id });
   P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar); save(); buildCreator();
 }
 function renderStats() {
@@ -125,8 +128,8 @@ function resetAsk(sure) {   // wiping the progress takes a second, explicit pres
   const no = btn('отмена', '', () => resetAsk(false).focus()); btn('да, стереть всё', 'warn', () => { resetProgress(); resetAsk(false).focus(); }); return no;
 }
 function resetProgress() {   // record, career, belt, points and stats; the name and the look stay (minus wraps that are locked again)
-  G.wins = G.losses = G.career = G.bagBest = 0; Object.assign(PROF, { sig: null, pts: 1, champ: 0 }); for (const k in PROF.stats) PROF.stats[k] = 0;
-  const w = WRAPS_LOOKS.find(x => x.id === (LOOK.wraps || 'white')); if (w && w.need > 0) { LOOK.wraps = 'white'; P1.applyLook(LOOK); }
+  G.wins = G.losses = G.career = G.bagBest = 0; Object.assign(PROF, { sig: null, pts: 1, champ: 0, cash: 0, own: {} }); for (const k in PROF.stats) PROF.stats[k] = 0;
+  wearSanitize(); const w = WRAPS_LOOKS.find(x => x.id === (LOOK.wraps || 'white')); if (w && w.need > 0) LOOK.wraps = 'white'; P1.applyLook(LOOK);   // bought and career clothes go away with the money
   save(); buildCreator(); updateMenu(); msg('Прогресс сброшен', 'tip');
 }
 
@@ -149,6 +152,8 @@ function buildMenu() {
   on('go', startQuick); on('quick-back', uiBack);
   on('go-train', () => uiShow('train')); on('train-back', uiBack); on('go-bag', startBag); on('go-spar', startSpar);
   on('go-fighter', () => { buildCreator(); uiShow('creator'); setCat(UI.cat); });
+  buildShop(); on('go-shop', () => uiShow('shop', 'sh-buy')); on('shop-back', uiBack); on('sh-face', () => setView(VIEW_FACE)); on('sh-full', () => setView(VIEW_FULL));
+  on('sh-buy', shopBuy);
   on('cr-done', uiBack); on('cr-rand', randomLook); on('v-face', () => setView(VIEW_FACE)); on('v-full', () => setView(VIEW_FULL));
   for (const b of $('cats').children) b.addEventListener('click', () => setCat(b.dataset.cat));
   on('go-set', () => { UI.from = 'menu'; uiShow('settings'); }); on('set-back', uiBack);
@@ -156,7 +161,10 @@ function buildMenu() {
   on('p-resume', resumeGame); on('p-set', () => uiShow('settings')); on('p-quit', surrender); on('pause-btn', pauseGame);
   if (TOUCH) $('cr-hint').textContent = 'тяни — вращать · щипок — зум';
   // the creator: drag turns him (the camera orbits), wheel / pinch zooms between the face and the full figure
-  const el = $('cr-drag'), pts = new Map(); let pinch = 0;
+  for (const el of [$('cr-drag'), $('sh-drag')]) dragView(el);
+}
+function dragView(el) {
+  const pts = new Map(); let pinch = 0;
   el.addEventListener('pointerdown', e => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (_) {} pts.set(e.pointerId, [e.clientX, e.clientY]); pinch = 0; UI.drag = pts.size; });
   el.addEventListener('pointermove', e => {
     const p = pts.get(e.pointerId), o = UI.orb; if (!p) return;

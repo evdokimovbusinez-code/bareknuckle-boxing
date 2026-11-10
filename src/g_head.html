@@ -190,7 +190,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .mnav{display:flex;flex-direction:column;align-items:flex-start;gap:clamp(0px,.7vmin,6px)}
 .mnav button{position:relative;display:flex;align-items:baseline;gap:clamp(8px,1.6vmin,14px);border:0;background:none;padding:1px 16px 1px 0;font-family:var(--poster);font-weight:700;font-size:clamp(21px,5.8vmin,44px);line-height:1.14;
   letter-spacing:.02em;text-transform:uppercase;text-align:left;color:#b4aea2;outline:none;transition:transform .16s ease-out,color .16s;animation:mIn .34s cubic-bezier(.2,.8,.2,1) both}
-.mnav button:nth-child(2){animation-delay:.04s}.mnav button:nth-child(3){animation-delay:.08s}.mnav button:nth-child(4){animation-delay:.12s}.mnav button:nth-child(5){animation-delay:.16s}
+.mnav button:nth-child(2){animation-delay:.04s}.mnav button:nth-child(3){animation-delay:.08s}.mnav button:nth-child(4){animation-delay:.12s}.mnav button:nth-child(5){animation-delay:.16s}.mnav button:nth-child(6){animation-delay:.2s}
 .mnav button b{font-weight:700;white-space:nowrap}
 .mnav button i{flex:none;width:20px;font:500 11px var(--mono);font-style:normal;letter-spacing:.08em;color:var(--muted);transition:color .16s}
 .mnav button small{font:400 clamp(10px,1.7vmin,12px) var(--mono);letter-spacing:.03em;text-transform:none;color:var(--muted);white-space:nowrap}
@@ -238,6 +238,24 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .cats i{position:absolute;top:50%;right:8px;width:7px;height:7px;margin-top:-3px;border-radius:50%;background:var(--gold);display:none}.cats i.on{display:block}
 .sw button.txt img{height:15px;vertical-align:-3px;margin-right:5px;opacity:.9}.sw button.txt small{margin-left:6px;font-size:8px;letter-spacing:.08em;opacity:.55}.sw button{background-size:cover}.wnote{font-size:11px;letter-spacing:.06em;opacity:.6;min-height:14px}
 .cpane{display:flex;flex-direction:column;gap:clamp(8px,1.8vmin,13px)}
+/* shop cards, prices, locks of the creator, the purse on the result screen */
+.ptitle .cash{float:right;font:600 clamp(14px,2.6vmin,19px) var(--mono);letter-spacing:.02em;color:var(--gold);text-transform:none;margin-top:4px}
+.shgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.shc{position:relative;display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid rgba(255,255,255,.16);border-radius:2px;background:rgba(255,255,255,.04);padding:clamp(5px,1.2vmin,8px) 9px;transition:border-color .15s,background .15s}
+.shc img{position:absolute;right:7px;top:6px;height:15px;opacity:.55}
+.shc b{font-family:var(--poster);font-weight:700;font-size:clamp(14px,2.6vmin,17px);letter-spacing:.04em;text-transform:uppercase;line-height:1.1}
+.shc small{font:400 8.5px var(--mono);letter-spacing:.1em;color:var(--muted);min-height:10px}
+.shc .pr{font:600 11.5px var(--mono);color:var(--gold)}
+.shc.own .pr{color:#8fd49a}.shc.lock{opacity:.7}.shc.lock .pr{color:var(--muted)}
+.shc:hover,.shc:focus{border-color:rgba(255,255,255,.5);outline:none}
+.shc[aria-pressed="true"]{border-color:var(--gold);background:rgba(226,177,74,.1)}.shc[aria-pressed="true"] b{color:var(--gold)}
+.sw button.txt.lock{opacity:.7}.sw button.txt.lock::after{content:none}.sw button.txt .pr{font-size:9px;letter-spacing:.04em;opacity:.8;color:var(--gold)}
+.btn:disabled{opacity:.55;cursor:default;box-shadow:none}.btn.pri:disabled{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.2)}
+.rtabs{display:flex;gap:clamp(10px,3vmin,34px);align-items:flex-start;justify-content:center}.rtabs .fstats{margin:6px 0 0}
+.fstats.pay{font-size:12px}.fstats.pay td{text-align:right;padding:1px 6px}.fstats.pay td.l{text-align:left;color:#d8d2c6;font-size:11px;letter-spacing:.03em;text-transform:none}.fstats.pay td.h{text-align:left;color:var(--muted);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.fstats.pay td:nth-child(2){color:#9fdca8;font-size:12px;letter-spacing:0;text-transform:none}.fstats.pay td.l{font-size:12px}
+.fstats.pay tr:last-of-type td:nth-child(2){color:var(--text)}
+.fstats.pay tr.tot td,.fstats.pay tr.tot td:nth-child(2){color:#e2b14a;border-top:1px solid rgba(255,255,255,.2);padding-top:3px;font-weight:600}.fstats.pay td.new{text-align:left;color:#8fd49a;font-size:11px}
 .dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
 .views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
 .locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -329,7 +347,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="rt" id="r-title">Победа</div>
     <div class="rs" id="r-sub"></div>
     <div class="rs car" id="r-car"></div>
-    <table class="fstats" id="r-stats"></table>
+    <div class="rtabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table></div>
     <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
   </div>
 
@@ -342,7 +360,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
         <button id="go-quick"><i>02</i><b>Быстрый бой</b><small>место и соперник</small></button>
         <button id="go-train"><i>03</i><b>Тренировка</b><small>груша · спарринг</small></button>
         <button id="go-fighter"><i>04</i><b>Боец</b><small id="fighter-lbl"></small></button>
-        <button id="go-set"><i>05</i><b>Настройки</b></button>
+        <button id="go-shop"><i>05</i><b>Магазин</b><small id="shop-lbl"></small></button>
+        <button id="go-set"><i>06</i><b>Настройки</b></button>
       </nav>
       <nav class="mnav" id="nav-train" hidden>
         <button id="go-bag"><i>01</i><b>Груша</b><small id="bag-lbl"></small></button>
@@ -408,6 +427,22 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="pfoot"><button class="btn" id="cr-rand">Случайно</button><button class="btn pri" id="cr-done">Готово</button></div>
     </div>
     <div class="views"><span class="khint" id="cr-hint">тяни — вращать · колесо — зум</span><button class="btn sm" id="v-face">Лицо</button><button class="btn sm" id="v-full">Полный рост</button></div>
+  </div>
+
+  <!-- shop: categories, cards with prices, colours; the man in the try-on on the right (drag = turn) -->
+  <div class="ui scr" id="shop" hidden>
+    <div class="dragl" id="sh-drag"></div>
+    <div class="panel wide">
+      <div class="ptitle"><small>одежда и экипировка</small>Магазин<b class="cash" id="sh-cash"></b></div>
+      <div class="pbody">
+        <div class="fld"><span>что</span><div class="sw" id="o-scat"></div></div>
+        <div class="shgrid" id="o-sitems"></div>
+        <div class="fld"><span>цвет</span><div class="sw" id="o-scolor"></div></div>
+        <div class="wnote" id="o-snote"></div>
+      </div>
+      <div class="pfoot"><button class="btn" id="shop-back">Назад</button><button class="btn pri" id="sh-buy">Купить</button></div>
+    </div>
+    <div class="views"><span class="khint">примерка на бойце · тяни — вращать</span><button class="btn sm" id="sh-face">Лицо</button><button class="btn sm" id="sh-full">Полный рост</button></div>
   </div>
 
   <!-- settings (from the menu and from the pause) -->
