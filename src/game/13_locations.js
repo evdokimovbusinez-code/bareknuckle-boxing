@@ -39,7 +39,8 @@ const LOCS = {
     id: 'parking', label: 'Парковка', desc: 'Подземная парковка, круг из тюков сена', bound: { kind: 'circle', r: 2.55 }, ring: false,
     // soft wall for the knockout ragdoll: inner face of the bales (r), spring k (N/m, shared by the contacts), friction, height of
     // two tiers, depth of a bale, how far a body sinks in before the wall goes hard, normal damping (1/s; hay swallows the bounce)
-    wall: { r: 2.72, k: 2.5e4, mu: 0.6, h: 0.9, d: 0.5, give: 0.25, damp: 25,
+    wall: { r: 2.72, k: 2.5e4, mu: 0.6, h: 0.9, d: 0.5, give: 0.25, damp: 25, back: 3.45,   // back: the crowd's front row (r 3.7) minus half a chest — see XWorld.solve
+
       top(x, z) { const i = ((Math.round(Math.atan2(z, x) / (2 * Math.PI / BALE_N)) % BALE_N) + BALE_N) % BALE_N; return BALE_LOW.includes(i) ? this.h / 2 : this.h; } },   // top of the bales at a point of the circle (ARENA frame)
     light: { bg: '#0b0e11', fog: ['#0b0e11', 9, 38], exposure: 0.95, hemi: ['#b4c6d6', '#26282a', 0.34], key: ['#d8f0ff', 48], rim: ['#9cc4ff', 1.9], rim2: ['#cfe4ff', 1.1], fill: ['#eaf4ff', 0.45] },
     build() {
@@ -180,6 +181,11 @@ const LOCS = {
          point lights where the tubes are so the cars, the wall and the far aisle read; everything else falls off into the dark fog */
       const top = new THREE.SpotLight('#d8f0ff', 24, 10, 1.15, 0.9, 1.4); top.position.set(0, 2.92, 0); top.target.position.set(0, 0, 0); g.add(top, top.target);
       for (const [x, z, k] of [[0, -6.9, 15], [-9.4, 0, 12], [9.4, 0, 12]]) { const p = new THREE.PointLight('#d6ecff', k, 15, 1.6); p.position.set(x, 2.6, z); g.add(p); }
+      /* the crowd behind the bales: three rows (the back ones on crates), nobody inside the cars or the columns */
+      const carsAt = [[-2.5, -1], [2.5, -1], [7.5, -1], [2.5, 1], [-5, 1]];
+      this.crowd = makeCrowd({ shape: 'circle', r: 3.7, rows: 3, look: 'street', seed: 23,
+        keep: (x, z) => !(Math.abs(Math.abs(x) - 3.75) < 0.6 && Math.abs(Math.abs(z) - 4.05) < 0.6) && !carsAt.some(([cx, s]) => z * s > 4.4 && Math.abs(x - cx) < 1.15) });
+      g.add(this.crowd.group);
       return g;
     },
     // per frame, after the camera: hide what stands between the camera and the fighters (as arenaSync does with the near ropes)

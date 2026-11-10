@@ -86,7 +86,7 @@ const FX = (() => {
 
 /* ───────── sound (synthesised) ───────── */
 const sfx = (() => {
-  let ac = null, noise = null;
+  let ac = null, noise = null, crowdG = null;
   const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; noise = b; } if (ac.state === 'suspended') ac.resume(); return ac; };
   const env = (g, t, a, d, peak) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
   return {
@@ -98,6 +98,23 @@ const sfx = (() => {
     whoosh() { const a = ac; if (!a) return; const t = a.currentTime, n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(2200, t + 0.14); env(g, t, 0.03, 0.14, 0.16); n.connect(f).connect(g).connect(a.destination); n.start(t); n.stop(t + 0.25); },
     bell(count) { const a = ac; if (!a) return; for (let k = 0; k < count; k++) { const t = a.currentTime + k * 0.3; for (const [fq, pk] of [[640, 0.22], [1287, 0.12], [1932, 0.07], [2580, 0.04]]) { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = fq; env(g, t, 0.003, 1.3, pk); o.connect(g).connect(a.destination); o.start(t); o.stop(t + 1.5); } } },
     count(n) { const a = ac; if (!a) return; const t = a.currentTime; for (const [fq, pk, d] of [[180, 0.5, 0.09], [1200, 0.08, 0.03]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(fq, t); o.frequency.exponentialRampToValueAtTime(fq * 0.6, t + d); env(g, t, 0.002, d, pk); o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + 0.05); } },
+    /* the crowd. crowd(level): a looped murmur (noise through three voice-band filters, its loudness wandering like many people
+       talking) whose level follows the reaction, 0 = nobody there. roar(p): the shout on a big shot — a swell of noise and a few voices */
+    crowd(level) { const a = ac; if (!a) return;
+      if (!crowdG) { if (level <= 0) return;
+        const src = a.createBufferSource(), am = a.createGain(), lf = a.createBufferSource(), lp = a.createBiquadFilter(), dep = a.createGain(); crowdG = a.createGain(); crowdG.gain.value = 0;
+        src.buffer = noise; src.loop = true;
+        for (const [fq, q, k] of [[330, 0.7, 1], [760, 1.1, 0.75], [1500, 1.4, 0.3]]) { const f = a.createBiquadFilter(), g = a.createGain(); f.type = 'bandpass'; f.frequency.value = fq; f.Q.value = q; g.gain.value = k; src.connect(f).connect(g).connect(crowdG); }
+        lf.buffer = noise; lf.loop = true; lf.playbackRate.value = 0.0004; lp.type = 'lowpass'; lp.frequency.value = 5; dep.gain.value = 0.45; am.gain.value = 0.7;
+        lf.connect(lp).connect(dep).connect(am.gain); crowdG.connect(am).connect(a.destination); src.start(); lf.start(); }
+      crowdG.gain.setTargetAtTime(0.2 * level, a.currentTime, 0.35); },
+    roar(p) { const a = ac; if (!a) return; const t = a.currentTime, d = 0.7 + 1.8 * p;
+      const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; n.loop = true; f.type = 'bandpass'; f.Q.value = 0.8;
+      f.frequency.setValueAtTime(600, t); f.frequency.linearRampToValueAtTime(1100 + 500 * p, t + 0.25); f.frequency.linearRampToValueAtTime(800, t + d);
+      env(g, t, 0.15, d, 0.12 + 0.3 * p); n.connect(f).connect(g).connect(a.destination); n.start(t, rr() * 0.5); n.stop(t + d + 0.3);
+      for (let i = 0, nv = 2 + (p * 5 | 0); i < nv; i++) { const o = a.createOscillator(), bf = a.createBiquadFilter(), og = a.createGain(), t0 = t + rr() * 0.35, f0 = 190 + rr() * 260, len = 0.25 + rr() * 0.5;
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(f0, t0); o.frequency.linearRampToValueAtTime(f0 * (1.25 + rr() * 0.4), t0 + len * 0.35); o.frequency.linearRampToValueAtTime(f0 * 0.85, t0 + len);
+        bf.type = 'bandpass'; bf.frequency.value = 700 + rr() * 700; bf.Q.value = 2; env(og, t0, 0.05, len, 0.02 + 0.03 * p); o.connect(bf).connect(og).connect(a.destination); o.start(t0); o.stop(t0 + len + 0.1); } },
     fall() { const a = ac; if (!a) return; const t = a.currentTime, o = a.createOscillator(), g = a.createGain(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.3); env(g, t, 0.005, 0.35, 0.7); o.connect(g).connect(a.destination); o.start(t); o.stop(t + 0.4); },
   };
 })();

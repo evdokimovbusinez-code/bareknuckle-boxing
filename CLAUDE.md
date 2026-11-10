@@ -40,6 +40,7 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 | `11_arena_loop.js` | ring lights, rope visuals, **main loop `frame()`** (update order) |
 | `12_ui.js` | menu build (`swatches`, `buildMenu`), keyboard/mouse (`MV_KEYS`, `ACT_KEYS`), touch stick, boot |
 | `13_locations.js` | locations: `LOCS` (`gym`, `parking`), current `LOC`, `setLocation(id)`, `locSync()`; per location: `bound`, `ring`, `wall` (soft wall for the KO ragdoll), `build()` set, `light`. Debug: `__loc.set('parking')` |
+| `14_crowd.js` | crowd around the fighting floor: `makeCrowd({ shape, r \| w,h, rows, density, look })` → `{ group, update, cheer, wall }` (one InstancedMesh, posed in the vertex shader: `crowdGeo`, `CROWD_VS`), `crowdTick(dt)`, reactions via `EVT` (defined in `07`), a location puts its crowd into `LOC.crowd`. Debug: `__crowd.cheer(1, 3)` |
 
 ## Conventions
 - Units: metres, seconds. Fighters stay on the world x-line; the ring (`ARENA`) rotates/slides around them.
