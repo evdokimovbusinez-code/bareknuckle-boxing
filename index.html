@@ -339,7 +339,9 @@ const fill = new THREE.DirectionalLight('#ffffff', 0.5); fill.position.set(-1, 1
 
 /* ───────── arena ───────── */
 /* the ring lives in its own frame: fighters stay on the world x line, circling the ring turns and slides this frame around them */
-const ARENA = new THREE.Group(); scene.add(ARENA);
+const ARENA = new THREE.Group(); scene.add(ARENA)
+// RINGSET = the boxing-ring props (canvas, apron, posts, ropes); a location can hide it and put its own set into ARENA
+const RINGSET = new THREE.Group(); ARENA.add(RINGSET);
 const ROPES = [];
 function canvasTex(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
@@ -354,21 +356,21 @@ function canvasTex(w, h, draw) {
     g.strokeStyle = 'rgba(255,255,255,.06)'; g.lineWidth = 3; g.beginPath(); g.arc(w / 2, h / 2, 210, 0, 7); g.stroke();
   });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 5.6), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.88 }));
-  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; ARENA.add(floor);
+  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; RINGSET.add(floor);
   const apron = new THREE.Mesh(new THREE.CircleGeometry(14, 48), new THREE.MeshStandardMaterial({ color: '#0d0f14', roughness: 1 }));
-  apron.rotation.x = -Math.PI / 2; apron.position.y = -0.002; ARENA.add(apron);
+  apron.rotation.x = -Math.PI / 2; apron.position.y = -0.002; RINGSET.add(apron);
   const postMat = new THREE.MeshStandardMaterial({ color: '#1a1c22', roughness: 0.5, metalness: 0.4 });
   const padMat = new THREE.MeshPhysicalMaterial({ color: '#8f1824', roughness: 0.35, clearcoat: 0.5 });
   const ropeCols = ['#a51b29', '#ece6da', '#a51b29'], H = 2.65;
   for (const [x, z] of [[-H, -H], [H, -H], [H, H], [-H, H]]) {
-    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.45, 16), postMat); p.position.set(x, 0.72, z); ARENA.add(p);
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.95, 16), padMat); pad.position.set(x, 0.92, z); ARENA.add(pad);
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.45, 16), postMat); p.position.set(x, 0.72, z); RINGSET.add(p);
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.95, 16), padMat); pad.position.set(x, 0.92, z); RINGSET.add(pad);
   }
   [[[-H, -H], [H, -H]], [[H, -H], [H, H]], [[H, H], [-H, H]], [[-H, H], [-H, -H]]].forEach(([a, b], side) => { for (let r = 0; r < 3; r++) {
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
     const m = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, len, 10, 48), new THREE.MeshPhysicalMaterial({ color: ropeCols[r], roughness: 0.4, clearcoat: 0.4 }));
     m.position.set((a[0] + b[0]) / 2, 0.55 + r * 0.38, (a[1] + b[1]) / 2);
-    m.quaternion.setFromUnitVectors(new V3(0, 1, 0), new V3(b[0] - a[0], 0, b[1] - a[1]).normalize()); ARENA.add(m);
+    m.quaternion.setFromUnitVectors(new V3(0, 1, 0), new V3(b[0] - a[0], 0, b[1] - a[1]).normalize()); RINGSET.add(m);
     ROPES.push({ side, n: new V3(-(a[0] + b[0]) / 2, 0, -(a[1] + b[1]) / 2).normalize(), aL: new V3(a[0], 0.55 + r * 0.38, a[1]), bL: new V3(b[0], 0.55 + r * 0.38, b[1]), a: new V3(), b: new V3(), m, base: m.geometry.attributes.position.array.slice(), cur: new V3(), vel: new V3(), s: 0.5, hit: null, live: 0 });
   } });
 }
