@@ -118,6 +118,10 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .rec i{width:10px;height:10px;border-radius:50%;background:var(--blood);animation:blink 1s steps(2) infinite}
 @keyframes blink{50%{opacity:.2}}
 .rec button,.rb button,.go{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:9px 16px;font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:.06em;text-transform:uppercase;transition:transform .12s cubic-bezier(.3,2.2,.5,1),border-color .15s}
+.hl{position:absolute;left:var(--pl);bottom:calc(9% + 20px);pointer-events:none;font-family:var(--display);text-transform:uppercase;animation:hlin .55s cubic-bezier(.2,1.2,.4,1)}
+.hl b{display:block;font-size:min(5.4vw,42px);font-weight:900;letter-spacing:.08em;color:var(--gold);text-shadow:0 3px 0 rgba(0,0,0,.65),0 0 30px rgba(0,0,0,.5)}
+.hl span{display:block;margin-top:2px;font-size:min(3vw,20px);font-weight:700;letter-spacing:.14em;color:#f1e3c2;text-shadow:0 2px 0 rgba(0,0,0,.7)}
+@keyframes hlin{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
 .rec button{margin-left:8px;font-size:13px;padding:6px 12px}
 .rec button:hover,.rb button:hover{border-color:var(--gold)} .rec button:active,.rb button:active,.go:active{transform:scale(.94)}
 .bars{position:absolute;left:0;right:0;height:9%;background:#000;pointer-events:none}
@@ -318,6 +322,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="kbar" id="kbar"><span><b>WASD</b> ходьба</span><span><b>ЛКМ·J</b> джеб</span><span><b>ПКМ·K</b> кросс</span><span><b>U I</b> хуки</span><span><b>M ,</b> апперы</span><span><b>O·СКМ</b> оверхенд</span><span id="kb-body"><b>Shift</b>+удар = корпус</span><span id="kb-pow"><b>F</b> сила</span><span><b>Q E</b> слипы</span><span><b>C</b> нырок</span><span><b>X</b> отклон</span><span id="kb-blk"><b>Пробел</b> блок</span></div>
   </div>
 
+  <div class="hl" id="hl" hidden><b>Лучшее в раунде</b><span id="hl-s"></span></div>
   <div class="rec" id="rec" hidden><i></i>ПОВТОР<button id="skip">Пропустить</button></div>
 
   <div class="result" id="result" hidden>
@@ -414,6 +419,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
         <div class="fld"><span>графика</span><div class="sw" id="o-gfx"></div><small class="note" id="gfx-note"></small></div>
         <div class="fld row"><span>громкость</span><div class="vol"><input type="range" id="o-vol" min="0" max="100" step="5" aria-label="Громкость"><b id="vol-v"></b></div></div>
         <div class="fld row"><span>тряска камеры</span><div class="sw" id="o-shake"></div></div>
+        <div class="fld row"><span>катсцены: стердаун, итоги раунда</span><div class="sw" id="o-cine"></div></div>
         <div class="fld row"><span>подсказка клавиш в бою</span><div class="sw" id="o-keys"></div></div>
         <div class="fld row"><span>счётчик кадров (F3)</span><div class="sw" id="o-fps"></div></div>
         <div class="fld row" id="reset-row"><span>сброс прогресса</span><div class="sw" id="o-reset"></div></div>

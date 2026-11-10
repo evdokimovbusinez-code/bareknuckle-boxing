@@ -42,7 +42,7 @@ function uiKey(e) {
   return true;   // Enter / Space act on the focused button by themselves
 }
 /* pause */
-const canPause = () => !G.paused && ['intro', 'fight', 'break', 'kd', 'ko'].includes(G.state);
+const canPause = () => !G.paused && ['intro', 'fight', 'break', 'kd', 'ko', 'rend'].includes(G.state);
 function pauseGame() { if (!canPause()) return; G.paused = true; HELD.clear(); mvKeys(); setBlock(false); Q.length = 0; UI.from = 'pause'; uiShow('pause'); }
 function resumeGame() { G.paused = false; UI.from = null; uiShow(null); last = performance.now(); }
 function surrender() { if (!BAG.on && G.state !== 'ko') { G.losses++; save(); } toMenu(); }   // giving up a live fight is a loss (after the knockout the result is already counted)
@@ -110,6 +110,7 @@ function gfxNote() { $('gfx-note').textContent = `сейчас: ${GFX_LABEL[GFX.
 function buildSettings() {
   swatches('o-gfx', ['auto', ...GFX_ORDER].map(id => ({ id, label: GFX_LABEL[id] })), () => GFX.set, v => { setGfx(v); gfxNote(); }, true, true); gfxNote();
   swatches('o-shake', ONOFF, () => OPT.shake ? 'on' : 'off', v => { OPT.shake = v === 'on'; }, true, true);
+  swatches('o-cine', ONOFF, () => OPT.cine ? 'on' : 'off', v => { OPT.cine = v === 'on'; }, true, true);
   swatches('o-keys', ONOFF, () => OPT.keys ? 'on' : 'off', v => { OPT.keys = v === 'on'; applyOpt(); }, true, true);
   swatches('o-fps', ONOFF, () => PERF.on ? 'on' : 'off', v => perfToggle(v === 'on'), true, true);
   const vol = $('o-vol'), vv = $('vol-v'); vol.value = Math.round(OPT.vol * 100); vv.textContent = vol.value + '%';

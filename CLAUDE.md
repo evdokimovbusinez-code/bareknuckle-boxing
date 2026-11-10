@@ -40,6 +40,7 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 | `07_state_replay_hits.js` | `G` state, `DIFFS`, `LADDER` (per man: `nm`, `name`, `legend`, `loc`, fixed `look`, `crowd`), `careerLoc`, `careerPlace`, career/profile, replay buffer (`REC`), `resolveHit`, `knockdown`, `knockout` (`DMG_K`) |
 | `08_ai_flow.js` | `STYLES`, `ai(dt)`, `playerInput`, `toMenu`, `rollOpponent` |
 | `09_bag.js` | heavy bag training, `startFight` / modes; the intro on `G.introT` (`introTick`): opponent's card of a career fight (`fightCard`, markup `#vs`) → camera fly-round on street locations (`G.flyT`, `G.flyA`, drawn in `camUpdate`) → «Готовься» → `roundSnd()`; `introSkip()` = any key / tap |
+| `09b_cine.js` | cutscenes (`OPT.cine`): the stare-down before the first round (`G.stareT`, `stareTick`, `stareCam`, `STARE_ADV`; runs in the intro while `0 ≤ G.introT < G.stareT`), the end of a round — state `rend` (`roundCine`, `rendTick`, `rendCam`: faces, panting via `Fighter.cineLayer`) then the round's best moments as a replay with `RP.hl` (`HL` records clips of strong hits / knockdowns, `hlPick`, `startHighlights`, `hlCam`, `endHighlights`); `cineSkip` = any key / tap. Debug: `__g.HL`, `__g.endRound()` |
 | `10_camera_layout.js` | fight / replay camera, HUD, `layout()`, resolution (`QUAL`, `applyRes`, `resTick`) |
 | `11_arena_loop.js` | ring lights, rope visuals, **main loop `frame()`** (update order) |
 | `12_ui.js` | option rows (`swatches`), fight input: keyboard/mouse (`MV_KEYS`, `ACT_KEYS`), touch stick, boot |

@@ -290,7 +290,7 @@ function makeCrowd(o = {}) {
    and the level of its murmur */
 function crowdTick(dt) {
   const c = LOC.crowd && LOC.group && LOC.group.visible ? LOC.crowd : null, s = G.state;
-  const tgt = !c ? 0 : s === 'fight' ? 0.42 : s === 'kd' ? 0.7 : s === 'ko' ? 0.85 : s === 'break' ? 0.06 : s === 'replay' ? 0.45 : s === 'intro' || s === 'result' ? 0.3 : 0.14;
+  const tgt = !c ? 0 : s === 'fight' ? 0.42 : s === 'kd' ? 0.7 : s === 'ko' ? 0.85 : s === 'break' ? 0.06 : s === 'replay' ? 0.45 : s === 'rend' ? 0.55 : s === 'intro' || s === 'result' ? 0.3 : 0.14;
   CROWD.heat = Math.max(0, CROWD.heat - dt * 0.25);
   CROWD.mood += (Math.min(1, tgt + CROWD.heat) - CROWD.mood) * (1 - Math.exp(-dt * 1.4));
   CROWD.u.uT.value += dt; CROWD.u.uMood.value = CROWD.mood;
