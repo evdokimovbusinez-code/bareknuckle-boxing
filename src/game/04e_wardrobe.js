@@ -26,7 +26,7 @@ const ITEMS = {
   // eyes
   shades: { cat: 'eyes', label: 'тёмные очки', model: { glass: 'shades', tint: [0.04, 0.04, 0.05, 0.95] }, colors: ['black', 'white', 'red'], price: 400, reward: 4, tags: ['street'], brand: 'AFTERHOURS' },
   specs: { cat: 'eyes', label: 'очки в оправе', model: { glass: 'specs', tint: [0.75, 0.85, 0.9, 0.16] }, colors: ['black', 'brown', 'grey'], price: 200, tags: [] },
-  // tops: shells of the torso (04_gear.js)
+  // tops: the real models (cuts with their own geometry) are in 04f_tops.js and replace these old shell models of the same ids
   tank: { cat: 'top', label: 'майка', model: { tex: 'cotton', sleeve: 0, thick: 0.42 }, colors: ['white', 'black'], price: 0, tags: ['street', 'basic'] },
   tee: { cat: 'top', label: 'футболка', model: { tex: 'cotton', sleeve: 0.55, thick: 0.45 }, colors: ['white', 'black', 'grey'], nat: wNat({ white: '#e9e6df', grey: '#9a9ca2' }), price: 150, tags: ['street', 'basic'] },
   teeSD: { cat: 'top', label: 'футболка', model: { tex: 'cotton', sleeve: 0.55, thick: 0.45, decal: { f: [0, 17, 21] } }, colors: ['black', 'white', 'wine'], price: 350, tags: ['street'], brand: 'STRAY DOGS' },
@@ -309,6 +309,7 @@ function wearDress(F, L) {
   const bt = W.bottom, tp = W.top, sh = W.shoes, bl = W.belt;
   wearSlot(F, 'bottom', bt.cut ? bt.key : null, () => pantsMesh(F, bt), ['pt_' + bt.key]);
   for (const k in S) if (k[0] === 't' && k[1] === '_') S[k].visible = false;   // tops: one shell per model, the colour is the material's
+  wearSlot(F, 'top', tp.cut ? tp.key : null, () => topMesh(F, tp), ['tt_' + tp.key]);   // tops: their own geometry (04f_tops.js); the old shell below is only a fallback for a model without a cut
   if (tp.tex) { const m = S['t_' + tp.mid] || (S['t_' + tp.mid] = shellMesh(F, 'shirt', tp)); m.visible = true; topTint(m, tp); }
   wearSlot(F, 'shoes', sh.top ? sh.key : null, () => shoeMesh(F, sh), ['st_' + sh.key]);
   const bm = wearSlot(F, 'belt', bl.buckle && bt.belt ? bl.mid + bt.cut : null, () => beltMesh(F, bt.cut, bl)); if (bm) { bm.material.color.set(bl.c); bm.userData = S.bottom.m.userData; }
