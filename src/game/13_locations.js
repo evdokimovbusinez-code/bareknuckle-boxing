@@ -214,6 +214,7 @@ function setLocation(id) {
   hemi.color.set(li.hemi[0]); hemi.groundColor.set(li.hemi[1]); hemi.intensity = li.hemi[2];
   for (const [l, v] of [[key, li.key], [rim, li.rim], [rim2, li.rim2], [fill, li.fill]]) { l.color.set(v[0]); l.intensity = v[1]; }
   if (was !== L) FX.clearFloor();   // floor stains belong to the floor they fell on
+  sfx.place(L.id);   // its ambience and the echo of its walls (06_fx_sound.js)
   ARENA.updateMatrixWorld(true);
 }
 function locSync() { if (LOC.sync && LOC.group) LOC.sync(); }

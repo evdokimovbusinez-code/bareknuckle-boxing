@@ -68,6 +68,21 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .msg.tip{margin:0 auto;font-size:min(4.2vw,30px);letter-spacing:.02em;text-transform:none;color:#f1e3c2;max-width:80%;line-height:1.15}
 .msg.tip.show{animation:pop 2.2s cubic-bezier(.2,1.6,.4,1) forwards}
 .msg.count{color:#fff;font-size:min(22vw,150px);text-shadow:0 6px 0 rgba(0,0,0,.6),0 0 40px rgba(255,255,255,.25)}
+.msg.place{top:auto;bottom:15%;font-size:min(7vw,58px);letter-spacing:.1em;color:#f1e3c2}   /* the name of the place during the fly-round */
+.msg.place.show{animation:pop 2.6s cubic-bezier(.2,1.6,.4,1) forwards}
+/* the card of a career opponent before the fight: a lower third over the place */
+.vs{position:absolute;inset:0;display:flex;align-items:flex-end;cursor:pointer;background:linear-gradient(0deg,rgba(5,6,9,.95),rgba(5,6,9,.7) 32%,rgba(5,6,9,0) 68%);padding:0 var(--pr) calc(var(--pb) + 4vmin) calc(var(--pl) + 4vmin)}
+.vs-b{max-width:min(780px,94%);border-left:4px solid var(--blood);padding-left:clamp(12px,2.4vmin,22px)}
+.vs.in .vs-b{animation:vsin .45s cubic-bezier(.2,1.2,.4,1)}
+@keyframes vsin{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+.vs-k{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.vs-n{font-family:var(--display);font-weight:900;font-size:clamp(32px,9vmin,84px);line-height:.95;text-transform:uppercase;margin:4px 0 9px;text-shadow:0 3px 0 rgba(0,0,0,.5)}
+.vs-n b{color:var(--blood)}.vs-n i{font-style:normal;color:var(--gold)}
+.vs-m{display:flex;flex-wrap:wrap;gap:6px}
+.vs-m span{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border:1px solid var(--line);border-radius:4px;background:rgba(5,6,9,.55)}
+.vs-l{font-size:clamp(14px,2.6vmin,19px);line-height:1.3;color:#e9e2d2;margin-top:10px;max-width:62ch}
+.vs-h{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:#8d897f;margin-top:12px}
+#stage.short .vs-n{font-size:clamp(28px,11vmin,60px)}#stage.short .vs-l{margin-top:6px}#stage.short .vs-h{margin-top:6px}
 @keyframes pop{0%{opacity:0;transform:scale(.4) rotate(-4deg)}14%{opacity:1;transform:scale(1.12) rotate(1.5deg)}24%{transform:scale(.97) rotate(-.6deg)}34%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
 .pops{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .popn{position:absolute;transform:translate(-50%,-50%);font-family:var(--display);font-weight:900;font-size:clamp(20px,4.5vmin,36px);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.6);animation:fly .8s ease-out forwards;white-space:nowrap}
@@ -280,6 +295,9 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 
   <div class="pops" id="pops"></div>
   <div class="msg" id="msg"></div>
+
+  <!-- the card of a career opponent before the fight (fightCard): name and nickname, style · place · level, his legend -->
+  <div class="vs" id="vs" hidden><div class="vs-b"><div class="vs-k" id="vs-k"></div><div class="vs-n" id="vs-n"></div><div class="vs-m" id="vs-m"></div><div class="vs-l" id="vs-l"></div><div class="vs-h" id="vs-h"></div></div></div>
 
   <div class="pad" id="pad" hidden>
     <div class="stick" id="stick" aria-label="Стик: ходить; быстрый рывок = уклон"><i class="knob"></i><span class="sl">ходьба · рывок = уклон</span></div>
@@ -4261,12 +4279,89 @@ const FX = (() => {
 /* ───────── sound (synthesised) ───────── */
 const sfx = (() => {
   let ac = null, noise = null, master = null, crowdG = null;   // master: everything goes through one gain — the volume of the settings screen (OPT.vol)
-  const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } master = ac.createGain(); master.gain.value = OPT.vol; master.connect(ac.destination); const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; noise = b; } if (ac.state === 'suspended') ac.resume(); return ac; };
+  let bus = null, conv = null, wet = null, amb = null, ambId = null, wantId = null; const IR = {}, BUF = {};   // bus: the punches, sent on to master and through the echo of the place (conv → wet)
+  const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } master = ac.createGain(); master.gain.value = OPT.vol; master.connect(ac.destination);
+    bus = ac.createGain(); conv = ac.createConvolver(); conv.normalize = false; wet = ac.createGain(); wet.gain.value = 0; bus.connect(master); bus.connect(conv).connect(wet).connect(master); const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; noise = b; } if (ac.state === 'suspended') ac.resume(); return ac; };
   const env = (g, t, a, d, peak) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
+  /* ── the place: the echo of its walls and its ambience ──
+     SPACE[id]: the reverb the punches (thud, fall, the referee's clap) are sent through — a convolution with a synthesised impulse:
+     noise through a one-pole low-pass (lp, Hz) that dies out in len seconds (−60 dB), plus a few early echoes (taps: [s, gain]),
+     scaled to unit energy; wet = its level, amb = how much of the ambience rings in it too. The parking and the warehouse boom,
+     the yard and the tyre yard are dry (open air: a faint slap off the houses), the gym is a padded hall.
+     AMB[id](out, L): the looped ambience of a place, built into the gain `out`; its sources go into L (place() starts and stops them).
+     Levels measured at master (offline render): ambience 0.02–0.035 RMS, a full punch ≈ 0.15–0.2 RMS over its 0.2 s (peak > 1) — the
+     ambience sits 15–20 dB under it; the tail 0.4–1.2 s after a punch: parking ≈ 0.04, warehouse ≈ 0.03, yard ≈ 0.01, tyres < 0.01. */
+  const SPACE = {
+    gym: { len: 0.6, lp: 3500, wet: 0.12 },
+    yard: { len: 0.3, lp: 2600, wet: 0.05, taps: [[0.12, 0.5], [0.19, 0.25]] },
+    tires: { len: 0.2, lp: 2400, wet: 0.03 },
+    parking: { len: 2.2, lp: 1700, wet: 0.6, amb: 0.3, taps: [[0.04, 0.5], [0.075, 0.4], [0.13, 0.3]] },
+    warehouse: { len: 2.8, lp: 3200, wet: 0.55, amb: 0.5, taps: [[0.055, 0.5], [0.12, 0.4], [0.2, 0.3], [0.31, 0.2]] } };
+  const AMB_LVL = 1;
+  const impulse = S => { const sr = ac.sampleRate, n = (sr * S.len) | 0, b = ac.createBuffer(2, n, sr), k = 1 - Math.exp(-2 * Math.PI * S.lp / sr);
+    for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); let y = 0, e = 0;
+      for (let i = 0; i < n; i++) { const t = i / sr; y += k * (Math.random() * 2 - 1 - y); d[i] = y * Math.exp(-6.9 * t / S.len) * Math.min(1, t / 0.006); }
+      const pk = Math.sqrt(k / (2 - k) / 3);   // the level the tail starts at: the early echoes are given relative to it
+      for (const [tt, g] of S.taps || []) { const i = (tt * (c ? 1.09 : 1) * sr) | 0; if (i < n) d[i] += g * pk * 0.5 * Math.sqrt(n / 13.8); }   // (each carries ≈ g² / 4 of the tail's energy)
+      for (let i = 0; i < n; i++) e += d[i] * d[i]; e = 1 / Math.sqrt(e || 1); for (let i = 0; i < n; i++) d[i] *= e; }
+    return b; };
+  const loop = (buf, rate = 1) => { const n = ac.createBufferSource(); n.buffer = buf; n.loop = true; n.playbackRate.value = rate; return n; };
+  const filt = (type, fq, q = 0.7) => { const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = fq; f.Q.value = q; return f; };
+  const gain = v => { const g = ac.createGain(); g.gain.value = v; return g; };
+  // a slowly wandering control signal (gusts, flutter): the noise buffer read very slowly, smoothed, scaled to about ±depth / 2, added to an AudioParam
+  const wander = (L, param, depth, rate = 0.0004, cut = 4) => { const n = loop(noise, rate), f = filt('lowpass', cut), g = gain(depth); n.connect(f).connect(g).connect(param); L.push(n); };
+  // a band of noise: noise → filter → gain → out; returns [filter, gain] to hang wander() on
+  const band = (L, out, type, fq, q, lvl) => { const n = loop(noise), f = filt(type, fq, q), g = gain(lvl); n.connect(f).connect(g).connect(out); L.push(n); return [f, g]; };
+  // a loop of sparse one-shots (crackles, drips) rendered once into a buffer of len seconds
+  const render = (len, fn) => { const sr = ac.sampleRate, b = ac.createBuffer(1, (sr * len) | 0, sr); fn(b.getChannelData(0), sr); return b; };
+  const AMB = {
+    // the yard at dusk: the far city (a low rumble that swells as traffic passes), wind between the houses, leaves
+    yard(out, L) {
+      const [, c] = band(L, out, 'lowpass', 150, 0.6, 0.55); wander(L, c.gain, 0.3, 0.00025, 1.5);
+      const [w, wg] = band(L, out, 'bandpass', 480, 0.9, 0.05); wander(L, wg.gain, 0.07, 0.0005, 2); wander(L, w.frequency, 260, 0.0003, 2);
+      const [, h] = band(L, out, 'highpass', 3500, 0.5, 0.006); wander(L, h.gain, 0.008, 0.0005, 2);
+    },
+    // tyres and fire: the drums roar and flutter, the wood crackles (clicks of 1–3 ms) and pops (dull thumps of 20–50 ms)
+    tires(out, L) {
+      const [, r] = band(L, out, 'lowpass', 380, 0.7, 0.22); wander(L, r.gain, 0.2, 0.003, 14);
+      const b = BUF.fire || (BUF.fire = render(6, (d, sr) => {
+        for (let k = 0; k < 150; k++) { const pop = k < 9, i0 = (Math.random() * d.length) | 0, n = (sr * (pop ? 0.02 + 0.03 * Math.random() : 0.0006 + 0.002 * Math.random())) | 0, a = pop ? 0.5 + 0.5 * Math.random() : 0.08 + 0.9 * Math.random() ** 3; let y = 0;
+          for (let i = 0; i < n && i0 + i < d.length; i++) { y += (pop ? 0.12 : 1) * (Math.random() * 2 - 1 - y); d[i0 + i] += a * y * (pop ? 2.2 : 1) * Math.exp(-5 * i / n); } } }));
+      for (const [rate, lvl] of [[1, 0.2], [0.81, 0.13]]) { const n = loop(b, rate), g = gain(lvl); n.connect(g).connect(out); L.push(n); }
+    },
+    // the underground parking: the ventilation — mains hum, air in the ducts beaten by a fan's blades, the hiss of the grilles
+    parking(out, L) {
+      for (const [fq, lvl, type] of [[50, 0.03, 'sine'], [100, 0.02, 'sine'], [149.6, 0.01, 'triangle']]) { const o = ac.createOscillator(), g = gain(lvl); o.type = type; o.frequency.value = fq; o.connect(g).connect(out); L.push(o); }
+      const [, d] = band(L, out, 'bandpass', 240, 0.7, 0.1), bl = ac.createOscillator(), bg = gain(0.025); bl.frequency.value = 11.3; bl.connect(bg).connect(d.gain); L.push(bl);
+      const [, lo] = band(L, out, 'lowpass', 95, 0.7, 0.3); wander(L, lo.gain, 0.1, 0.0003, 1);
+      band(L, out, 'bandpass', 1900, 1.2, 0.006);
+    },
+    // the abandoned warehouse: wind whistling in the cracks of the gate and the roof, water dripping from it
+    warehouse(out, L) {
+      const [, lo] = band(L, out, 'lowpass', 190, 0.7, 0.3); wander(L, lo.gain, 0.25, 0.0004, 1.5);
+      for (const [fq, q, lvl, dev] of [[820, 14, 0.05, 240], [1460, 20, 0.02, 380]]) { const [f, g] = band(L, out, 'bandpass', fq, q, lvl); wander(L, f.frequency, dev, 0.00035, 1.5); wander(L, g.gain, lvl * 1.6, 0.0005, 1.5); }
+      const b = BUF.drip || (BUF.drip = render(9, (d, sr) => {
+        let t = 0.3; while (t < 8.6) { const f0 = 750 + 900 * Math.random(), a = 0.35 + 0.65 * Math.random(), i0 = (t * sr) | 0, n = (0.09 * sr) | 0;
+          for (let i = 0; i < n && i0 + i < d.length; i++) { const x = i / sr; d[i0 + i] += a * Math.sin(2 * Math.PI * (f0 * x + 9000 * x * x)) * Math.exp(-x / 0.014) * Math.min(1, x / 0.001); }   // a plink: the pitch runs up
+          t += Math.random() < 0.25 ? 0.13 + 0.1 * Math.random() : 0.5 + 1.6 * Math.random(); } }));
+      const n = loop(b), g = gain(0.1); n.connect(g).connect(out); L.push(n);
+    },
+  };
   return {
-    unlock() { ctx(); },
+    unlock() { ctx(); if (ac && wantId) this.place(wantId); },
     vol(v) { if (master) master.gain.value = v; },
-    thud(p, body) { const a = ac; if (!a) return; const t = a.currentTime;
+    /* the location changed (setLocation): its echo for the punches and its ambience (cross-faded). Before the first sound of the
+       game there is no audio context yet — the place is remembered and set by unlock() */
+    place(id) { wantId = id; const a = ac; if (!a || id === ambId) return; ambId = id; const t = a.currentTime, S = SPACE[id] || SPACE.gym;
+      conv.buffer = IR[id] || (IR[id] = impulse(S)); wet.gain.setTargetAtTime(S.wet, t, 0.05);
+      if (amb) { const o = amb; amb = null; o.g.gain.setTargetAtTime(0, t, 0.25); setTimeout(() => { for (const n of o.L) try { n.stop(); } catch (e) {} o.g.disconnect(); }, 1500); }
+      if (!AMB[id]) return;
+      const g = gain(0), L = []; AMB[id](g, L); g.connect(master); if (S.amb) g.connect(gain(S.amb)).connect(conv);   // the drips and the hum ring in the hall too
+      for (const n of L) { if (n.buffer) n.start(t, Math.random() * n.buffer.duration); else n.start(t); }
+      g.gain.setTargetAtTime(AMB_LVL, t, 0.7); amb = { g, L }; },
+    // the referee claps his hands — the start of a round in a street fight: two palms never land together (a flam of two short bursts)
+    clap() { const a = ac; if (!a) return; for (const [d, pk] of [[0, 1.1], [0.011, 0.8]]) { const t = a.currentTime + d, n = a.createBufferSource(), f = filt('bandpass', 1400 + 500 * rr(), 1.1), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.09, pk); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.12); } },
+    thud(p, body) { const a = ac; if (!a) return; const t = a.currentTime, master = bus;   // (shadows master: a punch goes through the echo of the place)
       { const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 0.9; f.frequency.value = body ? 1700 : 2600; env(g, t, 0.002, 0.035, 0.22 + 0.2 * p); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // skin slap
       const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'lowpass'; f.frequency.setValueAtTime(1400 + 900 * p, t); f.frequency.exponentialRampToValueAtTime(180, t + 0.12); env(g, t, 0.004, 0.13, 0.5 + 0.4 * p); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.2);
       const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16); env(g2, t, 0.004, 0.18, 0.5 + 0.4 * p); o.connect(g2).connect(master); o.start(t); o.stop(t + 0.25); },
@@ -4290,7 +4385,7 @@ const sfx = (() => {
       for (let i = 0, nv = 2 + (p * 5 | 0); i < nv; i++) { const o = a.createOscillator(), bf = a.createBiquadFilter(), og = a.createGain(), t0 = t + rr() * 0.35, f0 = 190 + rr() * 260, len = 0.25 + rr() * 0.5;
         o.type = 'sawtooth'; o.frequency.setValueAtTime(f0, t0); o.frequency.linearRampToValueAtTime(f0 * (1.25 + rr() * 0.4), t0 + len * 0.35); o.frequency.linearRampToValueAtTime(f0 * 0.85, t0 + len);
         bf.type = 'bandpass'; bf.frequency.value = 700 + rr() * 700; bf.Q.value = 2; env(og, t0, 0.05, len, 0.02 + 0.03 * p); o.connect(bf).connect(og).connect(master); o.start(t0); o.stop(t0 + len + 0.1); } },
-    fall() { const a = ac; if (!a) return; const t = a.currentTime, o = a.createOscillator(), g = a.createGain(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.3); env(g, t, 0.005, 0.35, 0.7); o.connect(g).connect(master); o.start(t); o.stop(t + 0.4); },
+    fall() { const a = ac; if (!a) return; const t = a.currentTime, master = bus, o = a.createOscillator(), g = a.createGain(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.3); env(g, t, 0.005, 0.35, 0.7); o.connect(g).connect(master); o.start(t); o.stop(t + 0.4); },
   };
 })();
 
@@ -4312,18 +4407,37 @@ try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { 
 const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc, opt: OPT })); } catch (e) {} };
 const careerWins = () => G.career + PROF.champ * LADDER.length;   // wraps unlock by career wins ever
 /* career: a ladder of eight men, each tougher than the last — beat one to get the next; the last one holds the belt.
-   loc: the career sets the place — it starts in the underground parking and moves up to the ring in the hall */
+   The road of a street fighter: the yard (1–2) → tyres and fire (3–4) → the underground parking (5–6) → the warehouse cage (7),
+   and the title fight (8) in the same cage with the whole crowd in (crowd = the share of the place's crowd that came, CROWD.fill).
+   name / nm: his name and the nickname he fights under; legend: one line for the card before the fight (fightCard, 09_bag.js);
+   look: what he always wears — a street outfit of 04d_street.js fixed per man (startCareer), not a random one */
 const LADDER = [
-  { nm: 'Лом', st: 'brawler', diff: 'easy', loc: 'parking' }, { nm: 'Кабан', st: 'brawler', diff: 'easy', loc: 'parking' }, { nm: 'Грек', st: 'counter', diff: 'normal', loc: 'parking' }, { nm: 'Шрам', st: 'pressure', diff: 'normal', loc: 'parking' },
-  { nm: 'Молот', st: 'brawler', diff: 'normal', loc: 'gym' }, { nm: 'Седой', st: 'counter', diff: 'hard', loc: 'gym' }, { nm: 'Бизон', st: 'pressure', diff: 'hard', loc: 'gym' }, { nm: 'Кувалда', st: 'brawler', diff: 'hard', loc: 'gym', champ: true }];
+  { nm: 'Лом', name: 'Гена Рыжов', st: 'brawler', diff: 'easy', loc: 'yard', legend: 'Гроза своего подъезда. Бьёт размашисто и ждёт, что ты испугаешься раньше, чем он устанет.',
+    look: { skin: 'light', hair: 'bald', beard: false, bottom: 'sweatS', top: 'tank', shoes: 'sneak', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'black' } },
+  { nm: 'Кабан', name: 'Толя Брагин', st: 'brawler', diff: 'easy', loc: 'yard', legend: 'Грузчик с овощной базы. Сто десять кило идут вперёд и не знают, как это — назад.',
+    look: { skin: 'tan', hair: 'brown', beard: true, bottom: 'cargo', top: 'teeG', shoes: 'boots', wraps: 'white', hands: 'wraps', guard: 'black', shorts: 'green' } },
+  { nm: 'Грек', name: 'Костя Маврин', st: 'counter', diff: 'normal', loc: 'tires', legend: 'Недоучился на хирурга. Знает, где у человека печень, и спокойно ждёт твоей ошибки.',
+    look: { skin: 'tan', hair: 'black', beard: true, bottom: 'jeansB', top: 'none', shoes: 'keds', wraps: 'black', hands: 'wraps', guard: 'clear', shorts: 'blue' } },
+  { nm: 'Шрам', name: 'Вадим Чернов', st: 'pressure', diff: 'normal', loc: 'tires', legend: 'Шрам через бровь — память о первом бое у бочек. С тех пор огонь видел только его победы.',
+    look: { skin: 'light', hair: 'blond', beard: false, bottom: 'jeansL', top: 'tankB', shoes: 'sneakB', wraps: 'red', hands: 'wraps', guard: 'red', shorts: 'red' } },
+  { nm: 'Молот', name: 'Руслан Гатин', st: 'brawler', diff: 'normal', loc: 'parking', legend: 'Днём правит кузова кувалдой, ночью — челюсти правой. На минус втором этаже его ставка всегда первая.',
+    look: { skin: 'dark', hair: 'black', beard: false, bottom: 'jeans', top: 'teeB', shoes: 'sneakB', wraps: 'white', hands: 'mma', guard: 'black', shorts: 'black' } },
+  { nm: 'Седой', name: 'Аркадий Вершин', st: 'counter', diff: 'hard', loc: 'parking', legend: 'Двадцать лет в подвалах и гаражах. Быстрых он не боится — он их пересиживает.',
+    look: { skin: 'light', hair: 'grey', beard: true, bottom: 'pants', top: 'teeW', shoes: 'keds', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'white' } },
+  { nm: 'Бизон', name: 'Тимур Салаев', st: 'pressure', diff: 'hard', loc: 'warehouse', crowd: 0.55, legend: 'Вернулся с северной вахты злым. В клетке вжимает в сетку и не даёт вдохнуть.',
+    look: { skin: 'dark', hair: 'bald', beard: true, bottom: 'sweatG', top: 'none', shoes: 'boots', wraps: 'black', hands: 'mma', guard: 'blue', shorts: 'purple' } },
+  { nm: 'Кувалда', name: 'Захар Громов', st: 'brawler', diff: 'hard', loc: 'warehouse', crowd: 1, champ: true, legend: 'Хозяин склада и пояса. Из тех, кто вышел против него, своими ногами не ушёл никто.',
+    look: { skin: 'tan', hair: 'bald', beard: true, bottom: 'jeansB', top: 'none', shoes: 'boots', wraps: 'gold', hands: 'wraps', guard: 'gold', shorts: 'black' } }];
 const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1)].loc; return LOCS[id] ? id : G.loc; };
+// «Склад · аншлаг»: the place of career fight i as the menu, the card and the result screen name it
+const careerPlace = (i = G.career) => { const L = LADDER[Math.min(i, LADDER.length - 1)]; return (LOCS[L.loc] ? LOCS[L.loc].label : LOC.label) + (L.champ ? ' · аншлаг' : ''); };
 function fightOver(win, draw) {
   fightTable();
   if (draw) return; if (win) G.wins++; else G.losses++;
   let t = '', pts = 0;
   if (G.mode === 'career') {
-    if (win) { G.career = Math.min(LADDER.length, G.career + 1); pts = 2; if (G.career >= LADDER.length) { PROF.champ++; pts += 3; t = 'ЧЕМПИОН! Пояс твой'; } else t = `карьера ${G.career}/${LADDER.length} · следующий: ${LADDER[G.career].nm}`; }
-    else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути`;
+    if (win) { G.career = Math.min(LADDER.length, G.career + 1); pts = 2; if (G.career >= LADDER.length) { PROF.champ++; pts += 3; t = 'ЧЕМПИОН! Пояс твой'; } else t = `карьера ${G.career}/${LADDER.length} · следующий: ${LADDER[G.career].nm} — ${careerPlace()}`; }
+    else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути — ${careerPlace()}`;
   } else if (win) pts = 1;
   if (pts) { PROF.pts += pts; t += (t ? ' · ' : '') + `+${pts} ${pts === 1 ? 'очко' : 'очка'} бойцу`; }
   save(); const c = $('r-car'); if (c) c.textContent = t;
@@ -4691,7 +4805,7 @@ function toMenu() {
   if (G.mode === 'career') G.diff = G.userDiff; BAG.on = false; showP2(true); BAG.g.visible = false; updateMenu(); for (const F of [P1, P2]) F.sparGear(false);
   G.state = 'menu'; G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0;
   P1.resetState(); P2.resetState(); rollOpponent();
-  UI.from = null; uiShow('main'); show('hud', false); show('pad', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false);
+  CROWD.fill = 1; UI.from = null; uiShow('main'); show('vs', false); show('hud', false); show('pad', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false);
   camCut = true; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; setLocation(G.loc);
   showP2(false);   // the menu shows the player's man alone (startFight brings the opponent back)
 }
@@ -4761,7 +4875,7 @@ function bagEnd() {
 function updateMenu() {
   renderStats();
   const el = $('ladder'); if (el) el.innerHTML = LADDER.map((L, i) => `<i class="${i < G.career ? 'done' : i === G.career ? 'next' : ''}">${L.nm}${L.champ ? ' ★' : ''}</i>`).join('');
-  const c = $('car-lbl'); if (c) c.textContent = G.career >= LADDER.length ? 'ты чемпион — пройти заново' : `бой ${G.career + 1}/${LADDER.length} · ${LADDER[G.career].nm} · ${LOCS[careerLoc()].label.toLowerCase()}`;
+  const c = $('car-lbl'); if (c) c.textContent = G.career >= LADDER.length ? 'ты чемпион — пройти заново' : `бой ${G.career + 1}/${LADDER.length} · ${LADDER[G.career].nm} · ${careerPlace()}`;
   const f = $('fighter-lbl'); f.textContent = PROF.pts > 0 ? `свободных очков: ${PROF.pts}` : 'внешность · стиль'; f.classList.toggle('pt', PROF.pts > 0);
   $('who').innerHTML = `${esc(PROF.name || 'Боец')}${PROF.nick ? ` «${esc(PROF.nick)}»` : ''}<small>побед ${G.wins} · поражений ${G.losses}${PROF.champ ? ' · чемпион ×' + PROF.champ : ''}</small>`;
   const b = $('bag-lbl'); if (b) b.textContent = G.bagBest ? 'рекорд ' + G.bagBest : '45 секунд';
@@ -4776,8 +4890,7 @@ function fightTable() {
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function startCareer() {
   G.mode = 'career'; G.userDiff = G.diff; const L = LADDER[Math.min(G.career, LADDER.length - 1)];
-  let s = 9173 + G.career * 31; const r = () => (s = (s * 16807) % 2147483647) / 2147483647, pick = a => a[(r() * a.length) | 0];
-  P2.applyLook({ shorts: pick(SHORTS_LOOKS.filter(x => x.id !== LOOK.shorts)).id, hair: pick(HAIR_LOOKS).id, skin: pick(SKIN_LOOKS).id, beard: r() < 0.6, wraps: L.champ ? 'gold' : r() < 0.6 ? 'white' : pick(WRAPS_LOOKS.slice(0, 4)).id, guard: pick(GUARDS).id, hands: r() < 0.3 ? 'mma' : 'wraps' });
+  P2.applyLook({ ...L.look, street: true });   // every man of the ladder has his own outfit, the same every time (LADDER[].look)
   AI.style = STYLES[L.st]; $('n2').textContent = L.nm + (L.champ ? ' ★' : ''); const sl = $('st2'); if (sl) sl.textContent = STYLES[L.st].label;
   G.diff = L.diff; startFight(true);
 }
@@ -4787,7 +4900,8 @@ function startFight(fromMode) {
   if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); }
   for (const F of [P1, P2]) F.sparGear(G.mode === 'spar');
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
-  { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none' }) }); }
+  if (G.mode !== 'career') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none' }) }); }
+  CROWD.fill = G.mode === 'career' ? LADDER[Math.min(G.career, LADDER.length - 1)].crowd ?? 1 : 1;   // the semi-final in the warehouse: a half-empty hall; the title fight: everybody came
   setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'gym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the gym; a career fight is where the ladder says
   G.paused = false; UI.from = null; uiShow(null);
   BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; }
@@ -4796,13 +4910,45 @@ function startFight(fromMode) {
   $('n1').textContent = myName();
   P1.resetState(); P2.resetState(); P2.speed = DIFFS[G.diff].speed * (1 + 0.035 * SK(P2, 'spd')); P1.speed = 1.5 * (1 + 0.035 * SK(P1, 'spd'));
   FX.clearAir(); REC.frames.length = 0; REC.events.length = 0; Q.length = 0; AI.blockUntil = 0; AI.t = 1.0 + rr(); AI.combo = 0; AI.dodgeAt = 0;
-  G.state = 'intro'; G.introT = 0; G.slow = 1; G.slowT = 0; G.hitstop = 0; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; AI.lat = 0; AI.latT = 0;
+  /* the intro runs on G.introT: [−card − fly, −fly) the opponent's card (career), [−fly, 0) the camera flies round the place and
+     its crowd (street locations), [0, 1.25) «Готовься», then the referee's clap (the bell in the gym) starts the round */
+  { const street = LOC.id !== 'gym' && G.mode !== 'bag' && G.mode !== 'spar';
+    G.flyT = street ? INTRO_FLY : 0; G.cardT = G.mode === 'career' ? INTRO_CARD : 0; G.flyA = INTRO_ARC[LOC.id] ?? -2.1; }
+  G.state = 'intro'; G.introT = -(G.flyT + G.cardT); G.introMsg = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; AI.lat = 0; AI.latT = 0;
   // BKFC: five two-minute rounds; between rounds the corner works on him (stamina, the cuts, ice on the eye); no knockout → the judges
   G.round = 1; G.roundT = ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0]; G.cutWarn = false;
-  show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', true); show('pad', false);
+  show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', !G.cardT); show('pad', false);
   $('diffl').textContent = DIFFS[G.diff].label.toUpperCase(); $('w1').textContent = 'побед ' + G.wins; $('w2').textContent = 'побед ' + G.losses;
-  msg('Готовься');
+  if (G.cardT) fightCard(); else show('vs', false);
+  if (G.flyT) { camCut = true; if (!G.cardT) msg(LOC.label, 'place'); }
+  introTick(0);
 }
+/* ── before the fight ── */
+const INTRO_CARD = 2.8, INTRO_FLY = 2.8;   // s: the card stays up, the camera flies round
+const INTRO_ARC = { yard: -2.1, tires: 2.0, parking: -1.9, warehouse: 2.2 };   // rad about the centre from the fight camera's side (+z): where the fly-round starts
+/* the card of a career opponent: name and nickname, style, place, his legend; any key / tap skips it (introSkip) */
+function fightCard() {
+  const i = Math.min(G.career, LADDER.length - 1), L = LADDER[i];
+  $('vs-k').textContent = L.champ ? `титульный бой · ${i + 1}/${LADDER.length}` : `карьера · бой ${i + 1}/${LADDER.length}`;
+  $('vs-n').innerHTML = `${esc(L.name)} <b>«${esc(L.nm)}»</b>${L.champ ? ' <i>★</i>' : ''}`;
+  $('vs-m').innerHTML = `<span>${STYLES[L.st].label}</span><span>${esc(careerPlace(i))}</span><span>${DIFFS[L.diff].label.toLowerCase()}</span>`;
+  $('vs-l').textContent = L.legend; $('vs-h').textContent = TOUCH ? 'коснись — пропустить' : 'любая клавиша — пропустить';
+  const el = $('vs'); el.hidden = false; el.classList.remove('in'); void el.offsetWidth; el.classList.add('in');
+}
+/* any key / tap during the card or the fly-round goes straight to the next part; true = the input was used up */
+function introSkip() {
+  if (G.state !== 'intro' || G.paused || G.introT >= 0) return false;
+  if (G.introT + G.flyT + G.cardT < 0.3) return true;   // the press that started the fight is not a skip
+  G.introT = G.cardT && G.introT < -G.flyT ? -G.flyT : 0; introTick(0); return true;
+}
+function introTick(dt) {
+  G.introT += dt;
+  if (G.cardT && G.introT >= -G.flyT && !$('vs').hidden) { show('vs', false); show('hud', true); if (G.flyT && G.introT < 0) msg(LOC.label, 'place'); }
+  if (G.introT >= 0 && !G.introMsg) { G.introMsg = true; msg('Готовься'); }
+  if (G.introT > 1.25) { G.state = 'fight'; msg('Раунд ' + G.round); roundSnd(); show('pad', true); EVT.emit('round'); }
+}
+// the start of a round: the referee claps his hands in a street fight, the bell rings in the gym
+function roundSnd() { if (LOC.id === 'gym') sfx.bell(1); else sfx.clap(); }
 function endRound() {
   if (BAG.on) return bagEnd();
   // judges: 10-9 to whoever did more, a point off for each knockdown suffered
@@ -4846,7 +4992,7 @@ function cutCheck() {
   }
 }
 function stateTick(dtReal) {
-  if (G.state === 'intro') { G.introT += dtReal; if (G.introT > 1.25) { G.state = 'fight'; msg('Раунд ' + G.round); sfx.bell(1); show('pad', true); EVT.emit('round'); } }
+  if (G.state === 'intro') introTick(dtReal);
   else if (G.state === 'fight') {
     G.roundT -= dtReal * G.slow; if (G.roundT <= 0) return endRound();
     if ((G.cutT = (G.cutT || 0) + dtReal) > 0.5) { G.cutT = 0; cutCheck(); }
@@ -4854,7 +5000,7 @@ function stateTick(dtReal) {
   else if (G.state === 'break') {
     G.breakT -= dtReal; if (!G.doc) for (const F of [P1, P2]) corner(F, dtReal / BREAK_LEN);
     if (G.breakT <= 0) { if (!G.doc) { G.round++; G.roundT = ROUND_LEN; for (const F of [P1, P2]) if (F.mark) { F.adv = 0; F.advV = 0; } } G.doc = false;
-      G.state = 'fight'; msg(G.round > 1 && G.roundT === ROUND_LEN ? 'Раунд ' + G.round : 'Бой!'); sfx.bell(1); show('pad', true); EVT.emit('round'); }
+      G.state = 'fight'; msg(G.round > 1 && G.roundT === ROUND_LEN ? 'Раунд ' + G.round : 'Бой!'); roundSnd(); show('pad', true); EVT.emit('round'); }
   }
   else if (G.state === 'ko') {
     if (!G.fallSnd && G.loser.headNow.y < 0.3) { G.fallSnd = true; sfx.fall(); G.shake = Math.max(G.shake, 0.03); }
@@ -4864,6 +5010,7 @@ function stateTick(dtReal) {
 
 /* ───────── camera ───────── */
 const camP = new V3(1.2, 1.4, 3), camL = new V3(0, 1, 0), _cp = new V3(), _cl = new V3(); let camCut = true, camClock = 0;
+const FLY_R = 6.3, FLY_H = 2.25;   // m: where the intro fly-round starts — behind the back row of the crowd, over its heads (under the parking's ceiling)
 function camUpdate(dt) {
   camClock += dt; let k = 4;
   // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
@@ -4889,7 +5036,14 @@ function camUpdate(dt) {
   } else {   // the fight: framed on the pair, pushed in a little when they trade up close, a slow drift so the shot never sits dead
     const mx = (P1.headNow.x + P2.headNow.x) * 0.5, sep = Math.abs(P1.headNow.x - P2.headNow.x), hurt = Math.max(P1.daze || 0, P2.daze || 0);
     const z = far + 0.2 - clamp((1.0 - sep) * 0.6, 0, 0.35) - 0.2 * hurt + Math.max(0, sep - 1.0) * 1.1, drift = 0.18 * Math.sin(camClock * 0.13);
-    _cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), z); _cl.set(mx + drift * 0.3, 0.93, 0); k = G.state === 'intro' ? 2.4 : 3.5; }
+    _cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), z); _cl.set(mx + drift * 0.3, 0.93, 0); k = G.state === 'intro' ? 2.4 : 3.5;
+    /* the fly-round before a street fight (G.introT < 0, see startFight): an arc about the centre of the floor — from behind the crowd,
+       above its heads, at the angle G.flyA — that comes down into the fight camera; while the opponent's card is up it only creeps */
+    if (G.state === 'intro' && G.introT < 0 && G.flyT) {
+      const p = clamp(1 + G.introT / G.flyT, 0, 1), e = p * p * p * (p * (6 * p - 15) + 10), pre = Math.min(0, G.introT + G.flyT);
+      const a = lerp(G.flyA * (1 - 0.035 * pre), Math.atan2(_cp.x, _cp.z), e), R = lerp(FLY_R, Math.hypot(_cp.x, _cp.z), e);
+      _cp.set(R * Math.sin(a), lerp(FLY_H, _cp.y, e), R * Math.cos(a)); _cl.set(_cl.x * e, lerp(1.2, _cl.y, e), 0); k = 1e3;
+    } }
   if (camCut) { camP.copy(_cp); camL.copy(_cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * k); camP.lerp(_cp, a); camL.lerp(_cl, a); }
   camera.position.copy(camP); if (!OPT.shake) G.shake = 0;   // settings: camera shake off
@@ -5133,6 +5287,7 @@ window.addEventListener('keyup', e => {
 window.addEventListener('blur', () => { HELD.clear(); mvKeys(); setBlock(false); kbLit('kb-blk', false); kbLit('kb-body', false); });
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!e.repeat && introSkip()) { e.preventDefault(); return; }   // the card before a fight / the fly-round: any key skips
   if (uiKey(e)) return;   // menu screens / pause: arrows, Enter, Esc
   const live = G.state === 'fight' || G.state === 'ko' || G.state === 'kd';
   if (e.code === 'Space' && G.state === 'fight') { e.preventDefault(); if (!e.repeat) { setBlock(true); kbLit('kb-blk', true); } return; }
@@ -5143,6 +5298,7 @@ window.addEventListener('keydown', e => {
   if (k) { e.preventDefault(); press(k[0], k[1], document.querySelector(`[data-${k[0]}="${k[1]}"]`), e.shiftKey); }
   else if ((e.key === 'Enter' || e.key === ' ') && G.state === 'result' && document.activeElement === document.body) startFight();
 });
+stage.addEventListener('pointerdown', e => { if (!(e.target.closest && e.target.closest('button')) && introSkip()) e.preventDefault(); });   // a tap skips the card / the fly-round
 // mouse punches anywhere on the ring (not on menus / buttons)
 stage.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse' || G.paused || !(G.state === 'fight' || G.state === 'ko' || G.state === 'kd')) return;
@@ -5382,6 +5538,7 @@ function setLocation(id) {
   hemi.color.set(li.hemi[0]); hemi.groundColor.set(li.hemi[1]); hemi.intensity = li.hemi[2];
   for (const [l, v] of [[key, li.key], [rim, li.rim], [rim2, li.rim2], [fill, li.fill]]) { l.color.set(v[0]); l.intensity = v[1]; }
   if (was !== L) FX.clearFloor();   // floor stains belong to the floor they fell on
+  sfx.place(L.id);   // its ambience and the echo of its walls (06_fx_sound.js)
   ARENA.updateMatrixWorld(true);
 }
 function locSync() { if (LOC.sync && LOC.group) LOC.sync(); }
@@ -6386,7 +6543,7 @@ LOCS.warehouse = {
    The CPU only keeps a few numbers per person (excitement, head yaw, recoil, fade) and packs the visible ones: the crowd is split into
    sectors that are frustum-culled, and whoever stands between the camera and the fighters is dissolved (dither).
    Density follows GFX.crowd (low ≈ 0.3 of the people, high = all). Reactions come from EVT (07_state_replay_hits.js). */
-const CROWD = { u: { uT: { value: 0 }, uMood: { value: 0.15 } }, geo: null, mat: null, blobMat: null, blobs: [], mood: 0.15, heat: 0 };
+const CROWD = { u: { uT: { value: 0 }, uMood: { value: 0.15 } }, geo: null, mat: null, blobMat: null, blobs: [], mood: 0.15, heat: 0, fill: 1 };   // fill: the share of the crowd that came (a career fight sets it, startFight)
 // accessory bits of the instance mask
 const CW_HAIR = 2, CW_CAP = 4, CW_HOOD = 8, CW_BALA = 16, CW_SKULL = 32, CW_PHONE = 64, CW_CRATE = 128;
 const CROWD_LOOK = {
@@ -6628,7 +6785,7 @@ function makeCrowd(o = {}) {
       }
       // the view wedge in front of the fighters (world): people inside it are dissolved, as the location does with bales and cars
       const dx = camL.x - cam.x, dz = camL.z - cam.z, len = Math.hypot(dx, dz) || 1, ux = dx / len, uz = dz / len, tH = Math.tan(camera.fov * PI / 360) * camera.aspect * 1.1;
-      const nAct = Math.min(N, Math.round(N * clamp(GFX.crowd, 0, 1))), kE = 1 - Math.exp(-dt * 9), kF = 1 - Math.exp(-dt * 7), kY = 1 - Math.exp(-dt * 3), kUp = 1 - Math.exp(-dt * 10), kDn = 1 - Math.exp(-dt * 1.3);
+      const nAct = Math.min(N, Math.round(N * clamp(GFX.crowd, 0, 1) * CROWD.fill)), kE = 1 - Math.exp(-dt * 9), kF = 1 - Math.exp(-dt * 7), kY = 1 - Math.exp(-dt * 3), kUp = 1 - Math.exp(-dt * 10), kDn = 1 - Math.exp(-dt * 1.3);
       const D = aDyn.array, B = blob.instanceMatrix.array; let n = 0, hash = 0;
       for (let i = 0; i < nAct; i++) {
         const p = ppl[i]; if (!groups[p.g].vis) { p.seen = false; continue; }
@@ -6670,7 +6827,7 @@ function crowdTick(dt) {
   CROWD.mood += (Math.min(1, tgt + CROWD.heat) - CROWD.mood) * (1 - Math.exp(-dt * 1.4));
   CROWD.u.uT.value += dt; CROWD.u.uMood.value = CROWD.mood;
   if (c) c.update(dt);
-  sfx.crowd(c && s !== 'menu' ? 0.25 + 0.75 * CROWD.mood : 0);
+  sfx.crowd(c && s !== 'menu' ? (0.25 + 0.75 * CROWD.mood) * (0.55 + 0.45 * CROWD.fill) : 0);
 }
 /* reactions: a clean hard shot, a knockdown, a knockout → a wave of cheering from the place it happened, and a roar as loud */
 EVT.on((type, e) => {

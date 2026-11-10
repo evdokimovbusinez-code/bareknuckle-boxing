@@ -35,10 +35,10 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 | `04c_mma_pads.js` | rigid MMA-glove pads on the hand bones (`mmaPadGeo`, `mmaPads`) |
 | `04d_street.js` | street clothes with their own skinned geometry: loose trousers / long shorts (`PANT_CUTS`, `pantsGeo`, `pantsTex`, `pantsMesh`, hem spring `pantsTick`), shoes (`shoeGeo`, `shoeTex`, `shoeMesh`), `streetLook()`, `isStreet()` |
 | `05_fighter.js` | `class Fighter` — animation, IK, footwork (`plantFeet`), arm clearing (`armClear`), stamina, `dress`, `sparGear` |
-| `06_fx_sound.js` | blood mist, blood/sweat/floor stains (`FX`, `MIST`), synthesised sound |
-| `07_state_replay_hits.js` | `G` state, `DIFFS`, `LADDER`, career/profile, replay buffer (`REC`), `resolveHit`, `knockdown`, `knockout` (`DMG_K`) |
+| `06_fx_sound.js` | blood mist, blood/sweat/floor stains (`FX`, `MIST`), synthesised sound (`sfx`); per location: `sfx.place(id)` (called by `setLocation`) = looped ambience `AMB[id]` + the reverb of the punches `SPACE[id]` (convolver with a synthesised impulse; `thud` / `fall` / `clap` go through `bus`). Debug: `__sfx` |
+| `07_state_replay_hits.js` | `G` state, `DIFFS`, `LADDER` (per man: `nm`, `name`, `legend`, `loc`, fixed `look`, `crowd`), `careerLoc`, `careerPlace`, career/profile, replay buffer (`REC`), `resolveHit`, `knockdown`, `knockout` (`DMG_K`) |
 | `08_ai_flow.js` | `STYLES`, `ai(dt)`, `playerInput`, `toMenu`, `rollOpponent` |
-| `09_bag.js` | heavy bag training, `startFight` / modes |
+| `09_bag.js` | heavy bag training, `startFight` / modes; the intro on `G.introT` (`introTick`): opponent's card of a career fight (`fightCard`, markup `#vs`) → camera fly-round on street locations (`G.flyT`, `G.flyA`, drawn in `camUpdate`) → «Готовься» → `roundSnd()`; `introSkip()` = any key / tap |
 | `10_camera_layout.js` | fight / replay camera, HUD, `layout()`, resolution (`QUAL`, `applyRes`, `resTick`) |
 | `11_arena_loop.js` | ring lights, rope visuals, **main loop `frame()`** (update order) |
 | `12_ui.js` | option rows (`swatches`), fight input: keyboard/mouse (`MV_KEYS`, `ACT_KEYS`), touch stick, boot |

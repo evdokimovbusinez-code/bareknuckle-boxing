@@ -87,12 +87,89 @@ const FX = (() => {
 /* ───────── sound (synthesised) ───────── */
 const sfx = (() => {
   let ac = null, noise = null, master = null, crowdG = null;   // master: everything goes through one gain — the volume of the settings screen (OPT.vol)
-  const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } master = ac.createGain(); master.gain.value = OPT.vol; master.connect(ac.destination); const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; noise = b; } if (ac.state === 'suspended') ac.resume(); return ac; };
+  let bus = null, conv = null, wet = null, amb = null, ambId = null, wantId = null; const IR = {}, BUF = {};   // bus: the punches, sent on to master and through the echo of the place (conv → wet)
+  const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } master = ac.createGain(); master.gain.value = OPT.vol; master.connect(ac.destination);
+    bus = ac.createGain(); conv = ac.createConvolver(); conv.normalize = false; wet = ac.createGain(); wet.gain.value = 0; bus.connect(master); bus.connect(conv).connect(wet).connect(master); const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; noise = b; } if (ac.state === 'suspended') ac.resume(); return ac; };
   const env = (g, t, a, d, peak) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
+  /* ── the place: the echo of its walls and its ambience ──
+     SPACE[id]: the reverb the punches (thud, fall, the referee's clap) are sent through — a convolution with a synthesised impulse:
+     noise through a one-pole low-pass (lp, Hz) that dies out in len seconds (−60 dB), plus a few early echoes (taps: [s, gain]),
+     scaled to unit energy; wet = its level, amb = how much of the ambience rings in it too. The parking and the warehouse boom,
+     the yard and the tyre yard are dry (open air: a faint slap off the houses), the gym is a padded hall.
+     AMB[id](out, L): the looped ambience of a place, built into the gain `out`; its sources go into L (place() starts and stops them).
+     Levels measured at master (offline render): ambience 0.02–0.035 RMS, a full punch ≈ 0.15–0.2 RMS over its 0.2 s (peak > 1) — the
+     ambience sits 15–20 dB under it; the tail 0.4–1.2 s after a punch: parking ≈ 0.04, warehouse ≈ 0.03, yard ≈ 0.01, tyres < 0.01. */
+  const SPACE = {
+    gym: { len: 0.6, lp: 3500, wet: 0.12 },
+    yard: { len: 0.3, lp: 2600, wet: 0.05, taps: [[0.12, 0.5], [0.19, 0.25]] },
+    tires: { len: 0.2, lp: 2400, wet: 0.03 },
+    parking: { len: 2.2, lp: 1700, wet: 0.6, amb: 0.3, taps: [[0.04, 0.5], [0.075, 0.4], [0.13, 0.3]] },
+    warehouse: { len: 2.8, lp: 3200, wet: 0.55, amb: 0.5, taps: [[0.055, 0.5], [0.12, 0.4], [0.2, 0.3], [0.31, 0.2]] } };
+  const AMB_LVL = 1;
+  const impulse = S => { const sr = ac.sampleRate, n = (sr * S.len) | 0, b = ac.createBuffer(2, n, sr), k = 1 - Math.exp(-2 * Math.PI * S.lp / sr);
+    for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); let y = 0, e = 0;
+      for (let i = 0; i < n; i++) { const t = i / sr; y += k * (Math.random() * 2 - 1 - y); d[i] = y * Math.exp(-6.9 * t / S.len) * Math.min(1, t / 0.006); }
+      const pk = Math.sqrt(k / (2 - k) / 3);   // the level the tail starts at: the early echoes are given relative to it
+      for (const [tt, g] of S.taps || []) { const i = (tt * (c ? 1.09 : 1) * sr) | 0; if (i < n) d[i] += g * pk * 0.5 * Math.sqrt(n / 13.8); }   // (each carries ≈ g² / 4 of the tail's energy)
+      for (let i = 0; i < n; i++) e += d[i] * d[i]; e = 1 / Math.sqrt(e || 1); for (let i = 0; i < n; i++) d[i] *= e; }
+    return b; };
+  const loop = (buf, rate = 1) => { const n = ac.createBufferSource(); n.buffer = buf; n.loop = true; n.playbackRate.value = rate; return n; };
+  const filt = (type, fq, q = 0.7) => { const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = fq; f.Q.value = q; return f; };
+  const gain = v => { const g = ac.createGain(); g.gain.value = v; return g; };
+  // a slowly wandering control signal (gusts, flutter): the noise buffer read very slowly, smoothed, scaled to about ±depth / 2, added to an AudioParam
+  const wander = (L, param, depth, rate = 0.0004, cut = 4) => { const n = loop(noise, rate), f = filt('lowpass', cut), g = gain(depth); n.connect(f).connect(g).connect(param); L.push(n); };
+  // a band of noise: noise → filter → gain → out; returns [filter, gain] to hang wander() on
+  const band = (L, out, type, fq, q, lvl) => { const n = loop(noise), f = filt(type, fq, q), g = gain(lvl); n.connect(f).connect(g).connect(out); L.push(n); return [f, g]; };
+  // a loop of sparse one-shots (crackles, drips) rendered once into a buffer of len seconds
+  const render = (len, fn) => { const sr = ac.sampleRate, b = ac.createBuffer(1, (sr * len) | 0, sr); fn(b.getChannelData(0), sr); return b; };
+  const AMB = {
+    // the yard at dusk: the far city (a low rumble that swells as traffic passes), wind between the houses, leaves
+    yard(out, L) {
+      const [, c] = band(L, out, 'lowpass', 150, 0.6, 0.55); wander(L, c.gain, 0.3, 0.00025, 1.5);
+      const [w, wg] = band(L, out, 'bandpass', 480, 0.9, 0.05); wander(L, wg.gain, 0.07, 0.0005, 2); wander(L, w.frequency, 260, 0.0003, 2);
+      const [, h] = band(L, out, 'highpass', 3500, 0.5, 0.006); wander(L, h.gain, 0.008, 0.0005, 2);
+    },
+    // tyres and fire: the drums roar and flutter, the wood crackles (clicks of 1–3 ms) and pops (dull thumps of 20–50 ms)
+    tires(out, L) {
+      const [, r] = band(L, out, 'lowpass', 380, 0.7, 0.22); wander(L, r.gain, 0.2, 0.003, 14);
+      const b = BUF.fire || (BUF.fire = render(6, (d, sr) => {
+        for (let k = 0; k < 150; k++) { const pop = k < 9, i0 = (Math.random() * d.length) | 0, n = (sr * (pop ? 0.02 + 0.03 * Math.random() : 0.0006 + 0.002 * Math.random())) | 0, a = pop ? 0.5 + 0.5 * Math.random() : 0.08 + 0.9 * Math.random() ** 3; let y = 0;
+          for (let i = 0; i < n && i0 + i < d.length; i++) { y += (pop ? 0.12 : 1) * (Math.random() * 2 - 1 - y); d[i0 + i] += a * y * (pop ? 2.2 : 1) * Math.exp(-5 * i / n); } } }));
+      for (const [rate, lvl] of [[1, 0.2], [0.81, 0.13]]) { const n = loop(b, rate), g = gain(lvl); n.connect(g).connect(out); L.push(n); }
+    },
+    // the underground parking: the ventilation — mains hum, air in the ducts beaten by a fan's blades, the hiss of the grilles
+    parking(out, L) {
+      for (const [fq, lvl, type] of [[50, 0.03, 'sine'], [100, 0.02, 'sine'], [149.6, 0.01, 'triangle']]) { const o = ac.createOscillator(), g = gain(lvl); o.type = type; o.frequency.value = fq; o.connect(g).connect(out); L.push(o); }
+      const [, d] = band(L, out, 'bandpass', 240, 0.7, 0.1), bl = ac.createOscillator(), bg = gain(0.025); bl.frequency.value = 11.3; bl.connect(bg).connect(d.gain); L.push(bl);
+      const [, lo] = band(L, out, 'lowpass', 95, 0.7, 0.3); wander(L, lo.gain, 0.1, 0.0003, 1);
+      band(L, out, 'bandpass', 1900, 1.2, 0.006);
+    },
+    // the abandoned warehouse: wind whistling in the cracks of the gate and the roof, water dripping from it
+    warehouse(out, L) {
+      const [, lo] = band(L, out, 'lowpass', 190, 0.7, 0.3); wander(L, lo.gain, 0.25, 0.0004, 1.5);
+      for (const [fq, q, lvl, dev] of [[820, 14, 0.05, 240], [1460, 20, 0.02, 380]]) { const [f, g] = band(L, out, 'bandpass', fq, q, lvl); wander(L, f.frequency, dev, 0.00035, 1.5); wander(L, g.gain, lvl * 1.6, 0.0005, 1.5); }
+      const b = BUF.drip || (BUF.drip = render(9, (d, sr) => {
+        let t = 0.3; while (t < 8.6) { const f0 = 750 + 900 * Math.random(), a = 0.35 + 0.65 * Math.random(), i0 = (t * sr) | 0, n = (0.09 * sr) | 0;
+          for (let i = 0; i < n && i0 + i < d.length; i++) { const x = i / sr; d[i0 + i] += a * Math.sin(2 * Math.PI * (f0 * x + 9000 * x * x)) * Math.exp(-x / 0.014) * Math.min(1, x / 0.001); }   // a plink: the pitch runs up
+          t += Math.random() < 0.25 ? 0.13 + 0.1 * Math.random() : 0.5 + 1.6 * Math.random(); } }));
+      const n = loop(b), g = gain(0.1); n.connect(g).connect(out); L.push(n);
+    },
+  };
   return {
-    unlock() { ctx(); },
+    unlock() { ctx(); if (ac && wantId) this.place(wantId); },
     vol(v) { if (master) master.gain.value = v; },
-    thud(p, body) { const a = ac; if (!a) return; const t = a.currentTime;
+    /* the location changed (setLocation): its echo for the punches and its ambience (cross-faded). Before the first sound of the
+       game there is no audio context yet — the place is remembered and set by unlock() */
+    place(id) { wantId = id; const a = ac; if (!a || id === ambId) return; ambId = id; const t = a.currentTime, S = SPACE[id] || SPACE.gym;
+      conv.buffer = IR[id] || (IR[id] = impulse(S)); wet.gain.setTargetAtTime(S.wet, t, 0.05);
+      if (amb) { const o = amb; amb = null; o.g.gain.setTargetAtTime(0, t, 0.25); setTimeout(() => { for (const n of o.L) try { n.stop(); } catch (e) {} o.g.disconnect(); }, 1500); }
+      if (!AMB[id]) return;
+      const g = gain(0), L = []; AMB[id](g, L); g.connect(master); if (S.amb) g.connect(gain(S.amb)).connect(conv);   // the drips and the hum ring in the hall too
+      for (const n of L) { if (n.buffer) n.start(t, Math.random() * n.buffer.duration); else n.start(t); }
+      g.gain.setTargetAtTime(AMB_LVL, t, 0.7); amb = { g, L }; },
+    // the referee claps his hands — the start of a round in a street fight: two palms never land together (a flam of two short bursts)
+    clap() { const a = ac; if (!a) return; for (const [d, pk] of [[0, 1.1], [0.011, 0.8]]) { const t = a.currentTime + d, n = a.createBufferSource(), f = filt('bandpass', 1400 + 500 * rr(), 1.1), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.09, pk); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.12); } },
+    thud(p, body) { const a = ac; if (!a) return; const t = a.currentTime, master = bus;   // (shadows master: a punch goes through the echo of the place)
       { const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 0.9; f.frequency.value = body ? 1700 : 2600; env(g, t, 0.002, 0.035, 0.22 + 0.2 * p); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // skin slap
       const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'lowpass'; f.frequency.setValueAtTime(1400 + 900 * p, t); f.frequency.exponentialRampToValueAtTime(180, t + 0.12); env(g, t, 0.004, 0.13, 0.5 + 0.4 * p); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.2);
       const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16); env(g2, t, 0.004, 0.18, 0.5 + 0.4 * p); o.connect(g2).connect(master); o.start(t); o.stop(t + 0.25); },
@@ -116,7 +193,7 @@ const sfx = (() => {
       for (let i = 0, nv = 2 + (p * 5 | 0); i < nv; i++) { const o = a.createOscillator(), bf = a.createBiquadFilter(), og = a.createGain(), t0 = t + rr() * 0.35, f0 = 190 + rr() * 260, len = 0.25 + rr() * 0.5;
         o.type = 'sawtooth'; o.frequency.setValueAtTime(f0, t0); o.frequency.linearRampToValueAtTime(f0 * (1.25 + rr() * 0.4), t0 + len * 0.35); o.frequency.linearRampToValueAtTime(f0 * 0.85, t0 + len);
         bf.type = 'bandpass'; bf.frequency.value = 700 + rr() * 700; bf.Q.value = 2; env(og, t0, 0.05, len, 0.02 + 0.03 * p); o.connect(bf).connect(og).connect(master); o.start(t0); o.stop(t0 + len + 0.1); } },
-    fall() { const a = ac; if (!a) return; const t = a.currentTime, o = a.createOscillator(), g = a.createGain(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.3); env(g, t, 0.005, 0.35, 0.7); o.connect(g).connect(master); o.start(t); o.stop(t + 0.4); },
+    fall() { const a = ac; if (!a) return; const t = a.currentTime, master = bus, o = a.createOscillator(), g = a.createGain(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.3); env(g, t, 0.005, 0.35, 0.7); o.connect(g).connect(master); o.start(t); o.stop(t + 0.4); },
   };
 })();
 

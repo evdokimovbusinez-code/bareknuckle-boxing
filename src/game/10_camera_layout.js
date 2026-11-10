@@ -1,5 +1,6 @@
 /* ───────── camera ───────── */
 const camP = new V3(1.2, 1.4, 3), camL = new V3(0, 1, 0), _cp = new V3(), _cl = new V3(); let camCut = true, camClock = 0;
+const FLY_R = 6.3, FLY_H = 2.25;   // m: where the intro fly-round starts — behind the back row of the crowd, over its heads (under the parking's ceiling)
 function camUpdate(dt) {
   camClock += dt; let k = 4;
   // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
@@ -25,7 +26,14 @@ function camUpdate(dt) {
   } else {   // the fight: framed on the pair, pushed in a little when they trade up close, a slow drift so the shot never sits dead
     const mx = (P1.headNow.x + P2.headNow.x) * 0.5, sep = Math.abs(P1.headNow.x - P2.headNow.x), hurt = Math.max(P1.daze || 0, P2.daze || 0);
     const z = far + 0.2 - clamp((1.0 - sep) * 0.6, 0, 0.35) - 0.2 * hurt + Math.max(0, sep - 1.0) * 1.1, drift = 0.18 * Math.sin(camClock * 0.13);
-    _cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), z); _cl.set(mx + drift * 0.3, 0.93, 0); k = G.state === 'intro' ? 2.4 : 3.5; }
+    _cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), z); _cl.set(mx + drift * 0.3, 0.93, 0); k = G.state === 'intro' ? 2.4 : 3.5;
+    /* the fly-round before a street fight (G.introT < 0, see startFight): an arc about the centre of the floor — from behind the crowd,
+       above its heads, at the angle G.flyA — that comes down into the fight camera; while the opponent's card is up it only creeps */
+    if (G.state === 'intro' && G.introT < 0 && G.flyT) {
+      const p = clamp(1 + G.introT / G.flyT, 0, 1), e = p * p * p * (p * (6 * p - 15) + 10), pre = Math.min(0, G.introT + G.flyT);
+      const a = lerp(G.flyA * (1 - 0.035 * pre), Math.atan2(_cp.x, _cp.z), e), R = lerp(FLY_R, Math.hypot(_cp.x, _cp.z), e);
+      _cp.set(R * Math.sin(a), lerp(FLY_H, _cp.y, e), R * Math.cos(a)); _cl.set(_cl.x * e, lerp(1.2, _cl.y, e), 0); k = 1e3;
+    } }
   if (camCut) { camP.copy(_cp); camL.copy(_cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * k); camP.lerp(_cp, a); camL.lerp(_cl, a); }
   camera.position.copy(camP); if (!OPT.shake) G.shake = 0;   // settings: camera shake off
