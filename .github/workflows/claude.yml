@@ -78,7 +78,7 @@ jobs:
             git add -A; git commit -qm "Claude bot: #$N" -m "$(echo "$SUM" | head -20)"; git push -q -u origin "$B"
             PR=$(gh pr list --head "$B" --state open --json url -q '.[0].url')
             if [ -z "$PR" ]; then
-              PR=$(gh pr create --head "$B" --base main --title "$(gh issue view "$N" --json title -q .title)" --body "$(printf 'Closes #%s\n\n%s\n\n%s' "$N" "$SUM" "$CHK")")
+              PR=$(gh pr create --head "$B" --base main --title "$(gh issue view "$N" --json title -q .title)" --body "$(printf 'Closes #%s\n\n%s\n\n%s' "$N" "$SUM" "$CHK")" 2>/dev/null) || PR="ветка \`$B\` (PR откроет Claude или: ${{ github.server_url }}/${{ github.repository }}/compare/main...$B?expand=1)"
             fi
             MSG=$(printf '%s\n\n%s\n\n**PR:** %s\n%s\nСтоимость: %s' "$RES" "$SUM" "$PR" "$CHK" "$COST")
           else
