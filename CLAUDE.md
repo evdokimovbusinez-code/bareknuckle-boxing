@@ -28,6 +28,8 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 | `02_xpbd_ko.js` | `XBody`, `XWorld` — knockout ragdoll, rope + canvas contacts; knockout timeline, get-up poses (`POSES`) |
 | `03_flesh_face.js` | `class Flesh` (swelling, cuts, nose bleeds), `class Face` (gaze, blinks, jaw) |
 | `04_gear.js` | clothes shells (`BOTTOMS`, `TOPS`, `SHOES`, `shellMesh`), `gloveMesh`, `headgearMesh`, `guardMesh`, `gearSetup` |
+| `04b_gloves_headgear.js` | boxing gloves (`gloveMesh`, cuff, thumb, piping), MMA glove shell (`mmaShell`), training headgear (`headgearGeo`, `headMap`), gum shield; `HANDS`, `GLOVES` options |
+| `04c_mma_pads.js` | rigid MMA-glove pads on the hand bones (`mmaPadGeo`, `mmaPads`) |
 | `05_fighter.js` | `class Fighter` — animation, IK, footwork (`plantFeet`), arm clearing (`armClear`), stamina, `dress`, `sparGear` |
 | `06_fx_sound.js` | blood mist, blood/sweat/floor stains (`FX`, `MIST`), synthesised sound |
 | `07_state_replay_hits.js` | `G` state, `DIFFS`, `LADDER`, career/profile, replay buffer (`REC`), `resolveHit`, `knockdown`, `knockout` (`DMG_K`) |
