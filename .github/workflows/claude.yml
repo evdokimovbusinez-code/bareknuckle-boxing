@@ -66,7 +66,8 @@ jobs:
       - name: Run Claude
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          BOT_MODEL: claude-fable-5-2   # model and reasoning effort of the bot
+          # model: Fable 5.2 by default; a tag in the issue title picks another: [sonnet] (≈7x cheaper, plain code/UI/systems), [opus]
+          BOT_MODEL: ${{ contains(github.event.issue.title, '[sonnet]') && 'claude-sonnet-5-5' || contains(github.event.issue.title, '[opus]') && 'claude-opus-5-5' || 'claude-fable-5-2' }}
           BOT_EFFORT: high
           BOT_BUDGET: "8"               # hard cap per task, USD
         run: |
