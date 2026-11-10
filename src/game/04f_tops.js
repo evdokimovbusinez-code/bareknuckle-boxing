@@ -17,8 +17,8 @@ const TOP_CUTS = {
   tank: { hem: 92, cl: 0.8, fit: 0.9, neck: [9.5, 16.5, 7, 1.5], rib: 1.2, sl: 0, arm: [25, 2.5, 146, 17, 19, 15], fab: 'rib' },
   mesh: { hem: 90, cl: 1.4, fit: 0.98, neck: [9.5, 14, 5, 1.5], rib: 1.4, sl: 0, arm: [26, 2.5, 146, 16, 19, 14], fab: 'mesh' },
   crop: { hem: 121, cl: 1.2, fit: 1.0, neck: [9, 9, 1.5, 2], rib: 1.4, sl: 0, arm: [28, 3, 147, 13, 15, 12], fab: 'cotton' },
-  sweatshirt: { hem: 91, cl: 1.9, fit: 0.98, band: 6, neck: [8.8, 6.5, -0.5, 2], rib: 2.4, sl: 57, ease: [2.6, 2.2], cuff: 6, fab: 'fleece' },
-  hoodie: { hem: 91, cl: 2.0, fit: 0.98, band: 6, neck: [9.6, 7.5, -1, 2], rib: 2.4, sl: 57, ease: [2.8, 2.4], cuff: 6, hood: 1, fab: 'fleece' },
+  sweatshirt: { hem: 91, cl: 1.4, fit: 0.98, band: 6, neck: [8.8, 6.5, -0.5, 2], rib: 2.4, sl: 57, ease: [1.7, 1.2], cuff: 6, fab: 'fleece' },
+  hoodie: { hem: 91, cl: 1.5, fit: 0.98, band: 6, neck: [9.6, 7.5, -1, 2], rib: 2.4, sl: 57, ease: [1.8, 1.3], cuff: 6, hood: 1, fab: 'fleece' },
 };
 // the whole body but the head and the hands, in the bind pose: [x, y, z, region, vertex] (cm, z up from the soles, front = -y, +x = his left)
 function topEnv(F) {
