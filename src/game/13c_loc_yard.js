@@ -302,7 +302,7 @@ LOCS.yard = {
     if (!lite) for (const i of [1, 3]) { const p = new THREE.PointLight('#ff9a3d', 60, 22, 1.5); p.position.copy(heads[i]).y -= 0.3; g.add(p); }
 
     /* ── the circle: three tight rows of people on the asphalt (nobody on crates here), they are the boundary (`wall` above) ── */
-    this.crowd = makeCrowd({ shape: 'circle', r: 3.15, rows: 3, gap: 0.5, rise: [0, 0, 0], look: 'street', seed: 31, max: 140 });
+    this.crowd = makeCrowd({ shape: 'circle', r: 3.15, rows: 3, gap: 0.5, rise: [0, 0, 0], look: 'street', seed: 31, max: 140, squat: 0.16 });
     g.add(this.crowd.group);
 
     /* ── breath in the cold air: soft points at the fighters' mouths (world frame), GFX.particles scales the rate ── */

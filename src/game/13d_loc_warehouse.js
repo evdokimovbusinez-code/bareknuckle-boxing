@@ -231,7 +231,7 @@ LOCS.warehouse = {
     shaft.add(noAO(staticMesh(geoMerge(pools), new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.55 }))));
 
     /* the crowd: three rows right against the mesh on all four sides, the back rows on crates */
-    this.crowd = makeCrowd({ shape: 'rect', w: 2 * H, h: 2 * H, r: 0.42, rows: 3, look: 'masked', seed: 41, max: 120 });
+    this.crowd = makeCrowd({ shape: 'rect', w: 2 * H, h: 2 * H, r: 0.42, rows: 3, look: 'masked', seed: 41, max: 120, squat: 0.1 });
     g.add(this.crowd.group);
     return g;
   },
