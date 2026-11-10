@@ -66,6 +66,8 @@ async function buildTemplates() {
   T.nailMat = new THREE.MeshPhysicalMaterial({ map: tex.nails_d, roughness: 0.3, clearcoat: 0.6 });
   T.hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
 /*BODYBLOCK*/
+  // face blend shapes, read from the FBX itself (the loader's morphs are broken and were dropped above): 03b_face_shapes.js
+  try { T.fm = faceShapes(bufs.boxer, body.geometry); } catch (e) { console.warn('face shapes:', e); T.fm = null; }
   T.cc = cc;
   T.shortsGeo = makeShorts(body);
   T.shortsNormal = shortsNormal();

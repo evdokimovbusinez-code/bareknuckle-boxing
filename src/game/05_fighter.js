@@ -399,7 +399,7 @@ class Fighter {
   knuckle(v) { return v.setFromMatrixPosition(this.bones[`CC_Base_${this.aimArm}_Mid1`].matrixWorld); }
   takeHit(dirWorld, power, name, contact, body, blocked) {
     const g = this.group, hp = contact;
-    this.face.hit(body ? power * 0.4 : power, !body && (PUNCH[name].type === 'hook' || PUNCH[name].type === 'upper'));
+    this.face.hit(body ? power * 0.4 : power, !body && (PUNCH[name].type === 'hook' || PUNCH[name].type === 'upper'), hp);
     const dm = _v1.copy(hp).add(dirWorld); g.worldToLocal(dm); dm.sub(g.worldToLocal(_v2.copy(hp)));
     // the upper body takes the real impulse at the contact point (muscles let go there and pull back)
     const cm = g.worldToLocal(contact.clone()), speed = (body ? 0.8 : 1.1) + 1.6 * Math.min(power, 1.3);
@@ -663,7 +663,7 @@ class Fighter {
       if (G2.pants) pantsTick(this, G2.pants, 1 / 60); if (G2.top) topTick(this, G2.top, 1 / 60);
       if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
   }
-  capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; }
+  capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; arr.set(this.flesh.u.uFW.value, 4 * n + 5); }   // + the face shape weights
   restore(a, b2, t) {
     const b = this.allBones, n = b.length;
     for (let i = 0; i < n; i++) {
@@ -671,6 +671,7 @@ class Fighter {
       b[i].quaternion.set(a[k] + (b2[k] * s - a[k]) * t, a[k + 1] + (b2[k + 1] * s - a[k + 1]) * t, a[k + 2] + (b2[k + 2] * s - a[k + 2]) * t, a[k + 3] + (b2[k + 3] * s - a[k + 3]) * t).normalize();
     }
     const k = 4 * n; { const L = this.flesh.u.uLid.value; L.x = a[k + 3] + (b2[k + 3] - a[k + 3]) * t; L.y = a[k + 4] + (b2[k + 4] - a[k + 4]) * t; L.z = L.x * 0.6; L.w = L.y * 0.6; }
+    { const W = this.flesh.u.uFW.value; for (let i = 0, j = k + 5; i < W.length; i++, j++) W[i] = a[j] + (b2[j] - a[j]) * t; }
     this.hip.position.set(a[k] + (b2[k] - a[k]) * t, a[k + 1] + (b2[k + 1] - a[k + 1]) * t, a[k + 2] + (b2[k + 2] - a[k + 2]) * t);
     this.cc.updateMatrixWorld(true);
   }

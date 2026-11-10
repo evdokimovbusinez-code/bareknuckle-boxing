@@ -37,8 +37,18 @@ const HEAD_FRAG = `#include <map_fragment>
  gDrop = sweatBeads( vMapUv, uSweat * ( 1.0 - hairCover ) ); gH += gDrop * 0.00016 * ( 1.0 - WW.x );
  float bWet = clamp( max( WW.x * ( 1.0 - 0.85 * WW.z ), gFilm * 0.7 ) + WW.y + mWet, 0.0, 1.0 );
 `;
+/* face blend shapes kept from the CC export (character's Left / Right; read from the FBX by faceShapes, 03b_face_shapes.js) */
+const FACE_SHAPES = ['A01_Brow_Inner_Up', 'A02_Brow_Down_Left', 'A03_Brow_Down_Right', 'A04_Brow_Outer_Up_Left', 'A05_Brow_Outer_Up_Right',
+  'A16_Eye_Squint_Left', 'A17_Eye_Squint_Right', 'A18_Eye_Wide_Left', 'A19_Eye_Wide_Right', 'A21_Cheek_Squint_Left', 'A22_Cheek_Squint_Right',
+  'A23_Nose_Sneer_Left', 'A24_Nose_Sneer_Right', 'Cheek_Blow_L', 'Cheek_Blow_R', 'A29_Mouth_Funnel', 'A31_Mouth_Left', 'A32_Mouth_Right', 'A36_Mouth_Shrug_Lower',
+  'A38_Mouth_Smile_Left', 'A39_Mouth_Smile_Right', 'A40_Mouth_Frown_Left', 'A41_Mouth_Frown_Right', 'A44_Mouth_Upper_Up_Left', 'A45_Mouth_Upper_Up_Right',
+  'A46_Mouth_Lower_Down_Left', 'A47_Mouth_Lower_Down_Right', 'A48_Mouth_Press_Left', 'A49_Mouth_Press_Right', 'A50_Mouth_Stretch_Left', 'A51_Mouth_Stretch_Right'];
 /* ───────── flesh: soft-tissue impact (dent + surface wave) and swelling, displaced in bind space before skinning ───────── */
-const FLESH_VDECL = `uniform float uFT;
+const FLESH_VDECL = `attribute float aFM;
+uniform highp sampler2D uFMT;
+uniform float uFW[${FACE_SHAPES.length}];
+uniform int uFMN;
+uniform float uFT;
 uniform float uU;
 uniform float uFleshOn;
 uniform vec4 uImp[2];
@@ -84,14 +94,7 @@ vec3 fleshOff( vec3 p, vec3 n ) {
 const FLESH_NORMAL = `#include <beginnormal_vertex>
  vBP = position; vBN = objectNormal;
  vec3 fOff = vec3( 0.0 ); vEyeSw = 0.0;
- // expression (the rig has no face bones or blend shapes): brows, mouth corners and lips are moved by painted weights
- if ( dot( abs( aFace ), vec4( 1.0 ) ) > 0.0 ) {
-   float cm = uU * 0.01, sd = sign( dot( position - uFMid, uLidAx ) );
-   fOff += uFUp * ( -uEmo.x * 0.42 * aFace.x + uEmo.y * 0.8 * aFace.y ) * cm - uLidAx * sd * uEmo.x * 0.18 * aFace.y * cm;   // brows down + together / inner brows up
-   float c = abs( aFace.z ), cs = sign( aFace.z );
-   fOff += ( uLidAx * cs * 0.28 * uEmo.z - uFFw * 0.18 * uEmo.z + uFUp * 0.32 * uEmo.w ) * c * cm;                              // mouth corners: pulled back / up or down
-   fOff += uFUp * ( max( aFace.w, 0.0 ) * uEmo2.x * 0.28 - max( -aFace.w, 0.0 ) * uEmo2.y * 0.24 ) * cm;                      // upper lip up (teeth bared) / lower lip down
- }
+/*EXPR*/
  if ( aLid.x + aLid.y > 0.0 ) {
    bool left = distance( position, uEyeL ) < distance( position, uEyeR ); vec3 c = left ? uEyeL : uEyeR;
    float esw = left ? uEyeSw.x : uEyeSw.y; vEyeSw = ( aLid.x + aLid.y * 1.2 ) * esw;
@@ -102,12 +105,32 @@ const FLESH_NORMAL = `#include <beginnormal_vertex>
    objectNormal = normalize( mix( lidRot( objectNormal, a ), normalize( rp ) * length( objectNormal ), k * 0.85 ) );
    fOff += normalize( rp ) * vEyeSw * 0.0075 * uU;   // haematoma: the lids and the cheek under the eye puff up
  } else vLidK = 0.0;
+/*EXPR2*/
  if ( uFleshOn > 0.5 ) {
    vec3 n0 = normalize( objectNormal );
    fOff += fleshOff( position, n0 );
    vec3 t1 = normalize( cross( n0, abs( n0.y ) < 0.9 ? vec3( 0.0, 1.0, 0.0 ) : vec3( 1.0, 0.0, 0.0 ) ) ), t2 = cross( n0, t1 ); float e = 0.004 * uU;
    float hx = dot( fleshOff( position + t1 * e, n0 ) - fleshOff( position - t1 * e, n0 ), n0 ), hy = dot( fleshOff( position + t2 * e, n0 ) - fleshOff( position - t2 * e, n0 ), n0 );
    objectNormal = normalize( n0 - ( t1 * hx + t2 * hy ) / ( 2.0 * e ) );
+ }`;
+// expression, fallback (no blend shapes loaded): brows, mouth corners and lips are moved by painted weights (aFace, uEmo / uEmo2)
+const FACE_APPROX_V = ` if ( dot( abs( aFace ), vec4( 1.0 ) ) > 0.0 ) {
+   float cm = uU * 0.01, sd = sign( dot( position - uFMid, uLidAx ) );
+   fOff += uFUp * ( -uEmo.x * 0.42 * aFace.x + uEmo.y * 0.8 * aFace.y ) * cm - uLidAx * sd * uEmo.x * 0.18 * aFace.y * cm;   // brows down + together / inner brows up
+   float c = abs( aFace.z ), cs = sign( aFace.z );
+   fOff += ( uLidAx * cs * 0.28 * uEmo.z - uFFw * 0.18 * uEmo.z + uFUp * 0.32 * uEmo.w ) * c * cm;                              // mouth corners: pulled back / up or down
+   fOff += uFUp * ( max( aFace.w, 0.0 ) * uEmo2.x * 0.28 - max( -aFace.w, 0.0 ) * uEmo2.y * 0.24 ) * cm;                      // upper lip up (teeth bared) / lower lip down
+ }`;
+// expression from the real blend shapes: aFM = the vertex's slot among the face vertices (-1: not in any shape); uFMT holds, per shape,
+// uFMN position deltas then uFMN normal deltas (bind units), 2048 texels a row; uFW = the shape weights. Added after the lids (they rotate the lid skin)
+const FACE_MORPH_V = ` vec3 fM = vec3( 0.0 );
+ if ( aFM > -0.5 ) {
+   int k = int( aFM + 0.5 );
+   for ( int s = 0; s < ${FACE_SHAPES.length}; s++ ) {
+     float w = uFW[s]; if ( w == 0.0 ) continue;
+     int t = 2 * s * uFMN + k; fM += texelFetch( uFMT, ivec2( t & 2047, t >> 11 ), 0 ).xyz * w;
+     t += uFMN; objectNormal += texelFetch( uFMT, ivec2( t & 2047, t >> 11 ), 0 ).xyz * w;
+   }
  }`;
 /* wounds (head only): cuts and nose bleeds as decals projected on the skin around each source, with a rivulet that runs along gravity */
 const SKIN_FDECL = `uniform float uFT;
@@ -242,7 +265,8 @@ function skinify(mat, u, fu) {
  { float h = vGH.x, R = vGH.y, a = vGH.z;
    if ( ( uGear.x > 0.5 && R < 2.5 && h > uGear.x && h < ${(0).toFixed(1)} + GEAR_TOP ) || ( uGear.y > 0.0 && R < 1.5 && h < uGear.y - 1.0 ) || ( uGear.z > 0.5 && ( ( R > 1.5 && R < 2.5 && h > max( GEAR_TOP - 7.0, uGearT ) && h < uGear.z ) || ( R > 2.5 && R < 4.5 && a < uGear.w - 0.05 && h < GEAR_NECK + 3.0 ) ) ) || ( R > 3.5 && ( uGlv > 1.5 ? a > 1.81 && a < 2.53 : uGlv > 0.5 && a > 1.635 ) ) ) discard; }   // hands: inside a boxing glove (up to the cuff's rim) / under an MMA glove`).replace(/GEAR_TOP/g, GEAR.top.toFixed(2)).replace(/GEAR_NECK/g, GEAR.neck.toFixed(2));
     Object.assign(s.uniforms, fu); s.uniforms.uDropS = { value: u ? 190 : 300 };
-    s.vertexShader = 'attribute vec3 aGH;\nvarying vec3 vGH;\n' + FLESH_VDECL + s.vertexShader.replace('#include <beginnormal_vertex>', FLESH_NORMAL + '\n vGH = aGH;').replace('#include <begin_vertex>', '#include <begin_vertex>\n transformed += fOff' + (u ? ' * ( 1.0 - 0.92 * clamp( aScalp, 0.0, 1.0 ) );' : ';') + (u ? '\n vScalp = aScalp; vStub = aStub; vHairUV = aHairUV;' : ''));
+    const fn = FLESH_NORMAL.replace('/*EXPR*/', T.fm ? FACE_MORPH_V : FACE_APPROX_V).replace('/*EXPR2*/', T.fm ? ' fOff += fM;' : '');
+    s.vertexShader = 'attribute vec3 aGH;\nvarying vec3 vGH;\n' + FLESH_VDECL + s.vertexShader.replace('#include <beginnormal_vertex>', fn + '\n vGH = aGH;').replace('#include <begin_vertex>', '#include <begin_vertex>\n transformed += fOff' + (u ? ' * ( 1.0 - 0.92 * clamp( aScalp, 0.0, 1.0 ) );' : ';') + (u ? '\n vScalp = aScalp; vStub = aStub; vHairUV = aHairUV;' : ''));
     if (u) {
       Object.assign(s.uniforms, u);
       s.vertexShader = 'attribute float aScalp;\nattribute float aStub;\nattribute vec2 aHairUV;\nvarying float vScalp;\nvarying float vStub;\nvarying vec2 vHairUV;\n' + s.vertexShader;

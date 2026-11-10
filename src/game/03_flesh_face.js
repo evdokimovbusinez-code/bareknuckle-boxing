@@ -17,7 +17,8 @@ class Flesh {
     this.u = { uFT: { value: 0 }, uU: { value: this.U }, uFleshOn: { value: 0 }, uSweat: { value: 0 }, uImp: { value: v4(2, -1) }, uImpD: { value: v4(2, 0) }, uSw: { value: v4(6, 0) },
       uWP: { value: v4(8, -1e4) }, uWD: { value: v4(8, 0) }, uWN: { value: v4(8, 0) }, uWT: { value: v4(8, 0) }, uNB: { value: new V4() }, uNBD: { value: new V4() },
       uEyeL: { value: new V3() }, uEyeR: { value: new V3() }, uLidAx: { value: new V3(1, 0, 0) }, uLid: { value: new V4() },
-      uEyeSw: { value: new THREE.Vector2() }, uEmo: { value: new V4() }, uEmo2: { value: new V4() }, uFUp: { value: new V3() }, uFFw: { value: new V3() }, uFMid: { value: new V3() }, uBr: { value: v4(10, 0) }, uBrT: { value: v4(10, 0) }, uSm: { value: v4(28, 0) }, uGear: { value: new V4() }, uGearT: { value: 0 }, uGlv: { value: 0 }, uSmD: { value: v4(28, 0) } };
+      uEyeSw: { value: new THREE.Vector2() }, uEmo: { value: new V4() }, uEmo2: { value: new V4() }, uFUp: { value: new V3() }, uFFw: { value: new V3() }, uFMid: { value: new V3() }, uBr: { value: v4(10, 0) }, uBrT: { value: v4(10, 0) }, uSm: { value: v4(28, 0) }, uGear: { value: new V4() }, uGearT: { value: 0 }, uGlv: { value: 0 }, uSmD: { value: v4(28, 0) },
+      uFMT: { value: T.fm ? T.fm.tex : null }, uFMN: { value: T.fm ? T.fm.n : 0 }, uFW: { value: new Float32Array(FACE_SHAPES.length) } };   // face blend shapes (03b_face_shapes.js)
     this.eyeSwell = [0, 0]; this.brI = 0; this.smI = 0; this.lipBleed = 0;
     this.M = new M4(); this.Mi = new M4(); this.t = 0; this.ii = 0; this.wounds = []; this.vel = new V3();
     if (!T.headV) { T.headV = skinVerts(body.geometry, T.matNames.indexOf('Std_Skin_Head')); T.bodyV = skinVerts(body.geometry, T.matNames.indexOf('Std_Skin_Body')); }
@@ -47,7 +48,7 @@ class Flesh {
     // expression weights: brows (whole / inner half), mouth corners (signed by side), upper and lower lip
     this.u.uFUp.value.copy(this.up); this.u.uFFw.value.copy(fw); this.u.uFMid.value.addVectors(this.u.uEyeL.value, this.u.uEyeR.value).multiplyScalar(0.5);
     this.lips = this.snap(T.headV, this.nose.tip.clone().addScaledVector(this.up, -0.024 * this.U));
-    if (!T.faceAttr) {
+    if (!T.faceAttr && !T.fm) {   // (only for the fallback expressions: with the blend shapes loaded the shader does not use them)
       const geo = body.geometry, A = new Float32Array(geo.attributes.position.count * 4), H = T.headV, s = this.U / 100, mid = this.u.uFMid.value, L = this.lips.p;
       for (let k = 0; k < H.n; k++) {
         const p = _f3.fromArray(H.P, 3 * k), j = 4 * H.I[k];
@@ -221,10 +222,16 @@ class Face {
     this.t = 0; this.blinkT = 1 + rr() * 3; this.bl = -1; this.jawA = 0; this.jawV = 0; this.squint = 0; this.droop = 0;
     this.jolt = new V3(); this.sacc = new V3(); this.saccT = 0; this.drift = new V3(); this.koRoll = 0; this.koLid = 0.4 + rr() * 0.4; this.lids = [0, 0];
     this.breath = rr() * 6; this.koT = 0;
+    // blend-shape moods (faceWeights): smoothed in update; asym = this man's own lopsidedness, smSide = the corner he smirks with
+    this.x = { focus: 0, effort: 0, arm: 0, pain: 0, side: 0, daze: 0, tired: 0, smirk: 0, mean: 0, roar: 0, sad: 0, slack: 0, show: 0 };
+    this.asym = (rr() - 0.5) * 0.3; this.smSide = rr() < 0.5 ? 1 : -1; this.hitSide = 0;
   }
   blink(now) { if (this.bl < 0 || this.bl > 0.09 || now) this.bl = 0; }
-  hit(power, onJaw) {
+  hit(power, onJaw, at) {
     this.hitT = this.t; this.hitP = Math.min(1, power);
+    // which side of his face took it (+ = his left): the pain grimace screws up that side
+    if (at) { const g = this.F.group, l = g.worldToLocal(_fv1.copy(at)).x - g.worldToLocal(_fv3.copy(this.F.headNow)).x; this.hitSide = clamp(l / 0.05, -1, 1); }
+    else this.hitSide = (rr() - 0.5) * 0.6;
     this.blink(true); this.squint = Math.max(this.squint, 0.25 + 0.3 * power);
     this.jolt.set((rr() - 0.5) * 0.4 * power, (rr() - 0.3) * 0.25 * power, 0);
     this.jawV += (onJaw ? 9 : 4) * power;
@@ -250,14 +257,31 @@ class Face {
     // jaw: spring toward the target opening
     const D = _fq1.copy(F.mquat(F.head, _fq2)).multiply(_fq3.copy(this.head0).invert());
     let jt = F.cur ? 0 : 0.012;   // clenched when punching
-    if (tired > 0 && !ko) { this.breath += dt * (5 + 3 * tired); jt = 0.035 * tired + 0.05 * tired * (0.5 + 0.5 * Math.sin(this.breath)); }
+    if (tired > 0 && !ko) { this.breath += dt * (5 + 3 * tired); jt = T.fm ? tired * (0.012 + 0.085 * Math.max(0, Math.sin(this.breath))) : 0.035 * tired + 0.05 * tired * (0.5 + 0.5 * Math.sin(this.breath)); }   // (with the shapes: lips close to blow out, cheeks puffed)
     if (dz > 0.3 && !ko) jt = Math.max(jt, 0.05 * dz);
+    const roar = G.state === 'result' && G.winner === F && !BAG.on, show = G.state === 'menu' && F === P1 && UI.mouth && UI.scr === 'creator';
+    if (T.fm && roar) jt = Math.max(jt, 0.24 + 0.04 * Math.sin(this.t * 3.1));   // the roar: mouth wide
+    if (show) jt = 0.045;   // teeth just apart on the gum shield
     if (ko) { const gl = _fv1.set(0, -1, 0).applyQuaternion(_fq2.copy(D).invert()); jt = 0.07 + 0.22 * clamp(-gl.y * 0.8 - gl.z * 0.6, 0, 1); }
     this.jawV += ((jt - this.jawA) * 260 - this.jawV * 26) * dt; this.jawA = clamp(this.jawA + this.jawV * dt, -0.02, 0.4);
     F.setMQuat(this.jaw, _fq2.setFromAxisAngle(_fv1.set(1, 0, 0), this.jawA).premultiply(D).multiply(this.jaw0));
     // expression: focus by default (brows a little down), effort when throwing (brows down, lips back over clenched teeth),
     // pain on being hit (inner brows up, corners down, mouth open), dazed and tired (brows up and slack, mouth open)
     const hurt = Math.max(0, 1 - (this.t - (this.hitT || -9)) / 0.9) * (this.hitP || 0), EM = this.emo || (this.emo = [0, 0, 0, 0, 0, 0]);
+    if (T.fm) {   // the real blend shapes: moods → weights (faceWeights, 03b_face_shapes.js)
+      const X = this.x, up = !ko && !(F.rag.on && F.rag.mode === 'ko'), grit = F.gu || (F.rag.on && F.rag.prof && F.rag.prof.conscious), menu = G.state === 'menu';
+      const stare = G.state === 'intro' && G.stare > 0.01 ? G.stare : 0, punch = F.cur && !F.release, P = punch ? PUNCH[F.cur] : null;
+      const tgt = this.xt || (this.xt = {});   // the moods' targets this frame (reused: no garbage per frame)
+      tgt.focus = up && !menu ? (F.blockW > 0.5 ? 0.9 : 0.6) * (1 - stare) : menu ? 0.12 : 0;
+      tgt.effort = up ? Math.max(punch ? 1 : 0, F.blockW > 0.5 ? 0.25 : 0, grit ? 0.5 : 0) : 0;
+      tgt.pain = Math.max(hurt * 1.2, grit ? 0.6 : 0); tgt.daze = up && dz > 0.3 ? dz : 0; tgt.tired = up && tired > 0.2 ? tired : 0;
+      tgt.smirk = F === G.smirker ? stare : 0; tgt.mean = F !== G.smirker ? stare : 0; tgt.roar = roar ? 1 : 0;
+      tgt.sad = G.state === 'result' && G.loser === F && !ko && !BAG.on ? 1 : 0; tgt.slack = ko ? 1 : 0; tgt.show = show ? 1 : 0;
+      if (P) X.arm = P.arm === 'L' ? 0.35 : -0.35;
+      if (hurt > 0.05) X.side = this.hitSide;
+      for (const k in tgt) { const v = tgt[k], r = k === 'pain' ? (v > X[k] ? 30 : 5) : k === 'effort' ? (v > X[k] ? 16 : 6) : k === 'slack' ? 2.5 : 5; X[k] += (v - X[k]) * Math.min(1, dt * r); }
+      faceWeights(F.flesh.u.uFW.value, X, this);
+    } else {
     let tg = [0.35, 0, 0, 0, 0, 0];
     if (F.cur && !F.release) tg = [0.9, 0, 0.75, -0.1, 0.7, 0];
     if (F.blockW > 0.5) tg = [0.8, 0, 0.3, -0.2, 0.2, 0];
@@ -271,6 +295,7 @@ class Face {
     for (let i = 0; i < 6; i++) EM[i] += (tg[i] - EM[i]) * Math.min(1, dt * (hurt > 0.5 ? 25 : 8));
     for (let i = 0; i < 6; i++) EM[i] = clamp(EM[i], i === 2 || i === 3 ? -1 : 0, 1);   // expressions stay inside what a face can do
     F.flesh.u.uEmo.value.set(EM[0], EM[1], EM[2], EM[3]); F.flesh.u.uEmo2.value.set(EM[4], EM[5], 0, 0);
+    }
     // gaze
     const tgt = _fv2; if (o) { tgt.copy(o.headNow); tgt.y += 0.03; } else tgt.set(0, 1.6, 0);
     F.group.worldToLocal(tgt);

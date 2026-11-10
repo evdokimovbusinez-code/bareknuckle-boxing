@@ -2,9 +2,9 @@
    UI.scr is the screen on top: 'main' | 'train' | 'quick' | 'creator' | 'settings' | 'pause' | null (the fight / result).
    All of them except the pause (and the settings opened from it) live in G.state === 'menu'; the pause sets G.paused, frame() then
    runs with dt = 0. The menu camera (menuCam) orbits P1: the creator turns it by dragging, the other screens just frame him. */
-const UI = { scr: null, from: null, cat: 'name', spar: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };
+const UI = { scr: null, from: null, cat: 'name', spar: false, mouth: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };   // mouth: the gum-shield close-up of the creator (he bares his teeth: Face.update)
 const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', pause: 'pause' };
-const VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
+const VIEW_MOUTH = { yaw: 1.38, zoom: 0 }, _mouthP = new V3(), VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
 const myName = () => PROF.nick || PROF.name || 'Ты';
 function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [...root.querySelectorAll('button:not([disabled]),input')].filter(b => b.offsetParent !== null) : []; }
 function uiShow(scr, focusId) {
@@ -16,6 +16,7 @@ function uiShow(scr, focusId) {
   if (scr === 'pause') $('p-quit-l').textContent = BAG.on ? 'Выйти' : 'Сдаться';
   if (scr === 'shop') shopEnter();
   if (scr === 'social') socEnter();
+  if (scr !== 'creator') UI.mouth = false;
   if (scr !== 'creator' && UI.spar) { UI.spar = false; if (G.state === 'menu') P1.sparGear(false); }   // the glove preview of the creator
   const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur();
   if (!TOUCH && scr && scr !== 'creator') { const b = (focusId && $(focusId)) || (scr === 'main' || scr === 'train' || scr === 'pause' ? uiItems()[0] : null); b && b.focus({ preventScroll: true }); }
@@ -55,7 +56,8 @@ function surrender() { if (!BAG.on && G.state !== 'ko') { G.losses++; save(); } 
 const MCAM = { yaw: 0.5, d: 4, tx: 0, ty: 1, tz: 0, sh: 0.36, h: 0.1, init: false };
 function menuCam(dt, cp, cl) {
   const x = P1.group.position.x, th = Math.tan(camera.fov * Math.PI / 360), asp = VW / VH, dFull = 1.13 / th, hd = P1.headNow, T = { tx: x, tz: 0 };
-  if (UI.scr === 'creator' || UI.scr === 'shop') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1; }
+  if (UI.scr === 'creator' || UI.scr === 'shop') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1;
+    if (UI.mouth && UI.scr === 'creator') { const m = _mouthP.set(0, -0.08, 0.075).applyMatrix4(P1.gear.guard.matrix); T.d = 0.13 / th; T.tx = m.x; T.ty = m.y; T.tz = m.z; T.h = 0.012; } }   // the gum shield, close
   else if (UI.scr === 'quick') { T.yaw = 0.2; T.d = dFull * 1.18; T.ty = 1.02; T.sh = 0.4; T.h = 0.32; }
   else { T.yaw = 0.52 + 0.05 * Math.sin(camClock * 0.4); T.d = dFull * 0.84; T.ty = 1.05; T.sh = UI.scr === 'settings' || UI.scr === 'social' ? 0.5 : 0.38; T.h = 0.12; }
   const M = MCAM, a = camCut || !M.init ? 1 : 1 - Math.exp(-dt * (UI.drag ? 16 : 4.2)); M.init = true;
@@ -66,8 +68,9 @@ function menuCam(dt, cp, cl) {
 function setView(v) { const o = UI.orb, tau = 2 * Math.PI; o.yaw = v.yaw + tau * Math.round((o.yaw - v.yaw) / tau); o.zoom = v.zoom; }   // the short way round
 
 /* fighter creator */
+function mouthOff() { if (UI.mouth) { UI.mouth = false; setView(VIEW_HANDS); } }   // back from the gum-shield close-up to the hands
 function setCat(c) {
-  UI.cat = c;
+  UI.cat = c; UI.mouth = false;
   for (const b of $('cats').children) b.setAttribute('aria-pressed', String(b.dataset.cat === c));
   for (const p of document.querySelectorAll('.cpane')) p.hidden = p.dataset.cat !== c;
   if (UI.scr === 'creator') setView(c === 'face' || (c === 'wear' && (UI.wcat === 'head' || UI.wcat === 'eyes')) ? VIEW_FACE : c === 'hands' ? VIEW_HANDS : VIEW_FULL);
@@ -79,11 +82,11 @@ function buildCreator() {
   swatches('o-hair', col(HAIR_LOOKS, h => h.id === 'bald' ? { id: 'bald', label: 'под ноль' } : { id: h.id, c: h.c, label: h.id }), () => LOOK.hair, v => { LOOK.hair = v; });
   swatches('o-beard', [{ id: 'no', label: 'нет' }, { id: 'yes', label: 'есть' }], () => LOOK.beard ? 'yes' : 'no', v => { LOOK.beard = v === 'yes'; }, true);
   wearUI();   // clothes: category → model → the colours of that model (04e_wardrobe.js)
-  swatches('o-wraps', col(WRAPS_LOOKS, w => ({ id: w.id, c: w.c, label: w.label })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; spar(false)(); });
-  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { if (!itemOwned(v)) { setTimeout(() => { buildCreator(); shopOpen('hands', v); }, 0); return; } LOOK.hands = v; spar(false)(); }, true);   // street fights: wraps or 4 oz MMA gloves (bought)
+  swatches('o-wraps', col(WRAPS_LOOKS, w => ({ id: w.id, c: w.c, label: w.label })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; spar(false)(); mouthOff(); });
+  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { if (!itemOwned(v)) { setTimeout(() => { buildCreator(); shopOpen('hands', v); }, 0); return; } LOOK.hands = v; spar(false)(); mouthOff(); }, true);   // street fights: wraps or 4 oz MMA gloves (bought)
   [...$('o-hands').children].forEach((b, i) => { const it = ITEMS[HANDS[i].id]; if (it && !itemOwned(it.id)) { b.classList.add('lock'); b.title = 'купить в магазине'; const s = document.createElement('small'); s.className = 'pr'; s.textContent = '🔒 ' + cash(it.price); b.append(s); } });
-  swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; spar(true)(); });   // sparring (and MMA) gloves + headgear: shown on him while choosing
-  swatches('o-guard', col(GUARDS, b => ({ id: b.id, c: b.c, label: b.label })), () => LOOK.guard || 'clear', v => { LOOK.guard = v; });
+  swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; spar(true)(); mouthOff(); });   // sparring (and MMA) gloves + headgear: shown on him while choosing
+  swatches('o-guard', col(GUARDS, b => ({ id: b.id, c: b.c, label: b.label })), () => LOOK.guard || 'clear', v => { LOOK.guard = v; spar(false)(); UI.mouth = true; setView(VIEW_MOUTH); });   // choosing a gum shield: he shows it, the camera goes to his mouth
   swatches('o-sig', [{ id: 'none', label: 'нет' }, ...SIGS], () => PROF.sig || 'none', v => { PROF.sig = v === 'none' ? null : v; }, true, true);
   for (const [id, key, n] of [['o-name', 'name', 16], ['o-nick', 'nick', 14]]) { const el = $(id); el.value = PROF[key] || ''; el.oninput = () => { PROF[key] = el.value.replace(/[<>]/g, '').slice(0, n); save(); }; }
   renderStats();
@@ -173,8 +176,8 @@ function dragView(el) {
     const p = pts.get(e.pointerId), o = UI.orb; if (!p) return;
     if (pts.size === 1) o.yaw -= (stage.classList.contains('rot') ? e.clientY - p[1] : e.clientX - p[0]) * 0.009;
     p[0] = e.clientX; p[1] = e.clientY;
-    if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) o.zoom = clamp(o.zoom - (d - pinch) / 240, 0, 1); pinch = d; }
+    if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) { o.zoom = clamp(o.zoom - (d - pinch) / 240, 0, 1); UI.mouth = false; } pinch = d; }
   });
   for (const ev of ['pointerup', 'pointercancel']) el.addEventListener(ev, e => { pts.delete(e.pointerId); pinch = 0; UI.drag = pts.size; });
-  el.addEventListener('wheel', e => { e.preventDefault(); UI.orb.zoom = clamp(UI.orb.zoom + Math.sign(e.deltaY) * 0.14, 0, 1); }, { passive: false });
+  el.addEventListener('wheel', e => { e.preventDefault(); UI.mouth = false; UI.orb.zoom = clamp(UI.orb.zoom + Math.sign(e.deltaY) * 0.14, 0, 1); }, { passive: false });
 }
