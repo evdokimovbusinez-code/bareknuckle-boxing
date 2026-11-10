@@ -1,0 +1,48 @@
+import re, os
+os.chdir(os.path.dirname(os.path.abspath(__file__)))  # sources live next to this script; output goes to the repo root
+L = open('boxer.html').read().split('\n')
+def ln(a, b): return '\n'.join(L[a-1:b]) + '\n'
+def rep(s, a, b, cnt=None):
+    assert a in s, a[:70]
+    return s.replace(a, b) if cnt is None else s.replace(a, b, cnt)
+arena = ln(154, 183)
+arena = rep(arena, "new THREE.CylinderGeometry(0.02, 0.02, len, 10)", "new THREE.CylinderGeometry(0.02, 0.02, len, 10, 48)")
+arena = rep(arena, "  for (const [a, b] of [[[-H, -H], [H, -H]], [[H, -H], [H, H]], [[H, H], [-H, H]], [[-H, H], [-H, -H]]]) for (let r = 0; r < 3; r++) {", "  [[[-H, -H], [H, -H]], [[H, -H], [H, H]], [[H, H], [-H, H]], [[-H, H], [-H, -H]]].forEach(([a, b], side) => { for (let r = 0; r < 3; r++) {")
+arena = rep(arena, "new V3(b[0] - a[0], 0, b[1] - a[1]).normalize()); scene.add(m);\n  }", "new V3(b[0] - a[0], 0, b[1] - a[1]).normalize()); scene.add(m);\n    ROPES.push({ side, n: new V3(-(a[0] + b[0]) / 2, 0, -(a[1] + b[1]) / 2).normalize(), aL: new V3(a[0], 0.55 + r * 0.38, a[1]), bL: new V3(b[0], 0.55 + r * 0.38, b[1]), a: new V3(), b: new V3(), m, base: m.geometry.attributes.position.array.slice(), cur: new V3(), vel: new V3(), s: 0.5, hit: null, live: 0 });\n  } });")
+arena = arena.replace("scene.add(", "ARENA.add(")
+arena = "/* the ring lives in its own frame: fighters stay on the world x line, circling the ring turns and slides this frame around them */\nconst ARENA = new THREE.Group(); scene.add(ARENA);\nconst ROPES = [];\n" + arena
+cloth = ln(419, 570)
+cloth = rep(cloth, "  constructor(sm) {\n    this.sm = sm;", "  constructor(sm, F) {\n    this.F = F; this.sm = sm;")
+cloth = cloth.replace("bpos(", "this.F.bpos(")
+cloth = rep(cloth, "root.add(this.mesh)", "scene.add(this.mesh)")
+cloth = rep(cloth, "this.maxD[i] = band ? 0 : lerp(0.008, 0.075, free);", "this.maxD[i] = band ? 0 : lerp(0.008, 0.06, free);")
+cloth = rep(cloth, "this.pull[i] = band ? 0 : lerp(0.25, 0.009, Math.pow(free, 0.7));", "this.pull[i] = band ? 0 : lerp(0.25, 0.028, Math.pow(free, 0.7));")
+cloth = rep(cloth, "this.minD[i] = Math.min(best - 0.002, best - so + 0.007);", "this.minD[i] = Math.min(best + 0.012, best - so + 0.02);")
+hair = ln(587, 645) + "  const mat = hairMat(beard ? 'beard' : 'hair');\n" + ln(651, 653)
+hair = rep(hair, "function buildHair(roots, { kind }) {", "function buildHair(roots, { kind, frame, COL, np: npIn }) {")
+hair = rep(hair, "const np = beard || base ? 3 : 6, nc = pick.length, ps = new PS(nc * np, HEAD.frame);", "const np = beard || base ? 3 : (npIn || 6), nc = pick.length, ps = new PS(nc * np, frame);")
+hair = rep(hair, "const c = new THREE.Color(pal[(rnd() * pal.length) | 0]).multiplyScalar(0.8 + rnd() * 0.4); col.push(c);", "const c = new THREE.Color().setScalar(0.72 + rnd() * 0.5); col.push(c);")
+hair = rep(hair, " root.add(mesh);", "")
+rh = ln(654, 674).replace("HEAD.frame", "H.frame")
+shorts = ln(711, 744) + ln(745, 877) + "  return sg;\n}\n"
+body = ln(926, 1003)
+body = rep(body, "    const scalp = new Float32Array(p.count);", "    const scalp = new Float32Array(p.count), stub = new Float32Array(p.count);")
+body = rep(body, "scalp[i] = Math.max(h, bs * bs * 0.32);", "scalp[i] = h; stub[i] = bs * bs * 0.32;")
+body = rep(body, "    g.setAttribute('aScalp', new THREE.BufferAttribute(scalp, 1));", "    g.setAttribute('aScalp', new THREE.BufferAttribute(scalp, 1)); g.setAttribute('aStub', new THREE.BufferAttribute(stub, 1));")
+gb = rep(open('g_b.js').read(), "/*BODYBLOCK*/", body)
+files = ln(210, 241)
+files = rep(files, "upper: 'assets/Punch_Rear_Uppercut_Head.fbx.txt', hook: 'assets/Punch_Lead_Hook_Head.fbx.txt',", "upperR: 'assets/Punch_Rear_Uppercut_Head.fbx.txt', hookL: 'assets/Punch_Lead_Hook_Head.fbx.txt', hookR: 'assets/Punch_Rear_Hook_Head.fbx.txt', upperL: 'assets/Punch_Lead_Uppercut_Head.fbx.txt',")
+files = rep(files, "upper: 439344, hook: 423136 };", "upperR: 439344, hookL: 423136, hookR: 436640, upperL: 439344 };")
+post = ln(187, 200).replace("composer.addPass(new RenderPass(scene, camera));", "composer.addPass(new RenderPass(scene, camera));\n// one NaN pixel (a degenerate normal on some GPUs) would be smeared into a black hole by AO and bloom: scrub them first\ncomposer.addPass(new ShaderPass({ uniforms: { tDiffuse: { value: null } }, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }', fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ vec4 c = texture2D(tDiffuse, vUv); bool bad = !(c.r == c.r) || !(c.g == c.g) || !(c.b == c.b) || !(c.a == c.a) || max(max(c.r, c.g), c.b) > 65000.0; gl_FragColor = bad ? vec4(0.0, 0.0, 0.0, 1.0) : c; }' }));")
+js = (open('g_a.js').read() + '\n/* ───────── arena ───────── */\n' + arena + '\n/* ───────── post-processing ───────── */\n' + post + '\n' + files + '\n' + ln(244, 249) + ln(252, 261)
+      + ln(276, 284) + ln(287, 302) + open('g_pre.js').read() + '\n' + ln(306, 387) + ln(391, 392) + ln(394, 394) + '\n' + cloth + '\n' + ln(573, 586) + hair + rh + '\n' + shorts + gb)
+out = open('g_head.html').read() + '\n<script type="module">\n' + js + '</script>\n'
+open('../index.html', 'w').write(out)
+dbg = out.replace("/*DBG*/", "window.__manual = true; " + open("dbg_extra.js").read() + open("bench.js").read() + " window.__g = { G, P1, P2, REC, RP, FX, camera, press, startFight, PUNCH, AI, T, HEAD, scene, composer, renderer, knockout, knockdown, resolveHit, RAG_S, RAG_J, CANNON, THREE, ROPES, bodyOverlap, POSES, BAG, ARENA, AI, followOK, nearMiss, GEAR, T }; window.__HEADR = HEAD.R; window.__g.HEADRI = HEAD.restInvT; window.__g.REC = REC; window.__jointGeo = (d, a, b) => [...jointGeo(d, a, b).c]; window.__jointAngles = (d, a, b) => { const r = jointAngles(d, a, b); return { c: [...r.c], D: r.D.clone(), qs: r.qs.clone() }; }; window.__step = (n, dt) => { for (let i = 0; i < n; i++) { last = performance.now() - dt * 1000; frame(performance.now(), true); } composer.render(); }; window.__tick = (n, dt) => { for (let i = 0; i < n; i++) { last = performance.now() - dt * 1000; frame(performance.now(), true); } };")
+dbg = dbg.replace("function frame(now) {", "function frame(now, manual) {").replace("  composer.render();\n  requestAnimationFrame(frame);\n}", "  if (!manual) { composer.render(); if (!window.__manual) requestAnimationFrame(frame); }\n}")
+dbg = dbg.replace("https://cdn.jsdelivr.net/npm/three@0.160.0/", "./node_modules/three/").replace("https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/", "./node_modules/cannon-es/")
+dbg = dbg.replace("        const ax = d.ax[i], [lo, hi, n] = d.lim[i], c = r.dot(ax);", "        const ax = d.ax[i], [lo, hi, n] = d.lim[i], c = r.dot(ax);\n        (d.dbg || (d.dbg = [0, 0, 0]))[i] = Math.round((c - n) / D2R);").replace("this.tone = Math.max(0, 1 - this.t / 0.9);", "this.tone = window.__tone !== undefined ? window.__tone : Math.max(0, 1 - this.t / 0.9);")
+dbg = dbg.replace("const stiff = rr() < 0.35,", "const stiff = window.__ps !== undefined ? window.__ps : rr() < 0.35,").replace("seizure: rr() < 0.4,", "seizure: window.__pz !== undefined ? window.__pz : rr() < 0.4,")
+dbg = dbg.replace("        if (c > hi) { tw.addScaledVector(ax, -L2 * (c - hi)); limHit = 1; }", "        if (ko) { const ov = c > hi ? c - hi : c < lo ? lo - c : 0; const W = window.__viol || (window.__viol = {}); const key = d.key + ['F','S','T'][i]; W[key] = Math.max(W[key] || 0, ov / D2R); }\n        if (c > hi) { tw.addScaledVector(ax, -L2 * (c - hi)); limHit = 1; }")
+open('../gtest.html', 'w').write('<meta charset="utf-8"><style>[hidden]{display:none!important}body{margin:0}</style>\n' + dbg)
+print(len(out), out.count('\n'))

@@ -1,0 +1,1142 @@
+<title>Живой боксёр</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed WebGL ring; HUD floats in the corners — name + stage card top-left, punch controls bottom. Single dark arena look by design. */
+:root{
+  --ink:#0a0c11;
+  --panel:rgba(13,16,23,.74);
+  --line:rgba(226,177,74,.26);
+  --text:#ece6da;
+  --muted:#968f80;
+  --gold:#e2b14a;
+  --display:'Big Shoulders Display','Arial Narrow',Impact,sans-serif;
+  --body:'Barlow',system-ui,-apple-system,Segoe UI,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--ink);color:var(--text);font-family:var(--body);overflow:hidden;-webkit-font-smoothing:antialiased}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+.vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(120% 90% at 50% 42%,transparent 55%,rgba(0,0,0,.5) 100%)}
+.hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;gap:12px;
+  padding-block:max(14px,env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top{display:flex;flex-direction:column;gap:10px;max-width:min(420px,100%)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+h1{margin:2px 0 0;font-family:var(--display);font-weight:900;font-size:clamp(34px,6vw,56px);line-height:.9;letter-spacing:.01em;text-transform:uppercase;text-wrap:balance}
+.stage{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-family:var(--mono);font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--muted);
+  background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 12px;width:max-content;max-width:100%;backdrop-filter:blur(6px)}
+.stage dt{color:var(--muted)} .stage dd{margin:0;color:var(--text)}
+.steps{display:flex;gap:4px;margin-top:2px}
+.steps i{display:block;width:22px;height:4px;border-radius:2px;background:rgba(255,255,255,.14)}
+.steps i.on{background:var(--gold)}
+.bottom{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px}
+.group{display:flex;flex-wrap:wrap;gap:8px;pointer-events:auto}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mv{display:flex;align-items:center;gap:9px;padding:10px 14px 10px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel);
+  font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:.04em;text-transform:uppercase;backdrop-filter:blur(6px);transition:transform .08s,border-color .15s}
+.mv:hover{border-color:var(--gold)} .mv:active{transform:translateY(1px) scale(.98)}
+.mv kbd{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:4px;background:rgba(226,177,74,.14);color:var(--gold);font-family:var(--mono);font-size:11px;font-weight:500}
+.mv.combo{background:linear-gradient(180deg,rgba(179,32,46,.85),rgba(120,16,28,.85));border-color:rgba(255,120,120,.35)}
+.mv.combo kbd{background:rgba(0,0,0,.25);color:#ffd9a0}
+.tg{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-size:13px;font-weight:500;backdrop-filter:blur(6px)}
+.tg::before{content:"";width:8px;height:8px;border-radius:50%;background:#3a3a3a;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);transition:background .15s}
+.tg[aria-pressed="true"]{border-color:var(--gold)}
+.tg[aria-pressed="true"]::before{background:var(--gold);box-shadow:0 0 8px var(--gold)}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.hint{width:100%;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.loading{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;background:var(--ink)}
+.loading .box{display:flex;flex-direction:column;gap:10px;width:min(320px,80vw);font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted)}
+.loading .bar{height:4px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden}
+.loading .bar span{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+.err{color:#ff9b8a}
+@media (max-width:640px){
+  .stage{font-size:10.5px;padding:7px 10px}
+  .mv{font-size:16px;padding:8px 11px 8px 8px} .mv kbd{display:none} .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){.mv,.tg::before,.loading .bar span{transition:none}}
+</style>
+
+<canvas id="c" aria-label="3D-сцена: боксёр на ринге"></canvas>
+<div class="vignette"></div>
+
+<div class="hud">
+  <header class="top">
+    <div>
+      <div class="eyebrow">box m1 · CC-боец в three.js</div>
+      <h1>Живой боксёр</h1>
+    </div>
+    <dl class="stage">
+      <dt>этап</dt><dd>2 из 5 — ткань шорт, волосы, борода<div class="steps" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div></dd>
+      <dt>удар</dt><dd id="s-move">стойка</dd>
+      <dt>кадр</dt><dd id="s-fps">—</dd>
+    </dl>
+  </header>
+  <footer class="bottom">
+    <div class="group" role="group" aria-label="Удары">
+      <button class="mv" data-move="jab"><kbd>1</kbd>Джеб</button>
+      <button class="mv" data-move="cross"><kbd>2</kbd>Кросс</button>
+      <button class="mv" data-move="upper"><kbd>3</kbd>Апперкот</button>
+      <button class="mv" data-move="hook"><kbd>4</kbd>Хук</button>
+      <button class="mv combo" data-move="combo"><kbd>␣</kbd>1-2-3</button>
+    </div>
+    <div class="group" role="group" aria-label="Режимы">
+      <button class="tg" id="t-auto" aria-pressed="true">Авто-спарринг</button>
+      <button class="tg" id="t-slow" aria-pressed="false">Замедление ×0.25</button>
+    </div>
+    <div class="hint">Тяни — крутить камеру · колесо или щипок — зум · клавиши 1 2 3 4, пробел, S</div>
+  </footer>
+</div>
+
+<div class="loading" id="loading"><div class="box"><span id="ld-text">Загружаю бойца…</span><div class="bar"><span id="ld-bar"></span></div></div></div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const V3 = THREE.Vector3, Quat = THREE.Quaternion;
+const $ = id => document.getElementById(id);
+let seed = 4242; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+
+/* ───────── renderer / scene ───────── */
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+const PR = Math.min(window.devicePixelRatio || 1, 1.75);
+renderer.setPixelRatio(PR);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.92;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0a0c11');
+scene.fog = new THREE.Fog('#0a0c11', 6, 14);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 40);
+camera.position.set(1.45, 1.55, 3.1);
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0.0, 1.12, 0.25);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 0.6; controls.maxDistance = 7; controls.maxPolarAngle = Math.PI * 0.53;
+controls.update();
+
+scene.add(new THREE.HemisphereLight('#8ea3cc', '#1b1510', 0.4));
+const key = new THREE.SpotLight('#fff0dc', 48, 14, 0.5, 0.6, 1.7);
+key.position.set(1.4, 4.4, 2.6); key.target.position.set(0, 1.0, 0.25);
+key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+key.shadow.bias = -0.0002; key.shadow.normalBias = 0.02; key.shadow.camera.near = 1.5; key.shadow.camera.far = 9;
+scene.add(key, key.target);
+const rim = new THREE.DirectionalLight('#86b6ff', 2.8); rim.position.set(-2.6, 2.6, -2.8); scene.add(rim);
+const rim2 = new THREE.DirectionalLight('#ffb27a', 1.6); rim2.position.set(2.8, 1.8, -2.4); scene.add(rim2);
+const fill = new THREE.DirectionalLight('#ffffff', 0.45); fill.position.set(-2, 1.4, 2.5); scene.add(fill);
+
+/* ───────── arena ───────── */
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+{
+  const floorTex = canvasTex(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#273042'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 26000; i++) { g.fillStyle = `rgba(${rnd() < .5 ? '0,0,0' : '255,255,255'},${rnd() * 0.05})`; g.fillRect(rnd() * w, rnd() * h, 2, 2); }
+    for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(0,0,0,${0.03 + rnd() * 0.05})`; g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 20 + rnd() * 90, 10 + rnd() * 50, rnd() * 3, 0, 7); g.fill(); }
+    g.strokeStyle = 'rgba(226,177,74,.22)'; g.lineWidth = 10; g.strokeRect(40, 40, w - 80, h - 80);
+    g.strokeStyle = 'rgba(255,255,255,.06)'; g.lineWidth = 3; g.beginPath(); g.arc(w / 2, h / 2, 210, 0, 7); g.stroke();
+  });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 5.6), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.88 }));
+  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+  const apron = new THREE.Mesh(new THREE.CircleGeometry(14, 48), new THREE.MeshStandardMaterial({ color: '#0d0f14', roughness: 1 }));
+  apron.rotation.x = -Math.PI / 2; apron.position.y = -0.002; scene.add(apron);
+  const postMat = new THREE.MeshStandardMaterial({ color: '#1a1c22', roughness: 0.5, metalness: 0.4 });
+  const padMat = new THREE.MeshPhysicalMaterial({ color: '#8f1824', roughness: 0.35, clearcoat: 0.5 });
+  const ropeCols = ['#a51b29', '#ece6da', '#a51b29'], H = 2.65;
+  for (const [x, z] of [[-H, -H], [H, -H], [H, H], [-H, H]]) {
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.45, 16), postMat); p.position.set(x, 0.72, z); scene.add(p);
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.95, 16), padMat); pad.position.set(x, 0.92, z); scene.add(pad);
+  }
+  for (const [a, b] of [[[-H, -H], [H, -H]], [[H, -H], [H, H]], [[H, H], [-H, H]], [[-H, H], [-H, -H]]]) for (let r = 0; r < 3; r++) {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, len, 10), new THREE.MeshPhysicalMaterial({ color: ropeCols[r], roughness: 0.4, clearcoat: 0.4 }));
+    m.position.set((a[0] + b[0]) / 2, 0.55 + r * 0.38, (a[1] + b[1]) / 2);
+    m.quaternion.setFromUnitVectors(new V3(0, 1, 0), new V3(b[0] - a[0], 0, b[1] - a[1]).normalize()); scene.add(m);
+  }
+}
+
+/* ───────── post-processing ───────── */
+const lowEnd = Math.min(window.innerWidth, window.innerHeight) < 600 || /Mobi|Android|iPhone|iPad/.test(navigator.userAgent);
+const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: lowEnd ? 2 : 4 });
+const composer = new EffectComposer(renderer, rt);
+composer.addPass(new RenderPass(scene, camera));
+let gtao = null;
+if (!lowEnd) {
+  gtao = new GTAOPass(scene, camera, 1, 1);
+  gtao.blendIntensity = 0.9;
+  gtao.updateGtaoMaterial({ radius: 0.22, distanceExponent: 1.4, thickness: 1.2, scale: 1.0, samples: 12 });
+  gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
+  composer.addPass(gtao);
+}
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.16, 0.5, 0.92);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false); composer.setSize(w, h);
+  camera.aspect = w / h; camera.fov = w / h < 0.8 ? 44 : 30; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+
+/* ───────── asset loading with byte progress ───────── */
+const FILES = {
+  boxer: 'assets/boxer.fbx.txt', wraps: 'assets/wraps.fbx.txt',
+  idle: 'assets/Idle_Boxing_Bouncing.fbx.txt', jab: 'assets/Punch_Lead_Jab_Head_Medium.fbx.txt', cross: 'assets/Punch_Rear_Cross_Head.fbx.txt',
+  upper: 'assets/Punch_Rear_Uppercut_Head.fbx.txt', hook: 'assets/Punch_Lead_Hook_Head.fbx.txt',
+};
+const TEX = ['head_d', 'head_n', 'body_d', 'arm_d', 'leg_d', 'body_n', 'arm_n', 'leg_n', 'nails_d', 'eye_d', 'teeth_d', 'wraps_d', 'wraps_n'];
+const SIZES = { boxer: 9382944, wraps: 392652, idle: 439344, jab: 382640, cross: 433936, upper: 439344, hook: 423136 };
+const TOTAL = Object.values(SIZES).reduce((a, b) => a + b, 0) * 4 / 3 + 5.2e6;
+let loaded = 0;
+const bar = $('ld-bar'), ldText = $('ld-text');
+const bump = n => { loaded += n; bar.style.width = Math.min(100, loaded / TOTAL * 100).toFixed(1) + '%'; };
+async function fetchBuf(url) {
+  const res = await fetch(url); if (!res.ok) throw new Error(`${url}: ${res.status}`);
+  if (!res.body) { const t = await res.text(); bump(t.length); const bin = atob(t), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b.buffer; }
+  const reader = res.body.getReader(), chunks = []; let n = 0;
+  for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); n += value.length; bump(value.length); }
+  const out = new Uint8Array(n); let o = 0; for (const c of chunks) { out.set(c, o); o += c.length; }
+  // models ship as base64 text (the artifact host serves no .fbx); decode back to bytes
+  const bin = atob(new TextDecoder().decode(out)), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+const manager = new THREE.LoadingManager();
+manager.setURLModifier(u => /\.(jpg)(\?|$)/i.test(u) || u.startsWith('data:') || u.startsWith('blob:') ? u : BLANK);
+const fbx = new FBXLoader(manager);
+const texLoader = new THREE.TextureLoader();
+function loadTex(name, srgb) {
+  return new Promise((res, rej) => texLoader.load(`assets/${name}.jpg`, t => {
+    t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.flipY = true; bump(330000); res(t);
+  }, undefined, rej));
+}
+
+/* ───────── skin shader: wrap-lit subsurface tint on top of physical BRDF ───────── */
+const SSS_CHUNK = THREE.ShaderChunk.lights_physical_pars_fragment.replace(
+  'vec3 irradiance = dotNL * directLight.color;',
+  `vec3 irradiance = dotNL * directLight.color;
+   float sssN = dot( geometryNormal, directLight.direction );
+   float sssW = saturate( ( sssN + 0.55 ) / 1.55 );
+   reflectedLight.directDiffuse += max( sssW * sssW - dotNL, 0.0 ) * directLight.color * BRDF_Lambert( material.diffuseColor ) * vec3( 0.75, 0.22, 0.13 );`);
+const HAIR_COL = new THREE.Color('#2a1a0f');
+// painted strands on the scalp: fine variation across the flow (longitude), long streaks along it (latitude); meridians meet in a crown whorl
+const HAIR_NOISE = `
+float hHash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
+float hNoise( vec2 p ) { vec2 i = floor( p ), f = fract( p ); f = f * f * ( 3.0 - 2.0 * f );
+  return mix( mix( hHash( i ), hHash( i + vec2( 1.0, 0.0 ) ), f.x ), mix( hHash( i + vec2( 0.0, 1.0 ) ), hHash( i + vec2( 1.0, 1.0 ) ), f.x ), f.y ); }
+float hairStrands( vec2 uv ) {
+  float lon = uv.x, lat = uv.y, w = sin( lat * 9.0 ) * 0.35 + sin( lat * 23.0 + lon * 3.0 ) * 0.08;
+  float a = hNoise( vec2( ( lon + w ) * 260.0, lat * 7.0 ) ), b = hNoise( vec2( ( lon + w * 1.3 ) * 610.0, lat * 13.0 ) );
+  return clamp( a * 0.65 + b * 0.5 - 0.15, 0.0, 1.0 );
+}
+`;
+function skinify(mat, scalp = false) {
+  mat.onBeforeCompile = s => {
+    s.fragmentShader = s.fragmentShader.replace('#include <lights_physical_pars_fragment>', SSS_CHUNK);
+    if (scalp) {
+      s.uniforms.uHair = { value: HAIR_COL };
+      s.vertexShader = 'attribute float aScalp;\nattribute vec2 aHairUV;\nvarying float vScalp;\nvarying vec2 vHairUV;\n' + s.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vScalp = aScalp; vHairUV = aHairUV;');
+      s.fragmentShader = 'uniform vec3 uHair;\nvarying float vScalp;\nvarying vec2 vHairUV;\n' + HAIR_NOISE + s.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n float hs = hairStrands( vHairUV );\n diffuseColor.rgb = mix( diffuseColor.rgb, uHair * ( 0.45 + 1.1 * hs ), vScalp );').replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix( roughnessFactor, 0.9, vScalp );').replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.clearcoat *= 1.0 - vScalp;');
+    }
+  };
+  mat.customProgramCacheKey = () => scalp ? 'skin-sss-scalp' : 'skin-sss';
+  return mat;
+}
+
+/* ───────── retarget map: Mixamo → CC_Base ───────── */
+const MAP = { mixamorigHips: 'CC_Base_Hip', mixamorigSpine: 'CC_Base_Waist', mixamorigSpine1: 'CC_Base_Spine01', mixamorigSpine2: 'CC_Base_Spine02', mixamorigNeck: 'CC_Base_NeckTwist01', mixamorigHead: 'CC_Base_Head' };
+const CHILD = { mixamorigHips: 'mixamorigSpine', mixamorigSpine: 'mixamorigSpine1', mixamorigSpine1: 'mixamorigSpine2', mixamorigSpine2: 'mixamorigNeck', mixamorigNeck: 'mixamorigHead' };
+for (const [m, c] of [['Left', 'L'], ['Right', 'R']]) {
+  const pair = (a, b, child) => { MAP['mixamorig' + m + a] = `CC_Base_${c}_${b}`; if (child) CHILD['mixamorig' + m + a] = 'mixamorig' + m + child; };
+  pair('Shoulder', 'Clavicle', 'Arm'); pair('Arm', 'Upperarm', 'ForeArm'); pair('ForeArm', 'Forearm', 'Hand'); pair('Hand', 'Hand', 'HandMiddle1');
+  pair('UpLeg', 'Thigh', 'Leg'); pair('Leg', 'Calf', 'Foot'); pair('Foot', 'Foot', 'ToeBase'); pair('ToeBase', 'ToeBase');
+  for (const [f, cf] of [['Thumb', 'Thumb'], ['Index', 'Index'], ['Middle', 'Mid'], ['Ring', 'Ring'], ['Pinky', 'Pinky']])
+    for (let i = 1; i <= 3; i++) pair(`Hand${f}${i}`, `${cf}${i}`, i < 3 ? `Hand${f}${i + 1}` : null);
+}
+
+/* ───────── hair masks on the unit head (face = +Z, up = +Y) ───────── */
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x, lerp = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+function hairMask(x, y, z) {
+  const line = -0.40 + 0.88 * sstep(-0.2, 0.9, z) + 0.34 * clamp((Math.abs(x) - 0.6) / 0.4, 0, 1) * (1 - sstep(0.3, 0.8, z));
+  return sstep(line - 0.09, line + 0.1, y);
+}
+function beardMask(x, y, z) {
+  if (z < -0.25 || y < -0.98) return 0;
+  const ax = Math.abs(x);
+  const region = (y < -0.40 && (ax > 0.40 || y < -0.47)) || (ax > 0.80 && y < -0.05 && z > -0.1);
+  if (!region) return 0;
+  if (ax < 0.36 && y > -0.74 && y < -0.56 && z > 0.72) return 0;  // lips
+  if (ax < 0.2 && y > -0.47 && z > 0.8) return 0;                // nose
+  if (y < -0.85 && z < 0.35) return 0;                             // under the jaw
+  return 1;
+}
+const HEAD = { C: new V3(), R: new V3(), hairRoots: [], beardRoots: [], frame: new THREE.Matrix4(), frameInv: new THREE.Matrix4(), restInvT: new THREE.Matrix4() };
+
+/* ───────── particle system (verlet + distance constraints + shape pull + colliders) ───────── */
+const H_BASE = 1 / 120;
+class PS {
+  constructor(n, M) {
+    this.n = n; this.M = M;
+    this.L = new Float32Array(n * 3); this.p = new Float32Array(n * 3); this.o = new Float32Array(n * 3); this.t = new Float32Array(n * 3);
+    this.inv = new Float32Array(n).fill(1); this.sm = new Float32Array(n); this.cl = [];
+    this.damp = 0.97; this.iters = 2; this.fric = 0.25; this.thick = 0.002; this.cols = []; this.hs = new Float32Array(n).fill(1);
+  }
+  setL(i, x, y, z) { this.L[3 * i] = x; this.L[3 * i + 1] = y; this.L[3 * i + 2] = z; }
+  link(a, b, k = 1) { this.cl.push(a, b, k); }
+  build() {
+    const m = this.cl.length / 3, L = this.L; this.nc = m;
+    this.CA = new Int32Array(m); this.CB = new Int32Array(m); this.CR = new Float32Array(m); this.CK = new Float32Array(m);
+    for (let c = 0; c < m; c++) {
+      const a = this.cl[3 * c], b = this.cl[3 * c + 1]; this.CA[c] = a; this.CB[c] = b; this.CK[c] = this.cl[3 * c + 2];
+      this.CR[c] = Math.hypot(L[3 * a] - L[3 * b], L[3 * a + 1] - L[3 * b + 1], L[3 * a + 2] - L[3 * b + 2]);
+    }
+  }
+  targets() {
+    const e = this.M.elements, L = this.L, t = this.t;
+    for (let i = 0; i < L.length; i += 3) {
+      const x = L[i], y = L[i + 1], z = L[i + 2];
+      t[i] = e[0] * x + e[4] * y + e[8] * z + e[12]; t[i + 1] = e[1] * x + e[5] * y + e[9] * z + e[13]; t[i + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
+    }
+  }
+  reset() { this.targets(); this.p.set(this.t); this.o.set(this.t); }
+  step(h) {
+    const n = this.n, p = this.p, o = this.o, t = this.t, inv = this.inv, sm = this.sm;
+    const d = Math.pow(this.damp, h / H_BASE), g = -9.81 * h * h;
+    for (let i = 0; i < n; i++) {
+      const k = 3 * i;
+      if (inv[i] === 0) { o[k] = p[k]; o[k + 1] = p[k + 1]; o[k + 2] = p[k + 2]; p[k] = t[k]; p[k + 1] = t[k + 1]; p[k + 2] = t[k + 2]; continue; }
+      const vx = (p[k] - o[k]) * d, vy = (p[k + 1] - o[k + 1]) * d, vz = (p[k + 2] - o[k + 2]) * d;
+      o[k] = p[k]; o[k + 1] = p[k + 1]; o[k + 2] = p[k + 2];
+      p[k] += vx; p[k + 1] += vy + g; p[k + 2] += vz;
+      const s = sm[i]; if (s > 0) { p[k] += (t[k] - p[k]) * s; p[k + 1] += (t[k + 1] - p[k + 1]) * s; p[k + 2] += (t[k + 2] - p[k + 2]) * s; }
+    }
+    const CA = this.CA, CB = this.CB, CR = this.CR, CK = this.CK, nc = this.nc;
+    for (let it = 0; it < this.iters; it++) {
+      for (let c = 0; c < nc; c++) {
+        const ia = CA[c], ib = CB[c], wa = inv[ia], wb = inv[ib], ws = wa + wb; if (ws === 0) continue;
+        const a = 3 * ia, b = 3 * ib, dx = p[b] - p[a], dy = p[b + 1] - p[a + 1], dz = p[b + 2] - p[a + 2];
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz); if (len < 1e-9) continue;
+        const f = (len - CR[c]) / (len * ws) * CK[c];
+        p[a] += dx * f * wa; p[a + 1] += dy * f * wa; p[a + 2] += dz * f * wa;
+        p[b] -= dx * f * wb; p[b + 1] -= dy * f * wb; p[b + 2] -= dz * f * wb;
+      }
+    }
+    collide(this.cols, p, o, inv, n, this.thick, this.fric, this.hs);
+  }
+}
+function collide(cols, p, o, inv, n, th, fr, hs) {
+  for (const c of cols) {
+    if (c.t === 0) {
+      const R = c.r + th, R2 = R * R;
+      for (let i = 0; i < n; i++) {
+        if (inv[i] === 0) continue; const k = 3 * i;
+        let s = ((p[k] - c.ax) * c.abx + (p[k + 1] - c.ay) * c.aby + (p[k + 2] - c.az) * c.abz) / c.ab2; s = s < 0 ? 0 : s > 1 ? 1 : s;
+        const qx = c.ax + c.abx * s, qy = c.ay + c.aby * s, qz = c.az + c.abz * s, dx = p[k] - qx, dy = p[k + 1] - qy, dz = p[k + 2] - qz, d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < R2) { const m = R / (Math.sqrt(d2) || 1e-6); p[k] = qx + dx * m; p[k + 1] = qy + dy * m; p[k + 2] = qz + dz * m; o[k] += (p[k] - o[k]) * fr; o[k + 1] += (p[k + 1] - o[k + 1]) * fr; o[k + 2] += (p[k + 2] - o[k + 2]) * fr; }
+      }
+    } else if (c.t === 1) {
+      const R = c.r + th, R2 = R * R;
+      for (let i = 0; i < n; i++) {
+        if (inv[i] === 0) continue; const k = 3 * i, dx = p[k] - c.x, dy = p[k + 1] - c.y, dz = p[k + 2] - c.z, d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < R2) { const m = R / (Math.sqrt(d2) || 1e-6); p[k] = c.x + dx * m; p[k + 1] = c.y + dy * m; p[k + 2] = c.z + dz * m; o[k] += (p[k] - o[k]) * fr; o[k + 1] += (p[k + 1] - o[k + 1]) * fr; o[k + 2] += (p[k + 2] - o[k + 2]) * fr; }
+      }
+    } else {
+      const I = c.I.elements, M = c.M.elements;
+      for (let i = 0; i < n; i++) {
+        if (inv[i] === 0) continue; const k = 3 * i, x = p[k], y = p[k + 1], z = p[k + 2];
+        const lx = I[0] * x + I[4] * y + I[8] * z + I[12], ly = I[1] * x + I[5] * y + I[9] * z + I[13], lz = I[2] * x + I[6] * y + I[10] * z + I[14];
+        const hh = hs ? hs[i] : 1, qx = lx / (c.ax * hh), qy = ly / (c.ay * hh), qz = lz / (c.az * hh), s = qx * qx + qy * qy + qz * qz;
+        if (s < 1 && s > 1e-8) {
+          const m = 1 / Math.sqrt(s), nx = lx * m, ny = ly * m, nz = lz * m;
+          p[k] = M[0] * nx + M[4] * ny + M[8] * nz + M[12]; p[k + 1] = M[1] * nx + M[5] * ny + M[9] * nz + M[13]; p[k + 2] = M[2] * nx + M[6] * ny + M[10] * nz + M[14];
+          o[k] += (p[k] - o[k]) * fr; o[k + 1] += (p[k + 1] - o[k + 1]) * fr; o[k + 2] += (p[k + 2] - o[k + 2]) * fr;
+        }
+      }
+    }
+  }
+}
+
+/* ───────── colliders following CC bones ───────── */
+const COL = {};
+const capC = r => ({ t: 0, ax: 0, ay: 0, az: 0, abx: 0, aby: 1, abz: 0, ab2: 1, r });
+const sphC = r => ({ t: 1, x: 0, y: 0, z: 0, r });
+const _ca = new V3(), _cb = new V3();
+function setCap(c, a, b) { c.ax = a.x; c.ay = a.y; c.az = a.z; c.abx = b.x - a.x; c.aby = b.y - a.y; c.abz = b.z - a.z; c.ab2 = Math.max(1e-8, c.abx ** 2 + c.aby ** 2 + c.abz ** 2); }
+const bpos = (name, v) => v.setFromMatrixPosition(ccBones[name].matrixWorld);
+const ATT = [];   // points riding on a bone: { bone, local }
+function attach(name, worldRest) { const b = ccBones[name]; const a = { b, local: b.worldToLocal(worldRest.clone()), w: new V3() }; ATT.push(a); return a; }
+let chestPt, chestFrontA, chestFrontB;
+function setupColliders() {
+  COL.thighL = capC(0.07); COL.thighR = capC(0.07); COL.neck = capC(0.052); COL.chest = sphC(0.15); COL.chestFront = capC(0.12); COL.hipBar = capC(0.11);
+  chestPt = attach('CC_Base_Spine02', new V3(0, 1.43, -0.06));
+  chestFrontA = attach('CC_Base_Spine02', new V3(-0.09, 1.36, 0.03)); chestFrontB = attach('CC_Base_Spine02', new V3(0.09, 1.36, 0.03));
+  HEAD.restInvT.copy(ccBones.CC_Base_Head.matrixWorld).invert().multiply(new THREE.Matrix4().makeTranslation(HEAD.C.x, HEAD.C.y, HEAD.C.z));
+  COL.head = { t: 2, M: HEAD.frame, I: HEAD.frameInv, ax: HEAD.R.x + 0.006, ay: HEAD.R.y + 0.006, az: HEAD.R.z + 0.006 };
+  updateColliders();
+}
+function updateColliders() {
+  for (const a of ATT) a.w.copy(a.local).applyMatrix4(a.b.matrixWorld);
+  setCap(COL.thighL, bpos('CC_Base_L_Thigh', _ca), bpos('CC_Base_L_Calf', _cb));
+  setCap(COL.thighR, bpos('CC_Base_R_Thigh', _ca), bpos('CC_Base_R_Calf', _cb));
+  setCap(COL.hipBar, bpos('CC_Base_L_Thigh', _ca), bpos('CC_Base_R_Thigh', _cb));
+  setCap(COL.neck, bpos('CC_Base_NeckTwist01', _ca), bpos('CC_Base_Head', _cb));
+  COL.chest.x = chestPt.w.x; COL.chest.y = chestPt.w.y; COL.chest.z = chestPt.w.z;
+  setCap(COL.chestFront, chestFrontA.w, chestFrontB.w);
+  HEAD.frame.multiplyMatrices(ccBones.CC_Base_Head.matrixWorld, HEAD.restInvT); HEAD.frameInv.copy(HEAD.frame).invert();
+}
+
+/* ───────── satin shorts as cloth: skinned shape = target, legs free to hang and swing ───────── */
+class ShortsCloth {
+  constructor(sm) {
+    this.sm = sm; sm.visible = false;
+    const g = sm.geometry, pos = g.attributes.position, nv = pos.count, bm = sm.bindMatrix, v = new V3();
+    // weld corners into particles, but never across the two legs: the inner panels of the boxy legs touch at rest
+    const key = new Map(), map = new Int32Array(nv), rep = [], rest = [], sideOf = [];
+    const sIdx0 = g.attributes.skinIndex, sWt0 = g.attributes.skinWeight, bones0 = sm.skeleton.bones;
+    const vSide = i => { let L = 0, R = 0; for (let j = 0; j < 4; j++) { const nm = bones0[sIdx0.getComponent(i, j)].name, w = sWt0.getComponent(i, j); if (nm.includes('_L_')) L += w; else if (nm.includes('_R_')) R += w; } return L > 0.5 ? 1 : R > 0.5 ? 2 : 0; };
+    for (let i = 0; i < nv; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(bm);
+      const sd = vSide(i);
+      const k = `${Math.round(v.x * 4000)},${Math.round(v.y * 4000)},${Math.round(v.z * 4000)},${sd}`;
+      let id = key.get(k); if (id === undefined) { id = rep.length; key.set(k, id); rep.push(i); rest.push(v.clone()); sideOf.push(sd); }
+      map[i] = id;
+    }
+    const n = rep.length; this.n = n; this.map = map; this.rep = rep;
+    this.base = new Float32Array(n * 3); this.si = new Uint16Array(n * 4); this.sw = new Float32Array(n * 4);
+    { const sIdx = g.attributes.skinIndex, sWt = g.attributes.skinWeight;
+      for (let i = 0; i < n; i++) { const r = rep[i]; v.fromBufferAttribute(pos, r).applyMatrix4(bm); this.base.set([v.x, v.y, v.z], 3 * i);
+        let sum = 0; for (let j = 0; j < 4; j++) { this.si[4 * i + j] = sIdx.getComponent(r, j); this.sw[4 * i + j] = sWt.getComponent(r, j); sum += this.sw[4 * i + j]; }
+        if (sum > 0) for (let j = 0; j < 4; j++) this.sw[4 * i + j] /= sum; } }
+    this.p = new Float32Array(n * 3); this.o = new Float32Array(n * 3); this.t = new Float32Array(n * 3); this.inv = new Float32Array(n).fill(1);
+    let top = -1e9; for (const r of rest) top = Math.max(top, r.y);
+    this.maxD = new Float32Array(n); this.pull = new Float32Array(n);
+    // nearest bone segment + rest clearance → per-particle backstop
+    const segs = [['CC_Base_L_Thigh', 'CC_Base_L_Calf'], ['CC_Base_R_Thigh', 'CC_Base_R_Calf'], ['CC_Base_L_Thigh', 'CC_Base_R_Thigh']];
+    const segP = segs.map(([a, b]) => [bpos(a, new V3()), bpos(b, new V3())]);
+    this.seg = new Uint8Array(n); this.minD = new Float32Array(n);
+    const q = new V3(), ab = new V3();
+    // only the leg tubes below the crotch swing; waist, seat and crotch stay on the body
+    let yHem = 1e9, yCrotch = 1e9;
+    for (const r of rest) { yHem = Math.min(yHem, r.y); if (Math.abs(r.x) < 0.02 && r.y < top - 0.08) yCrotch = Math.min(yCrotch, r.y); }
+    if (yCrotch > 1e8) yCrotch = top - 0.2;
+    const yFree = yCrotch + 0.015;
+    rest.forEach((r, i) => {
+      const band = r.y > top - 0.045, free = sstep(top - 0.05, yFree - 0.03, r.y);
+      // waistband pinned; below it the hold fades out, the legs only hang and collide
+      this.maxD[i] = band ? 0 : lerp(0.008, 0.075, free);
+      this.pull[i] = band ? 0 : lerp(0.25, 0.009, Math.pow(free, 0.7));
+      let best = 1e9, bi = 0;
+      segP.forEach(([a, b], si) => {
+        if ((sideOf[i] === 1 && si === 1) || (sideOf[i] === 2 && si === 0)) return;   // a leg's cloth only backs onto its own thigh
+        ab.subVectors(b, a); const s = clamp(q.subVectors(r, a).dot(ab) / ab.lengthSq(), 0, 1); const d = q.copy(a).addScaledVector(ab, s).distanceTo(r); if (d < best) { best = d; bi = si; } });
+      const so = g.attributes.skinOff ? g.attributes.skinOff.getX(rep[i]) : 0.004;
+      this.seg[i] = bi; this.minD[i] = Math.min(best - 0.002, best - so + 0.007);   // thigh surface + 7 mm
+      this.p[3 * i] = this.o[3 * i] = r.x; this.p[3 * i + 1] = this.o[3 * i + 1] = r.y; this.p[3 * i + 2] = this.o[3 * i + 2] = r.z;
+      if (this.maxD[i] < 1e-4) this.inv[i] = 0;
+    });
+    this.segNames = segs;
+    this.otherSeg = Int8Array.from(sideOf.map(sd => sd === 1 ? 1 : sd === 2 ? 0 : -1));
+    // edges
+    const E = new Set(), ca = [], cb = [], cr = [], tri = [];
+    for (let t = 0; t < nv; t += 3) {
+      const a = map[t], b = map[t + 1], c = map[t + 2]; if (a === b || b === c || a === c) continue; tri.push(a, b, c);
+      for (const [x, y] of [[a, b], [b, c], [c, a]]) { const k = x < y ? x * n + y : y * n + x; if (E.has(k)) continue; E.add(k); ca.push(x); cb.push(y); cr.push(rest[x].distanceTo(rest[y])); }
+    }
+    // bending: link the two far corners of every pair of triangles sharing an edge
+    { const opp = new Map();
+      for (let t = 0; t < tri.length; t += 3) for (let e = 0; e < 3; e++) {
+        const a = tri[t + e], b = tri[t + (e + 1) % 3], c = tri[t + (e + 2) % 3], k = a < b ? a * n + b : b * n + a;
+        const o = opp.get(k); if (o === undefined) opp.set(k, c); else if (o !== c) { ca.push(o); cb.push(c); cr.push(-rest[o].distanceTo(rest[c])); }
+      } }
+    this.CA = Int32Array.from(ca); this.CB = Int32Array.from(cb); this.CR = Float32Array.from(cr.map(Math.abs)); this.CK = Float32Array.from(cr.map(x => x < 0 ? 0.12 : 1)); this.tri = Int32Array.from(tri);
+    this.pn = new Float32Array(n * 3);
+    // render mesh: same triangles/uv, positions written from particles
+    const rg = new THREE.BufferGeometry();
+    rg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nv * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    rg.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nv * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    rg.setAttribute('uv', g.attributes.uv);
+    this.mesh = new THREE.Mesh(rg, sm.material); this.mesh.castShadow = this.mesh.receiveShadow = true; this.mesh.frustumCulled = false;
+    root.add(this.mesh); this.geo = rg;
+    this.segA = [new V3(), new V3(), new V3()]; this.segB = [new V3(), new V3(), new V3()];
+    this.flip = 1;
+    this.targets(); this.p.set(this.t); this.o.set(this.t); this.render();
+    { // compare with the FBX normals (world) and flip if our winding is the other way
+      const fn = g.attributes.normal, nmat = new THREE.Matrix3().getNormalMatrix(bm), N = this.geo.attributes.normal.array, w = new V3(); let dot = 0;
+      for (let i = 0; i < nv; i += 7) { w.fromBufferAttribute(fn, i).applyMatrix3(nmat).normalize(); dot += w.x * N[3 * i] + w.y * N[3 * i + 1] + w.z * N[3 * i + 2]; }
+      if (dot < 0) { this.flip = -1; this.render(); }
+    }
+  }
+  targets() {
+    const sm = this.sm, t = this.t, B = this.base, SI = this.si, SW = this.sw;
+    sm.skeleton.update();
+    const M = sm.skeleton.boneMatrices;
+    for (let i = 0; i < this.n; i++) {
+      const x = B[3 * i], y = B[3 * i + 1], z = B[3 * i + 2]; let ox = 0, oy = 0, oz = 0;
+      for (let j = 0; j < 4; j++) {
+        const w = SW[4 * i + j]; if (w === 0) continue; const m = 16 * SI[4 * i + j];
+        ox += w * (M[m] * x + M[m + 4] * y + M[m + 8] * z + M[m + 12]); oy += w * (M[m + 1] * x + M[m + 5] * y + M[m + 9] * z + M[m + 13]); oz += w * (M[m + 2] * x + M[m + 6] * y + M[m + 10] * z + M[m + 14]);
+      }
+      t[3 * i] = ox; t[3 * i + 1] = oy; t[3 * i + 2] = oz;
+    }
+    this.segNames.forEach(([a, b], i) => { bpos(a, this.segA[i]); bpos(b, this.segB[i]); });
+  }
+  step(h) {
+    const n = this.n, p = this.p, o = this.o, t = this.t, inv = this.inv, d = Math.pow(0.955, h / H_BASE), g = -9.81 * h * h;
+    for (let i = 0; i < n; i++) {
+      const k = 3 * i;
+      if (inv[i] === 0) { o[k] = p[k]; o[k + 1] = p[k + 1]; o[k + 2] = p[k + 2]; p[k] = t[k]; p[k + 1] = t[k + 1]; p[k + 2] = t[k + 2]; continue; }
+      const vx = (p[k] - o[k]) * d, vy = (p[k + 1] - o[k + 1]) * d, vz = (p[k + 2] - o[k + 2]) * d;
+      o[k] = p[k]; o[k + 1] = p[k + 1]; o[k + 2] = p[k + 2];
+      p[k] += vx; p[k + 1] += vy + g; p[k + 2] += vz;
+      const s = this.pull[i]; p[k] += (t[k] - p[k]) * s; p[k + 1] += (t[k + 1] - p[k + 1]) * s; p[k + 2] += (t[k + 2] - p[k + 2]) * s;
+    }
+    const CA = this.CA, CB = this.CB, CR = this.CR, CK = this.CK;
+    for (let it = 0; it < 4; it++) {
+      for (let c = 0; c < CA.length; c++) {
+        const ia = CA[c], ib = CB[c], wa = inv[ia], wb = inv[ib], ws = wa + wb; if (ws === 0) continue;
+        const a = 3 * ia, b = 3 * ib, dx = p[b] - p[a], dy = p[b + 1] - p[a + 1], dz = p[b + 2] - p[a + 2], len = Math.sqrt(dx * dx + dy * dy + dz * dz); if (len < 1e-9) continue;
+        const f = (len - CR[c]) / (len * ws) * CK[c];
+        p[a] += dx * f * wa; p[a + 1] += dy * f * wa; p[a + 2] += dz * f * wa; p[b] -= dx * f * wb; p[b + 1] -= dy * f * wb; p[b + 2] -= dz * f * wb;
+      }
+      this.constrain();
+    }
+  }
+  constrain() {
+    const n = this.n, p = this.p, t = this.t, inv = this.inv, md = this.maxD, A = this.segA, B = this.segB;
+    for (let i = 0; i < n; i++) {
+      if (inv[i] === 0) continue; const k = 3 * i;
+      // stay within reach of the skinned shape
+      let dx = p[k] - t[k], dy = p[k + 1] - t[k + 1], dz = p[k + 2] - t[k + 2]; const d2 = dx * dx + dy * dy + dz * dz, m = md[i];
+      if (d2 > m * m) { const s = m / Math.sqrt(d2); p[k] = t[k] + dx * s; p[k + 1] = t[k + 1] + dy * s; p[k + 2] = t[k + 2] + dz * s; }
+      // never closer to the leg bone than at rest (keeps cloth outside the thigh)
+      const a = A[this.seg[i]], b = B[this.seg[i]], abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z, ab2 = abx * abx + aby * aby + abz * abz;
+      let s = ((p[k] - a.x) * abx + (p[k + 1] - a.y) * aby + (p[k + 2] - a.z) * abz) / ab2; s = s < 0 ? 0 : s > 1 ? 1 : s;
+      const qx = a.x + abx * s, qy = a.y + aby * s, qz = a.z + abz * s; dx = p[k] - qx; dy = p[k + 1] - qy; dz = p[k + 2] - qz;
+      const dd = Math.sqrt(dx * dx + dy * dy + dz * dz), r = this.minD[i];
+      if (dd < r && dd > 1e-6) { const s2 = r / dd; p[k] = qx + dx * s2; p[k + 1] = qy + dy * s2; p[k + 2] = qz + dz * s2; }
+      // keep off the other leg too
+      const os = this.otherSeg[i]; if (os < 0) continue;
+      const a2 = A[os], b2 = B[os], cx2 = b2.x - a2.x, cy2 = b2.y - a2.y, cz2 = b2.z - a2.z, c22 = cx2 * cx2 + cy2 * cy2 + cz2 * cz2;
+      let u = ((p[k] - a2.x) * cx2 + (p[k + 1] - a2.y) * cy2 + (p[k + 2] - a2.z) * cz2) / c22; u = u < 0 ? 0 : u > 1 ? 1 : u;
+      const ox = a2.x + cx2 * u, oy = a2.y + cy2 * u, oz = a2.z + cz2 * u, ex = p[k] - ox, ey = p[k + 1] - oy, ez = p[k + 2] - oz, ed = Math.sqrt(ex * ex + ey * ey + ez * ez);
+      if (ed < 0.082 && ed > 1e-6) { const s3 = 0.082 / ed; p[k] = ox + ex * s3; p[k + 1] = oy + ey * s3; p[k + 2] = oz + ez * s3; }
+    }
+  }
+  render() {
+    const p = this.p, pn = this.pn, tri = this.tri, map = this.map; pn.fill(0);
+    for (let q = 0; q < tri.length; q += 3) {
+      const a = 3 * tri[q], b = 3 * tri[q + 1], c = 3 * tri[q + 2];
+      const ux = p[b] - p[a], uy = p[b + 1] - p[a + 1], uz = p[b + 2] - p[a + 2], vx = p[c] - p[a], vy = p[c + 1] - p[a + 1], vz = p[c + 2] - p[a + 2];
+      const f = this.flip, nx = (uy * vz - uz * vy) * f, ny = (uz * vx - ux * vz) * f, nz = (ux * vy - uy * vx) * f;
+      for (const j of [a, b, c]) { pn[j] += nx; pn[j + 1] += ny; pn[j + 2] += nz; }
+    }
+    const P = this.geo.attributes.position.array, N = this.geo.attributes.normal.array;
+    for (let i = 0; i < map.length; i++) {
+      const j = 3 * map[i], k = 3 * i, l = Math.hypot(pn[j], pn[j + 1], pn[j + 2]) || 1;
+      P[k] = p[j]; P[k + 1] = p[j + 1]; P[k + 2] = p[j + 2]; N[k] = pn[j] / l; N[k + 1] = pn[j + 1] / l; N[k + 2] = pn[j + 2] / l;
+    }
+    this.geo.attributes.position.needsUpdate = true; this.geo.attributes.normal.needsUpdate = true;
+  }
+}
+
+/* ───────── hair & beard: strand cards on simulated guide spines ───────── */
+function hairTexture(kind) {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 512; const g = c.getContext('2d');
+  g.clearRect(0, 0, 128, 512);
+  const N = kind === 'beard' ? 55 : 170;
+  for (let i = 0; i < N; i++) {
+    const x = 4 + rnd() * 120, len = 512 * (0.5 + rnd() * 0.5), w = 0.6 + rnd() * 1.0, curl = (rnd() - 0.5) * (kind === 'beard' ? 30 : 12);
+    const shade = 150 + rnd() * 105;
+    const gr = g.createLinearGradient(0, 0, 0, len);
+    gr.addColorStop(0, `rgba(${shade},${shade},${shade},1)`); gr.addColorStop(0.75, `rgba(${shade},${shade},${shade},0.95)`); gr.addColorStop(1, `rgba(${shade},${shade},${shade},0)`);
+    g.strokeStyle = gr; g.lineWidth = w; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + curl, len * 0.35, x - curl, len * 0.7, x + curl * 0.5, len); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+function buildHair(roots, { kind }) {
+  const beard = kind === 'beard', base = kind === 'base';
+  const pick = roots;
+  const np = beard || base ? 3 : 6, nc = pick.length, ps = new PS(nc * np, HEAD.frame);
+  const side = [], width = [], col = [];
+  const dir = new V3(), pos = new V3(), flow = new V3(), sd = new V3(), C = HEAD.C, R = HEAD.R;
+  const pal = beard ? ['#3a2717', '#4a3220', '#2e1f14', '#5a3d27'] : ['#24180f', '#2e1f14', '#3a2719', '#1c130c'];
+  pick.forEach((r, s) => {
+    const d = r.d;
+    if (beard) {
+      const must = (d.y > -0.52 && Math.abs(d.x) < 0.42 && d.z > 0.55);
+      flow.set(must ? Math.sign(d.x) * 0.5 : 0.08 * d.x, -1, must ? 0.35 : 0.3).normalize();
+    } else {
+      const top = new V3(0.15 * d.x, -0.25, -1).normalize(), back = new V3(0.3 * d.x, -1, -0.25).normalize();
+      flow.copy(back).lerp(top, sstep(-0.55, 0.2, d.z)).normalize();
+    }
+    const fs = Math.max(1, Math.hypot((r.p.x - C.x) / R.x, (r.p.y - C.y) / R.y, (r.p.z - C.z) / R.z));
+    const L = beard ? 0.006 + rnd() * 0.005 + 0.008 * sstep(-0.6, -0.95, d.y) * sstep(0, 0.6, d.z)
+             : base ? 0.034 + rnd() * 0.016
+                    : 0.07 + rnd() * 0.045 + 0.05 * sstep(0.1, 0.9, d.y) * sstep(-0.4, 0.6, d.z) - 0.03 * sstep(0.6, 0.95, Math.abs(d.x));
+    const seg = L / (np - 1);
+    dir.copy(r.n).multiplyScalar(beard ? 1.1 : base ? 0.12 : 0.45).add(flow).normalize(); pos.copy(r.p).addScaledVector(r.n, -0.001);
+    const jx = (rnd() - 0.5) * 0.25, jz = (rnd() - 0.5) * 0.25;
+    for (let k = 0; k < np; k++) {
+      const i = s * np + k;
+      if (k > 0) {
+        dir.lerp(flow, beard ? 0.25 : 0.42); dir.x += jx * 0.3 + (rnd() - 0.5) * 0.1; dir.z += jz * 0.3 + (rnd() - 0.5) * 0.1; dir.normalize();
+        pos.addScaledVector(dir, seg);
+        if (!beard) {   // keep layers above the scalp
+          const pad = base ? 0.0015 + k * 0.001 : 0.004 + k * 0.0025, x = (pos.x - C.x) / (R.x * fs + pad), y = (pos.y - C.y) / (R.y * fs + pad), z = (pos.z - C.z) / (R.z * fs + pad), q = x * x + y * y + z * z;
+          if (q < 1) { const m = 1 / Math.sqrt(q); pos.set(C.x + (pos.x - C.x) * m, C.y + (pos.y - C.y) * m, C.z + (pos.z - C.z) * m); }
+        }
+        ps.hs[i] = fs;
+        ps.sm[i] = (beard || base ? 0.55 : 0.3) * Math.pow(1 - k / np, 1.4) + (beard || base ? 0.08 : 0.03);
+      } else ps.inv[i] = 0;
+      ps.setL(i, pos.x - C.x, pos.y - C.y, pos.z - C.z);
+    }
+    for (let k = 0; k < np - 1; k++) ps.link(s * np + k, s * np + k + 1, 1);
+    for (let k = 0; k < np - 2; k++) ps.link(s * np + k, s * np + k + 2, 0.3);
+    sd.crossVectors(flow, r.n).normalize(); side.push(sd.clone());   // rest card side in head-rest space (world axes)
+    width.push((beard ? 0.0028 : base ? 0.019 : 0.0095) * (0.7 + rnd() * 0.6));
+    const c = new THREE.Color(pal[(rnd() * pal.length) | 0]).multiplyScalar(0.8 + rnd() * 0.4); col.push(c);
+  });
+  ps.build(); ps.damp = beard ? 0.95 : 0.965; ps.iters = 2; ps.thick = 0.002; ps.fric = 0.3;
+  ps.cols = beard ? [COL.neck, COL.chest, COL.chestFront] : base ? [COL.head] : [COL.head, COL.neck, COL.chest];
+  ps.reset();
+  // card mesh
+  const nv = nc * np * 2, P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), UV = new Float32Array(nv * 2), CO = new Float32Array(nv * 3), idx = [];
+  for (let s = 0; s < nc; s++) for (let k = 0; k < np; k++) {
+    const v = 2 * (s * np + k), tv = 1 - k / (np - 1);
+    UV[2 * v] = 0; UV[2 * v + 1] = tv; UV[2 * v + 2] = 1; UV[2 * v + 3] = tv;
+    const lift = 1 + 0.5 * k / (np - 1);
+    for (const o of [0, 1]) { CO[3 * (v + o)] = col[s].r * lift; CO[3 * (v + o) + 1] = col[s].g * lift; CO[3 * (v + o) + 2] = col[s].b * lift; }
+    if (k < np - 1) idx.push(v, v + 2, v + 1, v + 1, v + 2, v + 3);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(P, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('normal', new THREE.BufferAttribute(N, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('uv', new THREE.BufferAttribute(UV, 2)); geo.setAttribute('color', new THREE.BufferAttribute(CO, 3)); geo.setIndex(idx);
+  const mat = new THREE.MeshPhysicalMaterial({ map: hairTexture(beard ? 'beard' : 'hair'), vertexColors: true, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.62, specularIntensity: 0.35, specularColor: new THREE.Color('#8a6a50'), envMapIntensity: 0.15 });
+  // card normals are set per vertex (outward from the head); keep them on both faces instead of flipping for the back face
+  const NB = THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', '');
+  mat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', NB); };
+  mat.customProgramCacheKey = () => 'hair-cards';
+  const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = true; mesh.receiveShadow = false; mesh.frustumCulled = false; root.add(mesh);
+  return { ps, nc, np, side, width, geo, mesh };
+}
+const _sd = new V3(), _hc = new V3();
+function renderHair(H) {
+  const p = H.ps.p, P = H.geo.attributes.position.array, N = H.geo.attributes.normal.array, np = H.np;
+  _hc.set(0, 0, 0).applyMatrix4(HEAD.frame);
+  const e = HEAD.frame.elements;
+  for (let s = 0; s < H.nc; s++) {
+    const sl = H.side[s];   // rotate rest side by the head
+    let sx = e[0] * sl.x + e[4] * sl.y + e[8] * sl.z, sy = e[1] * sl.x + e[5] * sl.y + e[9] * sl.z, sz = e[2] * sl.x + e[6] * sl.y + e[10] * sl.z;
+    for (let k = 0; k < np; k++) {
+      const i = s * np + k, q = 3 * i, a = 3 * (k > 0 ? i - 1 : i), b = 3 * (k < np - 1 ? i + 1 : i);
+      let tx = p[b] - p[a], ty = p[b + 1] - p[a + 1], tz = p[b + 2] - p[a + 2]; const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+      const dt = sx * tx + sy * ty + sz * tz; let wx = sx - tx * dt, wy = sy - ty * dt, wz = sz - tz * dt; const wl = Math.hypot(wx, wy, wz) || 1;
+      const w = H.width[s] * (1 - 0.45 * k / (np - 1)) * 0.5 / wl; wx *= w; wy *= w; wz *= w;
+      let nx = p[q] - _hc.x, ny = p[q + 1] - _hc.y, nz = p[q + 2] - _hc.z; const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+      const v = 6 * i;
+      P[v] = p[q] - wx; P[v + 1] = p[q + 1] - wy; P[v + 2] = p[q + 2] - wz; P[v + 3] = p[q] + wx; P[v + 4] = p[q + 1] + wy; P[v + 5] = p[q + 2] + wz;
+      N[v] = N[v + 3] = nx; N[v + 1] = N[v + 4] = ny; N[v + 2] = N[v + 5] = nz;
+    }
+  }
+  H.geo.attributes.position.needsUpdate = true; H.geo.attributes.normal.needsUpdate = true;
+}
+let shorts = null, hairSys = null, beardSys = null, baseSys = null;
+function simulate(sdt) {
+  root.updateMatrixWorld(true);
+  updateColliders();
+  shorts.targets();
+  hairSys.ps.targets(); beardSys.ps.targets(); baseSys.ps.targets();
+  beardSys.ps.p.set(beardSys.ps.t); baseSys.ps.p.set(baseSys.ps.t);   // stubble and the under-layer ride the head rigidly
+  if (sdt > 0) {
+    const steps = sdt > 0.012 ? 2 : 1, h = sdt / steps;
+    for (let s = 0; s < steps; s++) { shorts.step(h); hairSys.ps.step(h); }
+  }
+  shorts.render(); renderHair(hairSys); renderHair(beardSys); renderHair(baseSys);
+}
+
+
+/* ───────── boxing shorts generated from the body skin: waist to mid-thigh, two separate leg tubes ───────── */
+const BODY = { fullIndex: null, groups: null, crotchY: 0.87, gen: null };
+const SHORTS = { waistY: 1.04, hemY: 0.685 };
+function shortsTexture() {
+  const W = 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  // x = angular distance from the outer side seam (0) to the inner/centre line (1); y = waist (top) → hem (bottom)
+  const red = '#8a0e1a', gold = '#d6a640', cream = '#f1e7d2';
+  const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, '#93111f'); gr.addColorStop(1, '#7c0c17');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 2600; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '255,160,160' : '40,0,4'},${rnd() * 0.05})`; g.fillRect(rnd() * W, rnd() * H, 1, 2 + rnd() * 6); }
+  const yWB = H * 0.16, yHem = H * 0.94;
+  g.fillStyle = gold; g.fillRect(0, 0, W * 0.05, H);                     // side stripe
+  g.fillStyle = cream; g.fillRect(W * 0.05, 0, W * 0.012, H);           // piping
+  g.fillStyle = '#121012'; g.fillRect(0, 0, W, yWB);                    // elastic waistband
+  g.fillStyle = gold; g.fillRect(0, yWB * 0.18, W, yWB * 0.16); g.fillRect(0, yWB * 0.66, W, yWB * 0.16);
+  g.fillStyle = cream; g.fillRect(0, yWB * 0.44, W, yWB * 0.1);
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, yWB - 3, W, 3);
+  g.fillStyle = cream; g.fillRect(0, yHem - 6, W, 4);                    // hem piping + trim
+  g.fillStyle = gold; g.fillRect(0, yHem - 2, W, H - yHem + 2);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
+}
+function shortsNormal() {
+  const W = 512, H = 512, h = new Float32Array(W * H);
+  // gathered pleats under the elastic, ribbing in the band, soft weave noise
+  const nz = noiseField2(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const u = x / W, v = 1 - y / H; let z = 0.18 * nz[y * W + x];
+    const band = v > 0.84, under = Math.max(0, 1 - (0.84 - v) / 0.3);
+    if (band) z += 0.35 * Math.sin(u * Math.PI * 2 * 60);
+    else z += under * under * 1.1 * Math.pow(Math.abs(Math.sin(u * Math.PI * 2 * 9 + 1.3 * Math.sin(v * 9))), 0.6);
+    if (Math.abs(v - 0.84) < 0.008) z -= 1.2;
+    if (v < 0.06 && v > 0.045) z -= 0.8;
+    h[y * W + x] = z;
+  }
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), img = g.createImageData(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const l = h[y * W + Math.max(0, x - 1)], r = h[y * W + Math.min(W - 1, x + 1)], t = h[Math.max(0, y - 1) * W + x], b = h[Math.min(H - 1, y + 1) * W + x];
+    let nx = (l - r) * 1.6, ny = (b - t) * 1.6, nz2 = 1; const L = Math.hypot(nx, ny, nz2), i = 4 * (y * W + x);
+    img.data[i] = (nx / L * 0.5 + 0.5) * 255; img.data[i + 1] = (ny / L * 0.5 + 0.5) * 255; img.data[i + 2] = (nz2 / L * 0.5 + 0.5) * 255; img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
+}
+function noiseField2(W, H) {
+  const out = new Float32Array(W * H);
+  for (const [cx, cy, amp] of [[8, 16, 0.6], [32, 64, 0.3], [128, 160, 0.15]]) {
+    const gr = new Float32Array((cx + 1) * (cy + 1)); for (let i = 0; i < gr.length; i++) gr[i] = rnd() * 2 - 1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const fx = x / W * cx, fy = y / H * cy, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0, sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      const a = gr[y0 * (cx + 1) + x0], b = gr[y0 * (cx + 1) + x0 + 1], c = gr[(y0 + 1) * (cx + 1) + x0], d = gr[(y0 + 1) * (cx + 1) + x0 + 1];
+      out[y * W + x] += amp * lerp(lerp(a, b, sx), lerp(c, d, sx), sy);
+    }
+  }
+  return out;
+}
+function makeShorts(body) {
+  const g = body.geometry, pos = g.attributes.position, nrm = g.attributes.normal, bm = body.bindMatrix, nmat = new THREE.Matrix3().getNormalMatrix(bm);
+  const SI = g.attributes.skinIndex, SW = g.attributes.skinWeight, bones = body.skeleton.bones;
+  const { waistY, hemY } = SHORTS, crotchY = BODY.crotchY, ix = BODY.fullIndex;
+  const nv = pos.count, Wp = new Float32Array(nv * 3), Np = new Float32Array(nv * 3), v = new V3();
+  for (let i = 0; i < nv; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(bm).multiplyScalar(0.01); Wp.set([v.x, v.y, v.z], 3 * i); v.fromBufferAttribute(nrm, i).applyMatrix3(nmat).normalize(); Np.set([v.x, v.y, v.z], 3 * i); }
+  // triangles of body + legs inside the band
+  const pick = [];
+  for (const gr of BODY.groups) {
+    if (gr.materialIndex !== 1 && gr.materialIndex !== 3) continue;
+    for (let t = gr.start; t < gr.start + gr.count; t += 3) {
+      let ok = true; for (let k = 0; k < 3; k++) { const y = Wp[3 * ix[t + k] + 1], x = Wp[3 * ix[t + k]]; if (y < hemY - 0.004 || y > waistY + 0.004 || Math.abs(x) > 0.3 || BODY.gen[ix[t + k]]) ok = false; }
+      if (ok) pick.push(ix[t], ix[t + 1], ix[t + 2]);
+    }
+  }
+  // weld by position (UV seams of the skin)
+  const key = new Map(), uid = new Map(), U = [];
+  for (const i of new Set(pick)) {
+    const k = `${Math.round(Wp[3 * i] * 5000)},${Math.round(Wp[3 * i + 1] * 5000)},${Math.round(Wp[3 * i + 2] * 5000)}`;
+    let id = key.get(k); if (id === undefined) { id = U.length; key.set(k, id); U.push({ src: i, n: new V3() }); }
+    uid.set(i, id); U[id].n.add(v.fromArray(Np, 3 * i));
+  }
+  const n = U.length, tri = [];
+  for (let t = 0; t < pick.length; t += 3) { const a = uid.get(pick[t]), b = uid.get(pick[t + 1]), c = uid.get(pick[t + 2]); if (a !== b && b !== c && a !== c) tri.push(a, b, c); }
+  const nb = Array.from({ length: n }, () => new Set()), edgeCount = new Map();
+  for (let t = 0; t < tri.length; t += 3) for (const [a, b] of [[tri[t], tri[t + 1]], [tri[t + 1], tri[t + 2]], [tri[t + 2], tri[t]]]) {
+    nb[a].add(b); nb[b].add(a); const k = a < b ? a * n + b : b * n + a; edgeCount.set(k, (edgeCount.get(k) || 0) + 1);
+  }
+  // close holes left by the genitals: every border loop that is not the waist or a hem gets a fan to its centroid
+  {
+    const dir = new Map();
+    for (let t = 0; t < tri.length; t += 3) for (const [a, b] of [[tri[t], tri[t + 1]], [tri[t + 1], tri[t + 2]], [tri[t + 2], tri[t]]]) { const k = a < b ? a * n + b : b * n + a; if (edgeCount.get(k) === 1) dir.set(b, a); }
+    const seen = new Set();
+    for (const start of dir.keys()) {
+      if (seen.has(start)) continue;
+      const loop = []; let c = start; while (c !== undefined && !seen.has(c)) { seen.add(c); loop.push(c); c = dir.get(c); }
+      if (loop.length < 3) continue;
+      let my = 0, mx = 0, mz = 0; for (const i of loop) { const q = U[i].src; mx += Wp[3 * q]; my += Wp[3 * q + 1]; mz += Wp[3 * q + 2]; } mx /= loop.length; my /= loop.length; mz /= loop.length;
+      if (my > waistY - 0.02 || my < hemY + 0.02) continue;
+      const ci = U.length; U.push({ src: U[loop[0]].src, n: new V3(0, 0, 0), fill: new V3(mx, my, mz) }); nb.push(new Set());
+      for (let k = 0; k < loop.length; k++) { const a = loop[k], b = loop[(k + 1) % loop.length]; tri.push(a, b, ci); nb[ci].add(a); nb[a].add(ci); U[ci].n.add(U[a].n); }
+    }
+  }
+  const n2 = U.length;
+  const border = new Uint8Array(n2); for (const [k, c] of edgeCount) if (c === 1) { const a = Math.floor(k / n), b = k % n; const ya = Wp[3 * U[a].src + 1], yb = Wp[3 * U[b].src + 1]; if ((ya > waistY - 0.02 || ya < hemY + 0.02) && (yb > waistY - 0.02 || yb < hemY + 0.02)) { border[a] = 1; border[b] = 1; } }
+  // side + thigh axes
+  const side = new Int8Array(n2);
+  U.forEach((u, i) => { if (u.fill) { side[i] = 0; return; } let L = 0, R = 0; for (let j = 0; j < 4; j++) { const nm = bones[SI.getComponent(u.src, j)].name, w = SW.getComponent(u.src, j); if (nm.includes('_L_')) L += w; else if (nm.includes('_R_')) R += w; } side[i] = L > 0.35 ? 1 : R > 0.35 ? -1 : 0; });
+  const ax = { 1: [bpos('CC_Base_L_Thigh', new V3()), bpos('CC_Base_L_Calf', new V3())], [-1]: [bpos('CC_Base_R_Thigh', new V3()), bpos('CC_Base_R_Calf', new V3())] };
+  const pelvisC = new V3(0, 0, bpos('CC_Base_Hip', new V3()).z);
+  const P0 = new Float32Array(n2 * 3), P1 = new Float32Array(n2 * 3), UVu = new Float32Array(n2), UVv = new Float32Array(n2), LW = new Float32Array(n2), SD = new Int8Array(n2);
+  const q = new V3(), r = new V3(), d = new V3();
+  U.forEach((u, i) => {
+    const p0 = u.fill ? u.fill.clone() : v.fromArray(Wp, 3 * u.src).clone(); u.n.normalize();
+    // snap the cut rings to clean horizontal lines
+    if (border[i]) { if (p0.y > (waistY + hemY) / 2) p0.y = waistY; else p0.y = hemY; }
+    P0.set([p0.x, p0.y, p0.z], 3 * i);
+    const sd = side[i] || (p0.x >= 0 ? 1 : -1);
+    const legW = side[i] ? sstep(crotchY + 0.04, crotchY - 0.05, p0.y) : 0;
+    // upper: off the skin along the normal
+    const up = u.n.clone().multiplyScalar(lerp(0.016, 0.008, sstep(waistY - 0.07, waistY - 0.005, p0.y)));
+    // legs: boxy flare away from the thigh axis, less on the inner side
+    const [A, B] = ax[sd]; d.subVectors(B, A); const s = clamp(q.subVectors(p0, A).dot(d) / d.lengthSq(), 0, 1);
+    q.copy(A).addScaledVector(d, s); r.subVectors(p0, q); r.y = 0; r.normalize();
+    const t = clamp((crotchY - p0.y) / (crotchY - hemY), 0, 1);
+    let f = lerp(0.014, 0.05, t); f *= 1 - 0.65 * Math.max(0, -sd * r.x);
+    const leg = r.clone().multiplyScalar(f);
+    const off = up.multiplyScalar(1 - legW).add(leg.multiplyScalar(legW));
+    P1.set([p0.x + off.x, p0.y + off.y, p0.z + off.z], 3 * i);
+    LW[i] = legW; SD[i] = sd;
+  });
+  // Taubin smoothing: bridge the skin creases (seat, groin), keep the waistband
+  for (let it = 0; it < 14; it++) for (const lam of [0.5, -0.53]) {
+    const D = new Float32Array(n2 * 3);
+    for (let i = 0; i < n2; i++) {
+      if (border[i]) continue;
+      let cx = 0, cy = 0, cz = 0; for (const j of nb[i]) { cx += P1[3 * j]; cy += P1[3 * j + 1]; cz += P1[3 * j + 2]; }
+      const k = nb[i].size || 1; D[3 * i] = (cx / k - P1[3 * i]) * lam; D[3 * i + 1] = (cy / k - P1[3 * i + 1]) * lam * (border[i] ? 0 : 1); D[3 * i + 2] = (cz / k - P1[3 * i + 2]) * lam;
+    }
+    for (let i = 0; i < n2 * 3; i++) P1[i] += D[i];
+  }
+  // one midpoint subdivision: smoother silhouette and finer folds
+  let N2 = n2, PP0 = P0, PP1 = P1, LWs = LW, SDs = SD, BRD = border, Wt = U.map(u => { const m = new Map(); for (let j = 0; j < 4; j++) { const w = SW.getComponent(u.src, j); if (w > 0) m.set(SI.getComponent(u.src, j), w); } return m; });
+  {
+    const mid = new Map(), nP0 = Array.from(P0), nP1 = Array.from(P1), nLW = Array.from(LW), nSD = Array.from(SD), nB = Array.from(border), ntri = [];
+    const M = (a, b) => {
+      const k = a < b ? a * 1e6 + b : b * 1e6 + a; let id = mid.get(k); if (id !== undefined) return id;
+      id = nLW.length; mid.set(k, id);
+      for (let c = 0; c < 3; c++) { nP0.push((P0[3 * a + c] + P0[3 * b + c]) / 2); nP1.push((P1[3 * a + c] + P1[3 * b + c]) / 2); }
+      nLW.push((LW[a] + LW[b]) / 2); nSD.push(SD[a] === SD[b] ? SD[a] : (nP1[3 * id] >= 0 ? 1 : -1)); nB.push(border[a] && border[b] && edgeCount.get(a < b ? a * n + b : b * n + a) === 1 ? 1 : 0);
+      const w = new Map(Wt[a]); for (const [bi, x] of Wt[b]) w.set(bi, (w.get(bi) || 0) + x); for (const [bi, x] of Wt[a]) if (!Wt[b].has(bi)) w.set(bi, x); for (const bi of w.keys()) w.set(bi, w.get(bi) / 2);
+      Wt.push(w); return id;
+    };
+    for (let t = 0; t < tri.length; t += 3) {
+      const a = tri[t], b = tri[t + 1], c = tri[t + 2], ab = M(a, b), bc = M(b, c), ca = M(c, a);
+      ntri.push(a, ab, ca, ab, b, bc, ca, bc, c, ab, bc, ca);
+    }
+    N2 = nLW.length; PP0 = Float32Array.from(nP0); PP1 = Float32Array.from(nP1); LWs = Float32Array.from(nLW); SDs = Int8Array.from(nSD); BRD = Uint8Array.from(nB);
+    tri.length = 0; for (const x of ntri) tri.push(x);
+    const nb2 = Array.from({ length: N2 }, () => new Set());
+    for (let t = 0; t < tri.length; t += 3) for (const [a, b] of [[tri[t], tri[t + 1]], [tri[t + 1], tri[t + 2]], [tri[t + 2], tri[t]]]) { nb2[a].add(b); nb2[b].add(a); }
+    for (let it = 0; it < 6; it++) for (const lam of [0.5, -0.53]) {
+      const D = new Float32Array(N2 * 3);
+      for (let i = 0; i < N2; i++) {
+        if (BRD[i]) continue;
+        let cx = 0, cy = 0, cz = 0; for (const j of nb2[i]) { cx += PP1[3 * j]; cy += PP1[3 * j + 1]; cz += PP1[3 * j + 2]; }
+        const k = nb2[i].size || 1; D[3 * i] = (cx / k - PP1[3 * i]) * lam; D[3 * i + 1] = (cy / k - PP1[3 * i + 1]) * lam * (BRD[i] ? 0 : 1); D[3 * i + 2] = (cz / k - PP1[3 * i + 2]) * lam;
+      }
+      for (let i = 0; i < N2 * 3; i++) PP1[i] += D[i];
+    }
+  }
+  const P0s = PP0, P1s = PP1;
+  const UVu2 = new Float32Array(N2), UVv2 = new Float32Array(N2);
+  // texture coords from the final shape: angular distance from the outer side seam, and height
+  for (let i = 0; i < N2; i++) {
+    const k = 3 * i, sd = SDs[i], [A, B] = ax[sd]; d.subVectors(B, A); v.set(P1s[k], P1s[k + 1], P1s[k + 2]);
+    const s = clamp(q.subVectors(v, A).dot(d) / d.lengthSq(), 0, 1); q.copy(A).addScaledVector(d, s);
+    const cx = lerp(pelvisC.x, q.x, LWs[i]), cz = lerp(pelvisC.z, q.z, LWs[i]), ex = lerp(0.17, 1, LWs[i]), ez = lerp(0.12, 1, LWs[i]);
+    r.set((v.x - cx) / ex, 0, (v.z - cz) / ez).normalize();
+    UVu2[i] = Math.acos(clamp(r.x * sd, -1, 1)) / Math.PI; UVv2[i] = clamp((P1s[k + 1] - hemY) / (waistY - hemY), 0, 1);
+  }
+  // non-indexed skinned geometry (one corner per vertex, as the cloth expects)
+  const m = tri.length, Pp = new Float32Array(m * 3), UV = new Float32Array(m * 2), SIo = new Uint16Array(m * 4), SWo = new Float32Array(m * 4);
+  const top4 = Wt.map(w => { const a = [...w.entries()].sort((x, y) => y[1] - x[1]).slice(0, 4); const s = a.reduce((t, x) => t + x[1], 0) || 1; while (a.length < 4) a.push([0, 0]); return a.map(([b, x]) => [b, x / s]); });
+  for (let c = 0; c < m; c++) {
+    const i = tri[c]; Pp.set(P1s.subarray(3 * i, 3 * i + 3), 3 * c); UV[2 * c] = UVu2[i]; UV[2 * c + 1] = UVv2[i];
+    for (let j = 0; j < 4; j++) { SIo[4 * c + j] = top4[i][j][0]; SWo[4 * c + j] = top4[i][j][1]; }
+  }
+  const sg = new THREE.BufferGeometry();
+  sg.setAttribute('position', new THREE.BufferAttribute(Pp, 3)); sg.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
+  sg.setAttribute('skinIndex', new THREE.BufferAttribute(SIo, 4)); sg.setAttribute('skinWeight', new THREE.BufferAttribute(SWo, 4));
+  { const so = new Float32Array(m); for (let c = 0; c < m; c++) { const i = tri[c]; so[c] = Math.hypot(P1s[3 * i] - P0s[3 * i], P1s[3 * i + 1] - P0s[3 * i + 1], P1s[3 * i + 2] - P0s[3 * i + 2]); } sg.setAttribute('skinOff', new THREE.BufferAttribute(so, 1)); }
+  { const ig = new THREE.BufferGeometry(); ig.setAttribute('position', new THREE.BufferAttribute(P1s, 3)); ig.setIndex(tri); ig.computeVertexNormals(); const N = ig.attributes.normal, No = new Float32Array(m * 3); for (let c = 0; c < m; c++) No.set([N.getX(tri[c]), N.getY(tri[c]), N.getZ(tri[c])], 3 * c); sg.setAttribute('normal', new THREE.BufferAttribute(No, 3)); }
+  const mat = new THREE.MeshPhysicalMaterial({ map: shortsTexture(), normalMap: shortsNormal(), normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.46, sheen: 0.85, sheenRoughness: 0.34, sheenColor: new THREE.Color('#d8404a'), specularIntensity: 0.5, side: THREE.DoubleSide, envMapIntensity: 0.6 });
+  const sm = new THREE.SkinnedMesh(sg, mat);
+  root.add(sm); sm.updateMatrixWorld(true);
+  sm.bind(new THREE.Skeleton(bones), new THREE.Matrix4());
+  return sm;
+}
+/* ───────── build ───────── */
+const root = new THREE.Group(); scene.add(root);
+let mixer, A = {}, pairs = [], ccBones = {}, ccHip, srcHip, hipRatio = 1, ccBoneRoot, pairByCC = new Map();
+const walkQ = new Quat(), tmpQ = new Quat(), tmpV = new V3();
+
+function firstBones(obj) { const by = {}; obj.traverse(o => { if (o.isBone && !by[o.name]) by[o.name] = o; }); return by; }
+
+async function build() {
+  const bufs = {};
+  await Promise.all(Object.entries(FILES).map(async ([k, u]) => { bufs[k] = await fetchBuf(u); }));
+  const tex = {};
+  await Promise.all(TEX.map(async n => { tex[n] = await loadTex(n, n.endsWith('_d')); }));
+  ldText.textContent = 'Собираю бойца…';
+  await new Promise(r => setTimeout(r, 30));
+
+  // CC body
+  const cc = fbx.parse(bufs.boxer, 'assets/');
+  cc.scale.setScalar(0.01); root.add(cc);
+  for (const ch of [...cc.children]) if (/^(Shadow_Catcher|Light_Sets|Camera)/.test(ch.name)) cc.remove(ch);
+  ccBones = firstBones(cc);
+  const skin = (d, n, r = 0.52, scalp = false) => skinify(new THREE.MeshPhysicalMaterial({
+    map: tex[d], color: new THREE.Color('#e6cfc2'), normalMap: n ? tex[n] : null, normalScale: new THREE.Vector2(1, 1), roughness: r, specularIntensity: 0.5,
+    clearcoat: 0.08, clearcoatRoughness: 0.4, sheen: 0.15, sheenColor: new THREE.Color('#ff9b80'), sheenRoughness: 0.6, envMapIntensity: 0.6,
+  }), scalp);
+  const M = {
+    Std_Skin_Head: skin('head_d', 'head_n', 0.48, true), Std_Skin_Body: skin('body_d', 'body_n'), Std_Skin_Arm: skin('arm_d', 'arm_n'), Std_Skin_Leg: skin('leg_d', 'leg_n'),
+    Std_Nails: new THREE.MeshPhysicalMaterial({ map: tex.nails_d, roughness: 0.3, clearcoat: 0.6 }),
+    Std_Eyelash: new THREE.MeshBasicMaterial({ visible: false }),
+  };
+  let body;
+  cc.traverse(o => {
+    if (!o.isMesh) return;
+    o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true;
+    if (o.isSkinnedMesh) o.normalizeSkinWeights();
+    if (o.name === 'CC_Base_Body') { body = o; o.material = (Array.isArray(o.material) ? o.material : [o.material]).map(m => M[m.name] || m); }
+    else if (o.name === 'CC_Game_Eye') o.material = new THREE.MeshPhysicalMaterial({ map: tex.eye_d, roughness: 0.05, clearcoat: 1, clearcoatRoughness: 0.02 });
+    else if (o.name === 'CC_Game_Teeth') o.material = new THREE.MeshStandardMaterial({ map: tex.teeth_d, roughness: 0.35 });
+    else o.visible = false;
+  });
+  cc.updateMatrixWorld(true);
+
+  // weld the per-corner FBX vertices (smooth tangents), then drop skin hidden under shorts and shoes
+  {
+    body.geometry.morphAttributes = {}; body.morphTargetInfluences = undefined; body.morphTargetDictionary = undefined;
+    const g = mergeVertices(body.geometry); body.geometry.dispose(); body.geometry = g;
+    const p = g.attributes.position, bm = body.bindMatrix, v = new V3(), ys = new Float32Array(p.count), xs = new Float32Array(p.count), src = g.index.array;
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(bm).multiplyScalar(0.01); ys[i] = v.y; xs[i] = v.x; }
+    BODY.fullIndex = src.slice(); BODY.groups = g.groups.map(x => ({ ...x }));
+    BODY.crotchY = bpos('CC_Base_L_Thigh', v).y - 0.115;
+    BODY.gen = new Uint8Array(p.count);
+    const hideLo = BODY.crotchY + 0.02, hideHi = SHORTS.waistY - 0.015;
+    const idx = [], groups = [];
+    for (const gr of g.groups) {
+      const start = idx.length;
+      for (let t = gr.start; t < gr.start + gr.count; t += 3) {
+        let under = true, feet = true;
+        for (let k = 0; k < 3; k++) { const i = src[t + k], y = ys[i], ax = Math.abs(xs[i]); if (!(y > hideLo && y < hideHi && ax < 0.26)) under = false; if (!(y < 0.062)) feet = false; }
+        const gen = BODY.gen[src[t]] || BODY.gen[src[t + 1]] || BODY.gen[src[t + 2]];
+        if (!under && !gen) idx.push(src[t], src[t + 1], src[t + 2]);
+      }
+      groups.push({ start, count: idx.length - start, materialIndex: gr.materialIndex });
+    }
+    g.setIndex(idx); g.clearGroups(); for (const gr of groups) g.addGroup(gr.start, gr.count, gr.materialIndex);
+  }
+
+  // scalp + beard roots from the real head mesh; tint the skin under them
+  {
+    const g = body.geometry, p = g.attributes.position, nAttr = g.attributes.normal, bm = body.bindMatrix, nm = new THREE.Matrix3().getNormalMatrix(bm);
+    const headSet = new Uint8Array(p.count), ix = g.index.array, g0 = g.groups.find(x => x.materialIndex === 0);
+    for (let t = g0.start; t < g0.start + g0.count; t++) headSet[ix[t]] = 1;
+    const W = new Float32Array(p.count * 3), N = new Float32Array(p.count * 3), v = new V3(), nv = new V3();
+    const lo = new V3(1e9, 1e9, 1e9), hi = new V3(-1e9, -1e9, -1e9);
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i).applyMatrix4(bm).multiplyScalar(0.01); W[3 * i] = v.x; W[3 * i + 1] = v.y; W[3 * i + 2] = v.z;
+      nv.fromBufferAttribute(nAttr, i).applyMatrix3(nm).normalize(); N[3 * i] = nv.x; N[3 * i + 1] = nv.y; N[3 * i + 2] = nv.z;
+      if (headSet[i] && v.y > 1.6 && Math.abs(v.x) < 0.082) { lo.min(v); hi.max(v); }
+    }
+    HEAD.C.copy(lo).add(hi).multiplyScalar(0.5); HEAD.R.copy(hi).sub(lo).multiplyScalar(0.5);
+    HEAD.C.y -= 0.005;
+    const scalp = new Float32Array(p.count);
+    for (let i = 0; i < p.count; i++) {
+      if (!headSet[i]) continue;
+      v.set((W[3 * i] - HEAD.C.x) / HEAD.R.x, (W[3 * i + 1] - HEAD.C.y) / HEAD.R.y, (W[3 * i + 2] - HEAD.C.z) / HEAD.R.z);
+      if (v.lengthSq() < 0.15) continue;
+      v.normalize();
+      const h = hairMask(v.x, v.y, v.z), b = beardMask(v.x, v.y, v.z);
+      let bs = 0; for (let k = 0; k < 10; k++) { const ang = k * 2.4, rr = 0.09 * Math.sqrt((k + 0.5) / 10); bs += beardMask(v.x + Math.cos(ang) * rr, v.y + Math.sin(ang) * rr, v.z); } bs /= 10;
+      scalp[i] = Math.max(h, bs * bs * 0.32);
+    }
+    g.setAttribute('aScalp', new THREE.BufferAttribute(scalp, 1));
+    { const huv = new Float32Array(p.count * 2);
+      for (let i = 0; i < p.count; i++) { if (!headSet[i]) continue; v.set((W[3 * i] - HEAD.C.x) / HEAD.R.x, (W[3 * i + 1] - HEAD.C.y) / HEAD.R.y, (W[3 * i + 2] - HEAD.C.z) / HEAD.R.z).normalize();
+        huv[2 * i] = Math.atan2(v.x, v.z); huv[2 * i + 1] = Math.asin(clamp(v.y, -1, 1)); }
+      g.setAttribute('aHairUV', new THREE.BufferAttribute(huv, 2)); }
+    // area-weighted random roots on the scalp / jaw triangles (denser than the mesh vertices)
+    const tris = { hair: [], beard: [] }, A = new V3(), B = new V3(), Cc = new V3(), cen = new V3();
+    for (let t = g0.start; t < g0.start + g0.count; t += 3) {
+      const a = ix[t], b = ix[t + 1], c = ix[t + 2];
+      A.fromArray(W, 3 * a); B.fromArray(W, 3 * b); Cc.fromArray(W, 3 * c);
+      cen.copy(A).add(B).add(Cc).divideScalar(3);
+      v.set((cen.x - HEAD.C.x) / HEAD.R.x, (cen.y - HEAD.C.y) / HEAD.R.y, (cen.z - HEAD.C.z) / HEAD.R.z); { const l2 = v.lengthSq(); if (l2 < 0.45 || l2 > 1.8 || v.y < -1.02) continue; } v.normalize();
+      const area = B.clone().sub(A).cross(Cc.clone().sub(A)).length() / 2;
+      if (hairMask(v.x, v.y, v.z) > 0.6) tris.hair.push([a, b, c, area]); else if (beardMask(v.x, v.y, v.z) > 0.5) tris.beard.push([a, b, c, area]);
+    }
+    const sample = (list, count, out) => {
+      const total = list.reduce((s, x) => s + x[3], 0);
+      for (const [a, b, c, area] of list) {
+        let k = area / total * count; const whole = Math.floor(k) + (rnd() < k - Math.floor(k) ? 1 : 0);
+        for (let q = 0; q < whole; q++) {
+          let u = rnd(), w = rnd(); if (u + w > 1) { u = 1 - u; w = 1 - w; } const z0 = 1 - u - w;
+          const P = new V3(), Nn = new V3();
+          for (const [id, f] of [[a, z0], [b, u], [c, w]]) { P.x += W[3 * id] * f; P.y += W[3 * id + 1] * f; P.z += W[3 * id + 2] * f; Nn.x += N[3 * id] * f; Nn.y += N[3 * id + 1] * f; Nn.z += N[3 * id + 2] * f; }
+          Nn.normalize();
+          const d = new V3((P.x - HEAD.C.x) / HEAD.R.x, (P.y - HEAD.C.y) / HEAD.R.y, (P.z - HEAD.C.z) / HEAD.R.z).normalize();
+          out.push({ p: P, n: Nn, d });
+        }
+      }
+    };
+    sample(tris.hair, 3600, HEAD.hairRoots); sample(tris.beard, 2400, HEAD.beardRoots);
+  }
+
+  // clothes rebound onto the CC skeleton by bone name
+  const cloth = (buf, mat) => {
+    const o = fbx.parse(buf, 'assets/'); o.updateMatrixWorld(true);
+    let sm; o.traverse(x => { if (x.isSkinnedMesh) sm = x; });
+    const bones = sm.skeleton.bones.map(b => ccBones[b.name] || b);
+    const bind = sm.bindMatrix.clone();
+    sm.removeFromParent(); root.add(sm);
+    sm.bind(new THREE.Skeleton(bones), bind);
+    sm.material = mat; sm.frustumCulled = false; sm.castShadow = true; sm.receiveShadow = true;
+    return sm;
+  };
+  const shortsSM = makeShorts(body);
+  cloth(bufs.wraps, new THREE.MeshStandardMaterial({ map: tex.wraps_d, normalMap: tex.wraps_n, roughness: 0.88 }));
+
+  // simulated layers are built in the rest pose
+  root.updateMatrixWorld(true);
+  setupColliders();
+  shorts = new ShortsCloth(shortsSM);
+  baseSys = buildHair(HEAD.hairRoots, { kind: 'base' });
+  hairSys = buildHair(HEAD.hairRoots.filter(() => rnd() < 0.68), { kind: 'hair' });
+  beardSys = buildHair(HEAD.beardRoots, { kind: 'beard' });
+
+  // source Mixamo rig (invisible) + clips
+  const src = fbx.parse(bufs.idle, 'assets/'); src.scale.setScalar(0.01); src.visible = false; root.add(src);
+  src.updateMatrixWorld(true);
+  const sb = firstBones(src);
+  const qw = (b, q) => b.getWorldQuaternion(q);
+  const pw = (b, v) => v.setFromMatrixPosition(b.matrixWorld);
+  for (const [s, c] of Object.entries(MAP)) {
+    const S = sb[s], C = ccBones[c]; if (!S || !C) continue;
+    const pr = { S, C, qsRestInv: qw(S, new Quat()).invert(), qcRest: qw(C, new Quat()), R0: new Quat(), tw: new Quat() };
+    const cs = CHILD[s];
+    if (cs && sb[cs] && ccBones[MAP[cs]]) {
+      const ds = pw(sb[cs], new V3()).sub(pw(S, new V3())).normalize();
+      const dc = pw(ccBones[MAP[cs]], new V3()).sub(pw(C, new V3())).normalize();
+      pr.R0.setFromUnitVectors(dc, ds);
+    }
+    pairs.push(pr); pairByCC.set(C, pr);
+  }
+  ccHip = ccBones.CC_Base_Hip; srcHip = sb.mixamorigHips;
+  hipRatio = pw(ccHip, new V3()).y / pw(srcHip, new V3()).y;
+  ccBoneRoot = ccBones.CC_Base_BoneRoot;
+
+  mixer = new THREE.AnimationMixer(src);
+  const clip = (buf) => { const o = fbx.parse(buf, 'assets/'); const c = o.animations[0]; c.tracks = c.tracks.filter(t => !/\.scale$/.test(t.name)); return c; };
+  A.idle = mixer.clipAction(src.animations[0]); A.idle.play();
+  for (const k of ['jab', 'cross', 'upper', 'hook']) { const a = mixer.clipAction(clip(bufs[k])); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; A[k] = a; }
+
+}
+
+/* ───────── retarget per frame ───────── */
+const _pq = new Quat(), _hp = new V3();
+function retarget() {
+  src_update();
+  for (const p of pairs) { p.S.getWorldQuaternion(p.tw); p.tw.multiply(p.qsRestInv).multiply(p.R0).multiply(p.qcRest); }
+  ccBoneRoot.parent.getWorldQuaternion(_pq);
+  walk(ccBoneRoot, _pq);
+  _hp.setFromMatrixPosition(srcHip.matrixWorld).multiplyScalar(hipRatio);
+  ccHip.parent.updateWorldMatrix(true, false);
+  ccHip.position.copy(ccHip.parent.worldToLocal(_hp));
+}
+function src_update() { mixer.getRoot().updateMatrixWorld(true); }
+function walk(bone, parentQ) {
+  const p = pairByCC.get(bone);
+  const wq = new Quat();
+  if (p) { wq.copy(p.tw); bone.quaternion.copy(parentQ).invert().multiply(wq); }
+  else wq.copy(parentQ).multiply(bone.quaternion);
+  for (const c of bone.children) if (c.isBone) walk(c, wq);
+}
+
+/* ───────── punch sequencing ───────── */
+const SPEED = 1.15;
+const PUNCH = { jab: { chain: 0.82, name: 'джеб' }, cross: { chain: 1.12, name: 'кросс' }, upper: { chain: 1.18, name: 'апперкот' }, hook: { chain: 1.05, name: 'хук' } };
+const COMBOS = [['jab'], ['jab', 'cross'], ['jab', 'cross', 'upper'], ['jab', 'jab', 'cross'], ['cross', 'hook'], ['jab', 'upper'], ['hook', 'cross']];
+let cur = null, curName = '', returning = false, queue = [], autoOn = !window.matchMedia('(prefers-reduced-motion: reduce)').matches, nextAuto = 1.2, clock = 0, timeScale = 1;
+const elMove = $('s-move');
+function startPunch(name) {
+  const a = A[name], from = cur || A.idle;
+  a.reset(); a.setEffectiveTimeScale(SPEED); a.setEffectiveWeight(1); a.play();
+  a.crossFadeFrom(from, cur ? 0.16 : 0.14, false);
+  cur = a; curName = name; returning = false; elMove.textContent = PUNCH[name].name;
+}
+function sequence() {
+  if (cur) {
+    const t = cur.time, dur = cur.getClip().duration;
+    if (queue.length && t >= PUNCH[curName].chain) startPunch(queue.shift());
+    else if (!returning && t >= dur - 0.34) { A.idle.reset().play(); A.idle.crossFadeFrom(cur, 0.3, false); returning = true; }
+    else if (returning && (t >= dur || cur.getEffectiveWeight() <= 0.001)) { cur = null; elMove.textContent = 'стойка'; nextAuto = clock + 0.6 + rnd() * 1.1; }
+  } else {
+    if (queue.length) startPunch(queue.shift());
+    else if (autoOn && clock > nextAuto) queue.push(...COMBOS[(rnd() * COMBOS.length) | 0]);
+  }
+}
+
+/* ───────── loop ───────── */
+let last = performance.now(), fpsT = 0, fpsN = 0;
+const elFps = $('s-fps');
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const sdt = dt * timeScale; clock += sdt;
+  sequence();
+  mixer.update(sdt);
+  retarget();
+  simulate(sdt);
+  controls.update();
+  composer.render();
+  fpsN++; fpsT += dt; if (fpsT > 0.5) { elFps.textContent = `${Math.round(fpsN / fpsT)} к/с`; fpsN = 0; fpsT = 0; }
+  requestAnimationFrame(loop);
+}
+
+build().then(() => {
+  $('loading').hidden = true;
+  retarget(); simulate(0);
+  requestAnimationFrame(t => { last = t; loop(t); });
+}).catch(e => { console.error(e); ldText.textContent = 'Не удалось загрузить модель. Обнови страницу.'; ldText.className = 'err'; });
+
+/* ───────── UI ───────── */
+const tAuto = $('t-auto'), tSlow = $('t-slow');
+const setAuto = v => { autoOn = v; tAuto.setAttribute('aria-pressed', String(v)); if (v) nextAuto = clock + 0.3; };
+setAuto(autoOn);
+const setSlow = v => { timeScale = v ? 0.25 : 1; tSlow.setAttribute('aria-pressed', String(v)); };
+function fire(name) {
+  if (!mixer) return;
+  setAuto(false);
+  if (queue.length > 3) return;
+  if (name === 'combo') queue.push('jab', 'cross', 'upper'); else queue.push(name);
+}
+document.querySelectorAll('.mv').forEach(b => b.addEventListener('click', () => fire(b.dataset.move)));
+tAuto.addEventListener('click', () => setAuto(tAuto.getAttribute('aria-pressed') !== 'true'));
+tSlow.addEventListener('click', () => setSlow(tSlow.getAttribute('aria-pressed') !== 'true'));
+window.addEventListener('keydown', e => {
+  if (e.repeat || e.metaKey || e.ctrlKey) return;
+  const k = e.key.toLowerCase();
+  if (k === '1') fire('jab'); else if (k === '2') fire('cross'); else if (k === '3') fire('upper'); else if (k === '4') fire('hook');
+  else if (k === ' ') { e.preventDefault(); fire('combo'); }
+  else if (k === 's' || k === 'ы') setSlow(tSlow.getAttribute('aria-pressed') !== 'true');
+});
+</script>
