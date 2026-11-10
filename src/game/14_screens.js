@@ -67,7 +67,7 @@ function setCat(c) {
   UI.cat = c;
   for (const b of $('cats').children) b.setAttribute('aria-pressed', String(b.dataset.cat === c));
   for (const p of document.querySelectorAll('.cpane')) p.hidden = p.dataset.cat !== c;
-  if (UI.scr === 'creator') setView(c === 'face' ? VIEW_FACE : c === 'hands' ? VIEW_HANDS : VIEW_FULL);
+  if (UI.scr === 'creator') setView(c === 'face' || (c === 'wear' && (UI.wcat === 'head' || UI.wcat === 'eyes')) ? VIEW_FACE : c === 'hands' ? VIEW_HANDS : VIEW_FULL);
   if (c !== 'hands' && UI.spar) { UI.spar = false; P1.sparGear(false); }
 }
 function buildCreator() {
@@ -75,10 +75,7 @@ function buildCreator() {
   swatches('o-skin', col(SKIN_LOOKS, s => ({ id: s.id, c: s.c, sw: s.id === 'light' ? '#e2b79f' : s.id === 'tan' ? '#b98563' : '#6f4630', label: s.id })), () => LOOK.skin, v => { LOOK.skin = v; });
   swatches('o-hair', col(HAIR_LOOKS, h => h.id === 'bald' ? { id: 'bald', label: 'под ноль' } : { id: h.id, c: h.c, label: h.id }), () => LOOK.hair, v => { LOOK.hair = v; });
   swatches('o-beard', [{ id: 'no', label: 'нет' }, { id: 'yes', label: 'есть' }], () => LOOK.beard ? 'yes' : 'no', v => { LOOK.beard = v === 'yes'; }, true);
-  swatches('o-top', col(TOPS, b => ({ id: b.id, label: b.label })), () => LOOK.top || 'none', v => { LOOK.top = v; }, true);
-  swatches('o-bottom', col(BOTTOMS, b => ({ id: b.id, label: b.label })), () => LOOK.bottom || 'shorts', v => { LOOK.bottom = v; }, true);
-  swatches('o-shorts', col(SHORTS_LOOKS, s => ({ id: s.id, c: s.main, label: s.id })), () => LOOK.shorts, v => { LOOK.shorts = v; });
-  swatches('o-shoes', col(SHOES, b => ({ id: b.id, label: b.label })), () => LOOK.shoes || 'none', v => { LOOK.shoes = v; }, true);
+  wearUI();   // clothes: category → model → the colours of that model (04e_wardrobe.js)
   swatches('o-wraps', col(WRAPS_LOOKS, w => ({ id: w.id, c: w.c, label: w.label })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; spar(false)(); });
   swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { LOOK.hands = v; spar(false)(); }, true);   // street fights: wraps or 4 oz MMA gloves
   swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; spar(true)(); });   // sparring (and MMA) gloves + headgear: shown on him while choosing
@@ -89,7 +86,8 @@ function buildCreator() {
 }
 function randomLook() {
   const pick = a => a[(Math.random() * a.length) | 0], cw = careerWins();
-  Object.assign(LOOK, { shorts: pick(SHORTS_LOOKS).id, hair: pick(HAIR_LOOKS).id, skin: pick(SKIN_LOOKS).id, beard: Math.random() < 0.5, bottom: pick(BOTTOMS).id, top: pick(TOPS).id, shoes: pick(SHOES).id,
+  const of = (cat, pNone) => { if (Math.random() < pNone) return { id: 'none' }; const it = pick(wearItems(cat)); return { id: it.id, color: pick(Math.random() < 0.7 ? it.colors : wearColors(it)) }; };
+  Object.assign(LOOK, { hair: pick(HAIR_LOOKS).id, skin: pick(SKIN_LOOKS).id, beard: Math.random() < 0.5, bottom: of('bottom', 0), top: of('top', 0.3), shoes: of('shoes', 0.25), head: of('head', 0.6), eyes: of('eyes', 0.7), belt: of('belt', 0.4),
     guard: pick(GUARDS).id, wraps: pick(WRAPS_LOOKS.filter(w => cw >= w.need)).id, hands: pick(HANDS).id, gloves: pick(GLOVES).id });
   P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar); save(); buildCreator();
 }

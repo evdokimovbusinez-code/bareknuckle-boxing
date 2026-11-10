@@ -3,14 +3,7 @@
    the normal by the fabric's thickness and clipped to a band of the body (ankle → waist for trousers, …). The skin under them is
    discarded, so nothing pokes through. Gear for sparring (gloves, headgear) and the gum shield ride on bones. */
 // bottoms with a `cut` are loose trousers / long shorts with their own geometry, shoes are lofted meshes (04d_street.js); tops are shells of the torso
-const BOTTOMS = [{ id: 'shorts', label: 'шорты' }, { id: 'jeans', label: 'джинсы', cut: 'jeans', c: '#34507a' }, { id: 'jeansB', label: 'джинсы чёрные', cut: 'jeans', c: '#1e1f24' }, { id: 'jeansL', label: 'джинсы потёртые', cut: 'jeans', c: '#7f99b8', worn: 1 },
-  { id: 'sweatG', label: 'спортивки серые', cut: 'sweat', c: '#8a8c91' }, { id: 'pants', label: 'спортивки чёрные', cut: 'sweat', c: '#1c1d21' }, { id: 'sweatS', label: 'с лампасами', cut: 'sweat', c: '#1c1d21', stripe: '#e8e6e0' },
-  { id: 'cargo', label: 'карго', cut: 'short', c: '#6a6a4c', style: 'cargo' }, { id: 'bball', label: 'баскетбольные', cut: 'short', c: '#18191d', style: 'bball', stripe: '#e8e6e0' }];
-const TOPS = [{ id: 'none', label: 'без' }, { id: 'tank', label: 'майка', tex: 'cotton', c: '#ecebe6', sleeve: 0, thick: 0.42 }, { id: 'tankB', label: 'майка чёрная', tex: 'cotton', c: '#1b1c20', sleeve: 0, thick: 0.42 },
-  { id: 'teeW', label: 'футболка', tex: 'cotton', c: '#e9e6df', sleeve: 0.55, thick: 0.45 }, { id: 'teeB', label: 'чёрная', tex: 'cotton', c: '#1b1c20', sleeve: 0.55, thick: 0.45 }, { id: 'teeG', label: 'серая', tex: 'sweat', c: '#9a9ca2', sleeve: 0.55, thick: 0.45 },
-  { id: 'hoodie', label: 'худи', tex: 'sweat', c: '#2b2e36', sleeve: 1.9, thick: 1.15, hem: 11 }];
-const SHOES = [{ id: 'none', label: 'босиком' }, { id: 'sneak', label: 'кроссовки', c: '#e9e9ec', sole: '#f4f2ec', top: 8.5, stripe: '#9a9ca4', lace: '#ffffff' }, { id: 'sneakB', label: 'чёрные', c: '#17181c', sole: '#e9e6df', top: 8.5, stripe: '#e8e6e0', lace: '#d8d8dc' },
-  { id: 'boots', label: 'боксёрки', c: '#16171b', sole: '#d9d4c8', top: 20, boot: '#f2f0ea', lace: '#f2f0ea' }, { id: 'keds', label: 'кеды', c: '#1b1c21', sole: '#f1eee6', top: 13, cap: '#f1eee6', band: '#b3202c', patch: '#f1eee6', canvas: 1, lace: '#f4f2ec' }];
+// (the items themselves — tops, bottoms, shoes, hats, glasses, belts — are the registry ITEMS in 04e_wardrobe.js)
 const GUARDS = [{ id: 'clear', c: '#d8e4ea', label: 'прозрачная' }, { id: 'black', c: '#141416', label: 'чёрная' }, { id: 'red', c: '#b3202c', label: 'красная' }, { id: 'blue', c: '#2f55b5', label: 'синяя' }, { id: 'gold', c: '#d8b25a', label: 'золотая' }];
 const GLOVES = [{ id: 'red', c: '#b3202c', trim: '#efeae0', label: 'красные' }, { id: 'black', c: '#17181c', trim: '#a9a9b2', label: 'чёрные' }, { id: 'blue', c: '#1f3f9a', trim: '#efeae0', label: 'синие' }, { id: 'white', c: '#e6e2d8', trim: '#1b1c20', label: 'белые' }];
 const HANDS = [{ id: 'wraps', label: 'бинты' }, { id: 'mma', label: 'MMA 4 oz' }];
@@ -82,18 +75,19 @@ function shellMesh(F, kind, opt) {
   geo.setIndex(idx);
   const mat = new THREE.MeshPhysicalMaterial({ color: opt.c, map: opt.tex ? (GEAR['t_' + opt.tex] || (GEAR['t_' + opt.tex] = fabricTex(opt.tex))) : null, roughness: kind === 'shoes' ? 0.45 : 0.9, sheen: kind === 'shoes' ? 0 : 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color(opt.c), clearcoat: kind === 'shoes' ? 0.4 : 0 });
   if (mat.map) { mat.map = mat.map.clone(); mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping; mat.map.repeat.set(6, 6); mat.map.needsUpdate = true; }
-  const U = { uThick: { value: opt.thick }, uTop: { value: opt.top || 0 }, uSl: { value: opt.sleeve || 0 }, uGTop: { value: GEAR.top }, uGNeck: { value: GEAR.neck }, uSole: { value: new THREE.Color(opt.sole || opt.c) }, uHemD: { value: opt.hem || 9 } };
+  const U = { uThick: { value: opt.thick }, uTop: { value: opt.top || 0 }, uSl: { value: opt.sleeve || 0 }, uGTop: { value: GEAR.top }, uGNeck: { value: GEAR.neck }, uSole: { value: new THREE.Color(opt.sole || opt.c) }, uHemD: { value: opt.hem || 9 }, uDecal: { value: wearBlank() }, uDecF: { value: new V4() }, uDecB: { value: new V4() } };   // uDecal: prints (front | back halves), uDecF / uDecB: centre x, height, 1/width (signed), 1/height — see topTint
   const cond = { pants: '(R < 2.5 && h > 5.5 && h < uGTop)', shoes: '(R < 1.5 && h < uTop)', shirt: '((R > 0.5 && R < 2.5 && h > uGTop - uHemD && h < uGNeck) || (R > 2.5 && R < 4.5 && a < uSl && h < uGNeck + 3.0))' }[kind];   // (the height test keeps the sleeve rule off the neck: R is interpolated 2 → 5 across the trunk/head seam and used to draw a dark ring there)
   mat.onBeforeCompile = s => {
     Object.assign(s.uniforms, U);
-    s.vertexShader = 'attribute vec3 aGH; varying vec3 vGH; uniform float uThick;\n' + s.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-      vGH = aGH; float bag = ${kind === 'pants' ? '0.7 + 0.9 * smoothstep( 60.0, 8.0, aGH.x ) + 0.4 * smoothstep( 80.0, 100.0, aGH.x )' : kind === 'shirt' ? '1.0 + 0.6 * smoothstep( 0.2, 0.5, aGH.z )' : '1.0 + smoothstep( 4.0, 0.0, aGH.x ) * 0.4'};
+    s.vertexShader = 'attribute vec3 aGH; varying vec3 vGH; varying vec2 vBP; uniform float uThick;\n' + s.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      vGH = aGH; vBP = vec2( position.x, -normal.y ); float bag = ${kind === 'pants' ? '0.7 + 0.9 * smoothstep( 60.0, 8.0, aGH.x ) + 0.4 * smoothstep( 80.0, 100.0, aGH.x )' : kind === 'shirt' ? '1.0 + 0.6 * smoothstep( 0.2, 0.5, aGH.z )' : '1.0 + smoothstep( 4.0, 0.0, aGH.x ) * 0.4'};
       transformed += objectNormal * uThick * bag;`);
-    s.fragmentShader = 'varying vec3 vGH; uniform float uHemD; uniform float uTop; uniform float uSl; uniform float uGTop; uniform float uGNeck; uniform vec3 uSole;\n' + s.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+    s.fragmentShader = 'varying vec3 vGH; varying vec2 vBP; uniform sampler2D uDecal; uniform vec4 uDecF; uniform vec4 uDecB; uniform float uHemD; uniform float uTop; uniform float uSl; uniform float uGTop; uniform float uGNeck; uniform vec3 uSole;\n' + s.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
       { float h = vGH.x, R = vGH.y, a = vGH.z; if ( !${cond} ) discard; }`)
-      .replace('#include <map_fragment>', '#include <map_fragment>\n' + (kind === 'shoes' ? ' diffuseColor.rgb = mix( diffuseColor.rgb, uSole, smoothstep( 2.4, 1.8, vGH.x ) ); diffuseColor.rgb *= 1.0 - 0.25 * smoothstep( uTop - 1.5, uTop - 0.5, vGH.x );' : ' diffuseColor.rgb *= 1.0 - 0.18 * smoothstep( 1.0, 0.0, abs( vGH.x - uGTop + 1.5 ) );'));
+      .replace('#include <map_fragment>', '#include <map_fragment>\n' + (kind === 'shoes' ? ' diffuseColor.rgb = mix( diffuseColor.rgb, uSole, smoothstep( 2.4, 1.8, vGH.x ) ); diffuseColor.rgb *= 1.0 - 0.25 * smoothstep( uTop - 1.5, uTop - 0.5, vGH.x );' : ' diffuseColor.rgb *= 1.0 - 0.18 * smoothstep( 1.0, 0.0, abs( vGH.x - uGTop + 1.5 ) );'
+        + (kind === 'shirt' ? ' if ( vGH.y > 1.5 && vGH.y < 2.5 ) { vec4 dq = vBP.y > 0.0 ? uDecF : uDecB; vec2 du = ( vec2( vBP.x, vGH.x ) - dq.xy ) * dq.zw + 0.5; if ( abs( vBP.y ) > 0.25 && dq.w > 0.0 && du.x > 0.0 && du.x < 1.0 && du.y > 0.0 && du.y < 1.0 ) { vec4 dc = texture2D( uDecal, vec2( du.x * 0.5 + ( vBP.y > 0.0 ? 0.0 : 0.5 ), du.y ) ); diffuseColor.rgb = mix( diffuseColor.rgb, dc.rgb, dc.a * 0.92 ); } }' : '')));
   };
-  mat.customProgramCacheKey = () => 'shell-' + kind;
+  mat.customProgramCacheKey = () => 'shell-' + kind; mat.userData.U = U;
   const m = new THREE.SkinnedMesh(geo, mat); m.bind(F.body.skeleton, F.body.bindMatrix); m.frustumCulled = false; m.castShadow = m.receiveShadow = true;
   F.body.parent.add(m); m.position.copy(F.body.position); m.quaternion.copy(F.body.quaternion); m.scale.copy(F.body.scale);
   return m;
