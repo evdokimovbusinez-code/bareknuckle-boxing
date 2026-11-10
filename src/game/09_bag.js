@@ -11,7 +11,8 @@ const BAG = { on: false, th: new V3(), om: new V3(), yaw: 0, yawV: 0, sq: 0, sco
   const ch = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.45, 6), chainM); ch.position.y = -0.22; g.add(ch);
   g.visible = false; scene.add(g);
 }
-function showP2(v) { if (!P2) return; P2.group.visible = v; for (const o of P2.sceneObjs || []) o.visible = v; }
+function showP2(v) { if (!P2) return; P2.group.visible = v; for (const o of P2.sceneObjs || []) o.visible = v;
+  if (v) P2.handGear(); else if (P2.gear.gloves) { for (const gl of P2.gear.gloves) gl.g.visible = false; P2.gear.hg.visible = false; } }   // (his gear decides what of the wraps / hair shows)
 function startBag() {
   G.mode = 'bag'; if (G.diff !== G.userDiff && G.userDiff) G.diff = G.userDiff;
   startFight(true); BAG.on = true; showP2(false); BAG.g.visible = true;
@@ -69,7 +70,7 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 function startCareer() {
   G.mode = 'career'; G.userDiff = G.diff; const L = LADDER[Math.min(G.career, LADDER.length - 1)];
   let s = 9173 + G.career * 31; const r = () => (s = (s * 16807) % 2147483647) / 2147483647, pick = a => a[(r() * a.length) | 0];
-  P2.applyLook({ shorts: pick(SHORTS_LOOKS.filter(x => x.id !== LOOK.shorts)).id, hair: pick(HAIR_LOOKS).id, skin: pick(SKIN_LOOKS).id, beard: r() < 0.6, wraps: L.champ ? 'gold' : r() < 0.6 ? 'white' : pick(WRAPS_LOOKS.slice(0, 4)).id, guard: pick(GUARDS).id });
+  P2.applyLook({ shorts: pick(SHORTS_LOOKS.filter(x => x.id !== LOOK.shorts)).id, hair: pick(HAIR_LOOKS).id, skin: pick(SKIN_LOOKS).id, beard: r() < 0.6, wraps: L.champ ? 'gold' : r() < 0.6 ? 'white' : pick(WRAPS_LOOKS.slice(0, 4)).id, guard: pick(GUARDS).id, hands: r() < 0.3 ? 'mma' : 'wraps' });
   AI.style = STYLES[L.st]; $('n2').textContent = L.nm + (L.champ ? ' ★' : ''); const sl = $('st2'); if (sl) sl.textContent = STYLES[L.st].label;
   G.diff = L.diff; startFight(true);
 }

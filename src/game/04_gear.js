@@ -6,6 +6,8 @@ const BOTTOMS = [{ id: 'shorts', label: 'шорты' }, { id: 'pants', label: '�
 const TOPS = [{ id: 'none', label: 'без' }, { id: 'teeW', label: 'футболка', tex: 'cotton', c: '#e9e6df', sleeve: 0.55 }, { id: 'teeB', label: 'чёрная', tex: 'cotton', c: '#1b1c20', sleeve: 0.55 }, { id: 'tank', label: 'майка', tex: 'cotton', c: '#b3202c', sleeve: 0 }];
 const SHOES = [{ id: 'none', label: 'босиком' }, { id: 'sneak', label: 'кроссовки', c: '#e8e8ea', sole: '#d9d4c8', top: 7 }, { id: 'boots', label: 'боксёрки', c: '#16171b', sole: '#f2f0ea', top: 19 }];
 const GUARDS = [{ id: 'clear', c: '#d8e4ea', label: 'прозрачная' }, { id: 'black', c: '#141416', label: 'чёрная' }, { id: 'red', c: '#b3202c', label: 'красная' }, { id: 'blue', c: '#2f55b5', label: 'синяя' }, { id: 'gold', c: '#d8b25a', label: 'золотая' }];
+const GLOVES = [{ id: 'red', c: '#b3202c', trim: '#efeae0', label: 'красные' }, { id: 'black', c: '#17181c', trim: '#a9a9b2', label: 'чёрные' }, { id: 'blue', c: '#1f3f9a', trim: '#efeae0', label: 'синие' }, { id: 'white', c: '#e6e2d8', trim: '#1b1c20', label: 'белые' }];
+const HANDS = [{ id: 'wraps', label: 'бинты' }, { id: 'mma', label: 'MMA 4 oz' }];
 const GEAR = { ready: false };
 function fabricTex(kind) {
   return canvasTex(512, 512, (g, w, h) => {
@@ -32,17 +34,27 @@ function gearSetup(F) {
   GEAR.top = H(M('Waist')) - 1.5; GEAR.neck = H(M('NeckTwist01')) - 3.5;
   const sh = { L: M('L_UpperarmTwist01'), R: M('R_UpperarmTwist01') }, el = { L: M('L_ElbowShareBone'), R: M('R_ElbowShareBone') };
   const gh = new Float32Array(n * 3);
+  // hands, for gloves: a frame per hand from the bind pose of its bones → per vertex: cm along the hand from the wrist, how much the skin
+  // faces the back of the hand, finger segment (0 hand/forearm, 1 first phalanx, 2 the rest of a finger, 3 thumb), cm across the hand
+  const bi = body.bindMatrix.clone().invert(), bpos = nm => new V3().applyMatrix4(new M4().copy(sk.boneInverses[names.indexOf('CC_Base_' + nm)]).invert()).applyMatrix4(bi);
+  const HF = GEAR.HF = {}, gv = new Float32Array(n * 4), nr = geo.attributes.normal;
+  for (const S of ['L', 'R']) { const Hp = bpos(S + '_Hand'), Y = bpos(S + '_Mid1').sub(Hp), u = Y.length() / 10.3; Y.normalize(); const X = bpos(S + '_Index1').sub(bpos(S + '_Pinky1')); X.addScaledVector(Y, -X.dot(Y)).normalize();
+    HF[S] = { H: Hp, Y, X, Z: new V3().crossVectors(X, Y).multiplyScalar(S === 'R' ? 1 : -1), u }; }
   for (let i = 0; i < n; i++) {
     const nm = names[dom[i]]; p.fromBufferAttribute(pos, i); const h = H(p);
     let R = 0, a = 0;
     if (/Thigh|Calf|Knee|Foot|Toe|Hip|Pelvis/.test(nm)) R = 1;
     else if (/Upperarm|Shoulder|Clavicle/.test(nm) && !/Clavicle/.test(nm)) { R = 3; const S = /_L_/.test(nm) ? 'L' : 'R', ab = _v2.copy(el[S]).sub(sh[S]); a = clamp(0.25 + _v3.copy(p).sub(sh[S]).dot(ab) / ab.lengthSq() * 0.5, 0, 1); }
-    else if (/Forearm|Hand|Finger|Thumb|Index|Mid|Ring|Pinky|Elbow/.test(nm)) R = 4;
+    else if (/Forearm|Hand|Finger|Thumb|Index|Mid|Ring|Pinky|Elbow/.test(nm)) { R = 4;
+      const f = HF[/_L_/.test(nm) ? 'L' : 'R'], q = _v2.copy(p).sub(f.H), ya = q.dot(f.Y) / f.u;
+      a = /Forearm|Elbow/.test(nm) ? 1 + 0.99 * clamp(1 + ya / 24, 0, 1) : 2;   // forearm: 1 (elbow) … 1.99 (wrist); hand: 2
+      gv[i * 4] = ya; gv[i * 4 + 1] = -_v3.fromBufferAttribute(nr, i).dot(f.Z); gv[i * 4 + 2] = /Thumb/.test(nm) ? 3 : /(Index|Mid|Ring|Pinky)1/.test(nm) ? 1 : /(Index|Mid|Ring|Pinky)[23]/.test(nm) ? 2 : 0; gv[i * 4 + 3] = q.dot(f.X) / f.u; }
     else if (/Head|Jaw|Eye|Teeth|Tongue|Facial|NeckTwist02/.test(nm)) R = 5;
     else R = 2;
     gh[i * 3] = h; gh[i * 3 + 1] = R; gh[i * 3 + 2] = a;
   }
   geo.setAttribute('aGH', new THREE.BufferAttribute(gh, 3)); GEAR.gh = gh;
+  geo.setAttribute('aGlv', new THREE.BufferAttribute(gv, 4)); GEAR.gv = gv;
   const sm = T.matNames.map(nm => !/Nail|Eye|Teeth|Tongue|Cornea|Tearline|Occlusion|Lash/i.test(nm)); GEAR.tris = [];   // every skin-ish group (the trunks area and the neck front are in other groups)
   for (const gr of geo.groups) if (sm[gr.materialIndex]) for (let t = gr.start; t < gr.start + gr.count; t += 3) GEAR.tris.push(geo.index.getX(t), geo.index.getX(t + 1), geo.index.getX(t + 2));
 }
@@ -77,30 +89,5 @@ function shellMesh(F, kind, opt) {
   F.body.parent.add(m); m.position.copy(F.body.position); m.quaternion.copy(F.body.quaternion); m.scale.copy(F.body.scale);
   return m;
 }
-// gloves (12 oz sparring): padded mitt over the fist, a thumb, a cuff — in the hand's rest frame, carried by the hand bone
-function gloveMesh(F, S, col) {
-  const B = F.bones, h = B[`CC_Base_${S}_Hand`], hp = new V3().setFromMatrixPosition(h.matrixWorld), mp = new V3().setFromMatrixPosition(B[`CC_Base_${S}_Mid1`].matrixWorld);
-  const th = B[`CC_Base_${S}_Thumb1`] ? new V3().setFromMatrixPosition(B[`CC_Base_${S}_Thumb1`].matrixWorld) : null;
-  const ax = mp.clone().sub(hp).normalize(), q = new Quat().setFromUnitVectors(new V3(0, 1, 0), ax);
-  const mat = new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.35, sheen: 0.3 });
-  const g = new THREE.Group();
-  const mitt = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 18), mat); mitt.scale.set(0.062, 0.115, 0.06); mitt.position.copy(hp).addScaledVector(ax, 0.085); mitt.quaternion.copy(q); g.add(mitt);
-  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.047, 0.044, 0.1, 20), new THREE.MeshPhysicalMaterial({ color: '#f2f0ea', roughness: 0.6 })); cuff.position.copy(hp).addScaledVector(ax, -0.035); cuff.quaternion.copy(q); g.add(cuff);
-  if (th) { const t = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mat); t.scale.set(0.026, 0.05, 0.026); t.position.copy(th).lerp(mp, 0.35).addScaledVector(th.clone().sub(hp).normalize(), 0.015); t.quaternion.copy(q); g.add(t); }
-  const restInv = h.matrixWorld.clone().invert(); g.matrixAutoUpdate = false; for (const c of g.children) { c.castShadow = true; c.updateMatrix(); }
-  scene.add(g); return { g, h, restInv };
-}
-// headgear: an open-face leather shell over the skull, cheek pads, in the head-ellipsoid frame
-function headgearMesh(col) {
-  const R = HEAD.R, geo = new THREE.SphereGeometry(1, 32, 24), p = geo.attributes.position, keep = [], v = new V3();
-  const idx = geo.index; for (let t = 0; t < idx.count; t += 3) { let face = 0; for (let k = 0; k < 3; k++) { v.fromBufferAttribute(p, idx.getX(t + k)); if (v.z > 0.1 && Math.abs(v.x) < 0.7 && v.y < 0.38 && v.y > -0.95) face++; if (v.y < -0.62 && v.z > -0.3) face += 3; if (v.y < -0.85) face += 3; } if (!face) keep.push(idx.getX(t), idx.getX(t + 1), idx.getX(t + 2)); }
-  geo.setIndex(keep); for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); p.setXYZ(i, v.x * (R.x + 0.014), v.y * (R.y + 0.012) + 0.006, v.z * (R.z + 0.012)); } geo.computeVertexNormals();
-  const m = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.42, clearcoat: 0.5, side: THREE.DoubleSide }));
-  m.matrixAutoUpdate = false; m.castShadow = true; m.frustumCulled = false; scene.add(m); return m;
-}
-function guardMesh() {   // gum shield: an arch over the upper teeth, in the head-ellipsoid frame (mouth ≈ 6.5 cm below and 8 cm in front of its centre)
-  const geo = new THREE.TorusGeometry(0.024, 0.0062, 8, 20, Math.PI * 1.05); geo.rotateX(Math.PI / 2); geo.rotateY(-Math.PI * 0.025); geo.scale(1.05, 1.5, 1.3); geo.translate(0, -0.063, 0.057);   // arch over the upper incisors (teeth bone ≈ 4 cm below and 5 cm in front of the head centre)
-  const m = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: '#d8e4ea', roughness: 0.15, transmission: 0, clearcoat: 1 }));
-  m.matrixAutoUpdate = false; m.frustumCulled = false; scene.add(m); return m;
-}
+// gloves, headgear and the gum shield: 04b_gloves_headgear.js
 

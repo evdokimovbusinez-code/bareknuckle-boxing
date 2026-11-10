@@ -11,7 +11,7 @@ class Fighter {
     this.flesh = new Flesh(this);
     this.body.material = T.matNames.map(n => {
       const key = { Std_Skin_Head: 'head', Std_Skin_Body: 'body', Std_Skin_Arm: 'arm', Std_Skin_Leg: 'leg' }[n];
-      if (!key) return n === 'Std_Nails' ? T.nailMat : T.hiddenMat;
+      if (!key) return n === 'Std_Nails' ? nailMatFor(this.flesh.u) : T.hiddenMat;
       const m = new THREE.MeshPhysicalMaterial({ map: T.tex[key + '_d'], normalMap: T.tex[key + '_n'], roughness: key === 'head' ? 0.48 : 0.52, specularIntensity: 0.5, clearcoat: 0.08, clearcoatRoughness: 0.4, sheen: 0.15, sheenColor: new THREE.Color('#ff9b80'), sheenRoughness: 0.6, envMapIntensity: 0.6 });
       this.skinMats.push(m); return skinify(m, key === 'head' ? this.u : null, this.flesh.u);
     });
@@ -286,7 +286,7 @@ class Fighter {
     const S = SHORTS_LOOKS.find(x => x.id === L.shorts) || SHORTS_LOOKS[0]; paintShorts(this.shortsCanvas, S); this.shortsTex.needsUpdate = true; this.shortsMat.sheenColor.set(S.sheen);
     const bald = L.hair === 'bald'; this.bald = bald;
     this.hairCol.set((HAIR_LOOKS.find(x => x.id === L.hair) || HAIR_LOOKS[1]).c);
-    this.hair.mesh.visible = this.baseMesh.visible = !bald && !(this.gear && this.gear.spar);
+    this.hair.mesh.visible = this.baseMesh.visible = !bald;   // (handGear, called from dress below, tucks long hair under the headgear)
     this.hair.mesh.material.color.copy(this.hairCol); this.baseMesh.material.color.copy(this.hairCol); this.beardMesh.material.color.copy(this.hairCol).multiplyScalar(1.2);
     this.u.uHair.value.copy(this.hairCol).multiplyScalar(0.8); this.u.uHairAmt.value = bald ? 0.2 : 1;
     this.beardMesh.visible = !!L.beard; this.u.uStubAmt.value = L.beard ? 1 : 0.3;
@@ -305,14 +305,23 @@ class Fighter {
     else { const S0 = SHORTS_LOOKS.find(x => x.id === L.shorts) || SHORTS_LOOKS[0]; paintShorts(this.shortsCanvas, S0); this.shortsTex.needsUpdate = true; this.shortsMat.sheenColor.set(S0.sheen); }
     U.set(bt.tex ? 1 : 0, sh.top || 0, tp.tex ? 1 : 0, tp.sleeve || 0);
     G2.guard.material.color.set((GUARDS.find(x => x.id === L.guard) || GUARDS[0]).c);
-    G2.look = L;
+    { const c = (GUARDS.find(x => x.id === L.guard) || GUARDS[0]).c; G2.guard.material.emissive.set(c); }
+    G2.look = L; this.handGear();
   }
-  sparGear(on) {   // sparring: gloves and headgear on, wraps and hair under them
-    const G2 = this.gear; G2.spar = on;
-    if (on && !G2.gloves) { const c = this.isPlayer ? '#b3202c' : '#1f3f9a'; G2.gloves = ['L', 'R'].map(S => gloveMesh(this, S, c)); G2.hg = headgearMesh(c); }
-    if (G2.gloves) { for (const gl of G2.gloves) gl.g.visible = on; G2.hg.visible = on; }
-    this.wrapMesh.visible = !on; for (const t of this.tails) t.mesh.visible = !on;
-    const bald = this.bald; this.hair.mesh.visible = this.baseMesh.visible = !bald && !on;
+  sparGear(on) { this.gear.spar = on; this.handGear(); }   // sparring: 16 oz gloves and headgear, always
+  // what is on the hands and head: sparring → boxing gloves + headgear; otherwise wraps or 4 oz MMA gloves (look.hands)
+  handGear() {
+    const G2 = this.gear, L = G2.look || {}, box = G2.spar, mma = !box && L.hands === 'mma', mine = LOOK.gloves || 'red';
+    const gc = GLOVES.find(x => x.id === (this.isPlayer ? mine : L.gloves || (mine === 'blue' ? 'red' : 'blue'))) || GLOVES[0];   // the opponent never wears the player's colour
+    if ((box || mma) && !G2.mat) { G2.mat = leatherMat(gc.c); G2.trim = new THREE.MeshPhysicalMaterial({ color: gc.trim, roughness: 0.6 }); }
+    if (box && !G2.gloves) { G2.gloves = ['L', 'R'].map(S => gloveMesh(this, S, G2.mat, G2.trim)); G2.hg = headgearMesh(this, G2.mat, G2.trim); }
+    if (mma && !G2.mma) G2.mma = mmaShell(this, G2.mat);
+    if (G2.mat) { G2.mat.color.set(gc.c); G2.trim.color.set(gc.trim); }
+    if (G2.gloves) { for (const gl of G2.gloves) gl.g.visible = box; G2.hg.visible = box; }
+    if (G2.mma) { G2.mma.visible = mma; G2.mma.material.color.set(gc.c); }
+    this.flesh.u.uGlv.value = box ? 1 : 0;   // the hand inside a boxing glove is not drawn
+    this.wrapMesh.visible = !box && !mma; for (const t of this.tails) t.mesh.visible = !box && !mma;
+    this.hair.mesh.visible = !this.bald && !box; this.baseMesh.visible = !this.bald;   // long hair is tucked under the headgear, the short layer shows through the open crown
   }
 
   /* —— actions —— */
@@ -632,7 +641,7 @@ class Fighter {
     _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInv);
     this.baseMesh.matrix.copy(_m1); this.beardMesh.matrix.copy(_m1); this.baseMesh.matrixWorldNeedsUpdate = this.beardMesh.matrixWorldNeedsUpdate = true;
     { const G2 = this.gear, hf = _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInvT); G2.guard.matrix.copy(hf); G2.guard.matrixWorldNeedsUpdate = true;
-      if (G2.spar && G2.gloves) { G2.hg.matrix.copy(hf); G2.hg.matrixWorldNeedsUpdate = true; for (const gl of G2.gloves) { gl.g.matrix.multiplyMatrices(gl.h.matrixWorld, gl.restInv); gl.g.matrixWorldNeedsUpdate = true; } } }
+      if (G2.spar && G2.gloves) { G2.hg.matrix.copy(hf); G2.hg.matrixWorldNeedsUpdate = true; for (const gl of G2.gloves) { gl.g.matrix.multiplyMatrices(gl.h.matrixWorld, gl.rel); gl.g.matrixWorldNeedsUpdate = true; } } }
   }
   capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; }
   restore(a, b2, t) {
