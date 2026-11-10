@@ -73,6 +73,7 @@ function playerInput() {
 /* ───────── flow ───────── */
 function show(id, on) { $(id).hidden = !on; }
 function toMenu() {
+  socFlush(); socLeave();   // the frame of the last post; a challenge's place and level go back (15_social.js)
   if (G.mode === 'career') G.diff = G.userDiff; BAG.on = false; showP2(true); BAG.g.visible = false; updateMenu(); for (const F of [P1, P2]) F.sparGear(false);
   G.state = 'menu'; G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0; wearReset();
   P1.resetState(); P2.resetState(); rollOpponent();

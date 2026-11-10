@@ -7,7 +7,7 @@
       angles with slow motion at the impact and the plate «ЛУЧШЕЕ В РАУНДЕ». Afterwards the corner / the judges exactly as before.
    OPT.cine switches both off. Debug: __g.HL, __g.endRound() */
 const STARE_LEN = 4.2, STARE_ADV = 0.2;   // s the stare-down lasts, m each man walks toward the other
-const FACE_LEN = 2.0, HL_PRE = 0.7, HL_MAX = 3, HL_CAMS = [['side', 'face'], ['over', 'side'], ['wide', 'over']];   // s of face close-up; s of the clip before the impact; clips shown; camera pairs (angle 1, angle 2) of clip 1, 2, 3
+const FACE_LEN = 2.0, HL_PRE = 0.7, HL_MAX = 3, HL_CAMS = [['orbit', 'low'], ['behind', 'top'], ['over', 'wide']];   // s of face close-up; s of the clip before the impact; clips shown; camera pairs (angle 1, angle 2) of clip 1, 2, 3
 
 /* ── the stare-down ── */
 function stareTick(st) {
@@ -133,11 +133,15 @@ function endHighlights() {
   $('rec').hidden = true; $('hl').hidden = true; P1.simReset = P2.simReset = true; FX.clearAir(); G.shake = 0;
   cineEnd();
 }
-// cameras of the highlights: D = the man who is hit, A = the one who hits; the clip's segments pick two of these
+// cameras of the highlights: D = the man who is hit, A = the one who hits; each clip cuts between two of these.
+// Kept back (2.7–4.8 m) so both men and the punch are in frame, and from angles the fight camera never takes.
 function hlCam(s) {
   const D = s.who ? P2 : P1, A = D.other, h = D.headNow, a = A.headNow, f = Math.sign(a.x - h.x) || 1, mx = (h.x + a.x) / 2, p = clamp((RP.tau - s.from) / Math.max(0.01, s.to - s.from), 0, 1);
-  if (s.cam === 'side') { _cp.set(mx, h.y - 0.1, 1.9 - 0.4 * p); _cl.set(mx, h.y - 0.12, 0); return 5; }                      // profile of the exchange, creeping in
-  if (s.cam === 'face') { _cp.set(h.x + f * 0.55, h.y + 0.03, 0.85 - 0.15 * p); _cl.set(h.x - f * 0.03, h.y - 0.02, 0); return 6; }   // the face that takes it, from the side in front
-  if (s.cam === 'over') { _cp.set(a.x - f * 0.5, a.y + 0.12, 0.55 + 0.1 * p); _cl.set(h.x, h.y - 0.04, 0); return 6; }                  // over the shoulder of the puncher
-  _cp.set(mx - f * 0.4, 1.45, 3.2); _cl.set(mx, h.y - 0.25, 0); return 4;                                                                // wide
+  if (s.cam === 'orbit') { const ang = -0.55 * f + p * 0.9 * f, r = 3.4; _cp.set(mx + Math.sin(ang) * r, 1.25, Math.cos(ang) * r); _cl.set(mx, h.y - 0.2, 0); return 9; }   // a slow arc round the exchange
+  if (s.cam === 'low') { _cp.set(mx + f * 1.1, 0.34, 2.7 - 0.25 * p); _cl.set(mx, h.y - 0.05, 0); return 6; }                     // from the floor, looking up at the shot
+  if (s.cam === 'top') { _cp.set(mx + 0.3, 4.3 - 0.35 * p, 1.1); _cl.set(mx, 0.9, 0); return 5; }                               // straight down from the lights
+  if (s.cam === 'behind') { _cp.set(h.x - f * 2.3, 1.7, -1.7 + 0.3 * p); _cl.set(a.x, a.y - 0.15, 0); return 6; }            // over the hit man's back: the punch comes at the lens
+  if (s.cam === 'over') { _cp.set(a.x - f * 2.2, a.y + 0.4, 1.5); _cl.set(h.x, h.y - 0.08, 0); return 6; }                      // behind the puncher, high
+  if (s.cam === 'side') { _cp.set(mx, h.y - 0.1, 3.4 - 0.3 * p); _cl.set(mx, h.y - 0.15, 0); return 5; }                        // profile of the exchange
+  _cp.set(mx - f * 0.8, 1.6, 4.8); _cl.set(mx, 1.1, 0); return 4;                                                              // wide
 }
