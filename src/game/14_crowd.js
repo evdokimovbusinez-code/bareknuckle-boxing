@@ -228,8 +228,8 @@ function makeCrowd(o = {}) {
 
   return {
     group: g, mesh, people: ppl, count: N, shown: 0,
-    // for a location where the people themselves are the boundary: put this into LOC.wall (a soft round wall for the knockout ragdoll)
-    wall: shape === 'rect' ? null : { r: r0 - 0.3, k: 1.8e4, mu: 0.7, h: 1.5, d: 0.6, give: 0.3, damp: 18, top() { return this.h; } },
+    // for a location where the people themselves are the boundary: put this into LOC.wall (a soft wall for the knockout ragdoll, round or rectangular as the crowd)
+    wall: Object.assign(shape === 'rect' ? { kind: 'rect', hx: w / 2 + r0 - 0.3, hz: h / 2 + r0 - 0.3 } : { r: r0 - 0.3 }, { k: 1.8e4, mu: 0.7, h: 1.5, d: 0.6, give: 0.3, damp: 18, top() { return this.h; } }),
     /* a wave of cheering: power 0..1, from a world point (people nearer react sooner and harder), held `hold` seconds at the top */
     cheer(power, pos, hold = 0.3) {
       let x = 0, z = 0; if (pos) { g.updateWorldMatrix(true, false); _cwV.copy(pos).applyMatrix4(_cwI.copy(g.matrixWorld).invert()); x = _cwV.x; z = _cwV.z; }
