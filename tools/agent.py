@@ -4,7 +4,7 @@ import asyncio, json, os, sys
 from claude_agent_sdk import query, ClaudeAgentOptions
 
 TOOLS = ["Read", "Edit", "MultiEdit", "Write", "Glob", "Grep", "LS", "TodoWrite",
-         "Bash(bash tools/check.sh)", "Bash(python3 src/assemble.py)", "Bash(node --check:*)",
+         "Bash(bash tools/check.sh)", "Bash(bash tools/shot.sh:*)", "Bash(python3 src/assemble.py)", "Bash(node --check:*)",
          "Bash(grep:*)", "Bash(sed -n:*)", "Bash(wc:*)", "Bash(ls:*)", "Bash(head:*)", "Bash(tail:*)", "Bash(diff:*)", "Bash(git diff:*)", "Bash(git status:*)"]
 
 async def main():

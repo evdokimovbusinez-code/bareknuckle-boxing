@@ -1,0 +1,84 @@
+/* ───────── arena light: a ring is lit from a rig straight above it (a big soft top light), the canvas throws a little cool light
+   back up under the chin and the brows; the hall around is dark with a few far lamps that give the background depth */
+{
+  const top = new THREE.SpotLight('#fff6ea', 26, 11, 0.95, 0.9, 1.6); top.position.set(0, 6.2, 0.4); top.target.position.set(0, 0.6, 0); ARENA.add(top, top.target);
+  const bounce = new THREE.DirectionalLight('#6f86c2', 0.32); bounce.position.set(0.2, -1, 0.8); scene.add(bounce);
+  const lampG = new THREE.SphereGeometry(0.035, 6, 4), N = 46, lamps = new THREE.InstancedMesh(lampG, new THREE.MeshBasicMaterial({ color: '#ffe2b0', fog: false }), N), m4 = new M4();
+  for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2 + rr() * 0.1, r = 10 + rr() * 5, y = 1.7 + rr() * 2.9;
+    m4.makeScale(1, 1, 1).setPosition(Math.cos(a) * r, y, Math.sin(a) * r - 2); lamps.setMatrixAt(i, m4); lamps.setColorAt(i, new THREE.Color().setHSL(0.09 + rr() * 0.05, 0.6, 0.35 + rr() * 0.4)); }
+  ARENA.add(lamps);
+}
+
+/* ───────── rope visuals: while a body is in the rope the drawn line follows the contact (a V from post to post through the
+   deepest point); once it is free it rings out as a damped string (~2.5 Hz, a few visible swings) */
+/* the ring frame: keep the ropes' world ends current, hide the side(s) between the camera and the fighters */
+function arenaSync() {
+  ARENA.updateMatrixWorld(true); const cam = camera.position;
+  for (const R of ROPES) {
+    R.a.copy(R.aL).applyMatrix4(ARENA.matrixWorld); R.b.copy(R.bL).applyMatrix4(ARENA.matrixWorld);
+    const nW = _v1.copy(R.n).transformDirection(ARENA.matrixWorld), mid = _v2.addVectors(R.a, R.b).multiplyScalar(0.5);
+    R.m.visible = _v3.subVectors(cam, mid).dot(nW) > -0.35;   // n points into the ring: camera outside this side → hide it
+  }
+}
+// where a world point is in the ring (ring frame, metres)
+const ringPt = (p, out = new V3()) => out.copy(p).applyMatrix4(_m4a.copy(ARENA.matrixWorld).invert());
+const _m4a = new M4(), RING_IN = 2.2;
+const inRing = (p, m = 0) => { const l = ringPt(p, _v6); return Math.abs(l.x) < RING_IN - m && Math.abs(l.z) < RING_IN - m; };
+/* circling: F moves sideways by s metres (s > 0 = away from the camera) around the other man — done by turning the ring frame
+   about him the opposite way, so both stay on the world x line facing each other */
+function circleStep(F, s) {
+  const O = F.other.group.position, rx = F.group.position.x - O.x; if (Math.abs(rx) < 0.3) return false;
+  const saveP = ARENA.position.clone(), saveY = ARENA.rotation.y;
+  const ph = (-s) / rx;   // world turn about O that carries F by −s in z
+  const d = _v4.copy(ARENA.position).sub(O), c = Math.cos(ph), sn = Math.sin(ph);
+  ARENA.position.set(O.x + d.x * c + d.z * sn, 0, O.z - d.x * sn + d.z * c); ARENA.rotation.y += ph; ARENA.updateMatrixWorld(true);
+  if (!inRing(F.group.position, 0) || !inRing(F.other.group.position, 0)) { ARENA.position.copy(saveP); ARENA.rotation.y = saveY; ARENA.updateMatrixWorld(true); return false; }
+  return true;
+}
+function ropeTick(dt) {
+  arenaSync();
+  if (dt <= 0) return;
+  const w = 2 * Math.PI * 2.4, z = 0.09;
+  for (const R of ROPES) {
+    if (R.hit) { const nv = R.hit; R.vel.copy(nv).sub(R.cur).multiplyScalar(1 / dt).clampLength(0, 4); R.cur.copy(nv); R.hit = null; R.live = 1; }
+    else if (R.live) {
+      R.vel.addScaledVector(R.cur, -w * w * dt).multiplyScalar(Math.exp(-2 * z * w * dt)); R.cur.addScaledVector(R.vel, dt);
+      if (R.cur.lengthSq() < 1e-7 && R.vel.lengthSq() < 1e-5) { R.cur.set(0, 0, 0); R.vel.set(0, 0, 0); R.live = 0; }
+    } else continue;
+    if (!R.m) continue;
+    const pos = R.m.geometry.attributes.position, A = pos.array, B = R.base, d = _v1.copy(R.cur).applyQuaternion(R.m.getWorldQuaternion(_rq).invert());
+    const len = R.a.distanceTo(R.b), sc = clamp(R.s, 0.05, 0.95);
+    for (let i = 0; i < A.length; i += 3) { const s = B[i + 1] / len + 0.5, f = s < sc ? s / sc : (1 - s) / (1 - sc); A[i] = B[i] + d.x * f; A[i + 1] = B[i + 1] + d.y * f; A[i + 2] = B[i + 2] + d.z * f; }
+    pos.needsUpdate = true; R.m.geometry.computeBoundingSphere();
+  }
+}
+
+/* ───────── main loop ───────── */
+let last = performance.now();
+function frame(now) {
+  const dtReal = Math.min(0.05, (now - last) / 1000); last = now; G.real += dtReal;
+  let simDt = 0;
+  if (G.state === 'replay') simDt = stepReplay(dtReal);
+  if (G.state !== 'replay') {
+    if (G.slowT > 0) { G.slowT -= dtReal; if (G.slowT <= 0) G.slow = 1; }
+    let dt = dtReal * G.slow; if (G.hitstop > 0) { G.hitstop -= dtReal; dt = 0; }
+    G.t += dt; simDt = dt;
+    if (G.state === 'fight') { playerInput(); ai(dt); }
+    else if (G.state === 'ko' || G.state === 'kd') { if (followOK(P1)) playerInput(); aiFollow(); }
+    P1.aimTarget = aimFor(P1, P2); P2.aimTarget = aimFor(P2, P1);
+    P1.update(dt); P2.update(dt);
+    // both men are posed: now keep each one's arms out of the other's head and torso (against this frame's head, not last frame's)
+    for (const F of [P1, P2]) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
+    P1.armClear(); P2.armClear(); P1.armClear(); P2.armClear();   // twice: the second pass catches what the first IK left
+    if (G.state === 'kd') kdTick(dt);
+    if ((G.state === 'fight' || G.state === 'ko' || G.state === 'kd') && dt > 0) recFrame();
+    stateTick(dtReal);
+  }
+  P1.simulate(simDt); P2.simulate(simDt);
+  ropeTick(simDt); bagStep(simDt);
+  FX.update(simDt); MIST.update(simDt);
+  camUpdate(dtReal); hudUpdate(dtReal); resTick(dtReal);
+  composer.render();
+  requestAnimationFrame(frame);
+}
+

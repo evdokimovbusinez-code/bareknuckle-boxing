@@ -52,6 +52,7 @@ jobs:
             echo "You are the coding bot of this repository (bare-knuckle boxing browser game). Read CLAUDE.md first and follow it."
             echo "Do the task from GitHub #$N below (the latest @claude message is the current request; earlier messages are context)."
             echo "Rules: edit sources in src/ (never index.html by hand), then run 'bash tools/check.sh' and fix until it prints OK."
+            echo "For anything visual (models, clothes, locations, UI, lighting) LOOK at your result: 'bash tools/shot.sh /tmp/shots/NAME.png fight 4' (or menu / js \"CODE\"), then Read the PNG. Iterate until it looks right. Mention in the summary what you checked visually."
             echo "Do not run git commands that change history (no commit/push/checkout) - the workflow commits for you."
             echo "Finish by writing a short summary IN RUSSIAN to .claude-summary.md: what changed, which functions, how to see it in the game, anything left undone."
             echo; echo "=== #$N: $(gh issue view "$N" --json title -q .title) ==="
@@ -66,7 +67,8 @@ jobs:
           BOT_EFFORT: high
           BOT_BUDGET: "8"               # hard cap per task, USD
         run: |
-          pip install -q claude-agent-sdk
+          pip install -q claude-agent-sdk playwright
+          npm i --no-save --silent three@0.160.0 cannon-es@0.20.0
           python tools/agent.py /tmp/prompt.md
       - name: Commit, push, PR
         if: always()
