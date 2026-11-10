@@ -10,6 +10,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import * as CANNON from 'cannon-es';
+window.__boot = true;   // the boot watchdog in the page head checks this
 
 const V3 = THREE.Vector3, Quat = THREE.Quaternion, M4 = THREE.Matrix4;
 const $ = id => document.getElementById(id);

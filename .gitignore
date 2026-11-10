@@ -4,3 +4,4 @@ __pycache__/
 .DS_Store
 .claude-summary.md
 .claude-result.json
+node_modules

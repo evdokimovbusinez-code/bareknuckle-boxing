@@ -267,6 +267,20 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <div class="loading" id="loading"><div class="box"><span id="ld-text">Загружаю бойцов…</span><div class="bar"><span id="ld-bar"></span></div></div></div>
 </div>
 
+<script>
+/* boot watchdog: if the game module never starts (old browser, blocked CDN, script error) say why instead of an endless loading bar */
+window.__errs = [];
+(function () {
+  function show() { var t = document.getElementById('ld-text'); if (!t || !window.__errs.length) return; t.className = 'err';
+    var v = (navigator.userAgent.match(/Version\/([\d.]+).*Safari/) || [])[1]; t.textContent = 'Ошибка: ' + window.__errs[0] + (v ? ' · Safari ' + v : ''); }
+  addEventListener('error', function (e) { var t = e.target, m = e.message || (t && t.tagName === 'SCRIPT' && 'не загрузился ' + t.src);   // fonts/images failing don't matter
+    if (!m) return; window.__errs.push(String(m).slice(0, 160)); show(); }, true);
+  addEventListener('unhandledrejection', function (e) { var r = e.reason; window.__errs.push('promise: ' + String(r && r.message || r).slice(0, 160)); show(); });
+  setTimeout(function () { if (window.__boot) return;
+    window.__errs.push(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap') ? 'скрипт игры не запустился (проверь интернет / блокировщик)' : 'браузер не поддерживает import maps — нужен Safari 16.4+ или Chrome');
+    show(); }, 25000);
+})();
+</script>
 <script type="importmap">
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
