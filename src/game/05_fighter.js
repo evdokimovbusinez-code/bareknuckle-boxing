@@ -66,6 +66,8 @@ class Fighter {
     this.shortsCanvas = document.createElement('canvas'); this.shortsCanvas.width = 256; this.shortsCanvas.height = 512;
     this.shortsTex = new THREE.CanvasTexture(this.shortsCanvas); this.shortsTex.colorSpace = THREE.SRGBColorSpace; this.shortsTex.anisotropy = 8;
     this.shortsMat = new THREE.MeshPhysicalMaterial({ map: this.shortsTex, normalMap: T.shortsNormal, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.46, sheen: 0.85, sheenRoughness: 0.34, sheenColor: new THREE.Color('#d8404a'), specularIntensity: 0.5, side: THREE.DoubleSide, envMapIntensity: 0.6 });
+    // the part of the trunks under a top is not drawn (uTopV: from this v of their texture up; set in dress): the cloth of the trunks is simulated, the top is not, and lying down they would come through it
+    this.shortsU = { uTopV: { value: 9 } }; this.shortsMat.onBeforeCompile = s => { s.uniforms.uTopV = this.shortsU.uTopV; s.fragmentShader = 'uniform float uTopV;\n' + s.fragmentShader.replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if ( vMapUv.y > uTopV ) discard;'); };
     const ssm = new THREE.SkinnedMesh(T.shortsGeo, this.shortsMat); ssm.bind(new THREE.Skeleton(this.body.skeleton.bones), new M4());
 
     // colliders
@@ -305,6 +307,7 @@ class Fighter {
     if (!bt.cut) { const S0 = wearShorts(bt); paintShorts(this.shortsCanvas, S0); if (this.isPlayer) socPatch(this.shortsCanvas); this.shortsTex.needsUpdate = true; this.shortsMat.sheenColor.set(S0.sheen); }
     U.set(bt.cut ? PANT_CUTS[bt.cut].skin : 0, sh.top || 0,   /* x: the legs' skin is not drawn above this height (cm) */ G2.top ? G2.top.userData.D.skinHi : tp.tex ? GEAR.neck - 1 : 0, G2.top ? G2.top.userData.D.skinA : tp.sleeve || 0);   // z: the trunk's skin is not drawn below this height, w: the arm's up to this `a` (04f_tops.js)
     this.flesh.u.uGearT.value = G2.top ? G2.top.userData.D.skinLo : 0;
+    this.shortsU.uTopV.value = G2.top ? (G2.top.userData.D.skinLo / 100 - SHORTS.hemY) / (SHORTS.waistY - SHORTS.hemY) : 9;
     G2.guard.material.color.set((GUARDS.find(x => x.id === L.guard) || GUARDS[0]).c);
     { const c = (GUARDS.find(x => x.id === L.guard) || GUARDS[0]).c; G2.guard.material.emissive.set(c); }
     G2.look = L; this.handGear();

@@ -309,7 +309,7 @@ function wearDress(F, L) {
   const bt = W.bottom, tp = W.top, sh = W.shoes, bl = W.belt;
   wearSlot(F, 'bottom', bt.cut ? bt.key : null, () => pantsMesh(F, bt), ['pt_' + bt.key]);
   for (const k in S) if (k[0] === 't' && k[1] === '_') S[k].visible = false;   // tops: one shell per model, the colour is the material's
-  wearSlot(F, 'top', tp.cut ? tp.key : null, () => topMesh(F, tp), ['tt_' + tp.key]);   // tops: their own geometry (04f_tops.js); the old shell below is only a fallback for a model without a cut
+  wearSlot(F, 'top', tp.cut ? tp.key : null, () => topMesh(F, tp), ['tt_' + tp.key, 'tt_' + tp.key + '_u']);   // tops: their own geometry (04f_tops.js); the old shell below is only a fallback for a model without a cut
   if (tp.tex) { const m = S['t_' + tp.mid] || (S['t_' + tp.mid] = shellMesh(F, 'shirt', tp)); m.visible = true; topTint(m, tp); }
   wearSlot(F, 'shoes', sh.top ? sh.key : null, () => shoeMesh(F, sh), ['st_' + sh.key]);
   const bm = wearSlot(F, 'belt', bl.buckle && bt.belt ? bl.mid + bt.cut : null, () => beltMesh(F, bt.cut, bl)); if (bm) { bm.material.color.set(bl.c); bm.userData = S.bottom.m.userData; }
