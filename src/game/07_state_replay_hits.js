@@ -8,14 +8,17 @@ let P1, P2, VW = 1, VH = 1, inp = null;
 const LOOK = { shorts: 'red', hair: 'brown', skin: 'light', beard: false, bottom: 'shorts', top: 'none', shoes: 'none', guard: 'clear' };
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { Object.assign(LOOK, s.look || {}); G.diff = DIFFS[s.diff] ? s.diff : 'normal'; G.wins = s.wins | 0; G.losses = s.losses | 0; } } catch (e) {}
 G.mode = 'quick'; G.career = 0; G.bagBest = 0; G.userDiff = G.diff; G.loc = 'gym';
-const PROF = { nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0 };
-try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
-const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc })); } catch (e) {} };
+const OPT = { vol: 1, shake: true, keys: true };   // settings screen: master volume 0..1, camera shake, the key hint bar in a fight
+const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0 };
+try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
+const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc, opt: OPT })); } catch (e) {} };
 const careerWins = () => G.career + PROF.champ * LADDER.length;   // wraps unlock by career wins ever
-/* career: a ladder of eight men, each tougher than the last — beat one to get the next; the last one holds the belt */
+/* career: a ladder of eight men, each tougher than the last — beat one to get the next; the last one holds the belt.
+   loc: the career sets the place — it starts in the underground parking and moves up to the ring in the hall */
 const LADDER = [
-  { nm: 'Лом', st: 'brawler', diff: 'easy' }, { nm: 'Кабан', st: 'brawler', diff: 'easy' }, { nm: 'Грек', st: 'counter', diff: 'normal' }, { nm: 'Шрам', st: 'pressure', diff: 'normal' },
-  { nm: 'Молот', st: 'brawler', diff: 'normal' }, { nm: 'Седой', st: 'counter', diff: 'hard' }, { nm: 'Бизон', st: 'pressure', diff: 'hard' }, { nm: 'Кувалда', st: 'brawler', diff: 'hard', champ: true }];
+  { nm: 'Лом', st: 'brawler', diff: 'easy', loc: 'parking' }, { nm: 'Кабан', st: 'brawler', diff: 'easy', loc: 'parking' }, { nm: 'Грек', st: 'counter', diff: 'normal', loc: 'parking' }, { nm: 'Шрам', st: 'pressure', diff: 'normal', loc: 'parking' },
+  { nm: 'Молот', st: 'brawler', diff: 'normal', loc: 'gym' }, { nm: 'Седой', st: 'counter', diff: 'hard', loc: 'gym' }, { nm: 'Бизон', st: 'pressure', diff: 'hard', loc: 'gym' }, { nm: 'Кувалда', st: 'brawler', diff: 'hard', loc: 'gym', champ: true }];
+const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1)].loc; return LOCS[id] ? id : G.loc; };
 function fightOver(win, draw) {
   fightTable();
   if (draw) return; if (win) G.wins++; else G.losses++;

@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Oswald:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 [hidden]{display:none!important}   /* the hidden attribute must beat every display rule (loading screen, menus, pad) */
 /* Layout: one landscape stage (rotated 90° on a portrait phone). Full-bleed WebGL ring, health bars across the top, dodge pad bottom-left, punch diamond bottom-right. Single dark arena look by design. */
@@ -116,8 +116,6 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .rb .pri,.go{background:linear-gradient(180deg,rgba(194,34,53,.95),rgba(130,18,32,.95));border-color:rgba(255,130,130,.4)}
 
 /* menu */
-.menu{position:absolute;inset:0;display:flex;justify-content:flex-end;align-items:stretch;padding:var(--pt) var(--pr) var(--pb) var(--pl);pointer-events:none}
-.card{pointer-events:auto;width:min(360px,48%);min-width:0;display:flex;flex-direction:column;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow-y:auto}
 .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
 h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5vmin,46px);line-height:.92;text-transform:uppercase;text-wrap:balance}
 .opt{display:flex;align-items:center;gap:10px;min-width:0}
@@ -129,14 +127,11 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .rules{margin:2px 0 0;padding:0 0 0 16px;font-size:12px;line-height:1.4;color:#cfc8ba}
 .rules b{color:var(--text);font-weight:600}
 .go{font-size:22px;padding:11px 16px}
-.modes{margin-top:auto;display:flex;flex-direction:column;gap:8px}.modes .m2{display:flex;gap:8px}.modes .m2 .go{flex:1;font-size:16px;padding:9px 10px}
 .go small{display:block;font-family:var(--mono,monospace);font-size:11px;font-weight:400;letter-spacing:.04em;text-transform:none;opacity:.8;margin-top:2px}
 .go.alt{background:var(--panel);border-color:var(--line)}
 .hurt{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 45%,rgba(150,0,10,.55) 100%);z-index:3}.hurt.on{animation:hurt .45s ease-out}@keyframes hurt{0%{opacity:1}100%{opacity:0}}
 .tabs{display:flex;gap:4px}.tabs button{flex:1;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:5px;padding:5px 4px;font-family:var(--display);font-weight:700;font-size:12px;letter-spacing:.05em;text-transform:uppercase;position:relative}
 .tabs button[aria-pressed="true"]{color:var(--text);border-color:var(--gold);background:rgba(226,177,74,.12)}.tabs i{position:absolute;top:3px;right:5px;width:7px;height:7px;border-radius:50%;background:#e2b14a;display:none}.tabs i.on{display:block}
-.tab{display:flex;flex-direction:column;gap:9px}.tab[hidden]{display:none}
-#o-nick{flex:1;min-width:0;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:5px;color:var(--text);font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.04em;padding:5px 8px;text-transform:uppercase}
 .sw button.lock{opacity:.35;position:relative}.sw button.lock::after{content:'🔒';position:absolute;inset:0;display:grid;place-items:center;font-size:11px}
 .sw button.txt{width:auto;border-radius:5px;padding:0 8px;font-size:11px;background:transparent;color:var(--text)}
 .stats{display:flex;flex-direction:column;gap:6px}.stt{display:grid;grid-template-columns:88px 1fr 28px;align-items:center;gap:8px;font-size:12px}
@@ -156,15 +151,106 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .kbar b{color:var(--text);font-weight:600}.kbar span.lit,.kbar span.lit b{color:var(--gold)}
 .gfx .sw{flex-wrap:wrap}
 
+/* ── menu screens (main menu, quick-fight setup, fighter creator, settings, pause): underground look — raw concrete, a neon sign, poster type ── */
+#stage{--poster:'Oswald','Big Shoulders Display','Arial Narrow',Impact,sans-serif;--neon:#ff3b4e;
+  --grit:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1.4 0 0 0 -.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.ui{position:absolute;inset:0;z-index:4}
+.mm{display:flex;justify-content:space-between;gap:16px;padding:var(--pt) var(--pr) var(--pb) calc(var(--pl) + 14px);background:linear-gradient(90deg,rgba(5,6,9,.95),rgba(5,6,9,.74) 30%,rgba(5,6,9,0) 62%)}
+.mm::before{content:'';position:absolute;inset:0;background:var(--grit);opacity:.5;pointer-events:none;-webkit-mask-image:linear-gradient(90deg,#000 10%,transparent 58%);mask-image:linear-gradient(90deg,#000 10%,transparent 58%)}
+.mm-l{position:relative;display:flex;flex-direction:column;justify-content:space-between;gap:8px;min-width:0;max-width:66%}
+.mm-r{position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-end;gap:6px;text-align:right;min-width:0;animation:mFade .5s .15s both}
+.logo{animation:mFade .45s both}
+.logo .eyebrow{color:var(--neon)}
+.logo h1{display:flex;flex-direction:column;gap:0 .2em;margin:4px 0 0;font-family:var(--poster);font-weight:700;font-size:clamp(40px,14.5vmin,112px);line-height:.92;letter-spacing:.01em}
+.logo h1 span{color:#ece6da;text-shadow:0 3px 0 rgba(0,0,0,.55)}
+.logo h1 b{font-weight:700;color:transparent;-webkit-text-stroke:2px var(--neon);text-shadow:0 0 16px rgba(255,59,78,.8),0 0 56px rgba(255,59,78,.4);animation:neon 6s infinite}
+.logo::after{content:'';display:block;width:min(300px,60%);height:2px;margin-top:clamp(6px,1.6vmin,14px);background:linear-gradient(90deg,#e6f8ff,rgba(230,248,255,0));box-shadow:0 0 14px rgba(190,235,255,.85)}   /* a fluorescent tube */
+@keyframes neon{0%,91%,94%,96%,100%{opacity:1}92.5%{opacity:.5}95%{opacity:.72}}
+@keyframes mFade{from{opacity:0}}
+@keyframes mIn{from{opacity:0;transform:translateX(-18px)}}
+.mnav{display:flex;flex-direction:column;align-items:flex-start;gap:clamp(0px,.7vmin,6px)}
+.mnav button{position:relative;display:flex;align-items:baseline;gap:clamp(8px,1.6vmin,14px);border:0;background:none;padding:1px 16px 1px 0;font-family:var(--poster);font-weight:700;font-size:clamp(21px,5.8vmin,44px);line-height:1.14;
+  letter-spacing:.02em;text-transform:uppercase;text-align:left;color:#b4aea2;outline:none;transition:transform .16s ease-out,color .16s;animation:mIn .34s cubic-bezier(.2,.8,.2,1) both}
+.mnav button:nth-child(2){animation-delay:.04s}.mnav button:nth-child(3){animation-delay:.08s}.mnav button:nth-child(4){animation-delay:.12s}.mnav button:nth-child(5){animation-delay:.16s}
+.mnav button b{font-weight:700;white-space:nowrap}
+.mnav button i{flex:none;width:20px;font:500 11px var(--mono);font-style:normal;letter-spacing:.08em;color:var(--muted);transition:color .16s}
+.mnav button small{font:400 clamp(10px,1.7vmin,12px) var(--mono);letter-spacing:.03em;text-transform:none;color:var(--muted);white-space:nowrap}
+.mnav button small.pt{color:var(--gold)}
+.mnav button::before{content:'';position:absolute;left:-14px;top:16%;bottom:16%;width:4px;background:var(--neon);box-shadow:0 0 12px var(--neon);transform:scaleY(0);transition:transform .16s}
+.mnav button:hover,.mnav button:focus{color:#fff;transform:translateX(10px)}
+.mnav button:hover i,.mnav button:focus i{color:var(--neon)}
+.mnav button:hover::before,.mnav button:focus::before{transform:scaleY(1)}
+.mnav button:active{transform:translateX(10px) scale(.97)}
+.mfoot{display:flex;flex-direction:column;gap:6px;animation:mFade .5s .2s both}
+.who{font-family:var(--poster);font-weight:700;font-size:clamp(16px,3.4vmin,26px);letter-spacing:.04em;text-transform:uppercase;line-height:1}
+.who small{display:block;margin-top:5px;font:400 11px var(--mono);letter-spacing:.06em;text-transform:none;color:var(--muted)}
+.khint{font:400 10.5px var(--mono);letter-spacing:.06em;color:var(--muted)}
+/* docked panel: a slab of concrete along the left edge */
+.scr{pointer-events:none}.scr > *{pointer-events:auto}
+.scr.dim{background:rgba(5,6,9,.72)}
+.panel{position:absolute;left:0;top:0;bottom:0;width:min(400px,46%);display:flex;flex-direction:column;gap:clamp(8px,1.8vmin,14px);padding:var(--pt) 18px var(--pb) var(--pl);
+  background:var(--grit),linear-gradient(180deg,#1b1d22,#0c0d11);background-blend-mode:soft-light,normal;border-right:1px solid rgba(255,59,78,.55);box-shadow:16px 0 46px -22px rgba(255,59,78,.55);animation:pSlide .28s cubic-bezier(.2,.8,.2,1)}
+.panel.wide{width:min(470px,54%)}
+@keyframes pSlide{from{opacity:0;transform:translateX(-24px)}}
+.ptitle{font-family:var(--poster);font-weight:700;font-size:clamp(22px,5.2vmin,38px);line-height:1;letter-spacing:.02em;text-transform:uppercase}
+.ptitle small{display:block;margin-bottom:4px;font:500 10.5px var(--mono);letter-spacing:.14em;color:var(--neon)}
+.pbody{flex:1;min-height:0;min-width:0;overflow-y:auto;display:flex;flex-direction:column;gap:clamp(8px,1.8vmin,13px);padding-right:2px}
+.pfoot{display:flex;gap:8px;justify-content:space-between}
+.btn{border:1px solid rgba(255,255,255,.2);border-radius:2px;background:rgba(255,255,255,.05);padding:clamp(6px,1.4vmin,10px) 18px;font-family:var(--poster);font-weight:700;font-size:clamp(14px,2.8vmin,19px);letter-spacing:.06em;text-transform:uppercase;transition:transform .12s,border-color .15s,background .15s}
+.btn:hover,.btn:focus{border-color:var(--gold);outline:none}.btn:active{transform:scale(.96)}
+.btn.pri{background:linear-gradient(180deg,#d42a3c,#8f1626);border-color:rgba(255,140,140,.5);color:#fff;box-shadow:0 0 22px -6px rgba(255,59,78,.8)}
+.btn.sm{padding:6px 12px;font-size:clamp(12px,2.2vmin,14px);background:rgba(10,12,17,.7)}
+.btn[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.fld{display:flex;flex-direction:column;gap:6px;min-width:0}
+.fld > span{font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.fld.row{flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
+.note{font-size:11px;color:var(--muted);line-height:1.35}
+.ui .sw button.txt{height:28px;border-radius:2px;border:1px solid rgba(255,255,255,.18);padding:0 10px;font-size:12px;background:rgba(255,255,255,.04)}
+.ui .sw button.txt[aria-pressed="true"]{border-color:var(--gold);color:var(--gold);background:rgba(226,177,74,.12);transform:none}
+.ui .sw button.txt.warn{border-color:rgba(255,59,78,.7);color:#ff8f9a}
+.ui .sw button:focus{outline:2px solid rgba(255,255,255,.5);outline-offset:1px}
+.inp{box-sizing:border-box;width:100%;min-width:0;background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.18);border-radius:2px;color:var(--text);font-family:var(--poster);font-weight:700;font-size:18px;letter-spacing:.05em;padding:7px 10px;text-transform:uppercase;-webkit-user-select:text;user-select:text}
+.inp:focus{outline:none;border-color:var(--gold)}
+.crb{flex:1;min-height:0;display:flex;gap:14px}
+.cats{flex:none;display:flex;flex-direction:column;gap:4px;width:clamp(84px,25%,112px)}
+.cats button{position:relative;border:0;border-left:3px solid rgba(255,255,255,.14);border-radius:0;background:rgba(255,255,255,.035);padding:clamp(4px,1.3vmin,9px) 8px;text-align:left;font-family:var(--poster);font-weight:700;font-size:clamp(13px,2.6vmin,17px);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);transition:color .15s,border-color .15s}
+.cats button:hover,.cats button:focus{color:var(--text);outline:none;border-left-color:rgba(255,255,255,.5)}
+.cats button[aria-pressed="true"]{color:#fff;border-left-color:var(--neon);background:linear-gradient(90deg,rgba(255,59,78,.24),rgba(255,59,78,0))}
+.cats i{position:absolute;top:50%;right:8px;width:7px;height:7px;margin-top:-3px;border-radius:50%;background:var(--gold);display:none}.cats i.on{display:block}
+.cpane{display:flex;flex-direction:column;gap:clamp(8px,1.8vmin,13px)}
+.dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
+.views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
+.locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.locs button{display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid rgba(255,255,255,.16);border-radius:2px;background:rgba(255,255,255,.04);padding:clamp(7px,1.6vmin,11px) 12px;transition:border-color .15s,background .15s}
+.locs button b{font-family:var(--poster);font-weight:700;font-size:clamp(16px,3.2vmin,21px);letter-spacing:.04em;text-transform:uppercase}
+.locs button small{font-size:11.5px;line-height:1.3;color:var(--muted)}
+.locs button:hover,.locs button:focus{border-color:rgba(255,255,255,.5);outline:none}
+.locs button[aria-pressed="true"]{border-color:var(--gold);background:rgba(226,177,74,.1)}.locs button[aria-pressed="true"] b{color:var(--gold)}
+.tabs2{display:flex;gap:4px}.tabs2 button{flex:1;border:0;border-bottom:2px solid rgba(255,255,255,.14);background:none;padding:5px 4px;font-family:var(--poster);font-weight:700;font-size:clamp(13px,2.4vmin,15px);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tabs2 button[aria-pressed="true"]{color:#fff;border-bottom-color:var(--neon)}.tabs2 button:focus{outline:none;color:var(--text)}
+.vol{display:flex;align-items:center;gap:10px;min-width:0}.vol input{width:clamp(110px,22vmin,170px);accent-color:var(--neon)}.vol b{width:38px;text-align:right;font:500 12px var(--mono)}
+.pause{display:grid;place-items:center;background:rgba(5,6,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.pbox{display:flex;flex-direction:column;align-items:center;gap:clamp(6px,2.4vmin,20px);animation:mFade .2s both}
+.ptitle.big{font-size:clamp(44px,14vmin,104px);color:transparent;-webkit-text-stroke:2px var(--neon);text-shadow:0 0 16px rgba(255,59,78,.8),0 0 56px rgba(255,59,78,.4)}
+.mnav.c{align-items:center}.mnav.c button{flex-direction:column;align-items:center;gap:0;padding:1px 16px;animation:none}
+.mnav.c button::before{display:none}
+.mnav.c button:hover,.mnav.c button:focus{transform:none;text-shadow:0 0 18px rgba(255,59,78,.9)}
+.pz{pointer-events:auto;position:relative;display:block;margin:6px auto 0;width:36px;height:30px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+.pz::before{content:'';position:absolute;left:50%;top:50%;box-sizing:content-box;width:4px;height:12px;margin:-6px 0 0 -6px;border-left:4px solid var(--text);border-right:4px solid var(--text)}
+#stage.desk .pz{display:none}
+#stage.desk.nokeys .pad > .kbar{display:none}
+#stage:not(.desk) .khint{display:none}
+#stage.short .logo h1{flex-direction:row;font-size:40px}
+#stage.short .ladder i{font-size:9px;padding:2px 5px}
+#stage.short .panel{padding-right:12px}
+@media (prefers-reduced-motion:reduce){.mnav button,.panel,.logo,.logo h1 b,.mm-r,.mfoot,.views,.pbox{animation:none}}
+
 .loading{position:absolute;inset:0;display:grid;place-items:center;background:var(--ink)}
 .loading .box{display:flex;flex-direction:column;gap:10px;width:min(320px,70%);font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted)}
 .loading .bar{height:4px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden}
 .loading .bar span{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
 .err{color:#ff9b8a}
 #stage.short .rules,#stage.short .keys{display:none}
-#stage.short .card{gap:7px;padding:10px 14px;width:min(380px,56%)}
-#stage.short h1{font-size:30px}
-#stage.short .go{font-size:19px;padding:9px 14px}
 #stage.short .sw button:not(.txt){width:24px;height:24px}
 @media (hover:none){.db small,.pb small,.keys{display:none}}
 @media (prefers-reduced-motion:reduce){.msg.show,.popn,.rt,.hp.hit,.counter{animation-duration:.01s}}
@@ -184,7 +270,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="st"><i id="s1"></i></div>
       <div class="counter" id="cnt" hidden>КОНТРУДАР ×1.5</div>
     </div>
-    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small></div>
+    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><button class="pz" id="pause-btn" aria-label="Пауза"></button></div>
     <div class="side r">
       <div class="nm"><b id="n2">Соперник</b><span id="w2">побед 0</span><span id="st2" style="opacity:.7"></span></div>
       <div class="hp" id="hpb2"><i class="ghost" id="g2"></i><i class="fill" id="h2"></i></div>
@@ -223,48 +309,115 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
   </div>
 
-  <div class="menu" id="menu" hidden>
-    <div class="card">
-      <div><div class="eyebrow">бой до нокаута</div><h1>Нокаут-ринг</h1></div>
-      <div class="tabs" id="tabs"><button data-tab="look" aria-pressed="true">Вид</button><button data-tab="fighter">Боец<i id="pts-dot"></i></button><button data-tab="rules">Как драться</button></div>
-      <div class="tab" data-tab="look">
-      <div class="opt"><span>имя</span><input id="o-nick" maxlength="14" placeholder="Ты" autocomplete="off" spellcheck="false"></div>
-      <div class="opt"><span>шорты</span><div class="sw" id="o-shorts"></div></div>
-      <div class="opt"><span>низ</span><div class="sw" id="o-bottom"></div></div>
-      <div class="opt"><span>верх</span><div class="sw" id="o-top"></div></div>
-      <div class="opt"><span>обувь</span><div class="sw" id="o-shoes"></div></div>
-      <div class="opt"><span>бинты</span><div class="sw" id="o-wraps"></div></div>
-      <div class="opt"><span>на улице</span><div class="sw" id="o-hands"></div></div>
-      <div class="opt"><span>перчатки</span><div class="sw" id="o-gloves"></div></div>
-      <div class="opt"><span>капа</span><div class="sw" id="o-guard"></div></div>
-      <div class="opt"><span>волосы</span><div class="sw" id="o-hair"></div></div>
-      <div class="opt"><span>кожа</span><div class="sw" id="o-skin"></div></div>
-      <div class="opt"><span>борода</span><div class="sw" id="o-beard"></div></div>
-      <div class="opt"><span>соперник</span><div class="sw" id="o-diff"></div></div>
-      <div class="opt"><span>место</span><div class="sw" id="o-loc"></div></div>
-      <div class="opt gfx"><span>графика</span><div class="sw" id="o-gfx"></div></div>
+  <!-- main menu: logo, the column of modes; the scene (the fighter warming up in the current location) shows through -->
+  <div class="ui mm" id="menu" hidden>
+    <div class="mm-l">
+      <div class="logo"><div class="eyebrow">подпольные бои · голые кулаки</div><h1><span>Нокаут</span><b>ринг</b></h1></div>
+      <nav class="mnav" id="nav-main">
+        <button id="go-car"><i>01</i><b>Карьера</b><small id="car-lbl"></small></button>
+        <button id="go-quick"><i>02</i><b>Быстрый бой</b><small>место и соперник</small></button>
+        <button id="go-train"><i>03</i><b>Тренировка</b><small>груша · спарринг</small></button>
+        <button id="go-fighter"><i>04</i><b>Боец</b><small id="fighter-lbl"></small></button>
+        <button id="go-set"><i>05</i><b>Настройки</b></button>
+      </nav>
+      <nav class="mnav" id="nav-train" hidden>
+        <button id="go-bag"><i>01</i><b>Груша</b><small id="bag-lbl"></small></button>
+        <button id="go-spar"><i>02</i><b>Спарринг</b><small>шлем и перчатки · зал</small></button>
+        <button id="train-back"><i>←</i><b>Назад</b></button>
+      </nav>
+      <div class="mfoot"><div class="ladder" id="ladder"></div><div class="rec-line" id="rec-line"></div></div>
+    </div>
+    <div class="mm-r"><div class="who" id="who"></div><div class="khint">↑ ↓ выбор · Enter · Esc назад</div></div>
+  </div>
+
+  <!-- before a quick fight: the opponent and the place -->
+  <div class="ui scr" id="quick" hidden>
+    <div class="panel">
+      <div class="ptitle"><small>быстрый бой</small>Выбор места</div>
+      <div class="pbody">
+        <div class="fld"><span>место</span><div class="locs" id="o-loc"></div></div>
+        <div class="fld"><span>соперник</span><div class="sw" id="o-diff"></div></div>
       </div>
-      <div class="tab" data-tab="fighter" hidden>
-      <div class="rec-line" id="rec-line"></div>
-      <div class="stats" id="o-stats"></div>
-      <div class="opt"><span>коронный</span><div class="sw" id="o-sig"></div></div>
-      <div class="hint">Очки за победы в карьере (+2, пояс +3), в быстром бою (+1) и за грушу (400+ очков: +1, 800+: ещё +1). Бинты открываются победами в карьере.</div>
+      <div class="pfoot"><button class="btn" id="quick-back">Назад</button><button class="btn pri" id="go">В бой</button></div>
+    </div>
+  </div>
+
+  <!-- fighter creator: categories on the left, the man himself large on the right (drag = turn, wheel / pinch = zoom) -->
+  <div class="ui scr" id="creator" hidden>
+    <div class="dragl" id="cr-drag"></div>
+    <div class="panel wide">
+      <div class="ptitle"><small>боец</small>Создание бойца</div>
+      <div class="crb">
+        <div class="cats" id="cats"><button data-cat="name">Имя</button><button data-cat="body">Тело</button><button data-cat="face">Лицо</button><button data-cat="wear">Одежда</button><button data-cat="hands">Руки</button><button data-cat="style">Стиль<i id="pts-dot"></i></button></div>
+        <div class="pbody">
+          <div class="cpane" data-cat="name">
+            <div class="fld"><span>имя</span><input class="inp" id="o-name" maxlength="16" placeholder="Боец" autocomplete="off" spellcheck="false"></div>
+            <div class="fld"><span>прозвище (в бою над полосой здоровья)</span><input class="inp" id="o-nick" maxlength="14" placeholder="Ты" autocomplete="off" spellcheck="false"></div>
+            <div class="rec-line" id="rec-line2"></div>
+          </div>
+          <div class="cpane" data-cat="body" hidden>
+            <div class="fld"><span>тон кожи</span><div class="sw" id="o-skin"></div></div>
+          </div>
+          <div class="cpane" data-cat="face" hidden>
+            <div class="fld"><span>волосы</span><div class="sw" id="o-hair"></div></div>
+            <div class="fld"><span>борода</span><div class="sw" id="o-beard"></div></div>
+          </div>
+          <div class="cpane" data-cat="wear" hidden>
+            <div class="fld"><span>верх</span><div class="sw" id="o-top"></div></div>
+            <div class="fld"><span>низ</span><div class="sw" id="o-bottom"></div></div>
+            <div class="fld"><span>цвет шорт</span><div class="sw" id="o-shorts"></div></div>
+            <div class="fld"><span>обувь</span><div class="sw" id="o-shoes"></div></div>
+          </div>
+          <div class="cpane" data-cat="hands" hidden>
+            <div class="fld"><span>бинты</span><div class="sw" id="o-wraps"></div><small class="note">цвета открываются победами в карьере</small></div>
+            <div class="fld"><span>на улице</span><div class="sw" id="o-hands"></div></div>
+            <div class="fld"><span>перчатки и шлем (спарринг)</span><div class="sw" id="o-gloves"></div></div>
+            <div class="fld"><span>капа</span><div class="sw" id="o-guard"></div></div>
+          </div>
+          <div class="cpane" data-cat="style" hidden>
+            <div class="fld"><span>коронный удар (+12 % урона)</span><div class="sw" id="o-sig"></div></div>
+            <div class="stats" id="o-stats"></div>
+            <div class="hint">Очки за победы в карьере (+2, пояс +3), в быстром бою (+1) и за грушу (400+ очков: +1, 800+: ещё +1).</div>
+          </div>
+        </div>
       </div>
-      <div class="tab" data-tab="rules" hidden>
-      <ul class="rules">
-        <li><b>Слип</b> уходит от прямых и апперкотов, хук и оверхенд его ловят.</li>
-        <li><b>Нырок</b> уходит от прямых и хуков, апперкот его ловит.</li>
-        <li><b>Отклон</b> уходит почти от всего, но кросс и оверхенд достают.</li>
-        <li><b>Блок</b> держи: снимает большую часть урона, апперкот и корпус проходят. Держи блок и тяни в сторону, будет уклон туда.</li>
-        <li>Удары встают в очередь до трёх. После удачного уклона удар ×1.5.</li>
-      </ul>
-      <div class="keys">WASD / стрелки ходьба · ЛКМ или J джеб · ПКМ или K кросс · U I хуки · M , апперкоты · O или колесо оверхенд · Shift + удар в корпус · F сильный · Q E слипы · C нырок · X отклон · пробел блок</div>
+      <div class="pfoot"><button class="btn" id="cr-rand">Случайно</button><button class="btn pri" id="cr-done">Готово</button></div>
+    </div>
+    <div class="views"><span class="khint" id="cr-hint">тяни — вращать · колесо — зум</span><button class="btn sm" id="v-face">Лицо</button><button class="btn sm" id="v-full">Полный рост</button></div>
+  </div>
+
+  <!-- settings (from the menu and from the pause) -->
+  <div class="ui scr" id="settings" hidden>
+    <div class="panel wide">
+      <div class="ptitle"><small>игра</small>Настройки</div>
+      <div class="tabs2" id="set-tabs"><button data-t="opt" aria-pressed="true">Параметры</button><button data-t="how">Как драться</button></div>
+      <div class="pbody" data-t="opt">
+        <div class="fld"><span>графика</span><div class="sw" id="o-gfx"></div><small class="note" id="gfx-note"></small></div>
+        <div class="fld row"><span>громкость</span><div class="vol"><input type="range" id="o-vol" min="0" max="100" step="5" aria-label="Громкость"><b id="vol-v"></b></div></div>
+        <div class="fld row"><span>тряска камеры</span><div class="sw" id="o-shake"></div></div>
+        <div class="fld row"><span>подсказка клавиш в бою</span><div class="sw" id="o-keys"></div></div>
+        <div class="fld row"><span>счётчик кадров (F3)</span><div class="sw" id="o-fps"></div></div>
+        <div class="fld row" id="reset-row"><span>сброс прогресса</span><div class="sw" id="o-reset"></div></div>
       </div>
-      <div class="ladder" id="ladder"></div>
-      <div class="modes">
-        <button class="go" id="go-car">Карьера<small id="car-lbl"></small></button>
-        <div class="m2"><button class="go alt" id="go">Быстрый бой</button><button class="go alt" id="go-spar">Спарринг<small>шлем, перчатки</small></button><button class="go alt" id="go-bag">Груша<small id="bag-lbl"></small></button></div>
+      <div class="pbody" data-t="how" hidden>
+        <ul class="rules">
+          <li><b>Слип</b> уходит от прямых и апперкотов, хук и оверхенд его ловят.</li>
+          <li><b>Нырок</b> уходит от прямых и хуков, апперкот его ловит.</li>
+          <li><b>Отклон</b> уходит почти от всего, но кросс и оверхенд достают.</li>
+          <li><b>Блок</b> держи: снимает большую часть урона, апперкот и корпус проходят. Держи блок и тяни в сторону, будет уклон туда.</li>
+          <li>Удары встают в очередь до трёх. После удачного уклона удар ×1.5.</li>
+        </ul>
+        <div class="keys">WASD / стрелки ходьба · ЛКМ или J джеб · ПКМ или K кросс · U I хуки · M , апперкоты · O или колесо оверхенд · Shift + удар в корпус · F сильный · Q E слипы · C нырок · X отклон · пробел блок · Esc пауза</div>
       </div>
+      <div class="pfoot"><button class="btn pri" id="set-back">Назад</button></div>
+    </div>
+  </div>
+
+  <!-- pause: the simulation stands still -->
+  <div class="ui pause" id="pause" hidden>
+    <div class="pbox">
+      <div class="ptitle big">Пауза</div>
+      <nav class="mnav c"><button id="p-resume"><b>Продолжить</b></button><button id="p-set"><b>Настройки</b></button><button id="p-quit"><b id="p-quit-l">Сдаться</b><small>выход в меню</small></button></nav>
     </div>
   </div>
 

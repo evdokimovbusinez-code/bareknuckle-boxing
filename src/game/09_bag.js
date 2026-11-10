@@ -56,14 +56,16 @@ function bagEnd() {
 function updateMenu() {
   renderStats();
   const el = $('ladder'); if (el) el.innerHTML = LADDER.map((L, i) => `<i class="${i < G.career ? 'done' : i === G.career ? 'next' : ''}">${L.nm}${L.champ ? ' ★' : ''}</i>`).join('');
-  const c = $('car-lbl'); if (c) c.textContent = G.career >= LADDER.length ? 'ты чемпион — пройти заново' : `бой ${G.career + 1}/${LADDER.length}: ${LADDER[G.career].nm} · ${DIFFS[LADDER[G.career].diff].label.toLowerCase()}`;
+  const c = $('car-lbl'); if (c) c.textContent = G.career >= LADDER.length ? 'ты чемпион — пройти заново' : `бой ${G.career + 1}/${LADDER.length} · ${LADDER[G.career].nm} · ${LOCS[careerLoc()].label.toLowerCase()}`;
+  const f = $('fighter-lbl'); f.textContent = PROF.pts > 0 ? `свободных очков: ${PROF.pts}` : 'внешность · стиль'; f.classList.toggle('pt', PROF.pts > 0);
+  $('who').innerHTML = `${esc(PROF.name || 'Боец')}${PROF.nick ? ` «${esc(PROF.nick)}»` : ''}<small>побед ${G.wins} · поражений ${G.losses}${PROF.champ ? ' · чемпион ×' + PROF.champ : ''}</small>`;
   const b = $('bag-lbl'); if (b) b.textContent = G.bagBest ? 'рекорд ' + G.bagBest : '45 секунд';
 }
 /* the post-fight sheet (CompuBox style): punches thrown / landed, accuracy, power shots, knockdowns, damage */
 function fightTable() {
   const a = P1.fs, b = P2.fs; if (!a || !b) return;
   const acc = f => f.thr ? Math.round(100 * f.land / f.thr) + '%' : '—', row = (x, l, y, hi) => `<tr><td class="${hi && x > y ? 'w' : ''}">${x}</td><td>${l}</td><td class="${hi && y > x ? 'w' : ''}">${y}</td></tr>`;
-  $('r-stats').innerHTML = `<tr><td>${esc(PROF.nick || 'Ты')}</td><td></td><td>${esc($('n2').textContent)}</td></tr>` + row(a.land + '/' + a.thr, 'попал / выбросил', b.land + '/' + b.thr) + row(acc(a), 'точность', acc(b)) +
+  $('r-stats').innerHTML = `<tr><td>${esc(myName())}</td><td></td><td>${esc($('n2').textContent)}</td></tr>` + row(a.land + '/' + a.thr, 'попал / выбросил', b.land + '/' + b.thr) + row(acc(a), 'точность', acc(b)) +
     row(a.pow, 'силовых', b.pow, 1) + row(a.kd, 'нокдаунов', b.kd, 1) + row(Math.round(a.dmg / DMG_K), 'урон', Math.round(b.dmg / DMG_K), 1);
 }
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -79,17 +81,18 @@ function startQuick() { if (G.mode === 'career') { G.diff = G.userDiff; rollOppo
 function startFight(fromMode) {
   if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); }
   for (const F of [P1, P2]) F.sparGear(G.mode === 'spar');
-  setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'gym' : G.loc);   // sparring and the heavy bag are always in the gym
+  setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'gym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the gym; a career fight is where the ladder says
+  G.paused = false; UI.from = null; uiShow(null);
   BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; }
   sfx.unlock();
   P1.stat = PROF.stats; P1.sig = PROF.sig; P2.stat = lvlStats(G.mode === 'career' ? Math.min(5, Math.floor(G.career * 0.7)) : ({ easy: 0, normal: 1, hard: 2 })[G.diff] || 0); P2.sig = SIGS[(rr() * SIGS.length) | 0].id;
-  $('n1').textContent = PROF.nick || 'Ты';
+  $('n1').textContent = myName();
   P1.resetState(); P2.resetState(); P2.speed = DIFFS[G.diff].speed * (1 + 0.035 * SK(P2, 'spd')); P1.speed = 1.5 * (1 + 0.035 * SK(P1, 'spd'));
   FX.clearAir(); REC.frames.length = 0; REC.events.length = 0; Q.length = 0; AI.blockUntil = 0; AI.t = 1.0 + rr(); AI.combo = 0; AI.dodgeAt = 0;
   G.state = 'intro'; G.introT = 0; G.slow = 1; G.slowT = 0; G.hitstop = 0; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; AI.lat = 0; AI.latT = 0;
   // BKFC: five two-minute rounds; between rounds the corner works on him (stamina, the cuts, ice on the eye); no knockout → the judges
   G.round = 1; G.roundT = ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0]; G.cutWarn = false;
-  show('menu', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', true); show('pad', false);
+  show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', true); show('pad', false);
   $('diffl').textContent = DIFFS[G.diff].label.toUpperCase(); $('w1').textContent = 'побед ' + G.wins; $('w2').textContent = 'побед ' + G.losses;
   msg('Готовься');
 }
