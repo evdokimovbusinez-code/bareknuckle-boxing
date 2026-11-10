@@ -20,6 +20,8 @@ function buildMenu() {
   swatches('o-shoes', SHOES.map(b => ({ id: b.id, label: b.label })), () => LOOK.shoes || 'none', v => { LOOK.shoes = v; }, true);
   swatches('o-guard', GUARDS.map(b => ({ id: b.id, c: b.c, label: b.label })), () => LOOK.guard || 'clear', v => { LOOK.guard = v; });
   swatches('o-wraps', WRAPS_LOOKS.map(w => ({ id: w.id, c: w.c, label: w.label, need: w.need })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; });
+  swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { LOOK.hands = v; }, true);   // street fights: wraps or 4 oz MMA gloves
+  swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; });   // colour of the sparring (and MMA) gloves and the headgear
   swatches('o-gfx', ['auto', ...GFX_ORDER].map(id => ({ id, label: GFX_LABEL[id] })), () => GFX.set, setGfx, true);
   swatches('o-sig', [{ id: 'none', label: 'нет' }, ...SIGS], () => PROF.sig || 'none', v => { PROF.sig = v === 'none' ? null : v; }, true);
   const nk = $('o-nick'); nk.value = PROF.nick; nk.oninput = () => { PROF.nick = nk.value.replace(/[<>]/g, '').slice(0, 14); save(); };

@@ -17,7 +17,7 @@ class Flesh {
     this.u = { uFT: { value: 0 }, uU: { value: this.U }, uFleshOn: { value: 0 }, uSweat: { value: 0 }, uImp: { value: v4(2, -1) }, uImpD: { value: v4(2, 0) }, uSw: { value: v4(6, 0) },
       uWP: { value: v4(8, -1e4) }, uWD: { value: v4(8, 0) }, uWN: { value: v4(8, 0) }, uWT: { value: v4(8, 0) }, uNB: { value: new V4() }, uNBD: { value: new V4() },
       uEyeL: { value: new V3() }, uEyeR: { value: new V3() }, uLidAx: { value: new V3(1, 0, 0) }, uLid: { value: new V4() },
-      uEyeSw: { value: new THREE.Vector2() }, uEmo: { value: new V4() }, uEmo2: { value: new V4() }, uFUp: { value: new V3() }, uFFw: { value: new V3() }, uFMid: { value: new V3() }, uBr: { value: v4(10, 0) }, uBrT: { value: v4(10, 0) }, uSm: { value: v4(28, 0) }, uGear: { value: new V4() }, uSmD: { value: v4(28, 0) } };
+      uEyeSw: { value: new THREE.Vector2() }, uEmo: { value: new V4() }, uEmo2: { value: new V4() }, uFUp: { value: new V3() }, uFFw: { value: new V3() }, uFMid: { value: new V3() }, uBr: { value: v4(10, 0) }, uBrT: { value: v4(10, 0) }, uSm: { value: v4(28, 0) }, uGear: { value: new V4() }, uGlv: { value: 0 }, uSmD: { value: v4(28, 0) } };
     this.eyeSwell = [0, 0]; this.brI = 0; this.smI = 0; this.lipBleed = 0;
     this.M = new M4(); this.Mi = new M4(); this.t = 0; this.ii = 0; this.wounds = []; this.vel = new V3();
     if (!T.headV) { T.headV = skinVerts(body.geometry, T.matNames.indexOf('Std_Skin_Head')); T.bodyV = skinVerts(body.geometry, T.matNames.indexOf('Std_Skin_Body')); }
