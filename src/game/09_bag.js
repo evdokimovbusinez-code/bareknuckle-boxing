@@ -1,23 +1,13 @@
-/* ───────── training: the heavy bag. A 40 kg leather bag on a chain: punches swing it (pendulum about the hook, ~0.45 Hz) and
-   twist it (hooks); a 45-second drill — every landed shot scores its damage, punches thrown in quick succession build a combo ───────── */
-const BAG = { on: false, th: new V3(), om: new V3(), yaw: 0, yawV: 0, sq: 0, score: 0, hits: 0, combo: 0, best: 0, lastT: -9, L: 1.45, mass: 40 };
-{
-  const g = BAG.g = new THREE.Group(), leather = new THREE.MeshPhysicalMaterial({ color: '#4a1714', roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.4, sheen: 0.3, sheenColor: new THREE.Color('#ff9a8a') });
-  const strap = new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.6, metalness: 0.2 }), chainM = new THREE.MeshStandardMaterial({ color: '#8a8f99', roughness: 0.35, metalness: 0.9 });
-  const body = BAG.body = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.18, 1.1, 28, 6), leather); body.position.y = -1.45; body.castShadow = true; g.add(body);
-  for (const y of [-0.92, -1.98]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.195, 0.195, 0.05, 28), strap); b.position.y = y; g.add(b); }
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.19, 0.06, 28), strap); cap.position.y = -0.87; g.add(cap);
-  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2, c = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.45, 6), chainM); c.position.set(Math.cos(a) * 0.06, -0.66, Math.sin(a) * 0.06); c.rotation.set(Math.sin(a) * 0.25, 0, -Math.cos(a) * 0.25); g.add(c); }
-  const ch = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.45, 6), chainM); ch.position.y = -0.22; g.add(ch);
-  g.visible = false; scene.add(g);
-}
+/* ───────── training: the heavy bag. A 40 kg leather bag on a chain: punches swing it, rock it and twist it (09a_bag_rig.js:
+   bagImpact, bagStep); a 45-second drill — every landed shot scores its damage, punches thrown in quick succession build a combo ───────── */
+const BAG = { on: false, score: 0, hits: 0, combo: 0, best: 0, lastT: -9, mass: 40, x: null };   // the bag itself — model, chains, physics — is in 09a_bag_rig.js
 function showP2(v) { if (!P2) return; P2.group.visible = v; for (const o of P2.sceneObjs || []) o.visible = v;
   if (v) { P2.handGear(); if (P2.gear.look) P2.dress(P2.gear.look); P2.sparGear(!!P2.gear.spar); }   // re-apply what the outfit hides (trunks under trousers, hair under the headgear)
   else { const g = P2.gear; if (g.gloves) { for (const gl of g.gloves) gl.g.visible = false; g.hg.visible = false; } if (g.mma) { g.mma.visible = false; for (const pd of g.mmaPads) pd.m.visible = false; } } }   // (his gear decides what of the wraps / hair shows)
 function startBag() {
   G.mode = 'bag'; if (G.diff !== G.userDiff && G.userDiff) G.diff = G.userDiff;
   startFight(true); BAG.on = true; showP2(false); BAG.g.visible = true;
-  BAG.x = null; Object.assign(BAG, { score: 0, hits: 0, combo: 0, best: 0, lastT: -9, yaw: 0, yawV: 0, sq: 0 }); BAG.th.set(0, 0, 0); BAG.om.set(0, 0, 0);
+  BAG.x = null; Object.assign(BAG, { score: 0, hits: 0, combo: 0, best: 0, lastT: -9 }); bagReset(); BAG.setSkin(BAG.skin + 1);   // the other bag every time
   G.roundT = 45; $('n2').textContent = 'Груша'; const sl = $('st2'); if (sl) sl.textContent = 'рекорд ' + G.bagBest;
 }
 function bagHit(att, name, contact) {
@@ -25,25 +15,19 @@ function bagHit(att, name, contact) {
   const fwd = Math.sign(P2.group.position.x - att.group.position.x) || 1, dir = new V3(fwd, 0, 0);
   if (P.type === 'hook') dir.copy(_v1.set(P.arm === 'L' ? -1 : 1, 0, 0.35).transformDirection(att.group.matrixWorld)).setY(0).normalize();
   { const kn = att.knuckle(_v4); if (att.kOld) { _v3.copy(kn).sub(att.kOld).setY(0); if (_v3.lengthSq() > 1e-6) dir.lerp(_v3.normalize(), 0.5).normalize(); } }
-  const power = clamp(dmg / 18, 0.2, 1.6), J = 14 + 22 * power;   // N·s into a 40 kg bag
-  BAG.om.x += dir.x * J / BAG.mass / BAG.L; BAG.om.z += dir.z * J / BAG.mass / BAG.L;
-  if (P.type === 'hook') BAG.yawV += (P.arm === 'L' ? 1 : -1) * fwd * 1.6 * power; BAG.sq = Math.min(1, BAG.sq + 0.6 * power);
-  const pos = contact || att.knuckle(new V3());
+  if (P.type === 'upper') dir.setY(0.55).normalize();   // an uppercut lifts the bag: the chains go slack for a moment
+  const pos = contact || bagContact(att) || att.knuckle(new V3());
+  // the bag coming onto the punch is hit harder, one going away softer (the leather's speed at the point of contact, along the punch)
+  const vt = _v3.lerpVectors(BAG.topV, BAG.botV, clamp((BAG.top.y - pos.y) / (BAG.top.y - BAG.bot.y), 0, 1)).dot(dir);
+  const power = clamp(dmg / 18, 0.2, 1.6), J = (14 + 22 * power) * clamp(1 - 0.3 * vt, 0.75, 1.35);   // N·s into a 40 kg bag
+  bagImpact(pos, dir, J, power, P.type === 'hook' ? (P.arm === 'L' ? 1 : -1) * fwd * 0.8 * power : 0);   // (was: 1.6·power of twist for a hook, now part of it comes from where the fist lands)
   BAG.combo = G.t - BAG.lastT < 0.95 ? BAG.combo + 1 : 1; BAG.lastT = G.t; BAG.best = Math.max(BAG.best, BAG.combo);
   const pts = Math.round(dmg * (1 + 0.15 * (BAG.combo - 1))); BAG.score += pts; BAG.hits++;
   att.lastLand = G.t; att.whiff = false;
-  G.hitstop = 0.01 + 0.018 * power; G.shake = Math.max(G.shake, 0.008 + 0.02 * power); sfx.thud(power * 0.9, true);
+  G.hitstop = 0.01 + 0.018 * power; G.shake = Math.max(G.shake, 0.008 + 0.02 * power);
   popup(pos, BAG.combo > 1 ? `${pts} ×${BAG.combo}` : String(pts), BAG.combo >= 4 ? 'crit' : 'hit');
   if (BAG.combo === 4 || BAG.combo === 7) msg('Серия ×' + BAG.combo);
   const sl = $('st2'); if (sl) sl.textContent = 'очки ' + BAG.score;
-}
-function bagStep(dt) {
-  if (!BAG.on || dt <= 0) return;
-  const w2 = 9.81 / BAG.L;   // pendulum: θ'' = −(g/L)θ − cθ'
-  for (const k of ['x', 'z']) { BAG.om[k] += (-w2 * BAG.th[k] - 0.5 * BAG.om[k]) * dt; BAG.th[k] += BAG.om[k] * dt; }
-  BAG.yawV += (-6 * BAG.yaw - 1.2 * BAG.yawV) * dt; BAG.yaw += BAG.yawV * dt; BAG.sq *= Math.exp(-dt * 14);
-  const g = BAG.g; if (BAG.x == null) BAG.x = P2.headNow.x + 0.13 * (Math.sign(P2.group.position.x - P1.group.position.x) || 1); g.position.set(BAG.x, 2.72, 0);
-  g.rotation.set(BAG.th.z, BAG.yaw, -BAG.th.x, 'XYZ'); BAG.body.scale.set(1 + 0.06 * BAG.sq, 1 - 0.03 * BAG.sq, 1 + 0.06 * BAG.sq);
 }
 function bagEnd() {
   G.state = 'result'; G.winner = P1; G.loser = P2; BAG.on = true; sfx.bell(3); $('pad').hidden = true; Q.length = 0;
