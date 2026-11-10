@@ -23,6 +23,7 @@ function buildMenu() {
   swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { LOOK.hands = v; }, true);   // street fights: wraps or 4 oz MMA gloves
   swatches('o-gloves', GLOVES, () => LOOK.gloves || 'red', v => { LOOK.gloves = v; });   // colour of the sparring (and MMA) gloves and the headgear
   swatches('o-gfx', ['auto', ...GFX_ORDER].map(id => ({ id, label: GFX_LABEL[id] })), () => GFX.set, setGfx, true);
+  swatches('o-loc', Object.values(LOCS).map(L => ({ id: L.id, label: L.label })), () => G.loc, v => { G.loc = v; setLocation(v); }, true);
   swatches('o-sig', [{ id: 'none', label: 'нет' }, ...SIGS], () => PROF.sig || 'none', v => { PROF.sig = v === 'none' ? null : v; }, true);
   const nk = $('o-nick'); nk.value = PROF.nick; nk.oninput = () => { PROF.nick = nk.value.replace(/[<>]/g, '').slice(0, 14); save(); };
   nk.onkeydown = e => e.stopPropagation();

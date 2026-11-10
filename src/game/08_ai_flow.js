@@ -37,7 +37,7 @@ function ai(dt) {
   if (me.gest) return;
   // feet: he circles now and then (counter-punchers more), off the ropes toward the centre, and gives ground after a hard shot
   if ((AI.latT -= dt) <= 0) {
-    const rl = ringPt(me.group.position, _v1), dz = _v2.set(0, 0, -1).transformDirection(_m4a.copy(ARENA.matrixWorld).invert()), out = Math.max(Math.abs(rl.x), Math.abs(rl.z)) > 1.3;
+    const rl = ringPt(me.group.position, _v1), dz = _v2.set(0, 0, -1).transformDirection(_m4a.copy(ARENA.matrixWorld).invert()), out = edgeDist(rl) < 0.9;
     const sgn = out ? -Math.sign(rl.dot(dz)) || 1 : rr() < 0.5 ? -1 : 1;
     AI.lat = out || rr() < (S === STYLES.counter ? 0.55 : 0.3) ? sgn * (0.5 + 0.5 * rr()) : 0; AI.latT = 0.5 + rr() * 1.2;
   }
@@ -77,7 +77,7 @@ function toMenu() {
   G.state = 'menu'; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0;
   P1.resetState(); P2.resetState(); rollOpponent();
   show('menu', true); show('hud', false); show('pad', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false);
-  camCut = true; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0;
+  camCut = true; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; setLocation(G.loc);
 }
 const NAMES = ['Грек', 'Молот', 'Кабан', 'Шрам', 'Лом', 'Бизон', 'Кувалда', 'Седой'];
 function rollOpponent() {

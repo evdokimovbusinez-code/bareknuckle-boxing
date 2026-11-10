@@ -36,6 +36,7 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 | `10_camera_layout.js` | fight / replay camera, HUD, `layout()`, resolution (`QUAL`, `applyRes`, `resTick`) |
 | `11_arena_loop.js` | ring lights, rope visuals, **main loop `frame()`** (update order) |
 | `12_ui.js` | menu build (`swatches`, `buildMenu`), keyboard/mouse (`MV_KEYS`, `ACT_KEYS`), touch stick, boot |
+| `13_locations.js` | locations: `LOCS` (`gym`, `parking`), current `LOC`, `setLocation(id)`, `locSync()`; per location: `bound`, `ring`, `wall` (soft wall for the KO ragdoll), `build()` set, `light`. Debug: `__loc.set('parking')` |
 
 ## Conventions
 - Units: metres, seconds. Fighters stay on the world x-line; the ring (`ARENA`) rotates/slides around them.

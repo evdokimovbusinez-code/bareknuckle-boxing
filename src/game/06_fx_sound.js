@@ -44,7 +44,7 @@ const FX = (() => {
   for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero);
   const q = new Quat(), s3 = new V3(), p3 = new V3(), up = new V3(0, 1, 0);
   function decal(x, z, r) {
-    p3.set(x, 0, z); ARENA.worldToLocal(p3); if (Math.abs(p3.x) > 2.75 || Math.abs(p3.z) > 2.75) return;
+    p3.set(x, 0, z); ARENA.worldToLocal(p3); if (LOC.bound.kind === 'circle' ? Math.hypot(p3.x, p3.z) > LOC.wall.r - 0.05 : Math.abs(p3.x) > 2.75 || Math.abs(p3.z) > 2.75) return;   // only on the fighting floor
     q.setFromAxisAngle(up, rr() * 6.28); s3.set(r * (2.2 + rr() * 3), 1, r * (1.6 + rr() * 2.4)); p3.y = 0.003 + (dh % DN) * 2e-5;
     dmesh.setMatrixAt(dh % DN, m.compose(p3, q, s3)); dh++; dmesh.instanceMatrix.needsUpdate = true; dmesh.visible = true;
   }
