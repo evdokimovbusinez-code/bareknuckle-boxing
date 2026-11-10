@@ -7,3 +7,4 @@ window.__camFace=(F,dist)=>{const g=window.__g, T=g.THREE; g.G.state='menu'; con
 window.__crowd = { get: () => LOC.crowd, C: CROWD, cheer: (p, hold) => LOC.crowd && LOC.crowd.cheer(p, null, hold), EVT };
 window.__loc = { set: id => { G.loc = id; setLocation(id); }, get: () => LOC, LOCS, bodies: F => F.rag.world && F.rag.world.bodies ? F.rag.world.bodies.map(b => { const p = F.group.localToWorld(b.position.clone()); ARENA.worldToLocal(p); return [+Math.hypot(p.x, p.z).toFixed(2), +p.y.toFixed(2)]; }) : null };
 window.__camB=(F,bone,dist,dy)=>{const g=window.__g, T=g.THREE; g.G.state='menu'; const p=new T.Vector3().setFromMatrixPosition(F.bones[bone].matrixWorld); const f=F.other.headNow.clone().sub(F.headNow); f.y=0; f.normalize(); g.camera.position.copy(p).addScaledVector(f,dist); g.camera.position.y+=(dy||0); g.camera.position.z+=0.05; g.camera.lookAt(p); g.composer.render();};
+window.__sfx = sfx;

@@ -9,7 +9,7 @@
    The CPU only keeps a few numbers per person (excitement, head yaw, recoil, fade) and packs the visible ones: the crowd is split into
    sectors that are frustum-culled, and whoever stands between the camera and the fighters is dissolved (dither).
    Density follows GFX.crowd (low ≈ 0.3 of the people, high = all). Reactions come from EVT (07_state_replay_hits.js). */
-const CROWD = { u: { uT: { value: 0 }, uMood: { value: 0.15 } }, geo: null, mat: null, blobMat: null, blobs: [], mood: 0.15, heat: 0 };
+const CROWD = { u: { uT: { value: 0 }, uMood: { value: 0.15 } }, geo: null, mat: null, blobMat: null, blobs: [], mood: 0.15, heat: 0, fill: 1 };   // fill: the share of the crowd that came (a career fight sets it, startFight)
 // accessory bits of the instance mask
 const CW_HAIR = 2, CW_CAP = 4, CW_HOOD = 8, CW_BALA = 16, CW_SKULL = 32, CW_PHONE = 64, CW_CRATE = 128;
 const CROWD_LOOK = {
@@ -251,7 +251,7 @@ function makeCrowd(o = {}) {
       }
       // the view wedge in front of the fighters (world): people inside it are dissolved, as the location does with bales and cars
       const dx = camL.x - cam.x, dz = camL.z - cam.z, len = Math.hypot(dx, dz) || 1, ux = dx / len, uz = dz / len, tH = Math.tan(camera.fov * PI / 360) * camera.aspect * 1.1;
-      const nAct = Math.min(N, Math.round(N * clamp(GFX.crowd, 0, 1))), kE = 1 - Math.exp(-dt * 9), kF = 1 - Math.exp(-dt * 7), kY = 1 - Math.exp(-dt * 3), kUp = 1 - Math.exp(-dt * 10), kDn = 1 - Math.exp(-dt * 1.3);
+      const nAct = Math.min(N, Math.round(N * clamp(GFX.crowd, 0, 1) * CROWD.fill)), kE = 1 - Math.exp(-dt * 9), kF = 1 - Math.exp(-dt * 7), kY = 1 - Math.exp(-dt * 3), kUp = 1 - Math.exp(-dt * 10), kDn = 1 - Math.exp(-dt * 1.3);
       const D = aDyn.array, B = blob.instanceMatrix.array; let n = 0, hash = 0;
       for (let i = 0; i < nAct; i++) {
         const p = ppl[i]; if (!groups[p.g].vis) { p.seen = false; continue; }
@@ -293,7 +293,7 @@ function crowdTick(dt) {
   CROWD.mood += (Math.min(1, tgt + CROWD.heat) - CROWD.mood) * (1 - Math.exp(-dt * 1.4));
   CROWD.u.uT.value += dt; CROWD.u.uMood.value = CROWD.mood;
   if (c) c.update(dt);
-  sfx.crowd(c && s !== 'menu' ? 0.25 + 0.75 * CROWD.mood : 0);
+  sfx.crowd(c && s !== 'menu' ? (0.25 + 0.75 * CROWD.mood) * (0.55 + 0.45 * CROWD.fill) : 0);
 }
 /* reactions: a clean hard shot, a knockdown, a knockout → a wave of cheering from the place it happened, and a roar as loud */
 EVT.on((type, e) => {

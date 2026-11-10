@@ -16,18 +16,37 @@ try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { 
 const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.loc, opt: OPT })); } catch (e) {} };
 const careerWins = () => G.career + PROF.champ * LADDER.length;   // wraps unlock by career wins ever
 /* career: a ladder of eight men, each tougher than the last — beat one to get the next; the last one holds the belt.
-   loc: the career sets the place — it starts in the underground parking and moves up to the ring in the hall */
+   The road of a street fighter: the yard (1–2) → tyres and fire (3–4) → the underground parking (5–6) → the warehouse cage (7),
+   and the title fight (8) in the same cage with the whole crowd in (crowd = the share of the place's crowd that came, CROWD.fill).
+   name / nm: his name and the nickname he fights under; legend: one line for the card before the fight (fightCard, 09_bag.js);
+   look: what he always wears — a street outfit of 04d_street.js fixed per man (startCareer), not a random one */
 const LADDER = [
-  { nm: 'Лом', st: 'brawler', diff: 'easy', loc: 'parking' }, { nm: 'Кабан', st: 'brawler', diff: 'easy', loc: 'parking' }, { nm: 'Грек', st: 'counter', diff: 'normal', loc: 'parking' }, { nm: 'Шрам', st: 'pressure', diff: 'normal', loc: 'parking' },
-  { nm: 'Молот', st: 'brawler', diff: 'normal', loc: 'gym' }, { nm: 'Седой', st: 'counter', diff: 'hard', loc: 'gym' }, { nm: 'Бизон', st: 'pressure', diff: 'hard', loc: 'gym' }, { nm: 'Кувалда', st: 'brawler', diff: 'hard', loc: 'gym', champ: true }];
+  { nm: 'Лом', name: 'Гена Рыжов', st: 'brawler', diff: 'easy', loc: 'yard', legend: 'Гроза своего подъезда. Бьёт размашисто и ждёт, что ты испугаешься раньше, чем он устанет.',
+    look: { skin: 'light', hair: 'bald', beard: false, bottom: 'sweatS', top: 'tank', shoes: 'sneak', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'black' } },
+  { nm: 'Кабан', name: 'Толя Брагин', st: 'brawler', diff: 'easy', loc: 'yard', legend: 'Грузчик с овощной базы. Сто десять кило идут вперёд и не знают, как это — назад.',
+    look: { skin: 'tan', hair: 'brown', beard: true, bottom: 'cargo', top: 'teeG', shoes: 'boots', wraps: 'white', hands: 'wraps', guard: 'black', shorts: 'green' } },
+  { nm: 'Грек', name: 'Костя Маврин', st: 'counter', diff: 'normal', loc: 'tires', legend: 'Недоучился на хирурга. Знает, где у человека печень, и спокойно ждёт твоей ошибки.',
+    look: { skin: 'tan', hair: 'black', beard: true, bottom: 'jeansB', top: 'none', shoes: 'keds', wraps: 'black', hands: 'wraps', guard: 'clear', shorts: 'blue' } },
+  { nm: 'Шрам', name: 'Вадим Чернов', st: 'pressure', diff: 'normal', loc: 'tires', legend: 'Шрам через бровь — память о первом бое у бочек. С тех пор огонь видел только его победы.',
+    look: { skin: 'light', hair: 'blond', beard: false, bottom: 'jeansL', top: 'tankB', shoes: 'sneakB', wraps: 'red', hands: 'wraps', guard: 'red', shorts: 'red' } },
+  { nm: 'Молот', name: 'Руслан Гатин', st: 'brawler', diff: 'normal', loc: 'parking', legend: 'Днём правит кузова кувалдой, ночью — челюсти правой. На минус втором этаже его ставка всегда первая.',
+    look: { skin: 'dark', hair: 'black', beard: false, bottom: 'jeans', top: 'teeB', shoes: 'sneakB', wraps: 'white', hands: 'mma', guard: 'black', shorts: 'black' } },
+  { nm: 'Седой', name: 'Аркадий Вершин', st: 'counter', diff: 'hard', loc: 'parking', legend: 'Двадцать лет в подвалах и гаражах. Быстрых он не боится — он их пересиживает.',
+    look: { skin: 'light', hair: 'grey', beard: true, bottom: 'pants', top: 'teeW', shoes: 'keds', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'white' } },
+  { nm: 'Бизон', name: 'Тимур Салаев', st: 'pressure', diff: 'hard', loc: 'warehouse', crowd: 0.55, legend: 'Вернулся с северной вахты злым. В клетке вжимает в сетку и не даёт вдохнуть.',
+    look: { skin: 'dark', hair: 'bald', beard: true, bottom: 'sweatG', top: 'none', shoes: 'boots', wraps: 'black', hands: 'mma', guard: 'blue', shorts: 'purple' } },
+  { nm: 'Кувалда', name: 'Захар Громов', st: 'brawler', diff: 'hard', loc: 'warehouse', crowd: 1, champ: true, legend: 'Хозяин склада и пояса. Из тех, кто вышел против него, своими ногами не ушёл никто.',
+    look: { skin: 'tan', hair: 'bald', beard: true, bottom: 'jeansB', top: 'none', shoes: 'boots', wraps: 'gold', hands: 'wraps', guard: 'gold', shorts: 'black' } }];
 const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1)].loc; return LOCS[id] ? id : G.loc; };
+// «Склад · аншлаг»: the place of career fight i as the menu, the card and the result screen name it
+const careerPlace = (i = G.career) => { const L = LADDER[Math.min(i, LADDER.length - 1)]; return (LOCS[L.loc] ? LOCS[L.loc].label : LOC.label) + (L.champ ? ' · аншлаг' : ''); };
 function fightOver(win, draw) {
   fightTable();
   if (draw) return; if (win) G.wins++; else G.losses++;
   let t = '', pts = 0;
   if (G.mode === 'career') {
-    if (win) { G.career = Math.min(LADDER.length, G.career + 1); pts = 2; if (G.career >= LADDER.length) { PROF.champ++; pts += 3; t = 'ЧЕМПИОН! Пояс твой'; } else t = `карьера ${G.career}/${LADDER.length} · следующий: ${LADDER[G.career].nm}`; }
-    else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути`;
+    if (win) { G.career = Math.min(LADDER.length, G.career + 1); pts = 2; if (G.career >= LADDER.length) { PROF.champ++; pts += 3; t = 'ЧЕМПИОН! Пояс твой'; } else t = `карьера ${G.career}/${LADDER.length} · следующий: ${LADDER[G.career].nm} — ${careerPlace()}`; }
+    else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути — ${careerPlace()}`;
   } else if (win) pts = 1;
   if (pts) { PROF.pts += pts; t += (t ? ' · ' : '') + `+${pts} ${pts === 1 ? 'очко' : 'очка'} бойцу`; }
   save(); const c = $('r-car'); if (c) c.textContent = t;
