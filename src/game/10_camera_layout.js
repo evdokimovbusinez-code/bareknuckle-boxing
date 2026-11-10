@@ -2,6 +2,8 @@
 const camP = new V3(1.2, 1.4, 3), camL = new V3(0, 1, 0), _cp = new V3(), _cl = new V3(); let camCut = true, camClock = 0;
 function camUpdate(dt) {
   camClock += dt; let k = 4;
+  // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
+  if (window.__camHold) { const h = window.__camHold; camera.position.set(h.p[0], h.p[1], h.p[2]); camera.lookAt(h.l[0], h.l[1], h.l[2]); camP.copy(camera.position); camL.set(h.l[0], h.l[1], h.l[2]); return; }
   const far = VW / VH < 1.45 ? 5.0 : 4.5;
   if (G.state === 'menu') { const x = P1.group.position.x; _cp.set(x + 1.15 + 0.12 * Math.sin(camClock * 0.5), 1.28, 2.25); _cl.set(x + 0.42, 1.0, 0); k = 3; }
   else if (G.state === 'replay') {

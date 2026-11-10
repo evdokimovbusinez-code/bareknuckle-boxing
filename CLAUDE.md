@@ -15,6 +15,8 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 ## Looking at the game (do this for every visual change)
 - `bash tools/shot.sh /tmp/shots/a.png fight 4` — quick fight, 4 s in. `... menu` — the menu. `... js "CODE"` — run CODE first
   (`window.__g` exposes `G, P1, P2, camera, scene, ARENA, ...`; `__tick(n, dt)` steps the sim, e.g. `__tick(300, 1/60)`).
+  Close-ups: pin the camera with `window.__camHold = { p: [x, y, z], l: [x, y, z] }` (world metres; fighters face each other along x,
+  P1 at x≈-0.55, heads at y≈1.65; the default camera looks from +z). `delete window.__camHold` releases it.
   Then open the PNG with the Read tool. Software rendering: ~30 s – 3 min per shot. Compare before/after.
 
 ## Map of `src/game/`
