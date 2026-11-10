@@ -1,0 +1,32 @@
+name: Diag credits
+on:
+  push:
+    branches: [diag-credits]
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Messages API (plain)
+        env:
+          K: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          curl -s https://api.anthropic.com/v1/messages -H "x-api-key: $K" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" \
+            -d '{"model":"claude-haiku-5-5","max_tokens":5,"messages":[{"role":"user","content":"ok"}]}' | jq -c '{type, err: .error.message, model, usage}'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Agent SDK (python)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          pip install -q claude-agent-sdk
+          cat > t.py <<'PY'
+          import asyncio
+          from claude_agent_sdk import query, ClaudeAgentOptions
+          async def main():
+              async for m in query(prompt="Reply with the single word ok", options=ClaudeAgentOptions(model="claude-haiku-5-5", max_turns=1)):
+                  if type(m).__name__ == "ResultMessage":
+                      print("RESULT", m.is_error, m.result, m.total_cost_usd)
+          asyncio.run(main())
+          PY
+          python t.py || true
