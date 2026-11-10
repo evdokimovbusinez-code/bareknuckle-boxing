@@ -139,7 +139,7 @@ function buildQuick() {
   swatches('o-diff', Object.entries(DIFFS).map(([id, d]) => ({ id, label: d.label })), () => G.diff, v => { G.diff = v; G.userDiff = v; }, true, true);
   const box = $('o-loc'); box.textContent = '';
   if (!locOpen(G.loc)) G.loc = 'gym';
-  for (const L of Object.values(LOCS)) {   // a place can wait for followers (LOC_FANS, 15_social.js)
+  for (const L of Object.values(LOCS)) { if (L.train) continue;   // the training gym is not a place for fights; a place can wait for followers (LOC_FANS, 15_social.js)
     const open = locOpen(L.id), b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${open ? L.desc || '' : '🔒 от ' + numF(LOC_FANS[L.id]) + ' подписчиков'}</small>`; b.setAttribute('aria-pressed', String(G.loc === L.id)); b.disabled = !open;
     b.onclick = () => { G.loc = L.id; setLocation(L.id); save(); for (const o of box.children) o.setAttribute('aria-pressed', String(o === b)); };
     box.appendChild(b);

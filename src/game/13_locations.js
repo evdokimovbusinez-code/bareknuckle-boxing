@@ -210,6 +210,7 @@ function setLocation(id) {
   if (!L.group) { L.group = L.build(); ARENA.add(L.group); }
   for (const o of Object.values(LOCS)) { if (o.group) o.group.visible = o === L; for (const w of o.world || []) w.visible = o === L; }
   RINGSET.visible = L.ring;
+  if (was !== L && was.leave) was.leave(); if (L.enter) L.enter();   // a location that moves or hides shared things puts them back (13e_loc_boxgym.js)
   const li = L.light; scene.background.set(li.bg); scene.fog.color.set(li.fog[0]); scene.fog.near = li.fog[1]; scene.fog.far = li.fog[2]; renderer.toneMappingExposure = li.exposure;
   hemi.color.set(li.hemi[0]); hemi.groundColor.set(li.hemi[1]); hemi.intensity = li.hemi[2];
   for (const [l, v] of [[key, li.key], [rim, li.rim], [rim2, li.rim2], [fill, li.fill]]) { l.color.set(v[0]); l.intensity = v[1]; }

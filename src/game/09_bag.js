@@ -86,7 +86,7 @@ function startFight(fromMode) {
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
   if (G.mode !== 'career') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }
   CROWD.fill = G.mode === 'career' ? LADDER[Math.min(G.career, LADDER.length - 1)].crowd ?? 1 : 1;   // the semi-final in the warehouse: a half-empty hall; the title fight: everybody came
-  setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'gym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the gym; a career fight is where the ladder says
+  setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'boxgym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the training gym (13e_loc_boxgym.js); a career fight is where the ladder says
   G.paused = false; UI.from = null; uiShow(null);
   BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; payShow(null); }
   sfx.unlock(); socStart();   // the hype cools down (15_social.js)
@@ -96,7 +96,7 @@ function startFight(fromMode) {
   FX.clearAir(); REC.frames.length = 0; REC.events.length = 0; wearReset(); Q.length = 0; AI.blockUntil = 0; AI.t = 1.0 + rr(); AI.combo = 0; AI.dodgeAt = 0;
   /* the intro runs on G.introT: [−card − fly, −fly) the opponent's card (career), [−fly, 0) the camera flies round the place and
      its crowd (street locations), [0, 1.25) «Готовься», then the referee's clap (the bell in the gym) starts the round */
-  { const street = LOC.id !== 'gym' && G.mode !== 'bag' && G.mode !== 'spar';
+  { const street = !LOC.ring && G.mode !== 'bag' && G.mode !== 'spar';
     G.flyT = street ? INTRO_FLY : 0; G.cardT = G.mode === 'career' ? INTRO_CARD : 0; G.flyA = INTRO_ARC[LOC.id] ?? -2.1; }
   G.stareT = G.mode !== 'bag' && OPT.cine ? STARE_LEN : 0; G.stare = 0; G.stareOn = false; G.rend = null; RP.hl = false; P1.pant = P2.pant = 0; hlReset(); show('hl', false);   // the stare-down (09b_cine.js): after the card / the fly-round, before «Готовься»
   G.state = 'intro'; G.introT = -(G.flyT + G.cardT); G.introMsg = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; AI.lat = 0; AI.latT = 0;
@@ -136,7 +136,7 @@ function introTick(dt) {
   if (G.introT > st + 1.25) { G.state = 'fight'; msg('Раунд ' + G.round); roundSnd(); show('pad', true); EVT.emit('round'); }
 }
 // the start of a round: the referee claps his hands in a street fight, the bell rings in the gym
-function roundSnd() { if (LOC.id === 'gym') sfx.bell(1); else sfx.clap(); }
+function roundSnd() { if (LOC.ring) sfx.bell(1); else sfx.clap(); }
 function endRound() {
   if (BAG.on) return bagEnd();
   // judges: 10-9 to whoever did more, a point off for each knockdown suffered
