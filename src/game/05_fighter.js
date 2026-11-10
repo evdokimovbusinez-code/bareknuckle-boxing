@@ -302,13 +302,14 @@ class Fighter {
   dress(L) {
     const G2 = this.gear, S = G2.shells, U = this.flesh.u.uGear.value, show = (k, on, make) => { if (on && !S[k]) S[k] = make(); if (S[k]) S[k].visible = on; return S[k]; };
     const bt = BOTTOMS.find(x => x.id === (L.bottom || 'shorts')) || BOTTOMS[0], tp = TOPS.find(x => x.id === (L.top || 'none')) || TOPS[0], sh = SHOES.find(x => x.id === (L.shoes || 'none')) || SHOES[0];
-    for (const b of BOTTOMS) if (b.tex) { const m = show('b_' + b.id, b === bt, () => shellMesh(this, 'pants', { c: b.c, tex: b.tex, thick: 1.1 })); }
-    for (const t of TOPS) if (t.tex) show('t_' + t.id, t === tp, () => shellMesh(this, 'shirt', { c: t.c, tex: t.tex, thick: 0.42, sleeve: t.sleeve }));
-    for (const f of SHOES) if (f.top) show('s_' + f.id, f === sh, () => shellMesh(this, 'shoes', { c: f.c, sole: f.sole, top: f.top, thick: 0.75 }));
-    // the export has no skin under the trunks: with trousers the trunks cloth stays on as their seat and waist, in the trousers' colour
+    // loose trousers / long shorts are their own mesh (04d_street.js) and cover the hips completely: the boxing trunks (cloth) are hidden under them
+    for (const b of BOTTOMS) if (b.cut) show('b_' + b.id, b === bt, () => pantsMesh(this, b));
+    for (const t of TOPS) if (t.tex) show('t_' + t.id, t === tp, () => shellMesh(this, 'shirt', t));
+    for (const f of SHOES) if (f.top) show('s_' + f.id, f === sh, () => shoeMesh(this, f));
+    G2.pants = bt.cut ? S['b_' + bt.id] : null; this.shorts.mesh.visible = !bt.cut;
     if (bt.tex) { const c = new THREE.Color(bt.c), d = '#' + c.clone().multiplyScalar(0.6).getHexString(); paintShorts(this.shortsCanvas, { main: '#' + c.clone().multiplyScalar(0.8).getHexString(), trim: d, band: d, sheen: bt.c }); this.shortsTex.needsUpdate = true; this.shortsMat.sheenColor.set(d); }
     else { const S0 = SHORTS_LOOKS.find(x => x.id === L.shorts) || SHORTS_LOOKS[0]; paintShorts(this.shortsCanvas, S0); this.shortsTex.needsUpdate = true; this.shortsMat.sheenColor.set(S0.sheen); }
-    U.set(bt.tex ? 1 : 0, sh.top || 0, tp.tex ? 1 : 0, tp.sleeve || 0);
+    U.set(bt.cut ? PANT_CUTS[bt.cut].skin : 0, sh.top || 0,   /* x: the legs' skin is not drawn above this height (cm) */ tp.tex ? 1 : 0, tp.sleeve || 0);
     G2.guard.material.color.set((GUARDS.find(x => x.id === L.guard) || GUARDS[0]).c);
     { const c = (GUARDS.find(x => x.id === L.guard) || GUARDS[0]).c; G2.guard.material.emissive.set(c); }
     G2.look = L; this.handGear();
@@ -658,6 +659,7 @@ class Fighter {
     this.baseMesh.matrix.copy(_m1); this.beardMesh.matrix.copy(_m1); this.baseMesh.matrixWorldNeedsUpdate = this.beardMesh.matrixWorldNeedsUpdate = true;
     { const G2 = this.gear, hf = _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInvT); G2.guard.matrix.copy(hf); G2.guard.matrixWorldNeedsUpdate = true;
       if (G2.spar && G2.gloves) { G2.hg.matrix.copy(hf); G2.hg.matrixWorldNeedsUpdate = true; for (const gl of G2.gloves) { gl.g.matrix.multiplyMatrices(gl.h.matrixWorld, gl.rel); gl.g.matrixWorldNeedsUpdate = true; } }
+      if (G2.pants) pantsTick(this, G2.pants, 1 / 60);
       if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
   }
   capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; }

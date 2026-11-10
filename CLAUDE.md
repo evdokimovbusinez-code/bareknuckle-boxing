@@ -30,6 +30,7 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
 | `04_gear.js` | clothes shells (`BOTTOMS`, `TOPS`, `SHOES`, `shellMesh`), `gloveMesh`, `headgearMesh`, `guardMesh`, `gearSetup` |
 | `04b_gloves_headgear.js` | boxing gloves (`gloveMesh`, cuff, thumb, piping), MMA glove shell (`mmaShell`), training headgear (`headgearGeo`, `headMap`), gum shield; `HANDS`, `GLOVES` options |
 | `04c_mma_pads.js` | rigid MMA-glove pads on the hand bones (`mmaPadGeo`, `mmaPads`) |
+| `04d_street.js` | street clothes with their own skinned geometry: loose trousers / long shorts (`PANT_CUTS`, `pantsGeo`, `pantsTex`, `pantsMesh`, hem spring `pantsTick`), shoes (`shoeGeo`, `shoeTex`, `shoeMesh`), `streetLook()`, `isStreet()` |
 | `05_fighter.js` | `class Fighter` — animation, IK, footwork (`plantFeet`), arm clearing (`armClear`), stamina, `dress`, `sparGear` |
 | `06_fx_sound.js` | blood mist, blood/sweat/floor stains (`FX`, `MIST`), synthesised sound |
 | `07_state_replay_hits.js` | `G` state, `DIFFS`, `LADDER`, career/profile, replay buffer (`REC`), `resolveHit`, `knockdown`, `knockout` (`DMG_K`) |

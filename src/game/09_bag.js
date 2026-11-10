@@ -79,6 +79,8 @@ function startQuick() { if (G.mode === 'career') { G.diff = G.userDiff; rollOppo
 function startFight(fromMode) {
   if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); }
   for (const F of [P1, P2]) F.sparGear(G.mode === 'spar');
+  // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
+  { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none' }) }); }
   setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'gym' : G.loc);   // sparring and the heavy bag are always in the gym
   BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; }
   sfx.unlock();
