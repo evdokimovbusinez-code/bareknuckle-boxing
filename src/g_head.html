@@ -190,7 +190,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .mnav{display:flex;flex-direction:column;align-items:flex-start;gap:clamp(0px,.7vmin,6px)}
 .mnav button{position:relative;display:flex;align-items:baseline;gap:clamp(8px,1.6vmin,14px);border:0;background:none;padding:1px 16px 1px 0;font-family:var(--poster);font-weight:700;font-size:clamp(21px,5.8vmin,44px);line-height:1.14;
   letter-spacing:.02em;text-transform:uppercase;text-align:left;color:#b4aea2;outline:none;transition:transform .16s ease-out,color .16s;animation:mIn .34s cubic-bezier(.2,.8,.2,1) both}
-.mnav button:nth-child(2){animation-delay:.04s}.mnav button:nth-child(3){animation-delay:.08s}.mnav button:nth-child(4){animation-delay:.12s}.mnav button:nth-child(5){animation-delay:.16s}.mnav button:nth-child(6){animation-delay:.2s}
+.mnav button:nth-child(2){animation-delay:.04s}.mnav button:nth-child(3){animation-delay:.08s}.mnav button:nth-child(4){animation-delay:.12s}.mnav button:nth-child(5){animation-delay:.16s}.mnav button:nth-child(6){animation-delay:.2s}.mnav button:nth-child(7){animation-delay:.24s}
 .mnav button b{font-weight:700;white-space:nowrap}
 .mnav button i{flex:none;width:20px;font:500 11px var(--mono);font-style:normal;letter-spacing:.08em;color:var(--muted);transition:color .16s}
 .mnav button small{font:400 clamp(10px,1.7vmin,12px) var(--mono);letter-spacing:.03em;text-transform:none;color:var(--muted);white-space:nowrap}
@@ -256,6 +256,23 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .fstats.pay td:nth-child(2){color:#9fdca8;font-size:12px;letter-spacing:0;text-transform:none}.fstats.pay td.l{font-size:12px}
 .fstats.pay tr:last-of-type td:nth-child(2){color:var(--text)}
 .fstats.pay tr.tot td,.fstats.pay tr.tot td:nth-child(2){color:#e2b14a;border-top:1px solid rgba(255,255,255,.2);padding-top:3px;font-weight:600}.fstats.pay td.new{text-align:left;color:#8fd49a;font-size:11px}
+/* social networks: the chart, hype bar, posts / direct / sponsors cards */
+.fstats.pay td.neg,.fstats.pay td.neg:nth-child(2){color:#e58a8a}
+.locs button:disabled{opacity:.45;cursor:default}
+.so-top{display:flex;gap:12px;align-items:stretch}.so-chart{position:relative;flex:1.6;min-width:0;height:clamp(46px,11vmin,70px);border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.035)}
+.so-chart svg{position:absolute;inset:0;width:100%;height:100%}.so-chart span{position:absolute;right:4px;font:500 9px var(--mono);color:var(--muted)}.so-chart .hi{top:2px}.so-chart .lo{bottom:2px}
+.so-hype{flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px;font:500 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.so-hype i{display:block;height:7px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}.so-hype b{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--neon))}
+.so-list{gap:8px}
+.so-post{position:relative;display:flex;flex-direction:column;gap:5px;border:1px solid rgba(255,255,255,.14);border-radius:2px;background:rgba(10,12,17,.62);padding:8px 10px}
+.so-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.so-h b{font-family:var(--poster);font-size:15px;letter-spacing:.04em;text-transform:uppercase}.so-h small{font:400 9px var(--mono);letter-spacing:.08em;color:var(--muted);text-align:right}
+.so-img{position:relative;aspect-ratio:16/9;background:linear-gradient(135deg,#1a1d26,#0c0e14);overflow:hidden}.so-img img{display:block;width:100%;height:100%;object-fit:cover}
+.so-tag{position:absolute;left:6px;bottom:6px;padding:2px 7px;background:rgba(10,12,17,.8);border-left:3px solid var(--muted);font:700 11px var(--poster);letter-spacing:.08em;text-transform:uppercase}.so-tag.w{border-color:var(--gold);color:var(--gold)}.so-tag.l{border-color:var(--neon)}
+.so-cap{font-size:12.5px;line-height:1.35}.so-m{display:flex;gap:12px;font:500 11px var(--mono);color:var(--muted)}.so-m .d{margin-left:auto;color:#8fd49a}.so-m .d.neg{color:#e58a8a}
+.so-c{font-size:11px;color:#c9c3b6}.so-c b{color:var(--muted);font-weight:600;margin-right:8px}
+.so-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.so-n{font:400 9px var(--mono);letter-spacing:.04em;color:var(--muted)}
+.so-empty{padding:18px 4px;font-size:12px;color:var(--muted);line-height:1.4}
+.so-sp .so-logo{width:120px;height:36px;image-rendering:auto}.so-sp.lock{opacity:.62}.so-lock{font:500 10.5px var(--mono);letter-spacing:.06em;color:var(--muted)}.so-lock.on{color:#8fd49a}
 .dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
 .views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
 .locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -347,7 +364,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="rt" id="r-title">Победа</div>
     <div class="rs" id="r-sub"></div>
     <div class="rs car" id="r-car"></div>
-    <div class="rtabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table></div>
+    <div class="rtabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table><table class="fstats pay" id="r-soc"></table></div>
     <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
   </div>
 
@@ -361,7 +378,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
         <button id="go-train"><i>03</i><b>Тренировка</b><small>груша · спарринг</small></button>
         <button id="go-fighter"><i>04</i><b>Боец</b><small id="fighter-lbl"></small></button>
         <button id="go-shop"><i>05</i><b>Магазин</b><small id="shop-lbl"></small></button>
-        <button id="go-set"><i>06</i><b>Настройки</b></button>
+        <button id="go-social"><i>06</i><b>Соцсети</b><small id="soc-lbl"></small></button>
+        <button id="go-set"><i>07</i><b>Настройки</b></button>
       </nav>
       <nav class="mnav" id="nav-train" hidden>
         <button id="go-bag"><i>01</i><b>Груша</b><small id="bag-lbl"></small></button>
@@ -443,6 +461,17 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="pfoot"><button class="btn" id="shop-back">Назад</button><button class="btn pri" id="sh-buy">Купить</button></div>
     </div>
     <div class="views"><span class="khint">примерка на бойце · тяни — вращать</span><button class="btn sm" id="sh-face">Лицо</button><button class="btn sm" id="sh-full">Полный рост</button></div>
+  </div>
+
+  <!-- social networks: followers + chart, hype, tabs: the feed of posts / the direct (challenges) / sponsors -->
+  <div class="ui scr" id="social" hidden>
+    <div class="panel wide">
+      <div class="ptitle"><small>слава · хайп · контракты</small>Соцсети<b class="cash" id="so-fans"></b></div>
+      <div class="so-top"><div class="so-chart" id="so-chart"></div><div class="so-hype" id="so-hype"></div></div>
+      <div class="sw" id="so-tabs"></div>
+      <div class="pbody so-list" id="so-list"></div>
+      <div class="pfoot"><button class="btn" id="so-back">Назад</button></div>
+    </div>
   </div>
 
   <!-- settings (from the menu and from the pause) -->
