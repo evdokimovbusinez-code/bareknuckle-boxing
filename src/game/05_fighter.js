@@ -11,13 +11,14 @@ class Fighter {
     this.cc = SkeletonUtils.clone(T.cc); g.add(this.cc);
     const B = this.bones = firstBones(this.cc);
     this.cc.traverse(o => { if (o.name === 'CC_Base_Body') this.body = o; });
-    this.u = { uHair: { value: new THREE.Color() }, uHairAmt: { value: 1 }, uStubAmt: { value: 1 }, uDmg: { value: 0 } };
+    this.u = { uHair: { value: new THREE.Color() }, uHairAmt: { value: 1 }, uDmg: { value: 0 }, uHS: { value: new THREE.Vector4(1, 1, 9, -9) }, uRows: { value: new THREE.Vector2(0, 1) }, uGloss: { value: 0 }, uBeard: { value: new V3(0, 0.3, 0.3) }, uBeardC: { value: new THREE.Color() } };   // head shader: hair colour, cut, beard (04g_hair.js)
     this.skinMats = []; this.hairCol = new THREE.Color();
-    this.flesh = new Flesh(this);
+    this.flesh = new Flesh(this); Object.assign(this.flesh.u, skinUniforms());   // + skin tone, tattoo atlas (04h_skin_tattoo.js)
     this.body.material = T.matNames.map(n => {
       const key = { Std_Skin_Head: 'head', Std_Skin_Body: 'body', Std_Skin_Arm: 'arm', Std_Skin_Leg: 'leg' }[n];
       if (!key) return n === 'Std_Nails' ? nailMatFor(this.flesh.u) : T.hiddenMat;
       const m = new THREE.MeshPhysicalMaterial({ map: T.tex[key + '_d'], normalMap: T.tex[key + '_n'], roughness: key === 'head' ? 0.48 : 0.52, specularIntensity: 0.5, clearcoat: 0.08, clearcoatRoughness: 0.4, sheen: 0.15, sheenColor: new THREE.Color('#ff9b80'), sheenRoughness: 0.6, envMapIntensity: 0.6 });
+      m.userData = { skinKey: key, rough0: m.roughness, uTatR: { value: new THREE.Vector4() }, uTatB: { value: new THREE.Vector4(0, 0, 1, 1) } };
       this.skinMats.push(m); return skinify(m, key === 'head' ? this.u : null, this.flesh.u);
     });
     g.updateMatrixWorld(true);
@@ -288,13 +289,8 @@ class Fighter {
     }
   }
   applyLook(L) {
-    const bald = L.hair === 'bald'; this.bald = bald;
-    this.hairCol.set((HAIR_LOOKS.find(x => x.id === L.hair) || HAIR_LOOKS[1]).c);
-    this.hair.mesh.visible = this.baseMesh.visible = !bald;   // (handGear, called from dress below, tucks long hair under the headgear)
-    this.hair.mesh.material.color.copy(this.hairCol); this.baseMesh.material.color.copy(this.hairCol); this.beardMesh.material.color.copy(this.hairCol).multiplyScalar(1.2);
-    this.u.uHair.value.copy(this.hairCol).multiplyScalar(0.8); this.u.uHairAmt.value = bald ? 0.2 : 1;
-    this.beardMesh.visible = !!L.beard; this.u.uStubAmt.value = L.beard ? 1 : 0.3;
-    const sk = (SKIN_LOOKS.find(x => x.id === L.skin) || SKIN_LOOKS[0]).c; for (const m of this.skinMats) m.color.set(sk);
+    hairApply(this, L);   // cut, hair colour, beard (04g_hair.js); handGear, called from dress below, decides what of it shows (hairVis)
+    skinApply(this, L); tatApply(this, L);   // skin tone, tattoos (04h_skin_tattoo.js)
     if (this.wmat) this.wmat.color.set((WRAPS_LOOKS.find(x => x.id === L.wraps) || WRAPS_LOOKS[0]).c);
     this.dress(L);
   }
@@ -322,7 +318,7 @@ class Fighter {
     if (G2.mma) { G2.mma.visible = mma; G2.mma.material.color.set(gc.c); for (const pd of G2.mmaPads) pd.m.visible = mma; }
     this.flesh.u.uGlv.value = box ? 1 : mma ? 2 : 0;   // the hand inside a boxing glove / the skin under an MMA glove is not drawn
     this.wrapMesh.visible = !box && !mma; for (const t of this.tails) t.mesh.visible = !box && !mma;
-    this.hair.mesh.visible = !this.bald && !box && !wearTuck(this); this.baseMesh.visible = !this.bald;   // long hair is tucked under the headgear, the short layer shows through the open crown
+    hairVis(this);   // long hair is tucked under the headgear, the short layer shows through the open crown
   }
 
   /* —— actions —— */
@@ -639,22 +635,22 @@ class Fighter {
     this.flesh.tick(dt); this.face.update(dt);
     for (const j of this.jigs) j.update(dt);
     this.updateColliders();
-    const hairOn = !this.bald;
+    const HS = this.hsim || null;   // the simulated strands of the current cut (the classic cut, dreadlocks, pony tail, mullet) or none
     // the head jumped (a replay cut, a fall faster than the strands can follow): re-seat the hair instead of stretching it
     { const hp = _v1.setFromMatrixPosition(this.head.matrixWorld); if (this.lastHeadP && hp.distanceTo(this.lastHeadP) > (dt > 0 ? Math.max(0.12, 9 * dt) : 0.12)) this.simReset = true; (this.lastHeadP || (this.lastHeadP = new V3())).copy(hp); }
-    this.shorts.targets(); if (hairOn) this.hair.ps.targets(); for (const t of this.tails) t.ps.targets();
+    this.shorts.targets(); if (HS) HS.ps.targets(); for (const t of this.tails) t.ps.targets();
     if (this.simReset) {
-      this.shorts.p.set(this.shorts.t); this.shorts.o.set(this.shorts.t); this.hair.ps.reset(); for (const t of this.tails) t.ps.reset(); this.simReset = false;
+      this.shorts.p.set(this.shorts.t); this.shorts.o.set(this.shorts.t); if (HS) HS.ps.reset(); for (const t of this.tails) t.ps.reset(); this.simReset = false;
     } else if (dt > 0) {
       // GFX.simSkip = 2 (low preset): shorts cloth and hair are solved every other frame (the two men on alternate frames) with one
       // step of the summed time; in between only the pinned points follow the body and the cloth is kept off the legs
       this.simAcc = (this.simAcc || 0) + dt; this.simN = (this.simN || 0) + 1;
       if (GFX.simSkip < 2 || ((this.simN + (this.isPlayer ? 0 : 1)) & 1) === 0) {
         const sd = Math.min(this.simAcc, 0.05), steps = sd > (GFX.simSkip < 2 ? 0.02 : 0.04) ? 2 : 1, h = sd / steps; this.simAcc = 0;
-        for (let s = 0; s < steps; s++) { this.shorts.step(h); if (hairOn) this.hair.ps.step(h); for (const t of this.tails) t.ps.step(h); }
-      } else { simPin(this.shorts); this.shorts.constrain(); if (hairOn) simPin(this.hair.ps); for (const t of this.tails) simPin(t.ps); }
+        for (let s = 0; s < steps; s++) { this.shorts.step(h); if (HS) HS.ps.step(h); for (const t of this.tails) t.ps.step(h); }
+      } else { simPin(this.shorts); this.shorts.constrain(); if (HS) simPin(HS.ps); for (const t of this.tails) simPin(t.ps); }
     }
-    this.shorts.render(); if (hairOn) renderHair(this.hair);
+    this.shorts.render(); if (HS) { if (HS.tube) renderTubes(HS); else renderHair(HS); }
     for (const t of this.tails) { t.geo.attributes.position.needsUpdate = true; t.geo.computeVertexNormals(); }
     _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInv);
     this.baseMesh.matrix.copy(_m1); this.beardMesh.matrix.copy(_m1); this.baseMesh.matrixWorldNeedsUpdate = this.beardMesh.matrixWorldNeedsUpdate = true;
