@@ -9,7 +9,7 @@ const STYLES = {
 };
 const AI = { lat: 0, latT: 0, backT: 0, t: 1.2, combo: 0, seen: -1, dodgeAt: 0, dodgeType: 'duck', blockUntil: 0, feintAt: 0, style: STYLES.brawler };
 function ai(dt) {
-  if (BAG.on) { AI.t = 9; return; }
+  if (BAG.on || MITTS.on) { AI.t = 9; return; }   // the bag drill / the coach's mitts: the trainer is not an opponent
   const me = P2, pl = P1, D = DIFFS[G.diff], S = AI.style;
   if (me.doomed || me.liver || me.wind > G.t) return;
   me.blocking = G.t < AI.blockUntil;

@@ -466,7 +466,7 @@ class Fighter {
       // the punch lands when the knuckles actually touch the face (or ribs); if they never do, it is decided at the end of the window
       if (!this.resolved && t >= P.impact - 0.14) { const c = contactTest(this, this.other); if (c || t >= P.impact + 0.06) { this.resolved = true;
         // no touch by the end of the swing: a graze if the knuckles were within a few cm, otherwise it is thin air
-        if (c || (BAG.on ? bagMiss(this) < 0.14 : this.other.ko || nearMiss(this, this.other) < (PUNCH[this.cur].type === 'upper' ? 0.1 : 0.06))) resolveHit(this, this.cur, c); else whiffPunch(this); } }
+        if (c || (BAG.on ? bagMiss(this) < 0.14 : MITTS.on ? mittMiss(this) < 0.09 : this.other.ko || nearMiss(this, this.other) < (PUNCH[this.cur].type === 'upper' ? 0.1 : 0.06))) resolveHit(this, this.cur, c); else whiffPunch(this); } }
       if (this.cur) { if (!this.release && t >= P.impact + (this.whiff ? 0.3 : 0.15)) { this.release = true; this.relN = this.cur; } if (this.release && this.relN === this.cur && t >= P.impact + (this.whiff ? 0.52 : 0.25)) this.cur = null; }
     }
     if (this.daze > 0) { this.daze = Math.max(this.hp < 25 ? 0.5 : 0, this.daze - dt * 0.1);

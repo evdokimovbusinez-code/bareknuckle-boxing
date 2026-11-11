@@ -48,7 +48,7 @@ function hudBar(i, v) { const b = HUD_BARS[i]; v = Math.round(clamp(v, 0, 1) * 1
 function hudUpdate(dt) {
   hudBar(0, P1.hp / 100); hudBar(1, P1.hp / 100); hudBar(2, P2.hp / 100); hudBar(3, P2.hp / 100); hudBar(4, P1.stamina / 100); hudBar(5, P2.stamina / 100);
   $('cnt').hidden = !(G.state === 'fight' && P1.counterUntil > G.t);
-  if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), txt = `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`; if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
+  if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), txt = `${BAG.on ? 'ГРУША' : MITTS.on ? 'ЛАПЫ' : 'Р' + G.round} · ${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`; if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
   const k = Math.min(1, dt * 3); P1.u.uDmg.value += (clamp(1 - P1.hp / 100, 0, 1) - P1.u.uDmg.value) * k; P2.u.uDmg.value += (clamp(1 - P2.hp / 100, 0, 1) - P2.u.uDmg.value) * k;
 }
 

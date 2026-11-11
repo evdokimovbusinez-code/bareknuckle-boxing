@@ -126,6 +126,7 @@ const evades = (att, n, d) => !!d && (att.bodyShot ? d.type === 'lean' : EV[n].i
 function aimFor(att, def) {
   if (!att.cur) return null; const n = att.cur, d = def.dodge;
   if (BAG.on) return def === P2 ? bagAim(att) : null;   // the heavy bag: the leather, wherever it has swung to
+  if (MITTS.on) return def === P2 ? mittAim(att) : null;   // the coach's mitts (09d_mitts.js): the presented pad
   if (att.bodyShot) return att.aimV.copy(def.ribs[att.ribIdx].w);
   const ev = d && d.t > 0.03 && evades(att, n, d), c = ev ? def.headNeutral : def.headNow, kn = att.knuckle(_v5);
   // a point 2 cm inside the face on the side the fist comes from (uppercut: under the chin)
@@ -153,6 +154,7 @@ function whiffPunch(att) {
 }
 function contactTest(att, def) {
   if (BAG.on) return bagContact(att);
+  if (MITTS.on) return mittContact(att);
   const kn = att.knuckle(_v5);
   if (att.bodyShot) { const r = def.ribs[att.ribIdx].w; return kn.distanceTo(r) < 0.1 ? r.clone() : null; }
   const l = _v6.copy(kn).applyMatrix4(def.headFrameInv), R = HEAD.R, gm = att.gear.spar ? 0.07 : 0,   /* boxing glove: ≈ 4 cm of padding in front of the knuckles + his headgear */ x = l.x / (R.x + 0.032 + gm), y = l.y / (R.y + 0.028 + gm), z = l.z / (R.z + 0.032 + gm), q = x * x + y * y + z * z;   // the knuckle bone sits ~3 cm inside the fist's skin
@@ -188,6 +190,7 @@ function followHit(att, name, contact) {
 function resolveHit(att, name, contact) {
   const def = att.other; if (def.ko || G.state !== 'fight') { if (followOK(att)) followHit(att, name, contact); return; }
   if (BAG.on) { if (att === P1) bagHit(att, name, contact); return; }
+  if (MITTS.on) { if (att === P1) mittHit(att, name, contact); return; }   // the pad takes it: no damage, the mitt and the arm give (09d_mitts.js)
   const P = PUNCH[name], d = def.dodge, evading = !!d && d.t > 0.05 && d.t < 0.44, body = att.bodyShot;
   const evaded = evading && evades(att, name, d);
   let pos = contact || (body ? def.ribs[att.ribIdx].w.clone() : def.headNow.clone().add(_v3.copy(att.knuckle(_v4)).sub(def.headNow).setLength(0.1)));

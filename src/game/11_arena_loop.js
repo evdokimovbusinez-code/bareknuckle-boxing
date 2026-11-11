@@ -68,6 +68,7 @@ function frame(now) {
     // both men are posed: now keep each one's arms out of the other's head and torso (against this frame's head, not last frame's)
     headFrames(P1); headFrames(P2);
     P1.armClear(); P2.armClear(); P1.armClear(); P2.armClear();   // twice: the second pass catches what the first IK left
+    mittsTick(dt);   // the coach's mitts (09d_mitts.js): pose the trainer's arms over the cleared ones, carry the pads, step the recoil springs
     if (G.state === 'kd') kdTick(dt);
     if ((G.state === 'fight' || G.state === 'ko' || G.state === 'kd') && dt > 0) recFrame();
     stateTick(dtReal);

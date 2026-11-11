@@ -203,6 +203,10 @@ const sfx = (() => {
       { const n = a.createBufferSource(), f = filt('bandpass', 1500 + 500 * rr(), 0.8), g = a.createGain(); n.buffer = noise; env(g, t, 0.002, 0.03 + 0.012 * k, 0.12 + 0.2 * k); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.08); }
       { const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'lowpass'; f.frequency.setValueAtTime(700 + 600 * k, t); f.frequency.exponentialRampToValueAtTime(110, t + 0.16); env(g, t, 0.004, 0.14 + 0.06 * k, 0.4 + 0.5 * k); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.3); }
       const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(92 + 22 * k, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.24); env(g2, t, 0.005, 0.2 + 0.12 * k, 0.45 + 0.5 * k); o.connect(g2).connect(master); o.start(t); o.stop(t + 0.45); },
+    // the coach's mitts: a bright dry slap of the pad — no body behind it, the sound of a hand in a mitt, not of 40 kg of leather; p = 0.2 … 1.6
+    mitt(p) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.2, 1.6);
+      { const n = a.createBufferSource(), f = filt('bandpass', 1900 + 700 * rr(), 0.9), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.026 + 0.01 * k, 0.2 + 0.32 * k); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.08); }
+      { const n = a.createBufferSource(), f = filt('bandpass', 650 + 260 * rr(), 1.3), g = a.createGain(); n.buffer = noise; env(g, t + 0.004, 0.002, 0.05 + 0.02 * k, 0.14 + 0.2 * k); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.12); } },
     // its chains: a few links knocking together — short inharmonic pings, quiet; p = 0 … 1, d = delay (s)
     clink(p, d = 0) { const a = ac; if (!a) return; const n = 2 + ((p * 4) | 0);
       for (let i = 0; i < n; i++) { const t = a.currentTime + d + i * (0.018 + rr() * 0.04), f0 = 2300 + rr() * 2600;
