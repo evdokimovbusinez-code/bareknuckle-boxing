@@ -92,10 +92,11 @@ jobs:
       - name: Commit, push, PR
         if: always()
         run: |
+          set +e   # a reporting glitch must never lose the work
           B="${{ steps.br.outputs.b }}"
           RES=$(jq -r 'if .is_error then "❌ Ошибка: " + .result else "" end' .claude-result.json 2>/dev/null || echo "❌ Бот упал, см. лог")
           COST=$(jq -r '"$" + ((.cost*1000|round)/1000|tostring) + ", ходов: " + (.turns|tostring) + ", модель: " + (.model // "?")' .claude-result.json 2>/dev/null || echo "?")
-          COST="$COST $(cat /tmp/orspend 2>/dev/null) · tokens: $(jq -c '.usage | map_values({in: .inputTokens, out: .outputTokens, cr: .cacheReadInputTokens, cw: .cacheCreationInputTokens})' .claude-result.json 2>/dev/null) · $(jq -r '(.ms/60000|floor|tostring) + " мин"' .claude-result.json 2>/dev/null)"
+          COST="$COST $(cat /tmp/orspend 2>/dev/null) · tokens: $(jq -c '(.usage // {}) | map_values({in: .inputTokens, out: .outputTokens, cr: .cacheReadInputTokens, cw: .cacheCreationInputTokens})' .claude-result.json 2>/dev/null) · $(jq -r '((.ms // 0)/60000|floor|tostring) + " мин"' .claude-result.json 2>/dev/null)"
           SUM=$(cat .claude-summary.md 2>/dev/null || echo "")
           rm -f .claude-summary.md .claude-result.json
           if [ -n "$(git status --porcelain)" ]; then
