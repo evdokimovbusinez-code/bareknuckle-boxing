@@ -5,6 +5,7 @@
 const UI = { scr: null, from: null, cat: 'name', spar: false, mouth: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };   // mouth: the gum-shield close-up of the creator (he bares his teeth: Face.update)
 const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', pause: 'pause' };
 const VIEW_MOUTH = { yaw: 1.38, zoom: 0 }, _mouthP = new V3(), VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
+const VIEW_BACK = { yaw: -2.3, zoom: 0.55 };   // his back (the back tattoo)
 const myName = () => PROF.nick || PROF.name || 'Ты';
 function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [...root.querySelectorAll('button:not([disabled]),input')].filter(b => b.offsetParent !== null) : []; }
 function uiShow(scr, focusId) {
@@ -78,9 +79,17 @@ function setCat(c) {
 }
 function buildCreator() {
   const col = (list, f) => list.map(f), spar = v => () => { UI.spar = v; };
-  swatches('o-skin', col(SKIN_LOOKS, s => ({ id: s.id, c: s.c, sw: s.id === 'light' ? '#e2b79f' : s.id === 'tan' ? '#b98563' : '#6f4630', label: s.id })), () => LOOK.skin, v => { LOOK.skin = v; });
-  swatches('o-hair', col(HAIR_LOOKS, h => h.id === 'bald' ? { id: 'bald', label: 'под ноль' } : { id: h.id, c: h.c, label: h.id }), () => LOOK.hair, v => { LOOK.hair = v; });
-  swatches('o-beard', [{ id: 'no', label: 'нет' }, { id: 'yes', label: 'есть' }], () => LOOK.beard ? 'yes' : 'no', v => { LOOK.beard = v === 'yes'; }, true);
+  swatches('o-skin', col(SKIN_LOOKS, s => ({ id: s.id, c: s.c, sw: SKIN_TONES[s.id].sw, label: s.label })), () => LOOK.skin, v => { LOOK.skin = v; });
+  // tattoos: any set of them (LOOK.tats)
+  { const box = $('o-tats'); box.textContent = '';
+    for (const t of TATS) { const b = document.createElement('button'); b.type = 'button'; b.className = 'txt'; b.textContent = t.label; const on = () => (LOOK.tats || []).includes(t.id); b.setAttribute('aria-pressed', String(on()));
+      b.addEventListener('click', () => { LOOK.tats = on() ? LOOK.tats.filter(x => x !== t.id) : [...(LOOK.tats || []), t.id]; b.setAttribute('aria-pressed', String(on())); P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar);
+        setView(t.id === 'back' ? VIEW_BACK : t.id === 'face' || t.id === 'neck' ? VIEW_FACE : VIEW_FULL); save(); });
+      box.appendChild(b); } }
+  swatches('o-cut', HAIR_STYLES, () => hairStyleOf(LOOK).id, v => { LOOK.hairStyle = v; if (LOOK.hair === 'bald') LOOK.hair = 'black'; }, true);
+  swatches('o-hair', col(HAIR_LOOKS, h => ({ id: h.id, c: h.c, label: h.label })), () => LOOK.hair === 'bald' ? 'black' : LOOK.hair, v => { LOOK.hair = v; });
+  swatches('o-beard', BEARD_STYLES, () => beardStyleOf(LOOK).id, v => { LOOK.beard = v; }, true);
+  swatches('o-beardc', [{ id: 'hair', label: 'как волосы' }, ...col(HAIR_LOOKS, h => ({ id: h.id, c: h.c, label: h.label }))], () => LOOK.beardCol || 'hair', v => { LOOK.beardCol = v; });
   wearUI();   // clothes: category → model → the colours of that model (04e_wardrobe.js)
   swatches('o-wraps', col(WRAPS_LOOKS, w => ({ id: w.id, c: w.c, label: w.label })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; spar(false)(); mouthOff(); });
   swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { if (!itemOwned(v)) { setTimeout(() => { buildCreator(); shopOpen('hands', v); }, 0); return; } LOOK.hands = v; spar(false)(); mouthOff(); }, true);   // street fights: wraps or 4 oz MMA gloves (bought)
@@ -94,7 +103,8 @@ function buildCreator() {
 function randomLook() {
   const pick = a => a[(Math.random() * a.length) | 0], cw = careerWins();
   const of = (cat, pNone) => { if (Math.random() < pNone) return { id: 'none' }; const it = pick(wearItems(cat).filter(i => itemOwned(i.id))); return { id: it.id, color: pick(Math.random() < 0.7 ? it.colors : wearColors(it)) }; };   // only what he owns
-  Object.assign(LOOK, { hair: pick(HAIR_LOOKS).id, skin: pick(SKIN_LOOKS).id, beard: Math.random() < 0.5, bottom: of('bottom', 0), top: of('top', 0.3), shoes: of('shoes', 0.25), head: of('head', 0.6), eyes: of('eyes', 0.7), belt: of('belt', 0.4),
+  const skin = pick(SKIN_LOOKS).id;
+  Object.assign(LOOK, { hair: pick(HAIR_LOOKS).id, hairStyle: randomCut(skin, Math.random), skin, beard: Math.random() < 0.5 ? pick(BEARD_STYLES).id : 'none', beardCol: 'hair', tats: Math.random() < 0.4 ? TATS.filter(() => Math.random() < 0.3).map(t => t.id) : [], bottom: of('bottom', 0), top: of('top', 0.3), shoes: of('shoes', 0.25), head: of('head', 0.6), eyes: of('eyes', 0.7), belt: of('belt', 0.4),
     guard: pick(GUARDS).id, wraps: pick(WRAPS_LOOKS.filter(w => cw >= w.need)).id, hands: pick(HANDS.filter(h => itemOwned(h.id))).id, gloves: pick(GLOVES).id });
   P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar); save(); buildCreator();
 }

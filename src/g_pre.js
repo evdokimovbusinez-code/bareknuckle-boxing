@@ -18,8 +18,14 @@ function hairMat(kind) {
 }
 const HEAD_FRAG = `#include <map_fragment>
  float hs = hairStrands( vHairUV );
- float hairCover = max( max( vScalp, smoothstep( 0.0, 0.25, vHairUV.y - mix( 0.3, 0.6, smoothstep( 1.3, 0.4, abs( vHairUV.x ) ) ) ) ) * uHairAmt, vStub * uStubAmt );   // the crown is always under hair (no skin showing between the strands)
- diffuseColor.rgb = mix( diffuseColor.rgb, uHair * ( 0.45 + 1.1 * hs ), hairCover );
+ // the style of the cut (04g_hair.js): uHS = amount on the sides, on the top, half-width of the strip (mohawk), height of the fade; cornrows = partings between the rows
+ vec3 hd = vec3( cos( vHairUV.y ) * sin( vHairUV.x ), sin( vHairUV.y ), cos( vHairUV.y ) * cos( vHairUV.x ) );
+ float hAmt = mix( uHS.x, uHS.y, smoothstep( uHS.z + 0.1, uHS.z, abs( hd.x ) ) * smoothstep( uHS.w - 0.14, uHS.w + 0.14, hd.y ) );
+ if ( uRows.x > 0.5 ) { float rf = abs( fract( atan( hd.x, hd.y + 0.2 ) / uRows.y + 0.5 ) - 0.5 ); hAmt *= mix( 0.1, 1.0, smoothstep( 0.4, 0.26, rf ) ); }
+ float hScalp = max( vScalp, smoothstep( 0.0, 0.25, vHairUV.y - mix( 0.3, 0.6, smoothstep( 1.3, 0.4, abs( vHairUV.x ) ) ) ) );   // the crown is always under hair (no skin showing between the strands)
+ float hStub = vStub * mix( uBeard.z, uBeard.y, beardReg( hd, uBeard.x ) ) * ( 0.8 + 0.4 * hs );
+ float hairCover = max( hScalp * uHairAmt * hAmt, min( hStub, 0.85 ) );
+ diffuseColor.rgb = mix( diffuseColor.rgb, ( hStub > hScalp * uHairAmt * hAmt ? uBeardC : uHair ) * ( 0.45 + 1.1 * hs ), hairCover );
  float fLon = vHairUV.x, fLat = vHairUV.y;
  float faceM = smoothstep( 1.3, 0.75, abs( fLon ) ) * smoothstep( -1.05, -0.6, fLat ) * smoothstep( 0.5, 0.15, fLat );
  float bz = hNoise( vec2( fLon * 4.0 + 1.7, fLat * 5.0 ) ) * 0.7 + hNoise( vec2( fLon * 11.0, fLat * 13.0 + 4.0 ) ) * 0.3;
@@ -257,6 +263,48 @@ vec4 wounds() {
 }
 `;
 
+/* hair style / beard style of the head shader (uniforms set by hairApply, 04g_hair.js) */
+const HEAD_STYLE_FDECL = `uniform vec4 uHS;
+uniform vec2 uRows;
+uniform float uGloss;
+uniform vec3 uBeard;
+uniform vec3 uBeardC;
+// where a beard style grows on the unit head (x: 0 none, 1 everywhere, 2 goatee, 3 moustache, 4 chin strap) — the twin of beardReg() in 04g_hair.js
+float beardReg( vec3 d, float k ) {
+  float ax = abs( d.x );
+  if ( k < 1.5 ) return k < 0.5 ? 0.0 : 1.0;
+  if ( k < 2.5 ) return smoothstep( 0.42, 0.3, ax ) * smoothstep( -0.42, -0.5, d.y ) * step( 0.5, d.z );
+  if ( k < 3.5 ) return smoothstep( 0.5, 0.38, ax ) * smoothstep( -0.6, -0.54, d.y ) * step( 0.5, d.z );
+  return smoothstep( 0.12, 0.06, d.y - ( -0.97 + 0.8 * pow( smoothstep( 0.3, 1.0, ax ), 1.5 ) ) ) * smoothstep( -0.46, -0.6, d.y - 0.5 * smoothstep( 0.45, 0.8, ax ) );
+}
+`;
+/* skin tone: the CC textures are a light skin. Old tones only tint them (material colour). The new ones (uTone.w = 1) rebuild the colour:
+   target albedo × the texture's relative luminance (contrast uToneK.x) × part of its chroma (uToneK.y: dark skin shows far less redness),
+   palms and soles stay lighter (aPalm). Tattoo: one atlas for the man, a tile per skin texture (uTatB = the uv rectangle of this
+   material that the tile covers, uTatR = the tile in the atlas); the ink sits in the skin, so it darkens / tints it instead of covering */
+const SKIN_TONE_FDECL = `uniform vec4 uTone;
+uniform vec4 uToneK;
+uniform vec3 uPalmC;
+uniform vec3 uSSS;
+uniform sampler2D uTat;
+uniform vec4 uTatR;
+uniform vec4 uTatB;
+varying float vPalm;
+`;
+const SKIN_TONE_F = ` if ( uTone.w > 0.5 ) {
+   vec3 tr = diffuseColor.rgb / vec3( 0.55, 0.275, 0.19 ); float tl = max( dot( tr, vec3( 0.3, 0.5, 0.2 ) ), 1e-3 );
+   vec3 tc = mix( vec3( 1.0 ), tr / tl, uToneK.y ); float tp = pow( tl, uToneK.x );
+   diffuseColor.rgb = mix( uTone.rgb, uPalmC, vPalm * uToneK.z ) * tp * tc;
+ }
+ if ( uTatR.z > 0.0 ) {
+   vec2 tq = ( vMapUv - uTatB.xy ) * uTatB.zw;
+   if ( tq.x > 0.0 && tq.x < 1.0 && tq.y > 0.0 && tq.y < 1.0 ) {
+     vec4 ink = texture2D( uTat, uTatR.xy + tq * uTatR.zw );
+     diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * ( 0.1 + ink.rgb * 1.7 ) + ink.rgb * 0.035, ink.a * 0.88 );
+   }
+ }
+`;
+
 function skinify(mat, u, fu) {
   mat.onBeforeCompile = s => {
     s.fragmentShader = s.fragmentShader.replace('#include <lights_physical_pars_fragment>', SSS_CHUNK);
@@ -270,12 +318,12 @@ function skinify(mat, u, fu) {
     if (u) {
       Object.assign(s.uniforms, u);
       s.vertexShader = 'attribute float aScalp;\nattribute float aStub;\nattribute vec2 aHairUV;\nvarying float vScalp;\nvarying float vStub;\nvarying vec2 vHairUV;\n' + s.vertexShader;
-      s.fragmentShader = 'uniform vec3 uHair;\nuniform float uHairAmt;\nuniform float uStubAmt;\nuniform float uDmg;\nvarying float vScalp;\nvarying float vStub;\nvarying vec2 vHairUV;\n' + SKIN_FDECL + WOUND_FDECL + HAIR_NOISE + s.fragmentShader
+      s.fragmentShader = 'uniform vec3 uHair;\nuniform float uHairAmt;\nuniform float uDmg;\nvarying float vScalp;\nvarying float vStub;\nvarying vec2 vHairUV;\n' + HEAD_STYLE_FDECL + SKIN_FDECL + WOUND_FDECL + HAIR_NOISE + s.fragmentShader
         .replace('#include <map_fragment>', HEAD_FRAG)
-        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix( roughnessFactor, 0.9, hairCover );\n roughnessFactor = mix( roughnessFactor * ( 1.0 - 0.32 * uSweat ), 0.07, max( bWet, gDrop * 0.9 ) );')
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix( roughnessFactor * ( 1.0 - 0.42 * uGloss * hScalp ), 0.9, hairCover );\n roughnessFactor = mix( roughnessFactor * ( 1.0 - 0.32 * uSweat ), 0.07, max( bWet, gDrop * 0.9 ) );')
         .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal = wetBump( -vViewPosition, normal, gH );')
         .replace('#include <clearcoat_normal_fragment_begin>', '#include <clearcoat_normal_fragment_begin>\n clearcoatNormal = wetBump( -vViewPosition, clearcoatNormal, gH );')
-        .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.clearcoat = max( material.clearcoat * ( 1.0 - hairCover ), 0.9 * bWet + 0.6 * gDrop + 0.3 * uSweat * ( 1.0 - hairCover ) );\n material.clearcoatRoughness = mix( material.clearcoatRoughness, 0.03, max( bWet, gDrop ) );');
+        .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.sheenColor *= 1.0 - hairCover;\n material.clearcoat = max( material.clearcoat * ( 1.0 - hairCover ), 0.9 * bWet + 0.6 * gDrop + 0.3 * uSweat * ( 1.0 - hairCover ) );\n material.clearcoatRoughness = mix( material.clearcoatRoughness, 0.03, max( bWet, gDrop ) );');
     } else {
       s.fragmentShader = SKIN_FDECL + s.fragmentShader
         .replace('#include <map_fragment>', '#include <map_fragment>\n float mWet; diffuseColor.rgb = skinMarks( diffuseColor.rgb, mWet );\n gDrop = sweatBeads( vMapUv, uSweat ); gH += gDrop * 0.00016 * ( 1.0 - mWet );')
@@ -284,7 +332,11 @@ function skinify(mat, u, fu) {
         .replace('#include <clearcoat_normal_fragment_begin>', '#include <clearcoat_normal_fragment_begin>\n clearcoatNormal = wetBump( -vViewPosition, clearcoatNormal, gH );')
         .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.clearcoat = max( material.clearcoat, 0.3 * uSweat + 0.9 * mWet + 0.6 * gDrop );\n material.clearcoatRoughness = mix( material.clearcoatRoughness, 0.03, max( mWet, gDrop ) );');
     }
+    // skin tone, palms / soles, tattoo ink (04h_skin_tattoo.js): straight after the texture, under hair, bruises, blood and sweat
+    s.uniforms.uTatR = mat.userData.uTatR || { value: new THREE.Vector4() }; s.uniforms.uTatB = mat.userData.uTatB || { value: new THREE.Vector4( 0, 0, 1, 1 ) };
+    s.vertexShader = 'attribute float aPalm;\nvarying float vPalm;\n' + s.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vPalm = aPalm;');
+    s.fragmentShader = SKIN_TONE_FDECL + s.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n' + SKIN_TONE_F).replace('vec3( 0.75, 0.22, 0.13 )', 'uSSS');
   };
-  mat.customProgramCacheKey = () => u ? 'skin-head-f' : 'skin-sss-f';
+  mat.customProgramCacheKey = () => u ? 'skin-head-g' : 'skin-sss-g';
   return mat;
 }

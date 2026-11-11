@@ -418,10 +418,13 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           </div>
           <div class="cpane" data-cat="body" hidden>
             <div class="fld"><span>тон кожи</span><div class="sw" id="o-skin"></div></div>
+            <div class="fld"><span>тату</span><div class="sw" id="o-tats"></div></div>
           </div>
           <div class="cpane" data-cat="face" hidden>
-            <div class="fld"><span>волосы</span><div class="sw" id="o-hair"></div></div>
+            <div class="fld"><span>причёска</span><div class="sw" id="o-cut"></div></div>
+            <div class="fld"><span>цвет волос</span><div class="sw" id="o-hair"></div></div>
             <div class="fld"><span>борода</span><div class="sw" id="o-beard"></div></div>
+            <div class="fld"><span>цвет бороды</span><div class="sw" id="o-beardc"></div></div>
           </div>
           <div class="cpane" data-cat="wear" hidden>
             <div class="fld"><span>что</span><div class="sw" id="o-wcat"></div></div>
@@ -735,8 +738,14 @@ function hairMat(kind) {
 }
 const HEAD_FRAG = `#include <map_fragment>
  float hs = hairStrands( vHairUV );
- float hairCover = max( max( vScalp, smoothstep( 0.0, 0.25, vHairUV.y - mix( 0.3, 0.6, smoothstep( 1.3, 0.4, abs( vHairUV.x ) ) ) ) ) * uHairAmt, vStub * uStubAmt );   // the crown is always under hair (no skin showing between the strands)
- diffuseColor.rgb = mix( diffuseColor.rgb, uHair * ( 0.45 + 1.1 * hs ), hairCover );
+ // the style of the cut (04g_hair.js): uHS = amount on the sides, on the top, half-width of the strip (mohawk), height of the fade; cornrows = partings between the rows
+ vec3 hd = vec3( cos( vHairUV.y ) * sin( vHairUV.x ), sin( vHairUV.y ), cos( vHairUV.y ) * cos( vHairUV.x ) );
+ float hAmt = mix( uHS.x, uHS.y, smoothstep( uHS.z + 0.1, uHS.z, abs( hd.x ) ) * smoothstep( uHS.w - 0.14, uHS.w + 0.14, hd.y ) );
+ if ( uRows.x > 0.5 ) { float rf = abs( fract( atan( hd.x, hd.y + 0.2 ) / uRows.y + 0.5 ) - 0.5 ); hAmt *= mix( 0.1, 1.0, smoothstep( 0.4, 0.26, rf ) ); }
+ float hScalp = max( vScalp, smoothstep( 0.0, 0.25, vHairUV.y - mix( 0.3, 0.6, smoothstep( 1.3, 0.4, abs( vHairUV.x ) ) ) ) );   // the crown is always under hair (no skin showing between the strands)
+ float hStub = vStub * mix( uBeard.z, uBeard.y, beardReg( hd, uBeard.x ) ) * ( 0.8 + 0.4 * hs );
+ float hairCover = max( hScalp * uHairAmt * hAmt, min( hStub, 0.85 ) );
+ diffuseColor.rgb = mix( diffuseColor.rgb, ( hStub > hScalp * uHairAmt * hAmt ? uBeardC : uHair ) * ( 0.45 + 1.1 * hs ), hairCover );
  float fLon = vHairUV.x, fLat = vHairUV.y;
  float faceM = smoothstep( 1.3, 0.75, abs( fLon ) ) * smoothstep( -1.05, -0.6, fLat ) * smoothstep( 0.5, 0.15, fLat );
  float bz = hNoise( vec2( fLon * 4.0 + 1.7, fLat * 5.0 ) ) * 0.7 + hNoise( vec2( fLon * 11.0, fLat * 13.0 + 4.0 ) ) * 0.3;
@@ -974,6 +983,48 @@ vec4 wounds() {
 }
 `;
 
+/* hair style / beard style of the head shader (uniforms set by hairApply, 04g_hair.js) */
+const HEAD_STYLE_FDECL = `uniform vec4 uHS;
+uniform vec2 uRows;
+uniform float uGloss;
+uniform vec3 uBeard;
+uniform vec3 uBeardC;
+// where a beard style grows on the unit head (x: 0 none, 1 everywhere, 2 goatee, 3 moustache, 4 chin strap) — the twin of beardReg() in 04g_hair.js
+float beardReg( vec3 d, float k ) {
+  float ax = abs( d.x );
+  if ( k < 1.5 ) return k < 0.5 ? 0.0 : 1.0;
+  if ( k < 2.5 ) return smoothstep( 0.42, 0.3, ax ) * smoothstep( -0.42, -0.5, d.y ) * step( 0.5, d.z );
+  if ( k < 3.5 ) return smoothstep( 0.5, 0.38, ax ) * smoothstep( -0.6, -0.54, d.y ) * step( 0.5, d.z );
+  return smoothstep( 0.12, 0.06, d.y - ( -0.97 + 0.8 * pow( smoothstep( 0.3, 1.0, ax ), 1.5 ) ) ) * smoothstep( -0.46, -0.6, d.y - 0.5 * smoothstep( 0.45, 0.8, ax ) );
+}
+`;
+/* skin tone: the CC textures are a light skin. Old tones only tint them (material colour). The new ones (uTone.w = 1) rebuild the colour:
+   target albedo × the texture's relative luminance (contrast uToneK.x) × part of its chroma (uToneK.y: dark skin shows far less redness),
+   palms and soles stay lighter (aPalm). Tattoo: one atlas for the man, a tile per skin texture (uTatB = the uv rectangle of this
+   material that the tile covers, uTatR = the tile in the atlas); the ink sits in the skin, so it darkens / tints it instead of covering */
+const SKIN_TONE_FDECL = `uniform vec4 uTone;
+uniform vec4 uToneK;
+uniform vec3 uPalmC;
+uniform vec3 uSSS;
+uniform sampler2D uTat;
+uniform vec4 uTatR;
+uniform vec4 uTatB;
+varying float vPalm;
+`;
+const SKIN_TONE_F = ` if ( uTone.w > 0.5 ) {
+   vec3 tr = diffuseColor.rgb / vec3( 0.55, 0.275, 0.19 ); float tl = max( dot( tr, vec3( 0.3, 0.5, 0.2 ) ), 1e-3 );
+   vec3 tc = mix( vec3( 1.0 ), tr / tl, uToneK.y ); float tp = pow( tl, uToneK.x );
+   diffuseColor.rgb = mix( uTone.rgb, uPalmC, vPalm * uToneK.z ) * tp * tc;
+ }
+ if ( uTatR.z > 0.0 ) {
+   vec2 tq = ( vMapUv - uTatB.xy ) * uTatB.zw;
+   if ( tq.x > 0.0 && tq.x < 1.0 && tq.y > 0.0 && tq.y < 1.0 ) {
+     vec4 ink = texture2D( uTat, uTatR.xy + tq * uTatR.zw );
+     diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * ( 0.1 + ink.rgb * 1.7 ) + ink.rgb * 0.035, ink.a * 0.88 );
+   }
+ }
+`;
+
 function skinify(mat, u, fu) {
   mat.onBeforeCompile = s => {
     s.fragmentShader = s.fragmentShader.replace('#include <lights_physical_pars_fragment>', SSS_CHUNK);
@@ -987,12 +1038,12 @@ function skinify(mat, u, fu) {
     if (u) {
       Object.assign(s.uniforms, u);
       s.vertexShader = 'attribute float aScalp;\nattribute float aStub;\nattribute vec2 aHairUV;\nvarying float vScalp;\nvarying float vStub;\nvarying vec2 vHairUV;\n' + s.vertexShader;
-      s.fragmentShader = 'uniform vec3 uHair;\nuniform float uHairAmt;\nuniform float uStubAmt;\nuniform float uDmg;\nvarying float vScalp;\nvarying float vStub;\nvarying vec2 vHairUV;\n' + SKIN_FDECL + WOUND_FDECL + HAIR_NOISE + s.fragmentShader
+      s.fragmentShader = 'uniform vec3 uHair;\nuniform float uHairAmt;\nuniform float uDmg;\nvarying float vScalp;\nvarying float vStub;\nvarying vec2 vHairUV;\n' + HEAD_STYLE_FDECL + SKIN_FDECL + WOUND_FDECL + HAIR_NOISE + s.fragmentShader
         .replace('#include <map_fragment>', HEAD_FRAG)
-        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix( roughnessFactor, 0.9, hairCover );\n roughnessFactor = mix( roughnessFactor * ( 1.0 - 0.32 * uSweat ), 0.07, max( bWet, gDrop * 0.9 ) );')
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix( roughnessFactor * ( 1.0 - 0.42 * uGloss * hScalp ), 0.9, hairCover );\n roughnessFactor = mix( roughnessFactor * ( 1.0 - 0.32 * uSweat ), 0.07, max( bWet, gDrop * 0.9 ) );')
         .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n normal = wetBump( -vViewPosition, normal, gH );')
         .replace('#include <clearcoat_normal_fragment_begin>', '#include <clearcoat_normal_fragment_begin>\n clearcoatNormal = wetBump( -vViewPosition, clearcoatNormal, gH );')
-        .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.clearcoat = max( material.clearcoat * ( 1.0 - hairCover ), 0.9 * bWet + 0.6 * gDrop + 0.3 * uSweat * ( 1.0 - hairCover ) );\n material.clearcoatRoughness = mix( material.clearcoatRoughness, 0.03, max( bWet, gDrop ) );');
+        .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.sheenColor *= 1.0 - hairCover;\n material.clearcoat = max( material.clearcoat * ( 1.0 - hairCover ), 0.9 * bWet + 0.6 * gDrop + 0.3 * uSweat * ( 1.0 - hairCover ) );\n material.clearcoatRoughness = mix( material.clearcoatRoughness, 0.03, max( bWet, gDrop ) );');
     } else {
       s.fragmentShader = SKIN_FDECL + s.fragmentShader
         .replace('#include <map_fragment>', '#include <map_fragment>\n float mWet; diffuseColor.rgb = skinMarks( diffuseColor.rgb, mWet );\n gDrop = sweatBeads( vMapUv, uSweat ); gH += gDrop * 0.00016 * ( 1.0 - mWet );')
@@ -1001,8 +1052,12 @@ function skinify(mat, u, fu) {
         .replace('#include <clearcoat_normal_fragment_begin>', '#include <clearcoat_normal_fragment_begin>\n clearcoatNormal = wetBump( -vViewPosition, clearcoatNormal, gH );')
         .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.clearcoat = max( material.clearcoat, 0.3 * uSweat + 0.9 * mWet + 0.6 * gDrop );\n material.clearcoatRoughness = mix( material.clearcoatRoughness, 0.03, max( mWet, gDrop ) );');
     }
+    // skin tone, palms / soles, tattoo ink (04h_skin_tattoo.js): straight after the texture, under hair, bruises, blood and sweat
+    s.uniforms.uTatR = mat.userData.uTatR || { value: new THREE.Vector4() }; s.uniforms.uTatB = mat.userData.uTatB || { value: new THREE.Vector4( 0, 0, 1, 1 ) };
+    s.vertexShader = 'attribute float aPalm;\nvarying float vPalm;\n' + s.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vPalm = aPalm;');
+    s.fragmentShader = SKIN_TONE_FDECL + s.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n' + SKIN_TONE_F).replace('vec3( 0.75, 0.22, 0.13 )', 'uSSS');
   };
-  mat.customProgramCacheKey = () => u ? 'skin-head-f' : 'skin-sss-f';
+  mat.customProgramCacheKey = () => u ? 'skin-head-g' : 'skin-sss-g';
   return mat;
 }
 
@@ -1634,7 +1689,9 @@ const SHORTS_LOOKS = [
   { id: 'green', main: '#0f5a36', trim: '#d6a640', band: '#0a1a12', sheen: '#4fc48a' },
   { id: 'purple', main: '#4a1a6e', trim: '#cfd3da', band: '#140a1e', sheen: '#a66de0' },
 ];
-const HAIR_LOOKS = [{ id: 'black', c: '#1a130e' }, { id: 'brown', c: '#3a2616' }, { id: 'blond', c: '#b08e58' }, { id: 'red', c: '#84361a' }, { id: 'grey', c: '#9a9692' }, { id: 'bald', c: '#2a1a10' }];
+// hair colours (the cut itself: HAIR_STYLES in 04g_hair.js; an old save may still say hair: 'bald' — read as the bald style)
+const HAIR_LOOKS = [{ id: 'black', c: '#1b1511', label: 'чёрные' }, { id: 'dbrown', c: '#2f1d11', label: 'тёмно-каштановые' }, { id: 'brown', c: '#3a2616', label: 'каштановые' }, { id: 'blond', c: '#b08e58', label: 'русые' },
+  { id: 'red', c: '#84361a', label: 'рыжие' }, { id: 'grey', c: '#9a9692', label: 'седые' }, { id: 'bleach', c: '#d9c89a', label: 'обесцвеченные' }];
 const WRAPS_LOOKS = [{ id: 'white', c: '#ffffff', need: 0, label: 'белые' }, { id: 'black', c: '#2a2a2c', need: 2, label: 'чёрные' }, { id: 'red', c: '#b3202c', need: 4, label: 'красные' },
   { id: 'blue', c: '#2f55b5', need: 6, label: 'синие' }, { id: 'gold', c: '#d8b25a', need: 8, label: 'золотые' }];
 const SIGS = [{ id: 'jab', label: 'джеб' }, { id: 'cross', label: 'кросс' }, { id: 'hook', label: 'хук' }, { id: 'upper', label: 'апперкот' }, { id: 'over', label: 'оверхенд' }];
@@ -1644,7 +1701,9 @@ const sigOf = n => n === 'hookL' || n === 'hookR' ? 'hook' : n === 'upperL' || n
 const STATS = [{ id: 'pow', label: 'Сила', d: 'урон' }, { id: 'spd', label: 'Скорость', d: 'скорость ударов' }, { id: 'chin', label: 'Челюсть', d: 'держит удар' }, { id: 'sta', label: 'Дыхалка', d: 'выносливость' }];
 const SK = (F, k) => (F && F.stat ? F.stat[k] || 0 : 0);
 const lvlStats = l => ({ pow: l, spd: l, chin: l, sta: l });
-const SKIN_LOOKS = [{ id: 'light', c: '#e6cfc2' }, { id: 'tan', c: '#c8a288' }, { id: 'dark', c: '#8f6650' }];
+// skin tones, light → very dark; `c` tints the CC textures, the tones listed in SKIN_TONES (04h_skin_tattoo.js) are rebuilt in the shader instead
+const SKIN_LOOKS = [{ id: 'light', c: '#e6cfc2', label: 'светлая' }, { id: 'tan', c: '#c8a288', label: 'загар' }, { id: 'olive', c: '#ffffff', label: 'оливковая' }, { id: 'brown', c: '#ffffff', label: 'смуглая' },
+  { id: 'dark', c: '#ffffff', label: 'тёмная' }, { id: 'deep', c: '#ffffff', label: 'очень тёмная' }];
 function paintShorts(c, S) {
   const W = c.width, H = c.height, g = c.getContext('2d'), cream = '#f1e7d2';
   g.fillStyle = S.main; g.fillRect(0, 0, W, H);
@@ -1770,6 +1829,7 @@ async function buildTemplates() {
     sample(tris.hair, 3600, HEAD.hairRoots); sample(tris.beard, 2400, HEAD.beardRoots);
   }
 
+  skinTemplate(body);   // rest-pose data for tattoos, palms / soles mask (04h_skin_tattoo.js)
   // face blend shapes, read from the FBX itself (the loader's morphs are broken and were dropped above): 03b_face_shapes.js
   try { T.fm = faceShapes(bufs.boxer, body.geometry); } catch (e) { console.warn('face shapes:', e); T.fm = null; }
   T.cc = cc;
@@ -4128,7 +4188,7 @@ function debStep(d, dt) {
 // put a thing back on (a new fight, a cut back in time in the replay)
 function wearBack(w) { for (const d of w.deb) { WEAR_G.grp.remove(d.g); WEAR_G.list.splice(WEAR_G.list.indexOf(d), 1); } w.deb.length = 0; w.off = false; w.crack = 0; if (w.m.material.userData.U && w.m.material.userData.U.uCrack) w.m.material.userData.U.uCrack.value.set(0, 0); }
 function wearReset() { for (const F of [P1, P2]) { const W = F && F.gear.wear; if (!W) continue; for (const k of ['head', 'eyes']) if (W[k]) wearBack(W[k]); wearHair(F); } }
-function wearHair(F) { F.hair.mesh.visible = !F.bald && !F.gear.spar && !wearTuck(F); }
+function wearHair(F) { hairVis(F); }
 // a wear event happens (live, or again in the replay); ff = seconds to run it forward at once
 function wearEvent(e, ff = 0) {
   const F = e.who ? P2 : P1, w = F.gear.wear && F.gear.wear[e.cat]; if (!w || w.key !== e.key) return;
@@ -4541,6 +4601,687 @@ Object.assign(ITEMS, {
   vest: { cat: 'top', label: 'бронежилет', model: { cut: 'vest', uc: '#1b1c20' }, colors: ['black', 'olive', 'sand', 'camo'], nat: wNat({ black: '#1e1f22', olive: '#4c4e38' }, { black: { uc: '#6c6e73' } }), price: 1200, tags: ['street'], brand: 'BLACKOUT SUPPLY' },
 });
 for (const k in ITEMS) ITEMS[k].id = k;   // (the items above replace objects that already had their id)
+/* ───────── hair styles and beards ─────────
+   A style = scalp shading (uniforms of the head shader: uHS, uRows, uGloss) + a rigid mesh on the head (cards / coil clumps / tubes,
+   one geometry per style shared by both men, one draw call) + for the long ones strands simulated with the same PS solver as the
+   original cut (cards → renderHair, ropes → renderTubes). Everything is built on first use and cached. */
+const HAIR_STYLES = [
+  { id: 'bald', label: 'лысый', amt: [0.05, 0.05], gloss: 1 },
+  { id: 'buzz', label: 'под машинку', amt: [0.8, 0.8], rigid: 1 },
+  { id: 'crew', label: 'полубокс', amt: [0.72, 1], fade: 0.4, rigid: 1 },
+  { id: 'classic', label: 'классика', amt: [1, 1] },                                  // the original cut (its own strands + base layer)
+  { id: 'slick', label: 'зачёс назад', amt: [1, 1], rigid: 1, rough: 0.34 },
+  { id: 'coils', label: 'короткие кудри', amt: [1, 1], rigid: 1, rough: 0.8 },
+  { id: 'curly', label: 'кудри', amt: [0.75, 1], fade: 0.3, rigid: 1, rough: 0.8 },
+  { id: 'afro', label: 'афро', amt: [1, 1], rigid: 1, big: 1, rough: 0.85 },
+  { id: 'twists', label: 'твисты', amt: [0.9, 0.9], rigid: 1, big: 1, rough: 0.75 },
+  { id: 'dreads', label: 'дреды', amt: [0.9, 0.9], sim: 1, big: 1, rough: 0.8 },
+  { id: 'rows', label: 'косички', amt: [1, 1], rows: 11, rigid: 1, rough: 0.7 },
+  { id: 'bun', label: 'пучок', amt: [0.72, 1], fade: 0.25, rigid: 1, big: 1 },
+  { id: 'pony', label: 'хвост', amt: [1, 1], rigid: 1, sim: 1, big: 1 },
+  { id: 'mohawk', label: 'ирокез', amt: [0.22, 1], strip: 0.2, rigid: 1, big: 1 },
+  { id: 'mullet', label: 'маллет', amt: [1, 1], rigid: 1, sim: 1 },
+];
+const BEARD_STYLES = [
+  { id: 'none', label: 'нет', k: 0, u: [0.3, 0.3] },
+  { id: 'stubble', label: 'щетина', k: 1, u: [1.7, 1.7] },
+  { id: 'boxed', label: 'короткая', k: 1, u: [1, 1], geo: 1 },                       // the original beard
+  { id: 'full', label: 'длинная', k: 1, u: [1.6, 1.6], geo: 1 },
+  { id: 'goatee', label: 'эспаньолка', k: 2, u: [2.6, 0.3], geo: 1 },
+  { id: 'stache', label: 'усы', k: 3, u: [2.6, 0.3], geo: 1 },
+  { id: 'strap', label: 'шкиперская', k: 4, u: [2.6, 0.3], geo: 1 },
+];
+const hairStyleOf = L => HAIR_STYLES.find(s => s.id === (L.hair === 'bald' ? 'bald' : L.hairStyle || 'classic')) || HAIR_STYLES[3];
+const beardStyleOf = L => BEARD_STYLES.find(s => s.id === (typeof L.beard === 'string' ? L.beard : L.beard ? 'boxed' : 'none')) || BEARD_STYLES[0];
+const hairColOf = id => (HAIR_LOOKS.find(x => x.id === id) || HAIR_LOOKS[id === 'bald' ? 0 : 2]).c;
+const ROW_DPHI = 15 * Math.PI / 180, ROW_Y0 = 0.2;   // cornrows: planes through an axis parallel to z, 15° apart (the same numbers in the head shader)
+
+// own generator: the builds are lazy, they must not disturb the shared rnd() sequence
+let _hSeed = 1234567;
+const hr = () => { _hSeed = (_hSeed * 1664525 + 1013904223) >>> 0; return _hSeed / 4294967296; };
+// height above the hairline on the unit head (0 at the line, ≈1.4 on the crown) — the line of hairMask()
+const hairEdge = d => d.y - (-0.40 + 0.88 * sstep(-0.2, 0.9, d.z) + 0.34 * clamp((Math.abs(d.x) - 0.6) / 0.4, 0, 1) * (1 - sstep(0.3, 0.8, d.z)));
+const headDir = (p, out) => out.set((p.x - HEAD.C.x) / HEAD.R.x, (p.y - HEAD.C.y) / HEAD.R.y, (p.z - HEAD.C.z) / HEAD.R.z).normalize();
+// the scalp under a direction of the unit head: a blend of the nearest roots
+function scalpAt(d) {
+  const best = [];
+  for (const r of HEAD.hairRoots) { const q = r.d.distanceToSquared(d); if (best.length < 6 || q < best[5].q) { best.push({ q, r }); best.sort((a, b) => a.q - b.q); if (best.length > 6) best.pop(); } }
+  const p = new V3(), n = new V3(); let ws = 0;
+  for (const b of best) { const w = 1 / (b.q + 1e-4); p.addScaledVector(b.r.p, w); n.addScaledVector(b.r.n, w); ws += w; }
+  return { p: p.multiplyScalar(1 / ws), n: n.normalize(), d: d.clone() };
+}
+// roots no closer than `min` to each other
+function hSparse(roots, min) {
+  const out = [], m2 = min * min, idx = roots.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) { const j = (hr() * (i + 1)) | 0, t = idx[i]; idx[i] = idx[j]; idx[j] = t; }
+  for (const i of idx) { const r = roots[i]; let ok = true; for (const o of out) if (o.p.distanceToSquared(r.p) < m2) { ok = false; break; } if (ok) out.push(r); }
+  return out;
+}
+// more roots: copies moved a few millimetres along the skin
+function hDense(roots, times, jit) {
+  const out = [], t = new V3();
+  for (const r of roots) { out.push(r); for (let k = 1; k < times; k++) { t.set(hr() - 0.5, hr() - 0.5, hr() - 0.5).cross(r.n).multiplyScalar(2 * jit); const p = r.p.clone().add(t); out.push({ p, n: r.n, d: headDir(p, new V3()) }); } }
+  return out;
+}
+// a strand from a root: leaves along the normal, bends into `flow` (a vector or f(pos)), stays above the skull
+function hTrace(r, L, np, flow, nK, bend, jit, pad0, padK) {
+  const C = HEAD.C, R = HEAD.R, pts = [], fn = typeof flow === 'function', f0 = fn ? flow(r.p) : flow;
+  const fs = Math.max(1, Math.hypot((r.p.x - C.x) / R.x, (r.p.y - C.y) / R.y, (r.p.z - C.z) / R.z));
+  const dir = r.n.clone().multiplyScalar(nK).add(f0).normalize(), pos = r.p.clone().addScaledVector(r.n, -0.001), seg = L / (np - 1);
+  const jx = (hr() - 0.5) * jit, jz = (hr() - 0.5) * jit;
+  pts.push(pos.clone());
+  for (let k = 1; k < np; k++) {
+    dir.lerp(fn ? flow(pos) : flow, bend); dir.x += jx * 0.3 + (hr() - 0.5) * jit * 0.4; dir.z += jz * 0.3 + (hr() - 0.5) * jit * 0.4; dir.normalize();
+    pos.addScaledVector(dir, seg);
+    const pad = pad0 + k * padK, x = (pos.x - C.x) / (R.x * fs + pad), y = (pos.y - C.y) / (R.y * fs + pad), z = (pos.z - C.z) / (R.z * fs + pad), q = x * x + y * y + z * z;
+    if (q < 1) { const m = 1 / Math.sqrt(q); pos.set(C.x + (pos.x - C.x) * m, C.y + (pos.y - C.y) * m, C.z + (pos.z - C.z) * m); }
+    pts.push(pos.clone());
+  }
+  pts.fs = fs;
+  return pts;
+}
+
+/* one texture for all the new styles, four columns: 0 straight strands (alpha) · 1 coil clumps, four tiles (alpha) · 2 twisted rope · 3 braid */
+let _hAtlas = null;
+function hairAtlas() {
+  if (_hAtlas) return _hAtlas;
+  const c = document.createElement('canvas'); c.width = 512; c.height = 512; const g = c.getContext('2d'), cw = 128;
+  const grey = (s, a = 1) => `rgba(${s | 0},${s | 0},${s | 0},${a})`;
+  // 0: strands, as the original card texture
+  for (let i = 0; i < 170; i++) {
+    const x = 5 + hr() * (cw - 10), len = 512 * (0.5 + hr() * 0.5), curl = (hr() - 0.5) * 12, sh = 150 + hr() * 105, gr = g.createLinearGradient(0, 0, 0, len);
+    gr.addColorStop(0, grey(sh)); gr.addColorStop(0.75, grey(sh, 0.95)); gr.addColorStop(1, grey(sh, 0));
+    g.strokeStyle = gr; g.lineWidth = 0.6 + hr(); g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + curl, len * 0.35, x - curl, len * 0.7, x + curl * 0.5, len); g.stroke();
+  }
+  // 1: coil clumps — a ragged dark mass (so the card stays opaque in the far mips) with tight light and dark ringlets on it
+  for (let t = 0; t < 4; t++) {
+    const ox = cw, oy = t * 128; g.save(); g.beginPath(); g.rect(ox + 2, oy + 2, cw - 4, 124); g.clip();
+    for (let i = 0; i < 46; i++) { const a = hr() * 6.283, rr = 34 * Math.sqrt(hr()); g.fillStyle = grey(95 + hr() * 40); g.beginPath(); g.arc(ox + 64 + Math.cos(a) * rr, oy + 64 + Math.sin(a) * rr, 9 + hr() * 13, 0, 6.283); g.fill(); }
+    for (let i = 0; i < 150; i++) {
+      const a = hr() * 6.283, rr = 46 * Math.sqrt(hr()), x = ox + 64 + Math.cos(a) * rr, y = oy + 64 + Math.sin(a) * rr, dark = hr() < 0.4;
+      g.strokeStyle = grey(dark ? 40 + hr() * 40 : 165 + hr() * 90, 0.9); g.lineWidth = dark ? 2.4 : 1.5 + hr() * 0.8;
+      g.beginPath(); g.arc(x, y, 3 + hr() * 4.5, hr() * 6.283, hr() * 6.283 + 3.6 + hr() * 2.4); g.stroke();
+    }
+    g.restore();
+  }
+  // 2: rope (dreadlocks, twists): matted strands winding round, a dark groove every half turn
+  { const ox = 2 * cw; g.fillStyle = grey(150); g.fillRect(ox, 0, cw, 512);
+    for (let y = -64; y < 560; y += 32) { g.strokeStyle = grey(52); g.lineWidth = 7; g.beginPath(); g.moveTo(ox - 4, y + 44); g.lineTo(ox + cw + 4, y); g.stroke(); g.strokeStyle = grey(225, 0.55); g.lineWidth = 4; g.beginPath(); g.moveTo(ox - 4, y + 60); g.lineTo(ox + cw + 4, y + 16); g.stroke(); }
+    g.save(); g.beginPath(); g.rect(ox, 0, cw, 512); g.clip();
+    for (let i = 0; i < 1500; i++) { const x = ox + hr() * cw, y = hr() * 512, l = 5 + hr() * 12; g.strokeStyle = grey(hr() < 0.5 ? 70 + hr() * 50 : 190 + hr() * 60, 0.5); g.lineWidth = 0.8; g.beginPath(); g.moveTo(x, y); g.lineTo(x + l, y - l * 0.34 + (hr() - 0.5) * 4); g.stroke(); }
+    g.restore(); }
+  // 3: braid: plaits crossing in a herring-bone
+  { const ox = 3 * cw; g.fillStyle = grey(60); g.fillRect(ox, 0, cw, 512);
+    for (let y = -32, k = 0; y < 544; y += 16, k++) {
+      const s = k & 1 ? 1 : -1, x0 = ox + 64 - s * 50, x1 = ox + 64 + s * 14;
+      const gr = g.createLinearGradient(x0, y, x1, y + 26); gr.addColorStop(0, grey(120)); gr.addColorStop(0.5, grey(235)); gr.addColorStop(1, grey(110));
+      g.strokeStyle = gr; g.lineWidth = 15; g.lineCap = 'round'; g.beginPath(); g.moveTo(x0, y); g.quadraticCurveTo(ox + 64, y + 4, x1, y + 26); g.stroke();
+      g.strokeStyle = grey(30, 0.6); g.lineWidth = 1; for (let q = -5; q <= 5; q += 2.5) { g.beginPath(); g.moveTo(x0, y + q); g.quadraticCurveTo(ox + 64, y + 4 + q, x1, y + 26 + q); g.stroke(); }
+    } }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return (_hAtlas = t);
+}
+function hairMat2() {
+  const mat = new THREE.MeshPhysicalMaterial({ map: hairAtlas(), vertexColors: true, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.62, specularIntensity: 0.6, specularColor: new THREE.Color('#a89480'), envMapIntensity: 0.2 });
+  mat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', HAIR_NB); };
+  mat.customProgramCacheKey = () => 'hair-cards';
+  return mat;
+}
+
+/* geometry collector (head rest space, metres) */
+class HairGeo {
+  constructor() { this.P = []; this.N = []; this.UV = []; this.C = []; this.I = []; }
+  get nv() { return this.P.length / 3; }
+  vtx(p, n, u, v, c) { this.P.push(p.x, p.y, p.z); this.N.push(n.x, n.y, n.z); this.UV.push(u, v); this.C.push(c, c, c); }
+  // a card along a polyline; the normal looks away from the head centre; col = atlas column, or -1: the whole texture (beard cards)
+  ribbon(pts, side, w0, w1, col, c0, c1) {
+    const n = pts.length, b = this.nv, t = new V3(), s = new V3(), nn = new V3(), p = new V3(), u0 = col < 0 ? 0 : (col + 0.07) / 4, u1 = col < 0 ? 1 : (col + 0.93) / 4;
+    for (let k = 0; k < n; k++) {
+      const f = k / (n - 1); t.copy(pts[Math.min(k + 1, n - 1)]).sub(pts[Math.max(k - 1, 0)]).normalize();
+      s.copy(side).addScaledVector(t, -side.dot(t)).normalize().multiplyScalar(lerp(w0, w1, f) * 0.5);
+      nn.copy(pts[k]).sub(HEAD.C).normalize(); const c = lerp(c0, c1, f);
+      this.vtx(p.copy(pts[k]).sub(s), nn, u0, 1 - f, c); this.vtx(p.copy(pts[k]).add(s), nn, u1, 1 - f, c);
+      if (k < n - 1) { const v = b + 2 * k; this.I.push(v, v + 2, v + 1, v + 1, v + 2, v + 3); }
+    }
+  }
+  // a round rope along a polyline (m sides); `turns` texture periods per metre
+  tube(pts, r0, r1, m, col, c0, c1, turns) {
+    const n = pts.length, b = this.nv, t = new V3(), a = new V3(), bb = new V3(), nn = new V3(), p = new V3(); let len = 0;
+    a.set(0.31, 0.87, 0.38);
+    for (let k = 0; k < n; k++) {
+      const f = k / (n - 1); t.copy(pts[Math.min(k + 1, n - 1)]).sub(pts[Math.max(k - 1, 0)]).normalize(); if (k) len += pts[k].distanceTo(pts[k - 1]);
+      a.addScaledVector(t, -a.dot(t)).normalize(); bb.crossVectors(t, a);
+      const r = lerp(r0, r1, f), c = lerp(c0, c1, f), v = 1 - Math.min(len * turns, 15.9) / 16;
+      for (let j = 0; j <= m; j++) { const an = j / m * 6.2832; nn.copy(a).multiplyScalar(Math.cos(an)).addScaledVector(bb, Math.sin(an)); this.vtx(p.copy(pts[k]).addScaledVector(nn, r), nn, (col + 0.04 + 0.92 * j / m) / 4, v, c); }
+      if (k < n - 1) for (let j = 0; j < m; j++) { const v0 = b + k * (m + 1) + j, v1 = v0 + m + 1; this.I.push(v0, v1, v0 + 1, v0 + 1, v1, v1 + 1); }
+    }
+  }
+  // a low ridge lying on the skin (cornrow): pts with their skin normals
+  ridge(pts, nrm, w, h, col, turns) {
+    const n = pts.length, b = this.nv, t = new V3(), s = new V3(), nn = new V3(), p = new V3(), X = [-1, -0.62, 0, 0.62, 1], Y = [-0.15, 0.72, 1, 0.72, -0.15]; let len = 0;
+    for (let k = 0; k < n; k++) {
+      t.copy(pts[Math.min(k + 1, n - 1)]).sub(pts[Math.max(k - 1, 0)]).normalize(); s.crossVectors(t, nrm[k]).normalize(); if (k) len += pts[k].distanceTo(pts[k - 1]);
+      const e = Math.min(1, Math.min(k, n - 1 - k) / 2 + 0.35), v = 1 - (len * turns % 15.9) / 16;
+      for (let j = 0; j < 5; j++) { nn.copy(nrm[k]).multiplyScalar(0.35 + Y[j]).addScaledVector(s, X[j] * 0.9).normalize(); this.vtx(p.copy(pts[k]).addScaledVector(s, X[j] * w * 0.5 * e).addScaledVector(nrm[k], Y[j] * h * e), nn, (col + 0.06 + 0.88 * j / 4) / 4, v, 0.75 + 0.3 * Y[j]); }
+      if (k < n - 1) for (let j = 0; j < 4; j++) { const v0 = b + k * 5 + j, v1 = v0 + 5; this.I.push(v0, v0 + 1, v1, v0 + 1, v1 + 1, v1); }
+    }
+  }
+  // a coil clump: a square card (tile of column 1) in the plane ax / ay
+  clump(c, ax, ay, n, c0) {
+    const b = this.nv, t = (hr() * 4) | 0, u0 = 1.03 / 4, u1 = 1.97 / 4, v1 = 1 - (t + 0.03) / 4, v0 = 1 - (t + 0.97) / 4, p = new V3();
+    this.vtx(p.copy(c).sub(ax).sub(ay), n, u0, v0, c0); this.vtx(p.copy(c).add(ax).sub(ay), n, u1, v0, c0); this.vtx(p.copy(c).add(ax).add(ay), n, u1, v1, c0); this.vtx(p.copy(c).sub(ax).add(ay), n, u0, v1, c0);
+    this.I.push(b, b + 1, b + 2, b, b + 2, b + 3);
+  }
+  build() {
+    if (!this.nv) return null;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.N, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.UV, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.C, 3)); g.setIndex(this.I);
+    return g;
+  }
+}
+const _hSide = new V3();
+const hSideOf = (flow, n) => _hSide.crossVectors(flow, n).normalize().clone();
+// short stubble-like cards standing on the scalp (buzz cut, faded sides): len(r) in metres, 0 = none
+function hShort(G, roots, len, lean) {
+  const pts = [new V3(), new V3()], s = new V3();
+  for (const r of roots) {
+    const L = len(r); if (L <= 0) continue;
+    pts[0].copy(r.p).addScaledVector(r.n, -0.0008); pts[1].copy(r.n).multiplyScalar(1 - lean).add(s.set(0.1 * r.d.x + (hr() - 0.5) * 0.5, -0.5 * lean + (hr() - 0.5) * 0.3, -lean + (hr() - 0.5) * 0.5)).normalize().multiplyScalar(L).add(pts[0]);
+    s.set(hr() - 0.5, hr() - 0.5, hr() - 0.5).cross(r.n).normalize();
+    G.ribbon(pts, s, 0.0032, 0.0022, 0, 0.8 + hr() * 0.4, 1.1 + hr() * 0.4);
+  }
+}
+// coil clumps filling the space between the scalp and an outer surface `h(r)` metres above it (round: an ellipsoid about the head)
+function hBush(G, roots, h, size, round) {
+  const C = HEAD.C, R = HEAD.R, Ca = new V3(C.x, C.y + 0.012, C.z - 0.008), d = new V3(), po = new V3(), c = new V3(), out = new V3(), q = new V3(), ax = new V3(), ay = new V3(), n = new V3();
+  for (const r of roots) {
+    const H = h(r); if (H <= 0) continue;
+    d.set((r.p.x - Ca.x) / R.x, (r.p.y - Ca.y) / R.y, (r.p.z - Ca.z) / R.z).normalize();
+    po.set(Ca.x + d.x * (R.x + H * round.x), Ca.y + d.y * (R.y + H * round.y), Ca.z + d.z * (R.z + H * round.z));
+    out.copy(po).sub(r.p); const dist = out.length(); out.normalize(); if (out.dot(r.n) < 0.2) out.lerp(r.n, 0.6).normalize();
+    const t = Math.pow(hr(), 0.45); c.copy(r.p).addScaledVector(out, Math.max(dist, H * 0.4) * (0.12 + 0.88 * t) - size * 0.25);
+    q.set(hr() - 0.5, hr() - 0.5, hr() - 0.5).multiplyScalar(1.5).add(out).normalize();
+    ax.set(hr() - 0.5, hr() - 0.5, hr() - 0.5).cross(q).normalize(); ay.crossVectors(q, ax);
+    const s = size * (0.75 + hr() * 0.5); ax.multiplyScalar(s); ay.multiplyScalar(s);
+    n.copy(c).sub(Ca).normalize().lerp(q, 0.25).normalize();
+    G.clump(c, ax, ay, n, (0.34 + 0.8 * t * t) * (0.85 + hr() * 0.3));
+  }
+}
+const HAIR_BACK = d => new V3(0.12 * d.x, -0.3 - 0.5 * sstep(0.3, -0.6, d.y), -1).normalize();
+
+/* the rigid part of a style (null: none) */
+function hairRigid(id) {
+  const cache = T.hairGeoS || (T.hairGeoS = {}); if (id in cache) return cache[id];
+  _hSeed = 977 + id.length * 7919 + id.charCodeAt(0) * 131;
+  const G = new HairGeo(), roots = HEAD.hairRoots, C = HEAD.C, R = HEAD.R, v = new V3();
+  if (id === 'buzz') hShort(G, hDense(roots, 2, 0.003), () => 0.0035 + hr() * 0.002, 0.1);
+  else if (id === 'crew') {
+    hShort(G, roots, r => r.d.y < 0.55 ? 0.0035 + hr() * 0.002 : 0, 0.1);
+    for (const r of hDense(roots.filter(r => r.d.y > 0.3), 2, 0.003)) {
+      const top = sstep(0.3, 0.7, r.d.y), L = lerp(0.005, 0.016 + hr() * 0.006, top), flow = v.set(0.1 * r.d.x, 0.25, 0.75).normalize();
+      const pts = hTrace(r, L, 3, flow, 1.6, 0.3, 0.3, 0.002, 0.001);
+      G.ribbon(pts, hSideOf(flow, r.n), 0.008, 0.004, 0, 0.7 + hr() * 0.3, 1.0 + hr() * 0.4);
+    }
+  } else if (id === 'slick') {
+    for (const r of roots) {
+      const flow = HAIR_BACK(r.d), L = 0.06 + hr() * 0.035 + 0.03 * sstep(0.2, 0.9, r.d.y) * sstep(-0.2, 0.7, r.d.z);
+      const pts = hTrace(r, L, 5, flow, 0.1, 0.5, 0.06, 0.0025, 0.0011);
+      G.ribbon(pts, hSideOf(flow, r.n), 0.015 * (0.8 + hr() * 0.5), 0.008, 0, 0.72 + hr() * 0.3, 1.05 + hr() * 0.35);
+    }
+  } else if (id === 'coils') hBush(G, roots, r => 0.016 * (0.5 + 0.5 * sstep(0.0, 0.3, hairEdge(r.d))), 0.011, new V3(1, 1, 1));
+  else if (id === 'curly') {
+    hShort(G, roots, r => r.d.y < 0.45 ? 0.004 + hr() * 0.003 : 0, 0.1);
+    hBush(G, hDense(roots.filter(r => r.d.y > 0.2), 2, 0.004), r => 0.045 * sstep(0.2, 0.55, r.d.y) * (0.75 + 0.25 * sstep(-0.9, 0.6, r.d.z)), 0.017, new V3(0.6, 1, 1));
+  } else if (id === 'afro') {
+    hBush(G, hDense(roots, 2, 0.004), r => 0.085 * (0.42 + 0.58 * sstep(0.02, 0.5, hairEdge(r.d))), 0.024, new V3(1.05, 0.95, 1));
+  } else if (id === 'twists') {
+    for (const r of hSparse(roots, 0.0098)) {
+      const L = 0.02 + hr() * 0.014, flow = v.set(r.d.x * 0.8 + (hr() - 0.5) * 0.5, -0.55 + 0.5 * r.d.y + (hr() - 0.5) * 0.4, r.d.z * 0.6 + (hr() - 0.5) * 0.5).normalize().clone();
+      const pts = hTrace(r, L, 5, flow, 2.2, 0.3, 0.3, 0.003, 0.002);
+      G.tube(pts, 0.0046, 0.0034, 5, 2, 0.6, 1.3, 110);
+    }
+  } else if (id === 'rows') {
+    const d = new V3();
+    for (let i = -5; i <= 5; i++) {
+      const ph = i * ROW_DPHI, pts = [], nrm = []; let last = null;
+      for (let k = 0; k <= 46; k++) {
+        const th = 0.25 + (Math.PI - 0.5) * k / 46, z = Math.cos(th), q = 1 - z * z - ROW_Y0 * ROW_Y0 * Math.sin(ph) ** 2; if (q <= 0) continue;
+        const rho = ROW_Y0 * Math.cos(ph) + Math.sqrt(q); d.set(rho * Math.sin(ph), rho * Math.cos(ph) - ROW_Y0, z).normalize();
+        if (hairEdge(d) < 0.03) continue;
+        const s = scalpAt(d); pts.push(s.p.addScaledVector(s.n, 0.0005)); nrm.push(s.n); last = s;
+      }
+      if (pts.length < 4) continue;
+      G.ridge(pts, nrm, 0.0125, 0.0058, 3, 55);
+      // the end of the braid hangs loose at the nape
+      const a = pts[pts.length - 1], tail = [a.clone()], dir = a.clone().sub(pts[pts.length - 2]).normalize();
+      for (let k = 1; k < 4; k++) { dir.lerp(v.set(0, -1, -0.15), 0.4).normalize(); tail.push(tail[k - 1].clone().addScaledVector(dir, 0.011)); }
+      G.tube(tail, 0.004, 0.0024, 5, 3, 0.8, 1.1, 55);
+    }
+  } else if (id === 'bun' || id === 'pony') {
+    const K = scalpAt(id === 'bun' ? new V3(0, 0.6, -0.8).normalize() : new V3(0, 0.22, -0.975).normalize());
+    T.hairKnot = T.hairKnot || {}; T.hairKnot[id] = K;
+    if (id === 'bun') hShort(G, roots, r => r.d.y < 0.4 ? 0.004 + hr() * 0.002 : 0, 0.1);
+    for (const r of id === 'bun' ? hDense(roots.filter(r => r.d.y > 0.15), 2, 0.003) : roots) {
+      const dist = r.p.distanceTo(K.p); if (dist < 0.012) continue;
+      const flow = p => v.copy(K.p).sub(p).normalize(), L = Math.min(dist * 1.08, 0.085 + hr() * 0.04);
+      const pts = hTrace(r, L, 5, flow, 0.1, 0.6, 0.04, 0.0022, 0.0009);
+      G.ribbon(pts, hSideOf(flow(r.p), r.n), 0.014 * (0.8 + hr() * 0.5), 0.007, 0, 0.72 + hr() * 0.3, 1.05 + hr() * 0.3);
+    }
+    if (id === 'bun') {   // the knot: bands of hair wound round a ball
+      const c = K.p.clone().addScaledVector(K.n, 0.024), rad = 0.027, ax = new V3(), u = new V3(), w = new V3();
+      for (let i = 0; i < 26; i++) {
+        ax.set(hr() - 0.5, hr() - 0.5, hr() - 0.5).normalize().lerp(K.n, 0.35 + hr() * 0.4).normalize(); u.set(hr() - 0.5, hr() - 0.5, hr() - 0.5).cross(ax).normalize(); w.crossVectors(ax, u);
+        const pts = [], off = (hr() - 0.5) * 0.02, rr = Math.sqrt(Math.max(rad * rad - off * off, 1e-6)) * (0.92 + hr() * 0.14), a0 = hr() * 6.283, span = 3.6 + hr() * 2.4;
+        for (let k = 0; k <= 9; k++) { const a = a0 + span * k / 9; pts.push(c.clone().addScaledVector(ax, off).addScaledVector(u, Math.cos(a) * rr).addScaledVector(w, Math.sin(a) * rr)); }
+        const b = G.nv; G.ribbon(pts, ax, 0.016, 0.014, 0, 0.8 + hr() * 0.3, 0.9 + hr() * 0.35);
+        for (let q = b; q < G.nv; q++) { v.set(G.P[3 * q] - c.x, G.P[3 * q + 1] - c.y, G.P[3 * q + 2] - c.z).normalize(); G.N[3 * q] = v.x; G.N[3 * q + 1] = v.y; G.N[3 * q + 2] = v.z; G.UV[2 * q + 1] = 0.55 + 0.4 * G.UV[2 * q + 1]; }
+      }
+    }
+  } else if (id === 'mohawk') {
+    hShort(G, roots, r => Math.abs(r.d.x) > 0.2 ? 0.002 + hr() * 0.0015 : 0, 0.1);
+    for (const r of hDense(roots.filter(r => Math.abs(r.d.x) < 0.21 && hairEdge(r.d) > 0.02), 3, 0.004)) {
+      const k = 1 - Math.abs(r.d.x) / 0.21, L = (0.03 + 0.04 * sstep(-0.95, 0.2, r.d.z) * sstep(1.0, 0.75, r.d.z * 0.9)) * (0.55 + 0.45 * k) * (0.85 + hr() * 0.3);
+      const flow = v.set(r.d.x * 0.25, 1, -0.12 + (hr() - 0.5) * 0.2).normalize().clone();
+      const pts = hTrace(r, L, 4, flow, 1.2, 0.35, 0.12, 0.002, 0.001);
+      G.ribbon(pts, new V3((hr() - 0.5) * 1.1, 0, 1).normalize(), 0.014, 0.003, 0, 0.6 + hr() * 0.25, 1.1 + hr() * 0.4);
+    }
+  } else if (id === 'mullet') {
+    for (const r of roots) {
+      const back = sstep(0.1, -0.5, r.d.z) * sstep(0.6, 0.1, r.d.y), flow = HAIR_BACK(r.d), L = 0.022 + hr() * 0.014 + 0.03 * back;
+      const pts = hTrace(r, L, 4, flow, 0.5, 0.4, 0.22, 0.003, 0.0018);
+      G.ribbon(pts, hSideOf(flow, r.n), 0.012 * (0.8 + hr() * 0.5), 0.006, 0, 0.7 + hr() * 0.3, 1.05 + hr() * 0.4);
+    }
+  }
+  return (cache[id] = G.build());
+}
+
+/* the simulated part: strands as rest polylines (head rest space), shared; the particles are per fighter */
+function hairStrandSet(id) {
+  const cache = T.hairSets || (T.hairSets = {}); if (cache[id]) return cache[id];
+  _hSeed = 4241 + id.length * 104729;
+  const roots = HEAD.hairRoots, S = { list: [], tube: false, np: 6 }, v = new V3();
+  if (id === 'dreads') {
+    S.tube = true; S.np = 7;
+    for (const r of hSparse(roots, 0.0205)) {
+      const front = sstep(0.1, 0.6, r.d.z), sx = Math.abs(r.d.x) < 0.08 ? (hr() < 0.5 ? -1 : 1) : Math.sign(r.d.x);
+      const flow = v.set(lerp(r.d.x * 0.45, sx * 0.7, front), -1, lerp(Math.min(r.d.z, 0) * 0.5 - 0.1, -0.8, front)).normalize().clone();   // the front ones are thrown back, off the face
+      const L = 0.13 + hr() * 0.07 + 0.05 * sstep(0.3, -0.5, r.d.z) + 0.03 * sstep(0.2, 0.9, r.d.y);
+      const pts = hTrace(r, L, S.np, flow, 1.1, 0.42, 0.34, 0.006, 0.0016);
+      S.list.push({ pts, side: hSideOf(flow, r.n), w: 0.0056 + hr() * 0.0016, c: 0.8 + hr() * 0.35 });
+    }
+  } else if (id === 'pony') {
+    hairRigid('pony'); const K = T.hairKnot.pony; S.np = 6;
+    for (let i = 0; i < 40; i++) {
+      const r = { p: K.p.clone().add(v.set(hr() - 0.5, hr() - 0.5, 0).multiplyScalar(0.016)).addScaledVector(K.n, 0.004), n: K.n, d: K.d };
+      const flow = v.set((hr() - 0.5) * 0.3, -1, -0.3 + (hr() - 0.5) * 0.25).normalize().clone();
+      const pts = hTrace(r, 0.13 + hr() * 0.06, S.np, flow, 1.4, 0.4, 0.1, 0.005, 0.002);
+      S.list.push({ pts, side: new V3(hr() - 0.5, (hr() - 0.5) * 0.3, hr() - 0.5).normalize(), w: 0.017 * (0.8 + hr() * 0.4), c: 0.75 + hr() * 0.4 });
+    }
+  } else if (id === 'mullet') {
+    S.np = 5;
+    for (const r of hDense(roots.filter(r => r.d.z < -0.05 && r.d.y < 0.5 && hr() < 0.5), 2, 0.004)) {
+      const flow = v.set(0.2 * r.d.x, -1, -0.22).normalize().clone(), low = sstep(0.5, -0.2, r.d.y);
+      const pts = hTrace(r, 0.07 + 0.05 * low + hr() * 0.03, S.np, flow, 0.4, 0.42, 0.2, 0.004, 0.0022);
+      S.list.push({ pts, side: hSideOf(flow, r.n), w: 0.013 * (0.8 + hr() * 0.5), c: 0.72 + hr() * 0.4 });
+    }
+  }
+  return (cache[id] = S);
+}
+const TUBE_M = 6;
+function hairSim(F, id) {
+  const S = hairStrandSet(id), np = S.np, nc = S.list.length, ps = new PS(nc * np, F.headFrame), C = HEAD.C, tube = S.tube, per = tube ? TUBE_M + 1 : 2;
+  const nv = nc * np * per, P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), UV = new Float32Array(nv * 2), CO = new Float32Array(nv * 3), idx = [], side = [], width = [];
+  S.list.forEach((st, s) => {
+    for (let k = 0; k < np; k++) {
+      const i = s * np + k, p = st.pts[k];
+      if (k === 0) ps.inv[i] = 0; else { ps.hs[i] = st.pts.fs; ps.sm[i] = tube ? (k === 1 ? 0.5 : 0.3 * Math.pow(1 - k / np, 1.5) + 0.04) : 0.3 * Math.pow(1 - k / np, 1.4) + 0.03; }
+      ps.setL(i, p.x - C.x, p.y - C.y, p.z - C.z);
+      const f = k / (np - 1), c = st.c * (tube ? 1.3 + 0.5 * f : 1 + 0.5 * f), v0 = i * per;
+      for (let j = 0; j < per; j++) {
+        const v = v0 + j; CO[3 * v] = CO[3 * v + 1] = CO[3 * v + 2] = c;
+        if (tube) { UV[2 * v] = (2 + 0.04 + 0.92 * j / TUBE_M) / 4; UV[2 * v + 1] = 1 - Math.min(f * 0.2 * 62, 15.9) / 16 - (s % 5) * 0.01; }
+        else { UV[2 * v] = (j ? 0.93 : 0.07) / 4; UV[2 * v + 1] = 1 - f; }
+      }
+      if (k < np - 1) { if (tube) for (let j = 0; j < TUBE_M; j++) { const a = v0 + j, b = a + per; idx.push(a, b, a + 1, a + 1, b, b + 1); } else idx.push(v0, v0 + 2, v0 + 1, v0 + 1, v0 + 2, v0 + 3); }
+    }
+    for (let k = 0; k < np - 1; k++) ps.link(s * np + k, s * np + k + 1, 1);
+    for (let k = 0; k < np - 2; k++) ps.link(s * np + k, s * np + k + 2, tube ? 0.55 : 0.3);
+    side.push(st.side); width.push(st.w);
+  });
+  ps.build(); ps.damp = tube ? 0.972 : 0.965; ps.iters = tube ? 3 : 2; ps.thick = tube ? 0.006 : 0.002; ps.fric = tube ? 0.4 : 0.3;
+  ps.cols = [F.COL.head, F.COL.neck, F.COL.chest]; ps.reset();
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(P, 3).setUsage(THREE.DynamicDrawUsage)); geo.setAttribute('normal', new THREE.BufferAttribute(N, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('uv', new THREE.BufferAttribute(UV, 2)); geo.setAttribute('color', new THREE.BufferAttribute(CO, 3)); geo.setIndex(idx);
+  const mesh = new THREE.Mesh(geo, F.hairMatA); mesh.castShadow = true; mesh.frustumCulled = false; mesh.visible = false; scene.add(mesh);
+  return { ps, nc, np, side, width, geo, mesh, frame: F.headFrame, tube };
+}
+// ropes: a ring of TUBE_M + 1 vertices round every particle (no allocations)
+function renderTubes(H) {
+  const p = H.ps.p, P = H.geo.attributes.position.array, N = H.geo.attributes.normal.array, np = H.np, e = H.frame.elements, per = TUBE_M + 1;
+  for (let s = 0; s < H.nc; s++) {
+    const sl = H.side[s], sx = e[0] * sl.x + e[4] * sl.y + e[8] * sl.z, sy = e[1] * sl.x + e[5] * sl.y + e[9] * sl.z, sz = e[2] * sl.x + e[6] * sl.y + e[10] * sl.z, r0 = H.width[s];
+    for (let k = 0; k < np; k++) {
+      const i = s * np + k, q = 3 * i, a = 3 * (k > 0 ? i - 1 : i), b = 3 * (k < np - 1 ? i + 1 : i);
+      let tx = p[b] - p[a], ty = p[b + 1] - p[a + 1], tz = p[b + 2] - p[a + 2]; const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+      const dt = sx * tx + sy * ty + sz * tz; let ax = sx - tx * dt, ay = sy - ty * dt, az = sz - tz * dt; const al = Math.hypot(ax, ay, az) || 1; ax /= al; ay /= al; az /= al;
+      const bx = ty * az - tz * ay, by = tz * ax - tx * az, bz = tx * ay - ty * ax, r = r0 * (k === np - 1 ? 0.3 : k === 0 ? 0.85 : 1 - 0.18 * k / np);
+      for (let j = 0; j < per; j++) {
+        const an = j / TUBE_M * 6.2832, c = Math.cos(an), sn = Math.sin(an), nx = ax * c + bx * sn, ny = ay * c + by * sn, nz = az * c + bz * sn, v = 3 * (i * per + j);
+        P[v] = p[q] + nx * r; P[v + 1] = p[q + 1] + ny * r; P[v + 2] = p[q + 2] + nz * r; N[v] = nx; N[v + 1] = ny; N[v + 2] = nz;
+      }
+    }
+  }
+  H.geo.attributes.position.needsUpdate = true; H.geo.attributes.normal.needsUpdate = true;
+}
+
+/* beards: where each style grows on the unit head (the same regions in the head shader: beardReg) */
+function beardReg(k, d) {
+  const ax = Math.abs(d.x);
+  if (k < 2) return k;
+  if (k === 2) return sstep(0.42, 0.3, ax) * sstep(-0.42, -0.5, d.y) * (d.z > 0.5 ? 1 : 0);
+  if (k === 3) return sstep(0.5, 0.38, ax) * sstep(-0.6, -0.54, d.y) * (d.z > 0.5 ? 1 : 0);
+  return sstep(0.12, 0.06, d.y - (-0.97 + 0.8 * Math.pow(sstep(0.3, 1.0, ax), 1.5))) * sstep(-0.46, -0.6, d.y - 0.5 * sstep(0.45, 0.8, ax));
+}
+function beardGeo(id) {
+  if (id === 'boxed') return T.beardGeo;
+  const cache = T.beardGeoS || (T.beardGeoS = {}); if (id in cache) return cache[id];
+  const st = BEARD_STYLES.find(b => b.id === id); if (!st || !st.geo) return (cache[id] = null);
+  _hSeed = 31337 + id.length * 7919;
+  const G = new HairGeo(), flow = new V3(), all = HEAD.beardRoots;
+  const roots = id === 'full' ? hDense(all, 3, 0.003) : hDense(all.filter(r => beardReg(st.k, r.d) > 0.5), id === 'strap' ? 3 : 4, 0.0028);
+  for (const r of roots) {
+    const d = r.d, must = d.y > -0.52 && Math.abs(d.x) < 0.42 && d.z > 0.55, chin = sstep(-0.6, -0.95, d.y) * sstep(0, 0.6, d.z);
+    let L = 0.007 + hr() * 0.005 + 0.008 * chin, w = 0.0032, np = 3;
+    if (id === 'full') { L = must ? 0.014 + hr() * 0.006 : 0.014 + hr() * 0.01 + 0.04 * sstep(-0.45, -0.9, d.y) * sstep(-0.3, 0.5, d.z); w = 0.0075; np = 4; }
+    else if (id === 'goatee') L = must ? 0.009 + hr() * 0.004 : 0.01 + hr() * 0.006 + 0.014 * chin;
+    else if (id === 'stache') { L = 0.011 + hr() * 0.005; w = 0.0036; }
+    flow.set(must ? Math.sign(d.x) * (id === 'stache' ? 0.9 : 0.5) : 0.08 * d.x, -1, must ? 0.3 : id === 'full' ? 0.18 : 0.3).normalize();
+    const dir = r.n.clone().multiplyScalar(id === 'full' ? 0.8 : 1.1).add(flow).normalize(), pos = r.p.clone().addScaledVector(r.n, -0.001), pts = [pos.clone()], seg = L / (np - 1);
+    for (let k = 1; k < np; k++) { dir.lerp(flow, id === 'full' ? 0.4 : 0.25); dir.x += (hr() - 0.5) * 0.16; dir.z += (hr() - 0.5) * 0.16; dir.normalize(); pos.addScaledVector(dir, seg); pts.push(pos.clone()); }
+    const b0 = G.nv; G.ribbon(pts, hSideOf(flow, r.n), w * (0.7 + hr() * 0.6), w * 0.5, -1, 0.75 + hr() * 0.35, 1.05 + hr() * 0.45);
+    for (let q = b0; q < G.nv; q++) { G.N[3 * q] = r.n.x; G.N[3 * q + 1] = r.n.y + 0.25; G.N[3 * q + 2] = r.n.z; }   // lit like the skin it grows from (a normal from the head centre would leave the chin black)
+  }
+  return (cache[id] = G.build());
+}
+
+/* a fighter's hair and beard from his look (called by Fighter.applyLook) */
+const _hairC = new THREE.Color();
+function hairApply(F, L) {
+  const st = hairStyleOf(L), bs = beardStyleOf(L), U = F.u;
+  if (!F.hairMatA) { F.hairMatA = hairMat2(); F.hairMatC = F.baseMesh.material; F.hxs = {}; }
+  if (F.hstyle !== st) {
+    if (F.hx) F.hx.mesh.visible = false;
+    const geo = st.id === 'classic' ? T.baseGeo : st.rigid ? hairRigid(st.id) : null;
+    F.baseMesh.geometry = geo || T.baseGeo; F.baseMesh.material = st.id === 'classic' ? F.hairMatC : F.hairMatA; F.hasRigid = !!geo;
+    F.hx = st.sim ? F.hxs[st.id] || (F.hxs[st.id] = hairSim(F, st.id)) : null;
+    F.hstyle = st; F.simReset = true;
+  }
+  F.bald = st.id === 'bald';
+  F.hairCol.set(hairColOf(L.hair));
+  for (const m of [F.hair.mesh.material, F.hairMatC, F.hairMatA]) m.color.copy(F.hairCol);
+  F.hairMatA.roughness = st.rough || 0.62; F.hairMatA.specularIntensity = st.id === 'slick' ? 0.9 : 0.6;
+  U.uHair.value.copy(F.hairCol).multiplyScalar(0.8); U.uHairAmt.value = 1;
+  U.uHS.value.set(st.amt[0], st.amt[1], st.strip || 9, st.fade === undefined ? -9 : st.fade); U.uRows.value.set(st.rows ? 1 : 0, ROW_DPHI); U.uGloss.value = st.gloss || 0;
+  // beard: its own colour or the hair's
+  _hairC.set(hairColOf(L.beardCol && L.beardCol !== 'hair' ? L.beardCol : L.hair));
+  const bg = bs.geo ? beardGeo(bs.id) : null;
+  F.beardMesh.geometry = bg || T.beardGeo; F.beardMesh.visible = !!bg; F.beardMesh.material.color.copy(_hairC).multiplyScalar(1.2);
+  U.uBeard.value.set(bs.k, bs.u[0], bs.u[1]); U.uBeardC.value.copy(_hairC).multiplyScalar(0.8);
+}
+// what of the hair shows: long / tall hair is tucked under a hat or the headgear, the short layer shows through
+function hairVis(F) {
+  const st = F.hstyle || HAIR_STYLES[3], hid = !!F.gear.spar || wearTuck(F);
+  F.hair.mesh.visible = st.id === 'classic' && !hid;
+  F.baseMesh.visible = (st.id === 'classic' || !!F.hasRigid) && !(st.big && hid);
+  if (F.hx) F.hx.mesh.visible = !hid;
+  const was = F.hsim; F.hsim = hid ? null : st.id === 'classic' ? F.hair : F.hx || null;
+  if (F.hsim !== was) F.simReset = true;
+}
+// a cut for a random man: every cut is possible, the likelier ones depend on the hair type that goes with the skin tone
+function randomCut(skin, rnd) {
+  const coily = skin === 'deep' || skin === 'dark' || skin === 'brown', fav = coily ? ['bald', 'buzz', 'coils', 'afro', 'twists', 'dreads', 'rows', 'curly'] : ['bald', 'buzz', 'crew', 'classic', 'classic', 'slick', 'curly', 'bun', 'pony', 'mohawk', 'mullet'];
+  const list = rnd() < 0.85 ? fav : HAIR_STYLES.map(s => s.id);
+  return list[(rnd() * list.length) | 0];
+}
+/* ───────── skin tones, tattoos ─────────
+   Tones: the shader part is SKIN_TONE_F in g_pre.js. `c` = plain tint of the light CC textures (the three old tones); `tone` = the
+   rebuilt colour (target albedo, sRGB), k = [luminance contrast, chroma kept, palms / soles lightening], palm = their colour.
+   Tattoos: designs are drawn once on small canvases, then laid into the man's atlas (one 2048 × 1024 canvas texture: a tile for the
+   body, the arm and a part of the head texture — TAT_TILE) triangle by triangle through the mesh's own uv — so a band really goes round the arm
+   whatever the uv layout is. Projections are made in the rest pose (skinTemplate). */
+const SKIN_TONES = {
+  light: { sw: '#e2b79f' }, tan: { sw: '#b98563' },
+  olive: { sw: '#a67c52', tone: '#a2744b', k: [1.0, 0.9, 0.3], palm: '#c79f80', sss: [0.72, 0.24, 0.13], rough: 1, cc: 0.08, sheen: 0.15, sheenC: '#ff9b80' },
+  brown: { sw: '#7d5234', tone: '#875a3c', k: [1.05, 0.62, 0.55], palm: '#b68765', sss: [0.8, 0.26, 0.13], rough: 0.96, cc: 0.1, sheen: 0.14, sheenC: '#e08a66' },
+  dark: { sw: '#5d3a26', tone: '#6a4129', k: [1.08, 0.5, 0.7], palm: '#a87a5c', sss: [0.88, 0.28, 0.14], rough: 0.92, cc: 0.12, sheen: 0.16, sheenC: '#cf8c6c' },
+  deep: { sw: '#3c2519', tone: '#4b2e20', k: [1.12, 0.42, 0.85], palm: '#99694f', sss: [0.95, 0.3, 0.15], rough: 0.86, cc: 0.16, sheen: 0.2, sheenC: '#b9907a' },
+};
+function skinUniforms() {
+  return { uTone: { value: new THREE.Vector4(1, 1, 1, 0) }, uToneK: { value: new THREE.Vector4(1, 1, 0, 0) }, uPalmC: { value: new THREE.Color(1, 1, 1) }, uSSS: { value: new V3(0.75, 0.22, 0.13) }, uTat: { value: tatBlank() } };
+}
+const _skC = new THREE.Color();
+function skinApply(F, L) {
+  const S = SKIN_LOOKS.find(x => x.id === L.skin) || SKIN_LOOKS[0], K = SKIN_TONES[S.id] || {}, U = F.flesh.u;
+  for (const m of F.skinMats) {
+    m.color.set(K.tone ? '#ffffff' : S.c);
+    m.roughness = m.userData.rough0 * (K.rough || 1); m.clearcoat = K.cc || 0.08; m.sheen = K.sheen || 0.15; m.sheenColor.set(K.sheenC || '#ff9b80');
+  }
+  if (K.tone) { _skC.set(K.tone); U.uTone.value.set(_skC.r, _skC.g, _skC.b, 1); U.uToneK.value.set(K.k[0], K.k[1], K.k[2], 0); U.uPalmC.value.set(K.palm); U.uSSS.value.fromArray(K.sss); }
+  else { U.uTone.value.w = 0; U.uSSS.value.set(0.75, 0.22, 0.13); }
+}
+
+/* rest-pose data of the skin mesh: positions / normals in metres, palms + soles mask (attribute aPalm) */
+function skinTemplate(body) {
+  const g = body.geometry, p = g.attributes.position, nA = g.attributes.normal, bm = body.bindMatrix, nm = new THREE.Matrix3().getNormalMatrix(bm), n = p.count;
+  const W = new Float32Array(n * 3), N = new Float32Array(n * 3), v = new V3(), palm = new Float32Array(n);
+  for (let i = 0; i < n; i++) { v.fromBufferAttribute(p, i).applyMatrix4(bm).multiplyScalar(0.01); v.toArray(W, 3 * i); v.fromBufferAttribute(nA, i).applyMatrix3(nm).normalize(); v.toArray(N, 3 * i); }
+  const bp = name => bpos(name, new V3()), PN = {};
+  for (const S of ['L', 'R']) { const fw = bp(`CC_Base_${S}_Mid1`).sub(bp(`CC_Base_${S}_Hand`)), lat = bp(`CC_Base_${S}_Index1`).sub(bp(`CC_Base_${S}_Pinky1`)), pn = fw.cross(lat).normalize(); if (pn.y > 0) pn.negate(); PN[S] = pn; }   // rest pose: palms look down
+  const names = body.skeleton.bones.map(b => b.name), kind = names.map(nm2 => /_(Hand|Thumb\d|Index\d|Mid\d|Ring\d|Pinky\d)$/.test(nm2) ? (nm2.includes('_L_') ? 1 : 2) : /(Foot|Toe)/.test(nm2) ? 3 : 0);
+  const si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+  for (let i = 0; i < n; i++) {
+    let hl = 0, hR = 0, ft = 0;
+    for (let k = 0; k < 4; k++) { const kd = kind[si.getComponent(i, k)], w = sw.getComponent(i, k); if (kd === 1) hl += w; else if (kd === 2) hR += w; else if (kd === 3) ft += w; }
+    const pn = hl > hR ? PN.L : PN.R, hw = Math.max(hl, hR);
+    palm[i] = Math.max(sstep(0.3, 0.8, hw) * sstep(-0.05, 0.5, N[3 * i] * pn.x + N[3 * i + 1] * pn.y + N[3 * i + 2] * pn.z), sstep(0.5, 0.9, ft) * sstep(-0.3, -0.75, N[3 * i + 1]) * (W[3 * i + 1] < 0.06 ? 1 : 0));
+  }
+  g.setAttribute('aPalm', new THREE.BufferAttribute(palm, 1));
+  const keys = T.matNames.map(nm2 => ({ Std_Skin_Head: 'head', Std_Skin_Body: 'body', Std_Skin_Arm: 'arm' }[nm2] || null));
+  T.skinGeo = { W, N, uv: g.attributes.uv.array, ix: g.index.array, groups: g.groups.map(x => ({ ...x })), keys, PN, bp };
+}
+
+/* —— tattoo designs (all original) —— */
+const INK = '#26343f', INK_RED = '#6e2622';
+const TATS = [{ id: 'sleeve', label: 'рукав' }, { id: 'band', label: 'браслет' }, { id: 'chest', label: 'грудь' }, { id: 'back', label: 'спина' }, { id: 'neck', label: 'шея' }, { id: 'ribs', label: 'рёбра' }, { id: 'knuckles', label: 'костяшки' }, { id: 'face', label: 'слеза' }];
+function tatCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.fillStyle = g.strokeStyle = INK; g.lineJoin = g.lineCap = 'round'; return [c, g]; }
+const TAT_DRAW = {
+  // tribal band: eight hooked blades chasing each other round the arm, a line above and below
+  band() {
+    const [c, g] = tatCanvas(512, 80);
+    for (let x = 0; x < 512; x += 64) {
+      g.beginPath(); g.moveTo(x, 40); g.bezierCurveTo(x + 14, 8, x + 42, 6, x + 63, 30); g.bezierCurveTo(x + 46, 22, x + 30, 25, x + 20, 42);
+      g.bezierCurveTo(x + 32, 36, x + 46, 42, x + 54, 60); g.bezierCurveTo(x + 36, 76, x + 10, 68, x, 40); g.fill();
+      g.beginPath(); g.moveTo(x + 34, 14); g.lineTo(x + 40, 3); g.lineTo(x + 46, 15); g.fill(); g.beginPath(); g.moveTo(x + 22, 68); g.lineTo(x + 30, 79); g.lineTo(x + 38, 69); g.fill();
+    }
+    return c;
+  },
+  // forearm sleeve: solid cuffs cut by a zigzag, a row of diamonds, then scale-like waves down to the wrist
+  sleeve() {
+    const [c, g] = tatCanvas(512, 448);
+    for (const y of [0, 420]) { g.fillRect(0, y, 512, 28); g.globalCompositeOperation = 'destination-out'; g.lineWidth = 4; g.beginPath(); for (let x = 0; x <= 512; x += 16) g[x ? 'lineTo' : 'moveTo'](x, y + (x / 16 & 1 ? 8 : 20)); g.stroke(); g.globalCompositeOperation = 'source-over'; }
+    g.fillRect(0, 36, 512, 5); g.fillRect(0, 407, 512, 5);
+    for (let x = 0, k = 0; x < 512; x += 64, k++) {
+      g.beginPath(); g.moveTo(x + 32, 50); g.lineTo(x + 62, 96); g.lineTo(x + 32, 142); g.lineTo(x + 2, 96); g.closePath();
+      if (k & 1) g.fill(); else { g.lineWidth = 5; g.stroke(); g.beginPath(); g.moveTo(x + 32, 70); g.lineTo(x + 48, 96); g.lineTo(x + 32, 122); g.lineTo(x + 16, 96); g.closePath(); g.fill(); }
+      for (let d = 0; d < 3; d++) { g.beginPath(); g.arc(x + (k & 1 ? 0 : 64), 60 + d * 36, 3.2, 0, 6.283); g.fill(); }
+    }
+    g.fillRect(0, 152, 512, 5);
+    for (let row = 0; row < 11; row++) for (let i = -1; i <= 8; i++) {
+      const x = i * 64 + (row & 1 ? 32 : 0), y = 196 + row * 21;
+      g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.arc(x, y, 33, Math.PI, 0); g.fill(); g.globalCompositeOperation = 'source-over';
+      g.lineWidth = 4; for (const r of [31, 21, 11]) { g.beginPath(); g.arc(x, y, r, Math.PI, 0); g.stroke(); }
+    }
+    g.clearRect(0, 412, 512, 8);
+    return c;
+  },
+  // chest: a pair of wings from the breastbone, a shield with a star between them
+  chest() {
+    const [c, g] = tatCanvas(720, 400);
+    const feather = (bx, by, a, len, w, fill) => { g.save(); g.translate(bx, by); g.rotate(a); g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(len * 0.55, -w, len, 0); g.quadraticCurveTo(len * 0.55, w, 0, 0);
+      if (fill) g.fill(); else { g.lineWidth = 4.5; g.stroke(); g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(len * 0.55, w, len, 0); g.lineTo(0, 0); g.fill(); g.lineWidth = 2.5; for (let q = 0.25; q < 0.9; q += 0.16) { g.beginPath(); g.moveTo(len * q, 0); g.lineTo(len * (q + 0.1), -w * 0.42); g.stroke(); } } g.restore(); };
+    for (const sx of [1, -1]) {
+      g.save(); g.translate(360, 0); g.scale(sx, 1);
+      for (let i = 0; i < 9; i++) feather(34 + i * 3, 150 + i * 9, -0.3 + i * 0.17, 318 - i * 23, 20 - i * 0.6, false);
+      for (let i = 0; i < 7; i++) feather(30, 138 + i * 7, -0.42 + i * 0.2, 150 - i * 6, 15, true);
+      g.lineWidth = 7; g.beginPath(); g.moveTo(26, 132); g.quadraticCurveTo(150, 60, 330, 70); g.stroke();
+      g.restore();
+    }
+    g.beginPath(); g.moveTo(360, 96); g.lineTo(404, 124); g.lineTo(396, 214); g.lineTo(360, 262); g.lineTo(324, 214); g.lineTo(316, 124); g.closePath(); g.fill();
+    g.globalCompositeOperation = 'destination-out'; g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i & 1 ? 12 : 30; g[i ? 'lineTo' : 'moveTo'](360 + Math.cos(a) * r, 170 + Math.sin(a) * r); } g.fill();
+    g.lineWidth = 4; g.beginPath(); g.moveTo(360, 110); g.lineTo(392, 131); g.lineTo(386, 208); g.lineTo(360, 243); g.lineTo(334, 208); g.lineTo(328, 131); g.closePath(); g.stroke(); g.globalCompositeOperation = 'source-over';
+    for (const dx of [-26, 0, 26]) { g.beginPath(); g.moveTo(360 + dx - 11, 88); g.lineTo(360 + dx, dx ? 62 : 48); g.lineTo(360 + dx + 11, 88); g.fill(); }
+    g.fillStyle = INK_RED; g.beginPath(); g.moveTo(360, 276); g.lineTo(372, 300); g.lineTo(360, 340); g.lineTo(348, 300); g.closePath(); g.fill();
+    return c;
+  },
+  // back: a sun wheel between the shoulder blades, diamonds down the spine, two blades sweeping off it
+  back() {
+    const [c, g] = tatCanvas(640, 720), cx = 320, cy = 232, ray = (a, r0, r1, w, fill) => { g.beginPath(); g.moveTo(cx + Math.cos(a - w) * r0, cy + Math.sin(a - w) * r0); g.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.lineTo(cx + Math.cos(a + w) * r0, cy + Math.sin(a + w) * r0); if (fill) g.fill(); else { g.closePath(); g.lineWidth = 4; g.stroke(); } };
+    for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; g.save(); g.translate(cx, cy); g.rotate(a); g.beginPath(); g.moveTo(50, 0); g.quadraticCurveTo(82, -24, 114, 0); g.quadraticCurveTo(82, 24, 50, 0); if (i & 1) g.fill(); else { g.lineWidth = 4.5; g.stroke(); } g.restore(); }
+    g.lineWidth = 6; g.beginPath(); g.arc(cx, cy, 122, 0, 6.283); g.stroke(); g.lineWidth = 3; g.beginPath(); g.arc(cx, cy, 44, 0, 6.283); g.stroke();
+    for (let i = 0; i < 24; i++) ray(i * Math.PI / 12, 128, i & 1 ? 168 : 196, 0.1, true);
+    for (let i = 0; i < 12; i++) ray((i + 0.5) * Math.PI / 6, 150, 226, 0.2, false);
+    for (let i = 0; i < 48; i++) { const a = i * Math.PI / 24; g.beginPath(); g.arc(cx + Math.cos(a) * 212, cy + Math.sin(a) * 212, i & 1 ? 2.6 : 4.2, 0, 6.283); g.fill(); }
+    g.beginPath(); g.arc(cx, cy, 34, 0, 6.283); g.fill();
+    g.globalCompositeOperation = 'destination-out'; g.beginPath(); for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8, r = i & 1 ? 9 : 26; g[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r); } g.fill(); g.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < 6; i++) { const y = 490 + i * 40, s = 22 - i * 2.6; g.beginPath(); g.moveTo(cx, y - s * 1.1); g.lineTo(cx + s, y); g.lineTo(cx, y + s * 1.1); g.lineTo(cx - s, y); g.closePath(); if (i & 1) { g.lineWidth = 4; g.stroke(); } else g.fill(); }
+    for (const sx of [1, -1]) { g.save(); g.translate(cx, 0); g.scale(sx, 1);
+      g.beginPath(); g.moveTo(30, 470); g.bezierCurveTo(120, 470, 210, 520, 250, 640); g.bezierCurveTo(200, 560, 130, 520, 60, 520); g.bezierCurveTo(110, 540, 150, 580, 160, 650); g.bezierCurveTo(120, 580, 80, 545, 30, 540); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(40, 560); g.bezierCurveTo(70, 580, 96, 620, 96, 690); g.bezierCurveTo(74, 640, 58, 610, 34, 596); g.closePath(); g.fill(); g.restore(); }
+    return c;
+  },
+  neck() {
+    const [c, g] = tatCanvas(256, 128); g.font = '700 80px Georgia, "Times New Roman", serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('ВОЛЯ', 128, 58, 236);
+    g.lineWidth = 5; g.beginPath(); g.moveTo(18, 108); g.quadraticCurveTo(128, 124, 238, 104); g.stroke(); g.beginPath(); g.arc(128, 116, 5, 0, 6.283); g.fill();
+    return c;
+  },
+  ribs() {
+    const [c, g] = tatCanvas(512, 256); g.font = 'italic 700 74px Georgia, "Times New Roman", serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('Упал — встань.', 256, 72, 490); g.fillText('Боль пройдёт.', 256, 168, 470);
+    g.lineWidth = 4; g.beginPath(); g.moveTo(60, 226); g.bezierCurveTo(180, 250, 330, 206, 452, 232); g.stroke();
+    return c;
+  },
+  face() { const [c, g] = tatCanvas(48, 80); g.beginPath(); g.moveTo(24, 6); g.bezierCurveTo(30, 34, 44, 44, 40, 60); g.bezierCurveTo(36, 78, 12, 78, 8, 60); g.bezierCurveTo(4, 44, 18, 34, 24, 6); g.fill(); return c; },
+  letter(ch) { const [c, g] = tatCanvas(64, 72); g.font = '900 62px Arial, Helvetica, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, 32, 39, 56); return c; },
+};
+const KNUCKLE_WORDS = { L: 'СИЛА', R: 'ВОЛЯ' };
+
+/* —— projections in the rest pose: vertex → design coordinates (0…1, canvas y down), null = not on this part —— */
+function tatPlanar(c, U, Vv, su, sv, dir, minDot, depth) {
+  const M = T.skinGeo, W = M.W, N = M.N;
+  return i => {
+    const x = W[3 * i] - c.x, y = W[3 * i + 1] - c.y, z = W[3 * i + 2] - c.z;
+    if (N[3 * i] * dir.x + N[3 * i + 1] * dir.y + N[3 * i + 2] * dir.z < minDot || Math.abs(x * dir.x + y * dir.y + z * dir.z) > depth) return null;
+    return [(x * U.x + y * U.y + z * U.z) / su + 0.5, 0.5 - (x * Vv.x + y * Vv.y + z * Vv.z) / sv];
+  };
+}
+function tatCyl(A, B, t0, t1, ref) {
+  const M = T.skinGeo, W = M.W, ax = B.clone().sub(A), len = ax.length(); ax.normalize();
+  const e1 = ref.clone().addScaledVector(ax, -ref.dot(ax)).normalize(), e2 = new V3().crossVectors(ax, e1);
+  return i => {
+    const x = W[3 * i] - A.x, y = W[3 * i + 1] - A.y, z = W[3 * i + 2] - A.z, a = (x * ax.x + y * ax.y + z * ax.z) / len;
+    if (a < t0 - 0.2 || a > t1 + 0.2) return null;
+    const rx = x - ax.x * a * len, ry = y - ax.y * a * len, rz = z - ax.z * a * len; if (rx * rx + ry * ry + rz * rz > 0.0081) return null;
+    return [Math.atan2(rx * e2.x + ry * e2.y + rz * e2.z, rx * e1.x + ry * e1.y + rz * e1.z) / 6.2832 + 0.5, (a - t0) / (t1 - t0)];
+  };
+}
+// triangles of the given materials that the projection covers: [key, i0, i1, i2, s0, t0, s1, t1, s2, t2]
+function tatCollect(keys, proj, wrap, side) {
+  const M = T.skinGeo, ix = M.ix, out = [];
+  for (const gr of M.groups) {
+    const key = M.keys[gr.materialIndex]; if (!key || !keys.includes(key)) continue;
+    for (let t = gr.start; t < gr.start + gr.count; t += 3) {
+      if (side && M.W[3 * ix[t]] * side < 0) continue;
+      const a = proj(ix[t]), b = a && proj(ix[t + 1]), c = b && proj(ix[t + 2]); if (!c) continue;
+      if (wrap) { for (const q of [b, c]) { if (q[0] - a[0] > 0.5) q[0] -= 1; else if (q[0] - a[0] < -0.5) q[0] += 1; } }
+      const s0 = Math.min(a[0], b[0], c[0]), s1 = Math.max(a[0], b[0], c[0]), t0 = Math.min(a[1], b[1], c[1]), t1 = Math.max(a[1], b[1], c[1]);
+      if (t1 < 0 || t0 > 1 || (!wrap && (s1 < 0 || s0 > 1))) continue;
+      out.push([key, ix[t], ix[t + 1], ix[t + 2], a[0], a[1], b[0], b[1], c[0], c[1]]);
+      if (wrap && s0 < 0) out.push([key, ix[t], ix[t + 1], ix[t + 2], a[0] + 1, a[1], b[0] + 1, b[1], c[0] + 1, c[1]]);
+      if (wrap && s1 > 1) out.push([key, ix[t], ix[t + 1], ix[t + 2], a[0] - 1, a[1], b[0] - 1, b[1], c[0] - 1, c[1]]);
+    }
+  }
+  return out;
+}
+// a preset = parts: { img (design canvas), tris }
+function tatParts(id) {
+  const cache = T.tatParts || (T.tatParts = {}); if (cache[id]) return cache[id];
+  const M = T.skinGeo, bp = M.bp, X = new V3(1, 0, 0), Y = new V3(0, 1, 0), Z = new V3(0, 0, 1), parts = [];
+  const add = (img, tris) => parts.push({ img, tris });
+  if (id === 'sleeve') add(TAT_DRAW.sleeve(), tatCollect(['arm'], tatCyl(bp('CC_Base_L_Forearm'), bp('CC_Base_L_Hand'), 0.1, 0.94, Z), true, 1));
+  else if (id === 'band') add(TAT_DRAW.band(), tatCollect(['arm'], tatCyl(bp('CC_Base_R_Upperarm'), bp('CC_Base_R_Forearm'), 0.47, 0.62, Z), true, -1));
+  else if (id === 'chest') add(TAT_DRAW.chest(), tatCollect(['body'], tatPlanar(new V3(0, 1.385, 0.1), X, Y, 0.37, 0.205, Z, 0.12, 0.2)));
+  else if (id === 'back') add(TAT_DRAW.back(), tatCollect(['body'], tatPlanar(new V3(0, 1.3, -0.1), X.clone().negate(), Y, 0.34, 0.38, Z.clone().negate(), 0.12, 0.2)));
+  else if (id === 'neck') add(TAT_DRAW.neck(), tatCollect(['head', 'body'], tatPlanar(new V3(0.05, 1.59, -0.022), Z.clone().negate(), Y, 0.07, 0.035, X, 0.3, 0.06)));
+  else if (id === 'ribs') { const U = new V3(0, -0.2, -1).normalize(); add(TAT_DRAW.ribs(), tatCollect(['body'], tatPlanar(new V3(0.15, 1.235, 0.01), U, new V3().crossVectors(X, U), 0.165, 0.0825, X, 0.3, 0.1))); }
+  else if (id === 'face') { const e = bp('CC_Base_L_Eye'); add(TAT_DRAW.face(), tatCollect(['head'], tatPlanar(new V3(e.x + 0.013, e.y - 0.03, e.z + 0.03), X, Y, 0.0085, 0.014, Z, 0.2, 0.05))); }
+  else if (id === 'knuckles') for (const S of ['L', 'R']) {
+    const dorsal = M.PN[S].clone().negate(), F = ['Index', 'Mid', 'Ring', 'Pinky'].map(f => { const a = bp(`CC_Base_${S}_${f}1`), b = bp(`CC_Base_${S}_${f}2`); return { c: a.clone().lerp(b, 0.5).addScaledVector(dorsal, 0.008), up: a.clone().sub(b).normalize() }; });
+    const U0 = new V3().crossVectors(F[1].up, dorsal).normalize(); F.sort((p, q) => p.c.dot(U0) - q.c.dot(U0));
+    F.forEach((f, k) => { const U = new V3().crossVectors(f.up, dorsal).normalize(); add(TAT_DRAW.letter(KNUCKLE_WORDS[S][k]), tatCollect(['arm'], tatPlanar(f.c, U, f.up, 0.017, 0.021, dorsal, 0.25, 0.014), false, S === 'L' ? 1 : -1)); });
+  }
+  return (cache[id] = parts);
+}
+// the head tile covers only the part of the head texture that tattoos can reach (twice the resolution)
+function tatHeadBox() {
+  if (T.tatHeadB) return T.tatHeadB;
+  const uv = T.skinGeo.uv; let u0 = 1, v0 = 1, u1 = 0, v1 = 0;
+  for (const id of ['neck', 'face']) for (const p of tatParts(id)) for (const t of p.tris) if (t[0] === 'head') for (let k = 1; k <= 3; k++) { const u = uv[2 * t[k]], v = uv[2 * t[k] + 1]; u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
+  if (u1 <= u0) return (T.tatHeadB = [0, 0, 1, 1]);
+  return (T.tatHeadB = [u0 - 0.02, v0 - 0.02, u1 + 0.02, v1 + 0.02]);
+}
+const TAT_W = 2048, TAT_H = 1024, TAT_TILE = { body: [0, 0, 896, 1024], arm: [896, 0, 768, 1024], head: [1664, 0, 384, 1024] };
+// the uv rectangle a tile covers: the whole texture, in the uv tile (UDIM) where this material's coordinates lie
+function tatBox(key) {
+  if (key === 'head') return tatHeadBox();
+  const M = T.skinGeo, B = M.box || (M.box = {}); if (B[key]) return B[key];
+  const gr = M.groups.find(g => M.keys[g.materialIndex] === key), i = M.ix[gr.start + 3 * ((gr.count / 6) | 0)], u = Math.floor(M.uv[2 * i]), v = Math.floor(M.uv[2 * i + 1]);
+  return (B[key] = [u, v, u + 1, v + 1]);
+}
+let _tatBlank = null;
+function tatBlank() { if (!_tatBlank) { _tatBlank = new THREE.DataTexture(new Uint8Array(4), 1, 1); _tatBlank.needsUpdate = true; } return _tatBlank; }
+// one textured triangle: the affine map design → atlas, clipped to the triangle grown by a pixel (no hairlines between neighbours)
+function tatTri(g, img, sx0, sy0, sx1, sy1, sx2, sy2, dx0, dy0, dx1, dy1, dx2, dy2) {
+  const den = (sx1 - sx0) * (sy2 - sy0) - (sx2 - sx0) * (sy1 - sy0); if (Math.abs(den) < 1e-9) return;
+  const a = ((dx1 - dx0) * (sy2 - sy0) - (dx2 - dx0) * (sy1 - sy0)) / den, c = ((dx2 - dx0) * (sx1 - sx0) - (dx1 - dx0) * (sx2 - sx0)) / den;
+  const b = ((dy1 - dy0) * (sy2 - sy0) - (dy2 - dy0) * (sy1 - sy0)) / den, d = ((dy2 - dy0) * (sx1 - sx0) - (dy1 - dy0) * (sx2 - sx0)) / den;
+  const cx = (dx0 + dx1 + dx2) / 3, cy = (dy0 + dy1 + dy2) / 3, ex = (x, y) => { const l = Math.hypot(x - cx, y - cy) || 1; return [x + (x - cx) / l * 1.2, y + (y - cy) / l * 1.2]; };
+  const p0 = ex(dx0, dy0), p1 = ex(dx1, dy1), p2 = ex(dx2, dy2);
+  g.save(); g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.closePath(); g.clip();
+  g.transform(a, b, c, d, dx0 - a * sx0 - c * sy0, dy0 - b * sx0 - d * sy0); g.drawImage(img, 0, 0); g.restore();
+}
+/* the man's tattoos from his look (called by Fighter.applyLook); nothing is allocated for a man without any */
+function tatApply(F, L) {
+  const ids = (Array.isArray(L.tats) ? L.tats : []).filter(id => TATS.some(t => t.id === id)), key = ids.join(','), U = F.flesh.u;
+  if (F.tatKey === key) return; F.tatKey = key;
+  if (!ids.length) { U.uTat.value = tatBlank(); for (const m of F.skinMats) m.userData.uTatR.value.set(0, 0, 0, 0); return; }
+  if (!F.tatTex) { const c = document.createElement('canvas'); c.width = TAT_W; c.height = TAT_H; F.tatTex = new THREE.CanvasTexture(c); F.tatTex.colorSpace = THREE.SRGBColorSpace; F.tatTex.anisotropy = 4; }
+  const c = F.tatTex.image, g = c.getContext('2d'), uv = T.skinGeo.uv; g.clearRect(0, 0, TAT_W, TAT_H);
+  for (const id of ids) for (const P of tatParts(id)) {
+    const w = P.img.width, h = P.img.height;
+    for (const t of P.tris) {
+      const tl = TAT_TILE[t[0]], bx = tatBox(t[0]), X = k => tl[0] + (uv[2 * t[k]] - bx[0]) / (bx[2] - bx[0]) * tl[2], Y = k => tl[1] + (1 - (uv[2 * t[k] + 1] - bx[1]) / (bx[3] - bx[1])) * tl[3];
+      tatTri(g, P.img, t[4] * w, t[5] * h, t[6] * w, t[7] * h, t[8] * w, t[9] * h, X(1), Y(1), X(2), Y(2), X(3), Y(3));
+    }
+  }
+  F.tatTex.needsUpdate = true; U.uTat.value = F.tatTex;
+  for (const m of F.skinMats) {
+    const tl = TAT_TILE[m.userData.skinKey]; if (!tl) { m.userData.uTatR.value.set(0, 0, 0, 0); continue; }
+    const bx = tatBox(m.userData.skinKey);
+    m.userData.uTatR.value.set(tl[0] / TAT_W, 1 - (tl[1] + tl[3]) / TAT_H, tl[2] / TAT_W, tl[3] / TAT_H); m.userData.uTatB.value.set(bx[0], bx[1], 1 / (bx[2] - bx[0]), 1 / (bx[3] - bx[1]));
+  }
+}
 /* ───────── fighter ───────── */
 // scratch for the per-frame fighter code (walk, ik, pose, plantFeet, armClear): nothing there allocates
 const _walkQ = [], _ik1 = new Quat(), _ik2 = new Quat(), _ik3 = new Quat(), _po1 = new V3(), _po2 = new V3(), _po3 = new V3(), _po4 = new V3(), _poq1 = new Quat(), _poq2 = new Quat();
@@ -4554,13 +5295,14 @@ class Fighter {
     this.cc = SkeletonUtils.clone(T.cc); g.add(this.cc);
     const B = this.bones = firstBones(this.cc);
     this.cc.traverse(o => { if (o.name === 'CC_Base_Body') this.body = o; });
-    this.u = { uHair: { value: new THREE.Color() }, uHairAmt: { value: 1 }, uStubAmt: { value: 1 }, uDmg: { value: 0 } };
+    this.u = { uHair: { value: new THREE.Color() }, uHairAmt: { value: 1 }, uDmg: { value: 0 }, uHS: { value: new THREE.Vector4(1, 1, 9, -9) }, uRows: { value: new THREE.Vector2(0, 1) }, uGloss: { value: 0 }, uBeard: { value: new V3(0, 0.3, 0.3) }, uBeardC: { value: new THREE.Color() } };   // head shader: hair colour, cut, beard (04g_hair.js)
     this.skinMats = []; this.hairCol = new THREE.Color();
-    this.flesh = new Flesh(this);
+    this.flesh = new Flesh(this); Object.assign(this.flesh.u, skinUniforms());   // + skin tone, tattoo atlas (04h_skin_tattoo.js)
     this.body.material = T.matNames.map(n => {
       const key = { Std_Skin_Head: 'head', Std_Skin_Body: 'body', Std_Skin_Arm: 'arm', Std_Skin_Leg: 'leg' }[n];
       if (!key) return n === 'Std_Nails' ? nailMatFor(this.flesh.u) : T.hiddenMat;
       const m = new THREE.MeshPhysicalMaterial({ map: T.tex[key + '_d'], normalMap: T.tex[key + '_n'], roughness: key === 'head' ? 0.48 : 0.52, specularIntensity: 0.5, clearcoat: 0.08, clearcoatRoughness: 0.4, sheen: 0.15, sheenColor: new THREE.Color('#ff9b80'), sheenRoughness: 0.6, envMapIntensity: 0.6 });
+      m.userData = { skinKey: key, rough0: m.roughness, uTatR: { value: new THREE.Vector4() }, uTatB: { value: new THREE.Vector4(0, 0, 1, 1) } };
       this.skinMats.push(m); return skinify(m, key === 'head' ? this.u : null, this.flesh.u);
     });
     g.updateMatrixWorld(true);
@@ -4833,13 +5575,8 @@ class Fighter {
     }
   }
   applyLook(L) {
-    const bald = L.hair === 'bald'; this.bald = bald;
-    this.hairCol.set((HAIR_LOOKS.find(x => x.id === L.hair) || HAIR_LOOKS[1]).c);
-    this.hair.mesh.visible = this.baseMesh.visible = !bald;   // (handGear, called from dress below, tucks long hair under the headgear)
-    this.hair.mesh.material.color.copy(this.hairCol); this.baseMesh.material.color.copy(this.hairCol); this.beardMesh.material.color.copy(this.hairCol).multiplyScalar(1.2);
-    this.u.uHair.value.copy(this.hairCol).multiplyScalar(0.8); this.u.uHairAmt.value = bald ? 0.2 : 1;
-    this.beardMesh.visible = !!L.beard; this.u.uStubAmt.value = L.beard ? 1 : 0.3;
-    const sk = (SKIN_LOOKS.find(x => x.id === L.skin) || SKIN_LOOKS[0]).c; for (const m of this.skinMats) m.color.set(sk);
+    hairApply(this, L);   // cut, hair colour, beard (04g_hair.js); handGear, called from dress below, decides what of it shows (hairVis)
+    skinApply(this, L); tatApply(this, L);   // skin tone, tattoos (04h_skin_tattoo.js)
     if (this.wmat) this.wmat.color.set((WRAPS_LOOKS.find(x => x.id === L.wraps) || WRAPS_LOOKS[0]).c);
     this.dress(L);
   }
@@ -4868,7 +5605,7 @@ class Fighter {
     if (G2.mma) { G2.mma.visible = mma; G2.mma.material.color.set(gc.c); for (const pd of G2.mmaPads) pd.m.visible = mma; }
     this.flesh.u.uGlv.value = box ? 1 : mma ? 2 : 0;   // the hand inside a boxing glove / the skin under an MMA glove is not drawn
     this.wrapMesh.visible = !box && !mma; for (const t of this.tails) t.mesh.visible = !box && !mma;
-    this.hair.mesh.visible = !this.bald && !box && !wearTuck(this); this.baseMesh.visible = !this.bald;   // long hair is tucked under the headgear, the short layer shows through the open crown
+    hairVis(this);   // long hair is tucked under the headgear, the short layer shows through the open crown
   }
 
   /* —— actions —— */
@@ -5185,22 +5922,22 @@ class Fighter {
     this.flesh.tick(dt); this.face.update(dt);
     for (const j of this.jigs) j.update(dt);
     this.updateColliders();
-    const hairOn = !this.bald;
+    const HS = this.hsim || null;   // the simulated strands of the current cut (the classic cut, dreadlocks, pony tail, mullet) or none
     // the head jumped (a replay cut, a fall faster than the strands can follow): re-seat the hair instead of stretching it
     { const hp = _v1.setFromMatrixPosition(this.head.matrixWorld); if (this.lastHeadP && hp.distanceTo(this.lastHeadP) > (dt > 0 ? Math.max(0.12, 9 * dt) : 0.12)) this.simReset = true; (this.lastHeadP || (this.lastHeadP = new V3())).copy(hp); }
-    this.shorts.targets(); if (hairOn) this.hair.ps.targets(); for (const t of this.tails) t.ps.targets();
+    this.shorts.targets(); if (HS) HS.ps.targets(); for (const t of this.tails) t.ps.targets();
     if (this.simReset) {
-      this.shorts.p.set(this.shorts.t); this.shorts.o.set(this.shorts.t); this.hair.ps.reset(); for (const t of this.tails) t.ps.reset(); this.simReset = false;
+      this.shorts.p.set(this.shorts.t); this.shorts.o.set(this.shorts.t); if (HS) HS.ps.reset(); for (const t of this.tails) t.ps.reset(); this.simReset = false;
     } else if (dt > 0) {
       // GFX.simSkip = 2 (low preset): shorts cloth and hair are solved every other frame (the two men on alternate frames) with one
       // step of the summed time; in between only the pinned points follow the body and the cloth is kept off the legs
       this.simAcc = (this.simAcc || 0) + dt; this.simN = (this.simN || 0) + 1;
       if (GFX.simSkip < 2 || ((this.simN + (this.isPlayer ? 0 : 1)) & 1) === 0) {
         const sd = Math.min(this.simAcc, 0.05), steps = sd > (GFX.simSkip < 2 ? 0.02 : 0.04) ? 2 : 1, h = sd / steps; this.simAcc = 0;
-        for (let s = 0; s < steps; s++) { this.shorts.step(h); if (hairOn) this.hair.ps.step(h); for (const t of this.tails) t.ps.step(h); }
-      } else { simPin(this.shorts); this.shorts.constrain(); if (hairOn) simPin(this.hair.ps); for (const t of this.tails) simPin(t.ps); }
+        for (let s = 0; s < steps; s++) { this.shorts.step(h); if (HS) HS.ps.step(h); for (const t of this.tails) t.ps.step(h); }
+      } else { simPin(this.shorts); this.shorts.constrain(); if (HS) simPin(HS.ps); for (const t of this.tails) simPin(t.ps); }
     }
-    this.shorts.render(); if (hairOn) renderHair(this.hair);
+    this.shorts.render(); if (HS) { if (HS.tube) renderTubes(HS); else renderHair(HS); }
     for (const t of this.tails) { t.geo.attributes.position.needsUpdate = true; t.geo.computeVertexNormals(); }
     _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInv);
     this.baseMesh.matrix.copy(_m1); this.beardMesh.matrix.copy(_m1); this.baseMesh.matrixWorldNeedsUpdate = this.beardMesh.matrixWorldNeedsUpdate = true;
@@ -5481,21 +6218,21 @@ const careerWins = () => G.career + PROF.champ * LADDER.length;   // wraps unloc
    look: what he always wears — a street outfit of 04d_street.js fixed per man (startCareer), not a random one */
 const LADDER = [
   { nm: 'Лом', name: 'Гена Рыжов', st: 'brawler', diff: 'easy', loc: 'yard', legend: 'Гроза своего подъезда. Бьёт размашисто и ждёт, что ты испугаешься раньше, чем он устанет.',
-    look: { skin: 'light', hair: 'bald', beard: false, bottom: 'sweatS', top: 'tank', shoes: 'sneak', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'black' } },
+    look: { skin: 'light', hair: 'bald', beard: 'stubble', tats: ['neck'], bottom: 'sweatS', top: 'tank', shoes: 'sneak', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'black' } },
   { nm: 'Кабан', name: 'Толя Брагин', st: 'brawler', diff: 'easy', loc: 'yard', legend: 'Грузчик с овощной базы. Сто десять кило идут вперёд и не знают, как это — назад.',
-    look: { skin: 'tan', hair: 'brown', beard: true, bottom: 'cargo', top: 'teeG', shoes: 'boots', wraps: 'white', hands: 'wraps', guard: 'black', shorts: 'green' } },
+    look: { skin: 'olive', hair: 'dbrown', hairStyle: 'crew', beard: 'boxed', tats: ['band'], bottom: 'cargo', top: 'teeG', shoes: 'boots', wraps: 'white', hands: 'wraps', guard: 'black', shorts: 'green' } },
   { nm: 'Грек', name: 'Костя Маврин', st: 'counter', diff: 'normal', loc: 'tires', legend: 'Недоучился на хирурга. Знает, где у человека печень, и спокойно ждёт твоей ошибки.',
-    look: { skin: 'tan', hair: 'black', beard: true, bottom: 'jeansB', top: 'none', shoes: 'keds', wraps: 'black', hands: 'wraps', guard: 'clear', shorts: 'blue' } },
+    look: { skin: 'tan', hair: 'black', hairStyle: 'slick', beard: 'goatee', tats: ['chest', 'sleeve'], bottom: 'jeansB', top: 'none', shoes: 'keds', wraps: 'black', hands: 'wraps', guard: 'clear', shorts: 'blue' } },
   { nm: 'Шрам', name: 'Вадим Чернов', st: 'pressure', diff: 'normal', loc: 'tires', legend: 'Шрам через бровь — память о первом бое у бочек. С тех пор огонь видел только его победы.',
-    look: { skin: 'light', hair: 'blond', beard: false, bottom: 'jeansL', top: 'tankB', shoes: 'sneakB', wraps: 'red', hands: 'wraps', guard: 'red', shorts: 'red' } },
+    look: { skin: 'light', hair: 'bleach', hairStyle: 'mohawk', beard: 'none', tats: ['face', 'knuckles', 'ribs'], bottom: 'jeansL', top: 'tankB', shoes: 'sneakB', wraps: 'red', hands: 'wraps', guard: 'red', shorts: 'red' } },
   { nm: 'Молот', name: 'Руслан Гатин', st: 'brawler', diff: 'normal', loc: 'parking', legend: 'Днём правит кузова кувалдой, ночью — челюсти правой. На минус втором этаже его ставка всегда первая.',
-    look: { skin: 'dark', hair: 'black', beard: false, bottom: 'jeans', top: 'teeB', shoes: 'sneakB', wraps: 'white', hands: 'mma', guard: 'black', shorts: 'black' } },
+    look: { skin: 'deep', hair: 'black', hairStyle: 'dreads', beard: 'strap', bottom: 'jeans', top: 'teeB', shoes: 'sneakB', wraps: 'white', hands: 'mma', guard: 'black', shorts: 'black' } },
   { nm: 'Седой', name: 'Аркадий Вершин', st: 'counter', diff: 'hard', loc: 'parking', legend: 'Двадцать лет в подвалах и гаражах. Быстрых он не боится — он их пересиживает.',
-    look: { skin: 'light', hair: 'grey', beard: true, bottom: 'pants', top: 'teeW', shoes: 'keds', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'white' } },
+    look: { skin: 'light', hair: 'grey', hairStyle: 'classic', beard: 'full', bottom: 'pants', top: 'teeW', shoes: 'keds', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'white' } },
   { nm: 'Бизон', name: 'Тимур Салаев', st: 'pressure', diff: 'hard', loc: 'warehouse', crowd: 0.55, legend: 'Вернулся с северной вахты злым. В клетке вжимает в сетку и не даёт вдохнуть.',
-    look: { skin: 'dark', hair: 'bald', beard: true, bottom: 'sweatG', top: 'none', shoes: 'boots', wraps: 'black', hands: 'mma', guard: 'blue', shorts: 'purple' } },
+    look: { skin: 'dark', hair: 'black', hairStyle: 'rows', beard: 'boxed', tats: ['back', 'band'], bottom: 'sweatG', top: 'none', shoes: 'boots', wraps: 'black', hands: 'mma', guard: 'blue', shorts: 'purple' } },
   { nm: 'Кувалда', name: 'Захар Громов', st: 'brawler', diff: 'hard', loc: 'warehouse', crowd: 1, champ: true, legend: 'Хозяин склада и пояса. Из тех, кто вышел против него, своими ногами не ушёл никто.',
-    look: { skin: 'tan', hair: 'bald', beard: true, bottom: 'jeansB', top: 'none', shoes: 'boots', wraps: 'gold', hands: 'wraps', guard: 'gold', shorts: 'black' } }];
+    look: { skin: 'brown', hair: 'bald', beard: 'full', tats: ['chest', 'back', 'sleeve', 'neck'], bottom: 'jeansB', top: 'none', shoes: 'boots', wraps: 'gold', hands: 'wraps', guard: 'gold', shorts: 'black' } }];
 const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1)].loc; return LOCS[id] ? id : G.loc; };
 // «Склад · аншлаг»: the place of career fight i as the menu, the card and the result screen name it
 const careerPlace = (i = G.career) => { const L = LADDER[Math.min(i, LADDER.length - 1)]; return (LOCS[L.loc] ? LOCS[L.loc].label : LOC.label) + (L.champ ? ' · аншлаг' : ''); };
@@ -5945,7 +6682,8 @@ function toMenu() {
 const NAMES = ['Грек', 'Молот', 'Кабан', 'Шрам', 'Лом', 'Бизон', 'Кувалда', 'Седой'];
 function rollOpponent() {
   const sh = SHORTS_LOOKS.filter(s => s.id !== wearGet(LOOK, 'bottom').color), hl = HAIR_LOOKS, pick = a => a[(rr() * a.length) | 0];
-  P2.applyLook({ shorts: pick(sh).id, hair: pick(hl).id, skin: pick(SKIN_LOOKS).id, beard: rr() < 0.6, wraps: rr() < 0.6 ? 'white' : pick(WRAPS_LOOKS).id, guard: pick(GUARDS).id, hands: rr() < 0.3 ? 'mma' : 'wraps', ...(isStreet() ? streetLook() : {}) });   // street locations: a random street outfit (04d_street.js)
+  const skin = pick(SKIN_LOOKS).id, tats = rr() < 0.45 ? TATS.filter(() => rr() < 0.3).map(t => t.id) : [];
+  P2.applyLook({ shorts: pick(sh).id, hair: pick(hl).id, hairStyle: randomCut(skin, rr), skin, beard: rr() < 0.6 ? pick(BEARD_STYLES).id : 'none', tats, wraps: rr() < 0.6 ? 'white' : pick(WRAPS_LOOKS).id, guard: pick(GUARDS).id, hands: rr() < 0.3 ? 'mma' : 'wraps', ...(isStreet() ? streetLook() : {}) });   // street locations: a random street outfit (04d_street.js)
   const nm = pick(NAMES), st = { 'Грек': 'counter', 'Молот': 'brawler', 'Кабан': 'brawler', 'Шрам': 'pressure', 'Лом': 'brawler', 'Бизон': 'pressure', 'Кувалда': 'brawler', 'Седой': 'counter' }[nm];
   AI.style = STYLES[st]; $('n2').textContent = nm; const sl = $('st2'); if (sl) sl.textContent = STYLES[st].label;
 }
@@ -9536,6 +10274,7 @@ EVT.on((type, e) => {
 const UI = { scr: null, from: null, cat: 'name', spar: false, mouth: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };   // mouth: the gum-shield close-up of the creator (he bares his teeth: Face.update)
 const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', pause: 'pause' };
 const VIEW_MOUTH = { yaw: 1.38, zoom: 0 }, _mouthP = new V3(), VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
+const VIEW_BACK = { yaw: -2.3, zoom: 0.55 };   // his back (the back tattoo)
 const myName = () => PROF.nick || PROF.name || 'Ты';
 function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [...root.querySelectorAll('button:not([disabled]),input')].filter(b => b.offsetParent !== null) : []; }
 function uiShow(scr, focusId) {
@@ -9609,9 +10348,17 @@ function setCat(c) {
 }
 function buildCreator() {
   const col = (list, f) => list.map(f), spar = v => () => { UI.spar = v; };
-  swatches('o-skin', col(SKIN_LOOKS, s => ({ id: s.id, c: s.c, sw: s.id === 'light' ? '#e2b79f' : s.id === 'tan' ? '#b98563' : '#6f4630', label: s.id })), () => LOOK.skin, v => { LOOK.skin = v; });
-  swatches('o-hair', col(HAIR_LOOKS, h => h.id === 'bald' ? { id: 'bald', label: 'под ноль' } : { id: h.id, c: h.c, label: h.id }), () => LOOK.hair, v => { LOOK.hair = v; });
-  swatches('o-beard', [{ id: 'no', label: 'нет' }, { id: 'yes', label: 'есть' }], () => LOOK.beard ? 'yes' : 'no', v => { LOOK.beard = v === 'yes'; }, true);
+  swatches('o-skin', col(SKIN_LOOKS, s => ({ id: s.id, c: s.c, sw: SKIN_TONES[s.id].sw, label: s.label })), () => LOOK.skin, v => { LOOK.skin = v; });
+  // tattoos: any set of them (LOOK.tats)
+  { const box = $('o-tats'); box.textContent = '';
+    for (const t of TATS) { const b = document.createElement('button'); b.type = 'button'; b.className = 'txt'; b.textContent = t.label; const on = () => (LOOK.tats || []).includes(t.id); b.setAttribute('aria-pressed', String(on()));
+      b.addEventListener('click', () => { LOOK.tats = on() ? LOOK.tats.filter(x => x !== t.id) : [...(LOOK.tats || []), t.id]; b.setAttribute('aria-pressed', String(on())); P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar);
+        setView(t.id === 'back' ? VIEW_BACK : t.id === 'face' || t.id === 'neck' ? VIEW_FACE : VIEW_FULL); save(); });
+      box.appendChild(b); } }
+  swatches('o-cut', HAIR_STYLES, () => hairStyleOf(LOOK).id, v => { LOOK.hairStyle = v; if (LOOK.hair === 'bald') LOOK.hair = 'black'; }, true);
+  swatches('o-hair', col(HAIR_LOOKS, h => ({ id: h.id, c: h.c, label: h.label })), () => LOOK.hair === 'bald' ? 'black' : LOOK.hair, v => { LOOK.hair = v; });
+  swatches('o-beard', BEARD_STYLES, () => beardStyleOf(LOOK).id, v => { LOOK.beard = v; }, true);
+  swatches('o-beardc', [{ id: 'hair', label: 'как волосы' }, ...col(HAIR_LOOKS, h => ({ id: h.id, c: h.c, label: h.label }))], () => LOOK.beardCol || 'hair', v => { LOOK.beardCol = v; });
   wearUI();   // clothes: category → model → the colours of that model (04e_wardrobe.js)
   swatches('o-wraps', col(WRAPS_LOOKS, w => ({ id: w.id, c: w.c, label: w.label })), () => LOOK.wraps || 'white', v => { LOOK.wraps = v; spar(false)(); mouthOff(); });
   swatches('o-hands', HANDS, () => LOOK.hands || 'wraps', v => { if (!itemOwned(v)) { setTimeout(() => { buildCreator(); shopOpen('hands', v); }, 0); return; } LOOK.hands = v; spar(false)(); mouthOff(); }, true);   // street fights: wraps or 4 oz MMA gloves (bought)
@@ -9625,7 +10372,8 @@ function buildCreator() {
 function randomLook() {
   const pick = a => a[(Math.random() * a.length) | 0], cw = careerWins();
   const of = (cat, pNone) => { if (Math.random() < pNone) return { id: 'none' }; const it = pick(wearItems(cat).filter(i => itemOwned(i.id))); return { id: it.id, color: pick(Math.random() < 0.7 ? it.colors : wearColors(it)) }; };   // only what he owns
-  Object.assign(LOOK, { hair: pick(HAIR_LOOKS).id, skin: pick(SKIN_LOOKS).id, beard: Math.random() < 0.5, bottom: of('bottom', 0), top: of('top', 0.3), shoes: of('shoes', 0.25), head: of('head', 0.6), eyes: of('eyes', 0.7), belt: of('belt', 0.4),
+  const skin = pick(SKIN_LOOKS).id;
+  Object.assign(LOOK, { hair: pick(HAIR_LOOKS).id, hairStyle: randomCut(skin, Math.random), skin, beard: Math.random() < 0.5 ? pick(BEARD_STYLES).id : 'none', beardCol: 'hair', tats: Math.random() < 0.4 ? TATS.filter(() => Math.random() < 0.3).map(t => t.id) : [], bottom: of('bottom', 0), top: of('top', 0.3), shoes: of('shoes', 0.25), head: of('head', 0.6), eyes: of('eyes', 0.7), belt: of('belt', 0.4),
     guard: pick(GUARDS).id, wraps: pick(WRAPS_LOOKS.filter(w => cw >= w.need)).id, hands: pick(HANDS.filter(h => itemOwned(h.id))).id, gloves: pick(GLOVES).id });
   P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar); save(); buildCreator();
 }

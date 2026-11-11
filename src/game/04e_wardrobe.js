@@ -364,7 +364,7 @@ function debStep(d, dt) {
 // put a thing back on (a new fight, a cut back in time in the replay)
 function wearBack(w) { for (const d of w.deb) { WEAR_G.grp.remove(d.g); WEAR_G.list.splice(WEAR_G.list.indexOf(d), 1); } w.deb.length = 0; w.off = false; w.crack = 0; if (w.m.material.userData.U && w.m.material.userData.U.uCrack) w.m.material.userData.U.uCrack.value.set(0, 0); }
 function wearReset() { for (const F of [P1, P2]) { const W = F && F.gear.wear; if (!W) continue; for (const k of ['head', 'eyes']) if (W[k]) wearBack(W[k]); wearHair(F); } }
-function wearHair(F) { F.hair.mesh.visible = !F.bald && !F.gear.spar && !wearTuck(F); }
+function wearHair(F) { hairVis(F); }
 // a wear event happens (live, or again in the replay); ff = seconds to run it forward at once
 function wearEvent(e, ff = 0) {
   const F = e.who ? P2 : P1, w = F.gear.wear && F.gear.wear[e.cat]; if (!w || w.key !== e.key) return;

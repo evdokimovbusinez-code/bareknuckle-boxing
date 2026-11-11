@@ -8,7 +8,9 @@ const SHORTS_LOOKS = [
   { id: 'green', main: '#0f5a36', trim: '#d6a640', band: '#0a1a12', sheen: '#4fc48a' },
   { id: 'purple', main: '#4a1a6e', trim: '#cfd3da', band: '#140a1e', sheen: '#a66de0' },
 ];
-const HAIR_LOOKS = [{ id: 'black', c: '#1a130e' }, { id: 'brown', c: '#3a2616' }, { id: 'blond', c: '#b08e58' }, { id: 'red', c: '#84361a' }, { id: 'grey', c: '#9a9692' }, { id: 'bald', c: '#2a1a10' }];
+// hair colours (the cut itself: HAIR_STYLES in 04g_hair.js; an old save may still say hair: 'bald' — read as the bald style)
+const HAIR_LOOKS = [{ id: 'black', c: '#1b1511', label: 'чёрные' }, { id: 'dbrown', c: '#2f1d11', label: 'тёмно-каштановые' }, { id: 'brown', c: '#3a2616', label: 'каштановые' }, { id: 'blond', c: '#b08e58', label: 'русые' },
+  { id: 'red', c: '#84361a', label: 'рыжие' }, { id: 'grey', c: '#9a9692', label: 'седые' }, { id: 'bleach', c: '#d9c89a', label: 'обесцвеченные' }];
 const WRAPS_LOOKS = [{ id: 'white', c: '#ffffff', need: 0, label: 'белые' }, { id: 'black', c: '#2a2a2c', need: 2, label: 'чёрные' }, { id: 'red', c: '#b3202c', need: 4, label: 'красные' },
   { id: 'blue', c: '#2f55b5', need: 6, label: 'синие' }, { id: 'gold', c: '#d8b25a', need: 8, label: 'золотые' }];
 const SIGS = [{ id: 'jab', label: 'джеб' }, { id: 'cross', label: 'кросс' }, { id: 'hook', label: 'хук' }, { id: 'upper', label: 'апперкот' }, { id: 'over', label: 'оверхенд' }];
@@ -18,7 +20,9 @@ const sigOf = n => n === 'hookL' || n === 'hookR' ? 'hook' : n === 'upperL' || n
 const STATS = [{ id: 'pow', label: 'Сила', d: 'урон' }, { id: 'spd', label: 'Скорость', d: 'скорость ударов' }, { id: 'chin', label: 'Челюсть', d: 'держит удар' }, { id: 'sta', label: 'Дыхалка', d: 'выносливость' }];
 const SK = (F, k) => (F && F.stat ? F.stat[k] || 0 : 0);
 const lvlStats = l => ({ pow: l, spd: l, chin: l, sta: l });
-const SKIN_LOOKS = [{ id: 'light', c: '#e6cfc2' }, { id: 'tan', c: '#c8a288' }, { id: 'dark', c: '#8f6650' }];
+// skin tones, light → very dark; `c` tints the CC textures, the tones listed in SKIN_TONES (04h_skin_tattoo.js) are rebuilt in the shader instead
+const SKIN_LOOKS = [{ id: 'light', c: '#e6cfc2', label: 'светлая' }, { id: 'tan', c: '#c8a288', label: 'загар' }, { id: 'olive', c: '#ffffff', label: 'оливковая' }, { id: 'brown', c: '#ffffff', label: 'смуглая' },
+  { id: 'dark', c: '#ffffff', label: 'тёмная' }, { id: 'deep', c: '#ffffff', label: 'очень тёмная' }];
 function paintShorts(c, S) {
   const W = c.width, H = c.height, g = c.getContext('2d'), cream = '#f1e7d2';
   g.fillStyle = S.main; g.fillRect(0, 0, W, H);
@@ -66,6 +70,7 @@ async function buildTemplates() {
   T.nailMat = new THREE.MeshPhysicalMaterial({ map: tex.nails_d, roughness: 0.3, clearcoat: 0.6 });
   T.hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
 /*BODYBLOCK*/
+  skinTemplate(body);   // rest-pose data for tattoos, palms / soles mask (04h_skin_tattoo.js)
   // face blend shapes, read from the FBX itself (the loader's morphs are broken and were dropped above): 03b_face_shapes.js
   try { T.fm = faceShapes(bufs.boxer, body.geometry); } catch (e) { console.warn('face shapes:', e); T.fm = null; }
   T.cc = cc;
