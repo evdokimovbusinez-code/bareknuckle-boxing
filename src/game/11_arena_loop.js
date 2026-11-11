@@ -78,6 +78,7 @@ function frame(now) {
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
   FX.update(simDt); MIST.update(simDt); wearTick(simDt);
   tq = performance.now(); pm.fx += tq - tp; tp = tq;
+  trailTick(dtReal);   // the punch smear behind the knuckles (05b_trail.js)
   camUpdate(dtReal); locSync(); crowdTick(simDt); hudUpdate(dtReal); resTick(rawDt);   // locSync: the location hides what stands between the camera and the fighters; crowdTick: its crowd (14_crowd.js)
   pm.misc += performance.now() - tp;
   perfTick(rawDt);

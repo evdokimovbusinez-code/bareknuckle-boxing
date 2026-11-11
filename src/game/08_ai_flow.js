@@ -63,7 +63,7 @@ function aiFollow() {   // he doesn't let a falling man go: one or two more on t
 }
 const Q = [];
 function playerInput() {
-  while (Q.length && G.real - Q[0].at > 0.7) Q.shift();
+  while (Q.length && G.real - Q[0].at > 0.35) Q.shift();   // a press older than this is not what he means any more
   if (!Q.length) return; const q = Q[0];
   if (!(P1.canAct() || P1.canChain(q.type === 'punch' ? q.name : null))) return;
   Q.shift();

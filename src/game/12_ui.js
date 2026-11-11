@@ -51,7 +51,7 @@ const press = (type, n, el) => {
   let body = false, pow = false;
   if (type === 'punch') { const m = punchMod(); body = m.body; pow = m.pow; ctlLog(n, body, pow); }
   if (type === 'dodge') Q.length = 0;
-  if (Q.length < 3) Q.push({ type, name: n, at: G.real, body, pow });
+  if (Q.length < 2) Q.push({ type, name: n, at: G.real, body, pow });
   blip(el);
 };
 /* the punch zone: six 60° sectors, a narrow ±15° band about straight up = cross, about straight down = nothing,

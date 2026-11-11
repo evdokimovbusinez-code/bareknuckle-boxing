@@ -257,7 +257,10 @@ function resolveHit(att, name, contact) {
   }
   FX.spawn(pos, dir, blocked ? power * 0.4 : power); REC.events.push(ev);
   // contact is soft: a very short freeze, then a moment of slow motion while the head travels with the fist
-  G.hitstop = 0.012 + 0.022 * power; if (G.slowT <= 0.02) { G.slow = 0.4; G.slowT = 0.05 + 0.06 * power; }
+  // was on every hit (0.012–0.034 s freeze + 0.05–0.11 s at 40 % speed) — in a combo that read as stutter. Now: nothing on blocks
+  // and light shots, a short freeze on a clean heavy one, a breath of slow motion only on the really big ones
+  if (!blocked && power > 0.55) G.hitstop = Math.min(0.04, 0.012 + 0.03 * (power - 0.55));
+  if (!blocked && power > 1.05 && G.slowT <= 0.02) { G.slow = 0.6; G.slowT = 0.06; }
   G.shake = Math.max(G.shake, 0.012 + 0.03 * power); sfx.thud(power, body); EVT.emit('hit', { pos, power, blocked });
   popup(pos, String(Math.round(dmg)), counter ? 'crit' : 'hit');
   // feel it: the screen edge flushes red when you are hit, the phone kicks on what you land and harder on what you take

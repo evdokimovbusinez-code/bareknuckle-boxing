@@ -327,7 +327,7 @@ class Fighter {
   /* —— actions —— */
   canAct() { return !this.ko && !this.doomed && !(this.wind > G.t) && G.t >= this.stunUntil && !this.cur && (!this.dodge || this.dodge.t > 0.46); }
   // a combo: the next punch may start as soon as the current one has landed (switching hands is quicker)
-  canChain(next) { if (!this.cur || this.ko || G.t < this.stunUntil || !this.resolved) return false; const P = PUNCH[this.cur]; return this.act[this.cur].time >= P.impact + (next && PUNCH[next] && PUNCH[next].arm === P.arm ? 0.14 : 0.04); }
+  canChain(next) { if (!this.cur || this.ko || G.t < this.stunUntil || !this.resolved) return false; const P = PUNCH[this.cur]; return this.act[this.cur].time >= P.impact + (next && PUNCH[next] && PUNCH[next].arm === P.arm ? 0.07 : 0); }
   /* range: a few tens of centimetres of in-and-out on the line between the two (no walking cycle — the idle bounce carries it):
      you step in behind your punches, big shots knock you back, a pressure fighter keeps walking forward, a counter-puncher drifts off */
   footwork(dt) {
@@ -383,8 +383,12 @@ class Fighter {
     // power shot: sits down on it — slower, heavier, costs more breath; and the arms get heavy as the tank empties: the more
     // you throw on empty, the slower and softer every punch gets
     this.heavy = !!this.powerNext; this.powerNext = false;
-    this.fatK = 0.42 + 0.58 * sstep(0, 55, this.stamina); this.punchK = (0.45 + 0.55 * sstep(0, 45, this.stamina)) * (this.heavy ? 1.45 : 1);
-    a.reset(); a.time = P.start; a.setEffectiveTimeScale(this.speed * this.fatK * (this.heavy ? 0.84 : 1) * (P.slow || 1) * (1 - 0.3 * this.daze) * (this.sig && sigOf(n) === this.sig ? 1.08 : 1)); a.play();
+    this.fatK = 0.88 + 0.12 * sstep(0, 55, this.stamina); this.punchK = (0.45 + 0.55 * sstep(0, 45, this.stamina)) * (this.heavy ? 1.45 : 1);
+    // (fatigue was 0.42…1 and daze −30 %: a tired cross took 0.7 s to land; now tiredness mostly costs power and accuracy — punchK, aimJit)
+    this.tsBase = this.speed * this.fatK * (this.heavy ? 0.9 : 1) * (P.slow || 1) * (1 - 0.1 * this.daze) * (this.sig && sigOf(n) === this.sig ? 1.08 : 1);
+    const wind = (P.impact - P.start) / (PUNCH_T[n] || (P.impact - P.start)); this.tsWind = 1 + (wind - 1) * (this === P1 ? 1 : AI_SNAP);
+    a.reset(); a.time = P.start; a.setEffectiveTimeScale(this.tsBase * this.tsWind); a.play();
+    if (this === P1 && !BAG.on) sfx.whoosh(0.3);   // instant feedback on the press, long before the impact
     if (this.fs) this.fs.thr++;
     // out of gas: the fist travels wide and lands roughly where it was meant to
     const ex = this.tired ? 1 : clamp((25 - this.stamina) / 25, 0, 1) * 0.5;
@@ -462,7 +466,7 @@ class Fighter {
   tick(dt) {
     if (G.t > this.staT) this.stamina = Math.min(100, this.stamina + 26 * dt * (1 + 0.08 * SK(this, 'sta')));
     if (this.cur) {
-      const P = PUNCH[this.cur], t = this.act[this.cur].time; this.aImpactIn = (P.impact - t) / Math.max(0.3, this.speed);
+      const P = PUNCH[this.cur], t = this.act[this.cur].time, sc = (this.tsBase || 1) * (t < P.impact ? (this.tsWind || 1) : FOLLOW_K); this.act[this.cur].setEffectiveTimeScale(sc); this.aImpactIn = (P.impact - t) / Math.max(0.3, sc);
       // the punch lands when the knuckles actually touch the face (or ribs); if they never do, it is decided at the end of the window
       if (!this.resolved && t >= P.impact - 0.14) { const c = contactTest(this, this.other); if (c || t >= P.impact + 0.06) { this.resolved = true;
         // no touch by the end of the swing: a graze if the knuckles were within a few cm, otherwise it is thin air

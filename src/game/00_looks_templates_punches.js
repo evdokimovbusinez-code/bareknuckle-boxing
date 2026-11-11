@@ -124,6 +124,11 @@ const PUNCH = {
   upperR: { arm: 'R', type: 'upper', start: 0.20, impact: 0.70, dmg: 18, sta: 18, rootZ: 1.05, label: 'Апперкот правой' },
   over: { arm: 'R', type: 'over', start: 0.16, impact: 0.67, dmg: 21, sta: 24, rootZ: 1.05, slow: 0.82, label: 'Оверхенд' },
 };
+// seconds from the press to the impact (the wind-up of the clip is played faster to hit these; the follow-through keeps its pace).
+// Was the clip's own pace: jab 0.30, cross 0.49, hooks 0.38/0.48, uppers 0.48/0.50 — it read as lag between the key and the punch.
+const PUNCH_T = { jab: 0.17, cross: 0.24, hookL: 0.26, hookR: 0.30, upperL: 0.29, upperR: 0.30, over: 0.36 };
+const AI_SNAP = 0.85;    // the AI gets 85 % of that speed-up, so its punches stay readable for the player
+const FOLLOW_K = 1.3;    // the follow-through and the way back, a bit quicker than the clip
 // which defence beats which punch (body shots are only beaten by pulling back)
 const EV = { jab: ['slipL', 'slipR', 'duck', 'lean'], cross: ['slipL', 'slipR', 'duck'], hookL: ['duck', 'lean'], hookR: ['duck', 'lean'], upperL: ['slipL', 'slipR', 'lean'], upperR: ['slipL', 'slipR', 'lean'], over: ['lean'] };
 const RJ = ['L_Thigh', 'R_Thigh', 'L_Upperarm', 'R_Upperarm', 'NeckTwist01', 'L_Forearm', 'L_Hand', 'R_Forearm', 'R_Hand', 'L_Calf', 'L_Foot', 'L_ToeBase', 'R_Calf', 'R_Foot', 'R_ToeBase'];
