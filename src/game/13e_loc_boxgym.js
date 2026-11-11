@@ -17,7 +17,7 @@ const _bgI = new M4(), _bgM = new M4(), _bgQ = new Quat(), _bgE = new THREE.Eule
 LOCS.boxgym = {
   id: 'boxgym', label: 'Спортзал', desc: 'Старый боксёрский зал: ринг, мешки, зеркала', train: true, ring: true, wall: null,   // train: not offered for fights (buildQuick)
   ringBound: { kind: 'square', half: 2.2 }, bagBound: { kind: 'square', half: 1.5 },
-  get bound() { return BAG.on ? this.bagBound : this.ringBound; },
+  get bound() { return BAG.on || SKIP.on ? this.bagBound : this.ringBound; },   // the bag and the skipping rope both run on the mat beside the ring
   light: { bg: '#120f0c', fog: ['#33291f', 7, 46], exposure: 0.94, hemi: ['#c3cfe2', '#3b2f24', 0.28], key: ['#ffe8cc', 48], rim: ['#c4d8ff', 2.5], rim2: ['#ffc48c', 1.7], fill: ['#fff3e2', 0.5] },
   build() {
     const R = locRng(4107), g = new THREE.Group(), PI = Math.PI, { FL, X0, X1, Z0, Z1, H, SX, SZ } = BG;
@@ -424,17 +424,17 @@ LOCS.boxgym = {
     this.apron = RINGSET.children.find(o => o.geometry && o.geometry.type === 'CircleGeometry');   // the dark floor disc of the arena ring: not here
     return g;
   },
-  // sparring: the ring is the middle of the ARENA frame; the bag drill: the mat beside the ring is
-  place(bag) {
-    const { FL, SX, SZ, MAT } = BG; this.bagOn = bag;   // the drill is on a 30 mm mat: its top is the fighters' floor
-    this.group.position.set(bag ? -SX : 0, bag ? -MAT : -FL, bag ? -SZ : 0); RINGSET.position.set(bag ? -SX : 0, bag ? FL - MAT : 0, bag ? -SZ : 0);
-    this.bagRig.visible = bag; ARENA.updateMatrixWorld(true);
+  // sparring: the ring is the middle of the ARENA frame; a drill (the bag, the skipping rope): the mat beside the ring is
+  place(drill) {
+    const { FL, SX, SZ, MAT } = BG; this.bagOn = drill;   // the mat is 30 mm thick: its top is the fighters' floor (world y = 0)
+    this.group.position.set(drill ? -SX : 0, drill ? -MAT : -FL, drill ? -SZ : 0); RINGSET.position.set(drill ? -SX : 0, drill ? FL - MAT : 0, drill ? -SZ : 0);
+    this.bagRig.visible = BAG.on; ARENA.updateMatrixWorld(true);
   },
-  enter() { if (this.apron) this.apron.visible = false; this.place(BAG.on); },
+  enter() { if (this.apron) this.apron.visible = false; this.place(BAG.on || SKIP.on); },
   leave() { if (this.apron) this.apron.visible = true; RINGSET.position.set(0, 0, 0); RINGSET.visible = true; },
   // per frame, after the camera
   sync() {
-    const bag = BAG.on, g = this.group, { X0, X1, Z0, Z1, H } = BG, cam = camera.position, t = this.uT.value = CROWD.u.uT.value;
+    const bag = BAG.on || SKIP.on, g = this.group, { X0, X1, Z0, Z1, H } = BG, cam = camera.position, t = this.uT.value = CROWD.u.uT.value;
     if (bag !== this.bagOn) this.place(bag);
     g.updateWorldMatrix(true, false); const M = g.matrixWorld, cl = _bgC.copy(cam).applyMatrix4(_bgI.copy(M).invert());   // the camera in floor coordinates
     const inside = cl.x > X0 + 0.15 && cl.x < X1 && cl.z > Z0 && cl.z < Z1 && cl.y < H;

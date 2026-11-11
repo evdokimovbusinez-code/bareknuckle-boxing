@@ -68,13 +68,14 @@ function frame(now) {
     // both men are posed: now keep each one's arms out of the other's head and torso (against this frame's head, not last frame's)
     headFrames(P1); headFrames(P2);
     P1.armClear(); P2.armClear(); P1.armClear(); P2.armClear();   // twice: the second pass catches what the first IK left
+    ropeState(dt); ropePose(P1, dt);   // the skipping drill (09c_rope.js): the hop clock, then the pose laid over the idle
     if (G.state === 'kd') kdTick(dt);
     if ((G.state === 'fight' || G.state === 'ko' || G.state === 'kd') && dt > 0) recFrame();
     stateTick(dtReal);
   }
   tq = performance.now(); pm.anim += tq - tp - PERF.rag; pm.phys += PERF.rag; tp = tq;
   P1.simulate(simDt); P2.simulate(simDt);
-  ropeTick(simDt); bagStep(simDt);
+  ropeTick(simDt); ropeStep(simDt); bagStep(simDt);   // ropeTick = the ring's ropes; ropeStep = the skipping cord (09c_rope.js)
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
   FX.update(simDt); MIST.update(simDt); wearTick(simDt);
   tq = performance.now(); pm.fx += tq - tp; tp = tq;
