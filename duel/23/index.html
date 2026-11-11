@@ -11248,7 +11248,7 @@ window.__soc = { get S() { return PROF.soc; }, SOC, SPONSORS, LOC_FANS, socGain,
 <script>
 (function(){const T=window.__DUEL||'';document.getElementById('duelt').textContent=T;
 const B=[['__rope',[['▶ Скакалка','start()'],['Промах','miss()'],['■ Стоп','stop()']]],['__mitts',[['▶ Лапы','start()'],['Подача: джеб',"hold('jab')"],['кросс',"hold('cross')"],['хук',"hold('hook')"],['Удар L',"hit('L',1)"],['Удар R',"hit('R',1)"],['■ Стоп','stop()']]]];
-const iv=setInterval(()=>{const k=B.find(b=>window[b[0]]);if(!k||!window.__g)return;clearInterval(iv);const box=document.getElementById('duelb');
+const iv=setInterval(()=>{const k=B.find(b=>window[b[0]]);if(!k)return;clearInterval(iv);const box=document.getElementById('duelb');
 for(const[l,c]of k[1]){const e=document.createElement('button');e.textContent=l;e.style.cssText='font:13px system-ui;padding:6px 9px;border-radius:6px;border:0;background:#c33;color:#fff;cursor:pointer';e.onclick=ev=>{ev.stopPropagation();try{(new Function('return window.'+k[0]+'.'+c))()}catch(x){alert(x)}};box.appendChild(e);}
 document.getElementById('duelp').style.display='block';},500);})();
 </script>
