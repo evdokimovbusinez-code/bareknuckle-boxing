@@ -1,4 +1,4 @@
-"""Repo bot: runs Claude Fable 5.2, effort high by default (Agent SDK, billed to API credits) on a task prompt in the checked-out repo.
+"""Repo bot: runs a model through the Agent SDK — GLM-5.3-Flash via OpenRouter by default, Claude by tag (Agent SDK, billed to API credits) on a task prompt in the checked-out repo.
 Usage: python tools/agent.py PROMPT_FILE   -> writes .claude-result.json (is_error, result, cost, turns)."""
 import asyncio, json, os, sys
 from claude_agent_sdk import query, ClaudeAgentOptions
@@ -9,7 +9,8 @@ TOOLS = ["Read", "Edit", "MultiEdit", "Write", "Glob", "Grep", "LS", "TodoWrite"
 
 async def main():
     prompt = open(sys.argv[1]).read()
-    opts = ClaudeAgentOptions(model=os.environ.get("BOT_MODEL", "claude-fable-5-2"), effort=os.environ.get("BOT_EFFORT", "high"),
+    eff = os.environ.get("BOT_EFFORT") or None   # reasoning effort only for Claude models
+    opts = ClaudeAgentOptions(model=os.environ.get("BOT_MODEL", "z-ai/glm-5.3-flash"), effort=eff,
                               max_budget_usd=float(os.environ.get("BOT_BUDGET", "8")), max_turns=80, max_buffer_size=64 * 1024 * 1024, allowed_tools=TOOLS, permission_mode="acceptEdits",
                               setting_sources=["project"], system_prompt={"type": "preset", "preset": "claude_code"})
     out = {"is_error": True, "result": "no result", "cost": 0, "turns": 0}

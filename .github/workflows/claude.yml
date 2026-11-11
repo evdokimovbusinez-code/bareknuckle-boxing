@@ -54,7 +54,7 @@ jobs:
             echo "You are the coding bot of this repository (bare-knuckle boxing browser game). Read CLAUDE.md first and follow it."
             echo "Do the task from GitHub #$N below (the latest @claude message is the current request; earlier messages are context)."
             echo "Rules: edit sources in src/ (never index.html by hand), then run 'bash tools/check.sh' and fix until it prints OK."
-            echo "For anything visual (models, clothes, locations, UI, lighting) LOOK at your result: 'bash tools/shot.sh /tmp/shots/NAME.jpg fight 4' (or menu / js \"CODE\"), then Read the JPG. Iterate until it looks right. Mention in the summary what you checked visually."
+            echo "For anything visual (models, clothes, locations, UI, lighting) LOOK at your result: 'bash tools/shot.sh /tmp/shots/NAME.jpg fight 4' (or menu / js \"CODE\"), then Read the JPG. Iterate until it looks right. Mention in the summary what you checked visually. (If your model cannot view images, still take the shots and list their paths — the reviewer looks at them.)"
             echo "This branch may already hold earlier (partial) work on this task: check 'git log --oneline origin/main..HEAD' and 'git diff origin/main --stat' first and continue from it."
             echo "Do not run git commands that change history (no commit/push/checkout) - the workflow commits for you."
             echo "Finish by writing a short summary IN RUSSIAN to .claude-summary.md: what changed, which functions, how to see it in the game, anything left undone."
@@ -65,14 +65,22 @@ jobs:
           } > /tmp/prompt.md
       - name: Run Claude
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # model: Fable 5.2 by default; a tag in the issue title picks another: [sonnet] (≈7x cheaper, plain code/UI/systems), [opus]
-          BOT_MODEL: ${{ contains(github.event.issue.title, '[sonnet]') && 'claude-sonnet-5-5' || contains(github.event.issue.title, '[opus]') && 'claude-opus-5-5' || 'claude-fable-5-2' }}
+          ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # model: GLM-5.3-Flash through OpenRouter by default (cheap); a tag in the issue title picks another:
+          # [glm-x] = GLM-5.3-FlashX, [sonnet] / [opus] / [fable] = Claude through the Anthropic API key
+          BOT_MODEL: ${{ contains(github.event.issue.title, '[fable]') && 'claude-fable-5-2' || contains(github.event.issue.title, '[sonnet]') && 'claude-sonnet-5-5' || contains(github.event.issue.title, '[opus]') && 'claude-opus-5-5' || contains(github.event.issue.title, '[glm-x]') && 'z-ai/glm-5.3-flashx' || 'z-ai/glm-5.3-flash' }}
           BOT_EFFORT: high
-          BOT_BUDGET: "8"               # hard cap per task, USD
+          BOT_BUDGET: "8"               # hard cap per task, USD (Claude models; OpenRouter spend is capped by the key's own limit)
         run: |
           pip install -q claude-agent-sdk playwright
           npm i --no-save --silent three@0.160.0 cannon-es@0.20.0
+          if [[ "$BOT_MODEL" == claude-* ]]; then
+            export ANTHROPIC_API_KEY="$ANTHROPIC_KEY"
+          else   # OpenRouter speaks the Anthropic API: the SDK runs any of its models
+            export ANTHROPIC_BASE_URL="https://openrouter.ai/api" ANTHROPIC_AUTH_TOKEN="$OPENROUTER_KEY" ANTHROPIC_API_KEY=""
+            export ANTHROPIC_DEFAULT_HAIKU_MODEL="$BOT_MODEL" ANTHROPIC_SMALL_FAST_MODEL="$BOT_MODEL" BOT_EFFORT=""
+          fi
           python tools/agent.py /tmp/prompt.md
       - name: Commit, push, PR
         if: always()
