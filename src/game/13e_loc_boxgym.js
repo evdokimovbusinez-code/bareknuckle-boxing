@@ -16,6 +16,7 @@ const BG = { FL: 0.4, X0: -9, X1: 11, Z0: -8.5, Z1: 8, H: 5.2, SX: 6.4, SZ: 0.5,
 const _bgI = new M4(), _bgM = new M4(), _bgQ = new Quat(), _bgE = new THREE.Euler(), _bgS = new V3(), _bgC = new V3(), _bgZero = new M4().makeScale(0, 0, 0);
 LOCS.boxgym = {
   id: 'boxgym', label: 'Спортзал', desc: 'Старый боксёрский зал: ринг, мешки, зеркала', train: true, ring: true, wall: null,   // train: not offered for fights (buildQuick)
+  ropeOn: false,   // the skipping rope drill (09c_rope.js): the man is on the mat beside the ring
   ringBound: { kind: 'square', half: 2.2 }, bagBound: { kind: 'square', half: 1.5 },
   get bound() { return BAG.on ? this.bagBound : this.ringBound; },
   light: { bg: '#120f0c', fog: ['#33291f', 7, 46], exposure: 0.94, hemi: ['#c3cfe2', '#3b2f24', 0.28], key: ['#ffe8cc', 48], rim: ['#c4d8ff', 2.5], rim2: ['#ffc48c', 1.7], fill: ['#fff3e2', 0.5] },
@@ -427,7 +428,8 @@ LOCS.boxgym = {
   // sparring: the ring is the middle of the ARENA frame; the bag drill: the mat beside the ring is
   place(bag) {
     const { FL, SX, SZ, MAT } = BG; this.bagOn = bag;   // the drill is on a 30 mm mat: its top is the fighters' floor
-    this.group.position.set(bag ? -SX : 0, bag ? -MAT : -FL, bag ? -SZ : 0); RINGSET.position.set(bag ? -SX : 0, bag ? FL - MAT : 0, bag ? -SZ : 0);
+    const mat = bag || this.ropeOn;   // the rope drill (09c_rope.js) is on the same mat
+    this.group.position.set(mat ? -SX : 0, mat ? -MAT : -FL, mat ? -SZ : 0); RINGSET.position.set(mat ? -SX : 0, mat ? FL - MAT : 0, mat ? -SZ : 0);
     this.bagRig.visible = bag; ARENA.updateMatrixWorld(true);
   },
   enter() { if (this.apron) this.apron.visible = false; this.place(BAG.on); },
@@ -442,7 +444,7 @@ LOCS.boxgym = {
     // the ring's lamps: out of the way of the top-down replay shot; in the drill the whole ring goes when the camera is over it
     const over = bag && cl.x < 3.7 && Math.abs(cl.z) < 4.2;
     RINGSET.visible = !over; this.plat.visible = !over; this.rig.visible = !over && cl.y < 3.5;
-    if (bag) for (const r of ROPES) r.m.visible = true;   // arenaSync hides the sides of a ring the fighters are in; here they are beside it
+    if (bag || this.ropeOn) for (const r of ROPES) r.m.visible = true;   // arenaSync hides the sides of a ring the fighters are in; here they are beside it
     // props (and the bags of the row): hidden while inside the view wedge in front of what the camera looks at
     const dx = camL.x - cam.x, dz = camL.z - cam.z, len = Math.hypot(dx, dz) || 1, ux = dx / len, uz = dz / len, tH = Math.tan(camera.fov * Math.PI / 360) * camera.aspect * 1.1;
     const hid = (p, r) => { _lp.copy(p).applyMatrix4(M); const px = _lp.x - cam.x, pz = _lp.z - cam.z, s = px * ux + pz * uz; return s > -r && s < len - 0.5 && Math.abs(px * uz - pz * ux) - r < Math.max(s, 0) * tH + 0.3; };

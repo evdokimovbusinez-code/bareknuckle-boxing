@@ -65,6 +65,7 @@ function frame(now) {
     else if (G.state === 'ko' || G.state === 'kd') { if (followOK(P1)) playerInput(); aiFollow(); }
     P1.aimTarget = aimFor(P1, P2); P2.aimTarget = aimFor(P2, P1);
     P1.update(dt); P2.update(dt);
+    jumpTick(dt);   // the skipping rope drill: the pose and the cord (09c_rope.js)
     // both men are posed: now keep each one's arms out of the other's head and torso (against this frame's head, not last frame's)
     headFrames(P1); headFrames(P2);
     P1.armClear(); P2.armClear(); P1.armClear(); P2.armClear();   // twice: the second pass catches what the first IK left

@@ -26,7 +26,7 @@ function camUpdate(dt) {
     const L = G.state === 'kd' ? G.kd.def : G.loser, W = G.state === 'kd' ? G.kd.att : G.winner, h = L.headNow, c = L.jp[0], w = W.headNow, mx = (c.x + h.x) * 0.5 * 0.65 + w.x * 0.35;
     _cp.set(mx, 1.4, far - 0.25); _cl.set(mx, Math.max(0.62, h.y * 0.45 + 0.42), 0); k = 2.2;
   } else {   // the fight: framed on the pair, pushed in a little when they trade up close, a slow drift so the shot never sits dead
-    const mx = (P1.headNow.x + P2.headNow.x) * 0.5, sep = Math.abs(P1.headNow.x - P2.headNow.x), hurt = Math.max(P1.daze || 0, P2.daze || 0);
+    const mx = JUMP.on ? P1.headNow.x : (P1.headNow.x + P2.headNow.x) * 0.5, sep = JUMP.on ? 0 : Math.abs(P1.headNow.x - P2.headNow.x), hurt = Math.max(P1.daze || 0, P2.daze || 0);
     const z = far + 0.2 - clamp((1.0 - sep) * 0.6, 0, 0.35) - 0.2 * hurt + Math.max(0, sep - 1.0) * 1.1, drift = 0.18 * Math.sin(camClock * 0.13);
     _cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), z); _cl.set(mx + drift * 0.3, 0.93, 0); k = G.state === 'intro' ? 2.4 : 3.5;
     /* the fly-round before a street fight (G.introT < 0, see startFight): an arc about the centre of the floor — from behind the crowd,
