@@ -101,18 +101,14 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .db.wk{border-color:rgba(255,255,255,.22);font-size:clamp(10px,2.2vmin,13px)}.db.wk.on{border-color:var(--gold);background:rgba(226,177,74,.18)}.db.bk{grid-column:1;grid-row:3}.db.fw{grid-column:3;grid-row:3}.db.up{grid-column:2;grid-row:1}.db.lf{grid-column:1;grid-row:2}.db.bl{grid-column:2;grid-row:2;border-radius:50%;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}.db.ri{grid-column:3;grid-row:2}.db.dn{grid-column:2;grid-row:3}
 .db small,.pb small{display:block;font-family:var(--mono);font-weight:500;font-size:9px;color:var(--muted);letter-spacing:.04em;margin-top:3px;text-transform:none}
 .db:active,.pb:active,.db.on,.pb.on{transform:scale(.88);border-color:var(--gold);background:rgba(226,177,74,.22)}
-.punches{display:grid;grid-template-columns:repeat(3,clamp(54px,14vmin,76px));grid-auto-rows:auto;gap:3px}
-.punches .ph{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:center}
-.pb{width:100%;height:clamp(44px,11.5vmin,62px);font-size:clamp(11px,2.5vmin,15px)}
+.punches{display:grid;grid-template-columns:repeat(2,clamp(76px,20vmin,110px));gap:6px}
+.pb{width:100%;height:clamp(58px,15.5vmin,86px);font-size:clamp(13px,3.1vmin,19px)}
 .pb.r{border-color:rgba(226,80,90,.5)}
-.pb.ov{border-color:rgba(226,80,90,.7);background:linear-gradient(180deg,rgba(150,24,40,.6),rgba(13,16,23,.86))}
-.pb.bd,.pb.pw{border-style:dashed}.pb.pw.lit{border-style:solid;border-color:#ff6a3d;background:rgba(255,106,61,.32)}
-.pb.blk{grid-column:1/4;height:clamp(40px,10vmin,54px);border-radius:999px;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}
+.pb.blk{grid-column:1/3;height:clamp(48px,12vmin,60px);border-radius:999px;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}
 .stick{position:relative;width:clamp(120px,30vmin,170px);height:clamp(120px,30vmin,170px);border-radius:50%;border:1px solid rgba(255,255,255,.18);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.55) 70%);touch-action:none}
 .stick .knob{position:absolute;left:50%;top:50%;width:42%;height:42%;margin:-21% 0 0 -21%;border-radius:50%;background:rgba(226,177,74,.28);border:1px solid rgba(226,177,74,.6);transition:transform .08s}
 .stick.on .knob{transition:none;background:rgba(226,177,74,.45)}
 .stick .sl{position:absolute;left:0;right:0;bottom:-15px;text-align:center;font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.06em}
-.pb.bd.lit{border-style:solid;border-color:var(--gold);background:rgba(226,177,74,.3)}
 /* replay + result */
 .rec{position:absolute;left:var(--pl);top:calc(var(--pt) + 4px);display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;letter-spacing:.14em}
 .rec i{width:10px;height:10px;border-radius:50%;background:var(--blood);animation:blink 1s steps(2) infinite}
@@ -342,19 +338,13 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <div class="pad" id="pad" hidden>
     <div class="stick" id="stick" aria-label="Стик: ходить; быстрый рывок = уклон"><i class="knob"></i><span class="sl">ходьба · рывок = уклон</span></div>
     <div class="punches">
-      <span class="ph">левая</span><span class="ph">правая</span><span></span>
-      <button class="pb st" data-punch="jab">Джеб<small>J</small></button>
-      <button class="pb st r" data-punch="cross">Кросс<small>K</small></button>
-      <button class="pb ov r" data-punch="over">Овер&shy;хенд<small>O</small></button>
-      <button class="pb" data-punch="hookL">Хук<small>U</small></button>
-      <button class="pb r" data-punch="hookR">Хук<small>I</small></button>
-      <button class="pb bd" id="body-btn" aria-label="Следующий удар в корпус">Корпус<small>Shift</small></button>
-      <button class="pb" data-punch="upperL">Аппер<small>M</small></button>
-      <button class="pb r" data-punch="upperR">Аппер<small>,</small></button>
-      <button class="pb pw" id="pow-btn" aria-label="Следующий удар — сильный">Сила<small>F</small></button>
-      <button class="pb blk" id="block-btn" aria-label="Блок: держи">Блок<small>пробел</small></button>
+      <button class="pb" data-punch="jab">Джеб</button>
+      <button class="pb r" data-punch="cross">Кросс</button>
+      <button class="pb" data-punch="hook">Хук</button>
+      <button class="pb r" data-punch="upper">Аппер</button>
+      <button class="pb blk" id="block-btn" aria-label="Блок: держи">Блок</button>
     </div>
-    <div class="kbar" id="kbar"><span><b>WASD</b> ходьба</span><span><b>ЛКМ·J</b> джеб</span><span><b>ПКМ·K</b> кросс</span><span><b>U I</b> хуки</span><span><b>M ,</b> апперы</span><span><b>O·СКМ</b> оверхенд</span><span id="kb-body"><b>Shift</b>+удар = корпус</span><span id="kb-pow"><b>F</b> сила</span><span><b>Q E</b> слипы</span><span><b>C</b> нырок</span><span><b>X</b> отклон</span><span id="kb-blk"><b>Пробел</b> блок</span></div>
+    <div class="kbar" id="kbar"><span><b>WASD</b> ходьба</span><span><b>J/ЛКМ</b> джеб</span><span><b>K/ПКМ</b> кросс</span><span><b>L</b> хук</span><span><b>I</b> аппер</span><span id="kb-body"><b>+S</b> корпус</span><span id="kb-pow"><b>+W</b> сила</span><span><b>Q E C</b> уклоны</span><span id="kb-blk"><b>пробел</b> блок</span></div>
   </div>
 
   <div class="hl" id="hl" hidden><b>Лучшее в раунде</b><span id="hl-s"></span></div>
@@ -499,7 +489,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           <li><b>Блок</b> держи: снимает большую часть урона, апперкот и корпус проходят. Держи блок и тяни в сторону, будет уклон туда.</li>
           <li>Удары встают в очередь до трёх. После удачного уклона удар ×1.5.</li>
         </ul>
-        <div class="keys">WASD / стрелки ходьба · ЛКМ или J джеб · ПКМ или K кросс · U I хуки · M , апперкоты · O или колесо оверхенд · Shift + удар в корпус · F сильный · Q E слипы · C нырок · X отклон · пробел блок · Esc пауза</div>
+        <div class="keys">WASD / стрелки ходьба · ЛКМ или J джеб · ПКМ или K кросс · L хук · I апперкот · зажатая S/↓ + удар в корпус · зажатая W/↑ + удар силовой · Q E C уклоны · пробел блок · Esc пауза</div>
       </div>
       <div class="pfoot"><button class="btn pri" id="set-back">Назад</button></div>
     </div>
