@@ -61,7 +61,7 @@ function frame(now) {
     let dt = dtReal * G.slow; if (G.hitstop > 0) { G.hitstop -= dtReal; dt = 0; }
     G.t += dt; simDt = dt;
     if (G.paused) {}
-    else if (G.state === 'fight') { playerInput(); ai(dt); }
+    else if (G.state === 'fight') { playerInput(); if (!MITTS.on) ai(dt); }
     else if (G.state === 'ko' || G.state === 'kd') { if (followOK(P1)) playerInput(); aiFollow(); }
     P1.aimTarget = aimFor(P1, P2); P2.aimTarget = aimFor(P2, P1);
     P1.update(dt); P2.update(dt);
@@ -74,7 +74,7 @@ function frame(now) {
   }
   tq = performance.now(); pm.anim += tq - tp - PERF.rag; pm.phys += PERF.rag; tp = tq;
   P1.simulate(simDt); P2.simulate(simDt);
-  ropeTick(simDt); bagStep(simDt);
+  ropeTick(simDt); bagStep(simDt); mittsTick(simDt);
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
   FX.update(simDt); MIST.update(simDt); wearTick(simDt);
   tq = performance.now(); pm.fx += tq - tp; tp = tq;

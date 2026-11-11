@@ -333,7 +333,7 @@ class Fighter {
   footwork(dt) {
     if (!this.mark) this.mark = this.group.position.clone();
     if (this.slide || dt <= 0 || this.rag.on || this.ko || this.gu) return;
-    if (BAG.on && this === P2) return;   // the bag hangs where it hangs
+    if ((BAG.on || MITTS.on) && this === P2) return;   // the bag hangs where it hangs / the coach holds still
     const o = this.other, fight = G.state === 'fight' || (this === P1 && followOK(this) && this.moveDir), fwd = Math.sign(o.mark ? o.mark.x - this.mark.x : -this.mark.x) || 1;
     if (G.state === 'intro' && G.stareT && G.introT >= 0) {   // the stare-down (09b_cine.js): both walk in face to face, then back to their marks
       this.hold = null; this.advV = 0; this.adv += (G.stare * STARE_ADV - this.adv) * Math.min(1, dt * 7);
