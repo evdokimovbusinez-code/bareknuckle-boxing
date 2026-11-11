@@ -650,6 +650,7 @@ class Fighter {
     // the head jumped (a replay cut, a fall faster than the strands can follow): re-seat the hair instead of stretching it
     { const hp = _v1.setFromMatrixPosition(this.head.matrixWorld); if (this.lastHeadP && hp.distanceTo(this.lastHeadP) > (dt > 0 ? Math.max(0.12, 9 * dt) : 0.12)) this.simReset = true; (this.lastHeadP || (this.lastHeadP = new V3())).copy(hp); }
     this.shorts.targets(); if (HS) HS.ps.targets(); for (const t of this.tails) t.ps.targets();
+    const still = GFX.level === 'low';
     if (this.simReset) {
       this.shorts.p.set(this.shorts.t); this.shorts.o.set(this.shorts.t); if (HS) HS.ps.reset(); for (const t of this.tails) t.ps.reset(); this.simReset = false;
     } else if (dt > 0) {
@@ -658,12 +659,14 @@ class Fighter {
       this.simAcc = (this.simAcc || 0) + dt; this.simN = (this.simN || 0) + 1;
       if (GFX.simSkip < 2 || ((this.simN + (this.isPlayer ? 0 : 1)) & 1) === 0) {
         const sd = Math.min(this.simAcc, 0.05), steps = sd > (GFX.simSkip < 2 ? 0.02 : 0.04) ? 2 : 1, h = sd / steps; this.simAcc = 0;
-        for (let s = 0; s < steps; s++) { this.shorts.step(h); if (HS) HS.ps.step(h); for (const t of this.tails) t.ps.step(h); }
+        for (let s = 0; s < steps; s++) { this.shorts.step(h); if (!still) { if (HS) HS.ps.step(h); for (const t of this.tails) t.ps.step(h); } }
       } else { simPin(this.shorts); this.shorts.constrain();
-        if (this._hfP && (HS || this.tails.length)) { _hcM.multiplyMatrices(this.headFrame, _hcI.copy(this._hfP).invert()); if (HS) simCarry(HS.ps, _hcM); for (const t of this.tails) simCarry(t.ps, _hcM); }
+        if (!still && this._hfP && (HS || this.tails.length)) { _hcM.multiplyMatrices(this.headFrame, _hcI.copy(this._hfP).invert()); if (HS) simCarry(HS.ps, _hcM); for (const t of this.tails) simCarry(t.ps, _hcM); }
         if (HS) simPin(HS.ps); for (const t of this.tails) simPin(t.ps); }
     }
     (this._hfP || (this._hfP = new M4())).copy(this.headFrame);
+    // GFX low: no hair physics at all — the cut sits on the head in its rest shape (saves the solver on weak phones)
+    if (still) { if (HS) { HS.ps.p.set(HS.ps.t); HS.ps.o.set(HS.ps.t); } for (const t of this.tails) { t.ps.p.set(t.ps.t); t.ps.o.set(t.ps.t); } }
     this.shorts.render(); if (HS) { if (HS.tube) renderTubes(HS); else renderHair(HS); }
     for (const t of this.tails) { t.geo.attributes.position.needsUpdate = true; t.geo.computeVertexNormals(); }
     _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInv);
