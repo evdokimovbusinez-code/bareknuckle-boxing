@@ -5,3 +5,4 @@
 29|MiniMax M3.1 Flash|скакалка
 31|Tencent Hy4|скакалка
 32|Tencent Hy4|лапы
+38|Inkling 2 Small (бесплатная)|лапы
