@@ -12,10 +12,28 @@ function swatches(id, list, get, set, txt, noLook) {
   }
 }
 /* (the menu screens themselves — buildMenu, creator, settings, pause — are in 14_screens.js) */
-/* two hand buttons: a tap = a straight, a sideways swipe = a hook, an up swipe = an uppercut — all of the hand that was touched.
+/* one circular punch zone: a short swipe from the touch point picks the punch, the way a right stick does in Undisputed.
    window.__ctl is the control log for the issue-40 check: the last ten punches as the queue saw them ({ name, body, pow }). */
 window.__ctl = { last: [] };
 const ctlLog = (name, body, pow) => { const L = window.__ctl.last; L.push({ name, body, pow }); if (L.length > 10) L.shift(); };
+/* hints: the first three bouts are "learning" — the zone captions are bright and the desktop bar is always up; after that
+   the captions dim and the bar only comes back after 8 s of no input. The settings switch turns every hint off. The
+   bout count lives in its own localStorage key (not the save), read through try/catch so a blocked storage can't break input. */
+const HINT_KEY = 'bx_fights';
+function fightsSeen() { try { return +localStorage.getItem(HINT_KEY) || 0; } catch (_) { return 0; } }
+function bumpFights() { try { localStorage.setItem(HINT_KEY, String(fightsSeen() + 1)); } catch (_) {} hintTick(); }
+let lastAct = -1e9;
+function noteAct() { lastAct = G.real; }
+function hintFightStart() { noteAct(); if (G.mode !== 'bag') bumpFights(); }
+function hintTick() {
+  const on = OPT.keys, first3 = fightsSeen() < 3;
+  const kb = $('kbar'), desk = stage.classList.contains('desk');
+  const live = G.state === 'fight' || G.state === 'ko' || G.state === 'kd';
+  kb && kb.classList.toggle('show', !!(on && desk && live && (first3 || G.real - lastAct > 8)));
+  const pz = $('pzone');
+  if (pz) { pz.classList.toggle('bright', !!(on && first3)); pz.classList.toggle('nohint', !on); }
+}
+for (const ev of ['pointerdown', 'pointerup', 'pointermove', 'keydown', 'keyup', 'wheel']) document.addEventListener(ev, () => noteAct(), { passive: true });
 /* body / power are a direction held at the very moment of the punch: S / ↓ (or the stick pushed down) = to the body,
    W / ↑ (or the stick pushed up) = power. W / S still walk him round the ring; the stick's flick-and-release still dodges. */
 const punchMod = () => {
@@ -26,6 +44,7 @@ const punchMod = () => {
 const blip = (el, ms = 110) => { if (!el) return; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), ms); };
 const press = (type, n, el) => {
   if (G.paused) return;
+  noteAct();
   if (G.state === 'kd' && G.kd && G.kd.def === P1 && type === 'punch') { G.kd.mash = Math.min(G.kd.mash + 0.3, 6); blip(el); return; }
   if (G.state !== 'fight' && !(type === 'punch' && followOK(P1))) return;
   let body = false, pow = false;
@@ -34,39 +53,50 @@ const press = (type, n, el) => {
   if (Q.length < 3) Q.push({ type, name: n, at: G.real, body, pow });
   blip(el);
 };
-/* the hand is chosen by the button, never guessed: L taps to a jab, R to a cross; hooks / uppercuts keep that hand */
-const HAND = { L: { tap: 'jab', hook: 'hookL', upper: 'upperL' }, R: { tap: 'cross', hook: 'hookR', upper: 'upperR' } };
-document.querySelectorAll('[data-hand]').forEach(b => {
-  const P = HAND[b.dataset.hand], fl = b.querySelector('.fl'); let g = null;
-  const fire = (name, label) => {
-    press('punch', name, b);
-    if (label && fl) {   // a short flash of the recognized swipe on the button
-      fl.textContent = label; fl.classList.remove('on'); void fl.offsetWidth; fl.classList.add('on');
-      clearTimeout(fl._t); fl._t = setTimeout(() => fl.classList.remove('on'), 320);
-    }
-  };
-  // the same rotation transform the stick uses: after it, dx/dy are in the frame the player actually sees
-  const dir = e => { let dx = e.clientX - g.x, dy = e.clientY - g.y;
-    if (stage.classList.contains('rot')) { const t = dx; dx = dy; dy = -t; }
-    return { dx, dy }; };
-  b.addEventListener('pointerdown', e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (_) {}
-    g = { id: e.pointerId, x: e.clientX, y: e.clientY, fired: false, peak: 0 }; });
-  b.addEventListener('pointermove', e => {
-    if (!g || g.fired || e.pointerId !== g.id) return;
-    const { dx, dy } = dir(e), peak = Math.hypot(dx, dy); g.peak = Math.max(g.peak, peak);
-    if (peak > 24) {   // a swipe fires at once, not on release
-      g.fired = true;
-      if (Math.abs(dx) >= Math.abs(dy)) fire(P.hook, 'ХУК');
-      else if (dy < 0) fire(P.upper, 'АППЕР');
-      // a down swipe is consumed: no punch, and no tap when the finger lifts
-    }
-  });
-  for (const ev of ['pointerup', 'pointercancel']) b.addEventListener(ev, e => {
-    if (!g || e.pointerId !== g.id) return;
-    if (!g.fired && g.peak < 18) fire(P.tap, null);   // a quick, still tap = the straight of this hand
-    g = null;
-  });
-});
+/* the punch zone: six 60° sectors, a narrow ±15° band about straight up = cross, about straight down = nothing,
+   a still tap = jab. The hand is never guessed — the direction of the swipe is the punch. */
+const PZ_LABEL = { jab: 'ДЖЕБ', cross: 'КРОСС', hookL: 'ХУК', hookR: 'ХУК', upperL: 'АППЕР', upperR: 'АППЕР' };
+const punchFromSwipe = (dx, dy) => {
+  let a = Math.atan2(-dy, dx) * 180 / Math.PI; if (a < 0) a += 360;   // 0 = right, 90 = up, in the frame the player sees
+  if (a >= 75 && a <= 105) return 'cross';    // straight up
+  if (a >= 255 && a <= 285) return null;      // straight down: no punch
+  const sec = Math.floor(((a + 30) % 360) / 60);   // centres 0/60/120/180/240/300 → six sectors
+  return ['hookR', 'cross', 'jab', 'hookL', 'upperL', 'upperR'][sec];
+};
+{ const pzone = $('pzone');
+  if (pzone) {
+    const cap = pzone.querySelector('.pz-fl');
+    const flash = name => {
+      const set = el => { if (!el) return; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('on'), 320); };
+      if (cap) { cap.textContent = PZ_LABEL[name] || ''; set(cap); }
+      set(pzone.querySelector(`.pl[data-p="${name}"]`));
+    };
+    const fire = name => { press('punch', name); flash(name); };
+    let g = null;
+    // the same rotation transform the stick uses: afterwards dx/dy are in the frame the player actually sees
+    const dir = e => { let dx = e.clientX - g.x, dy = e.clientY - g.y;
+      if (stage.classList.contains('rot')) { const t = dx; dx = dy; dy = -t; }
+      return { dx, dy }; };
+    pzone.addEventListener('pointerdown', e => { e.preventDefault(); try { pzone.setPointerCapture(e.pointerId); } catch (_) {}
+      g = { id: e.pointerId, x: e.clientX, y: e.clientY, armed: true, swiped: false }; });
+    pzone.addEventListener('pointermove', e => {
+      if (!g || e.pointerId !== g.id) return;
+      const { dx, dy } = dir(e), d = Math.hypot(dx, dy);
+      if (g.armed && d > 24) {         // a swipe fires at once, without waiting for the release
+        g.armed = false; g.swiped = true;
+        const name = punchFromSwipe(dx, dy);
+        if (name) fire(name);
+      } else if (!g.armed && d < 18) {   // back at the centre: arm the next swipe, the touch point is the new centre
+        g.x = e.clientX; g.y = e.clientY; g.armed = true;
+      }
+    });
+    for (const ev of ['pointerup', 'pointercancel']) pzone.addEventListener(ev, e => {
+      if (!g || e.pointerId !== g.id) return;
+      if (!g.swiped) fire('jab');       // a still tap = a jab, so it can be tapped quickly
+      g = null;
+    });
+  }
+}
 const setBlock = v => { if (P1) P1.blocking = v && G.state === 'fight'; const b = $('block-btn'); b && b.classList.toggle('on', !!v); };
 // block: hold the button (or space)
 { const bb = $('block-btn'); bb.addEventListener('pointerdown', e => { e.preventDefault(); try { bb.setPointerCapture(e.pointerId); } catch (_) {} setBlock(true); });
@@ -126,11 +156,11 @@ for (const ev of ['touchmove', 'gesturestart']) document.addEventListener(ev, e 
     btn.addEventListener('click', e => { e.preventDefault();
       try { const p = !inFs() && req ? req.call(root) : inFs() && exit ? exit.call(document) : null; p && p.catch && p.catch(() => {}); } catch (_) {} }); }
 }
-/* desktop: WASD / arrows walk, U I hooks, J K straights, N M uppercuts (left column = left hand, right = right),
-   mouse LMB jab / RMB cross, Q E slips, C duck, Space block; W / S held at the punch make it a power / body shot.
-   Physical keys (e.code): any layout works */
+/* desktop: WASD / arrows walk, U I straights (top row: jab / cross), J K hooks (middle row), N M uppercuts (bottom row) —
+   the same geometry as the swipes. Mouse LMB jab / RMB cross, Q E slips, C duck, Space block; W / S held at the punch
+   make it a power / body shot. Physical keys (e.code): any layout works */
 const MV_KEYS = { ArrowLeft: ['kx', -1], ArrowRight: ['kx', 1], KeyA: ['kx', -1], KeyD: ['kx', 1], ArrowUp: ['ky', 1], ArrowDown: ['ky', -1], KeyW: ['ky', 1], KeyS: ['ky', -1] };
-const ACT_KEYS = { KeyU: ['punch', 'hookL'], KeyI: ['punch', 'hookR'], KeyJ: ['punch', 'jab'], KeyK: ['punch', 'cross'], KeyN: ['punch', 'upperL'], KeyM: ['punch', 'upperR'],
+const ACT_KEYS = { KeyU: ['punch', 'jab'], KeyI: ['punch', 'cross'], KeyJ: ['punch', 'hookL'], KeyK: ['punch', 'hookR'], KeyN: ['punch', 'upperL'], KeyM: ['punch', 'upperR'],
   KeyQ: ['dodge', 'slipL'], KeyE: ['dodge', 'slipR'], KeyC: ['dodge', 'duck'] };
 const HELD = new Set();
 const mvKeys = () => { let x = 0, y = 0; for (const c of HELD) { const m = MV_KEYS[c]; if (m) { if (m[0] === 'kx') x += m[1]; else y += m[1]; } } MV.kx = Math.sign(x); MV.ky = Math.sign(y); setMove();

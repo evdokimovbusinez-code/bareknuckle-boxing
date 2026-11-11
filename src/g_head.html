@@ -106,16 +106,26 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .db.wk{border-color:rgba(255,255,255,.22);font-size:clamp(10px,2.2vmin,13px)}.db.wk.on{border-color:var(--gold);background:rgba(226,177,74,.18)}.db.bk{grid-column:1;grid-row:3}.db.fw{grid-column:3;grid-row:3}.db.up{grid-column:2;grid-row:1}.db.lf{grid-column:1;grid-row:2}.db.bl{grid-column:2;grid-row:2;border-radius:50%;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}.db.ri{grid-column:3;grid-row:2}.db.dn{grid-column:2;grid-row:3}
 .db small,.pb small{display:block;font-family:var(--mono);font-weight:500;font-size:9px;color:var(--muted);letter-spacing:.04em;margin-top:3px;text-transform:none}
 .db:active,.pb:active,.db.on,.pb.on{transform:scale(.88);border-color:var(--gold);background:rgba(226,177,74,.22)}
-/* the two hand buttons sit bottom-right; each is about a quarter of the (short) screen height, for the right thumb */
-.punches{position:absolute;right:var(--pr);bottom:var(--pb);display:grid;grid-template-columns:repeat(2,clamp(90px,24vmin,140px));gap:8px}
-.pb{width:100%;height:clamp(84px,25vmin,150px);font-size:clamp(16px,3.6vmin,24px)}
-.pb.r{border-color:rgba(226,80,90,.5)}
-.pb.blk{grid-column:1/3;height:clamp(44px,12vmin,58px);border-radius:999px;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}
-/* the recognized swipe flashes on the button for ~0.3 s */
-.pb.hand{overflow:hidden}
-.pb.hand .fl{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;border-radius:11px;background:rgba(226,177,74,.34);font-family:var(--display);font-weight:900;font-size:clamp(18px,5vmin,30px);color:#fff;opacity:0}
-.pb.hand .fl.on{animation:flrec .3s ease-out}
+/* the punch zone (right) is a circular pad about the size of the stick; БЛОК sits under it, for the right thumb */
+.punches{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;flex-direction:column;align-items:center;gap:8px}
+.pzone{position:relative;width:clamp(160px,44vmin,240px);height:clamp(160px,44vmin,240px);border-radius:50%;
+  border:1px solid rgba(255,255,255,.22);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.5) 72%);touch-action:none}
+.pzone .pz-c{position:absolute;left:50%;top:50%;width:17%;height:17%;transform:translate(-50%,-50%);border-radius:50%;border:1px dashed rgba(226,177,74,.4);background:rgba(226,177,74,.07);pointer-events:none}
+.pzone .pl{position:absolute;transform:translate(-50%,-50%);font:600 clamp(9px,2.1vmin,12px) var(--mono);letter-spacing:.04em;color:var(--text);white-space:nowrap;pointer-events:none;opacity:.3;transition:opacity .15s}
+.pzone.bright .pl{opacity:.7}
+.pzone .pl.on{opacity:1;color:var(--gold);text-shadow:0 0 12px rgba(226,177,74,.9)}
+.pzone.nohint .pl{display:none}
+.pzone .pl[data-p="jab"]{left:27%;top:19%}
+.pzone .pl[data-p="cross"]{left:73%;top:19%}
+.pzone .pl[data-p="hookR"]{left:87%;top:50%}
+.pzone .pl[data-p="upperR"]{left:73%;top:81%}
+.pzone .pl[data-p="upperL"]{left:27%;top:81%}
+.pzone .pl[data-p="hookL"]{left:13%;top:50%}
+/* the recognized swipe flashes its caption in the middle of the zone for ~0.3 s */
+.pz-fl{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--display);font-weight:900;font-size:clamp(16px,4.6vmin,28px);color:#fff;text-shadow:0 0 16px rgba(226,177,74,.95);white-space:nowrap;pointer-events:none;opacity:0}
+.pz-fl.on{animation:flrec .3s ease-out}
 @keyframes flrec{0%{opacity:0}15%{opacity:1}70%{opacity:1}100%{opacity:0}}
+.pb.blk{width:clamp(120px,32vmin,175px);height:clamp(42px,11vmin,56px);border-radius:999px;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}
 /* the floating stick: no fixed home, a faint hint at rest, solid under the thumb; the document catches the left-half touch */
 .stick{position:absolute;left:15%;top:78%;width:clamp(160px,44vmin,240px);height:clamp(160px,44vmin,240px);transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(255,255,255,.18);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.55) 70%);touch-action:none;pointer-events:none;opacity:.26;transition:opacity .14s}
 .stick.on{opacity:1}
