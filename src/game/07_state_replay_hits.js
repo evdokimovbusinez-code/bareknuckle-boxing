@@ -301,7 +301,7 @@ function knockdown(att, def, dir, power, name, fwd, sev, kind) {
   } else def.takeKnee(type === 'liver' ? 'liver' : 'knee');
   G.slow = 0.5; G.slowT = 0.35; G.shake = 0.04;
   msg('Нокдаун', 'ko'); sfx.fall(); EVT.emit('kd', { pos: def.headNow });
-  if (def === P1) setTimeout(() => { if (G.state === 'kd' && G.kd.def === P1 && !P1.gu) msg('Жми удары — вставай!', 'count'); }, 900);
+  if (def === P1) setTimeout(() => { if (G.state === 'kd' && G.kd.def === P1 && !P1.gu) msg('Жми удары — вставай!', 'tip kdp'); }, 900);
 }
 function kdTick(dt) {
   const K = G.kd, D = K.def;
