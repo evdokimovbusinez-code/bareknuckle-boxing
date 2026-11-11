@@ -104,7 +104,8 @@ const sfx = (() => {
     yard: { len: 0.3, lp: 2600, wet: 0.05, taps: [[0.12, 0.5], [0.19, 0.25]] },
     tires: { len: 0.2, lp: 2400, wet: 0.03 },
     parking: { len: 2.2, lp: 1700, wet: 0.6, amb: 0.3, taps: [[0.04, 0.5], [0.075, 0.4], [0.13, 0.3]] },
-    warehouse: { len: 2.8, lp: 3200, wet: 0.55, amb: 0.5, taps: [[0.055, 0.5], [0.12, 0.4], [0.2, 0.3], [0.31, 0.2]] } };
+    warehouse: { len: 2.8, lp: 3200, wet: 0.55, amb: 0.5, taps: [[0.055, 0.5], [0.12, 0.4], [0.2, 0.3], [0.31, 0.2]] },
+    metro: { len: 2.6, lp: 2900, wet: 0.5, amb: 0.4, taps: [[0.035, 0.5], [0.07, 0.4], [0.16, 0.3], [0.26, 0.2]] } };   // a long stone hall: the slap comes back off the track walls, then from the ends
   const AMB_LVL = 1;
   const impulse = S => { const sr = ac.sampleRate, n = (sr * S.len) | 0, b = ac.createBuffer(2, n, sr), k = 1 - Math.exp(-2 * Math.PI * S.lp / sr);
     for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); let y = 0, e = 0;
@@ -154,8 +155,31 @@ const sfx = (() => {
           t += Math.random() < 0.25 ? 0.13 + 0.1 * Math.random() : 0.5 + 1.6 * Math.random(); } }));
       const n = loop(b), g = gain(0.1); n.connect(g).connect(out); L.push(n);
     },
+    // the metro station at night: the ventilation shafts breathe, the escalators grind far away, a transformer hums
+    metro(out, L) {
+      const [, lo] = band(L, out, 'lowpass', 110, 0.7, 0.32); wander(L, lo.gain, 0.2, 0.0002, 1);
+      const [, es] = band(L, out, 'bandpass', 310, 2.2, 0.035), cl = ac.createOscillator(), cg = gain(0.02); cl.frequency.value = 6.4; cl.connect(cg).connect(es.gain); L.push(cl);
+      for (const [fq, lvl] of [[100, 0.012], [200, 0.006]]) { const o = ac.createOscillator(), g = gain(lvl); o.frequency.value = fq; o.connect(g).connect(out); L.push(o); }
+      const [w, wg] = band(L, out, 'bandpass', 620, 1.4, 0.02); wander(L, wg.gain, 0.03, 0.0004, 1.5); wander(L, w.frequency, 300, 0.0003, 1.5);
+    },
   };
+  let trn = null;   // the metro train (13f_loc_metro.js): its looped rumble, built on first use
   return {
+    /* the train in the station: lv 0..1 = how loud (how much of it is here × how fast), v = its speed (m/s): a low roar, the clatter
+       of the wheels on the joints (the roar beaten at a rate that follows the speed), the whine of the motors rising with it */
+    train(lv, v) { const a = ac; if (!a || (!trn && lv <= 0)) return; const t = a.currentTime;
+      if (!trn) { const g = gain(0), lo = loop(noise), f1 = filt('lowpass', 140, 0.8), g1 = gain(1.5), hi = loop(noise, 0.7), f2 = filt('bandpass', 1300, 0.7), g2 = gain(0.16), wh = a.createOscillator(), f3 = filt('lowpass', 900), g3 = gain(0.03), bt = a.createOscillator(), bg = gain(0.5), am = gain(0.6);
+        wh.type = 'sawtooth'; bt.type = 'square'; lo.connect(f1).connect(g1).connect(am); hi.connect(f2).connect(g2).connect(am); bt.connect(bg).connect(am.gain); am.connect(g); wh.connect(f3).connect(g3).connect(g); g.connect(master); g.connect(gain(0.5)).connect(conv);
+        for (const n of [lo, hi, wh, bt]) n.start(t); trn = { g, wh, bt, f2 }; }
+      trn.g.gain.setTargetAtTime(0.5 * clamp(lv, 0, 1), t, 0.25); trn.wh.frequency.setTargetAtTime(70 + 26 * v, t, 0.2); trn.bt.frequency.setTargetAtTime(0.4 + 0.5 * v, t, 0.2); trn.f2.frequency.setTargetAtTime(700 + 90 * v, t, 0.2); },
+    // air let out of the brakes
+    trainHiss(p = 1) { const a = ac; if (!a) return; const t = a.currentTime, n = a.createBufferSource(), f = filt('highpass', 2600), g = a.createGain(); n.buffer = noise; n.loop = true; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.11 * p, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 1.6); },
+    // the doors: a hiss of the pneumatics and the leaves hitting their stops (closing: harder, with the warning tone before it)
+    trainDoors(open) { const a = ac; if (!a) return; const t = a.currentTime; this.trainHiss(0.5);
+      if (!open) for (const [d, fq] of [[0, 660], [0.22, 520]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.value = fq; env(g, t + d, 0.01, 0.2, 0.05); o.connect(g).connect(bus); o.start(t + d); o.stop(t + d + 0.3); }
+      for (const d of [1.2, 1.26]) { const n = a.createBufferSource(), f = filt('lowpass', open ? 500 : 800), g = a.createGain(); n.buffer = noise; env(g, t + d, 0.003, 0.09, open ? 0.25 : 0.45); n.connect(f).connect(g).connect(bus); n.start(t + d, rr() * 0.5); n.stop(t + d + 0.15); } },
+    // the horn out of the tunnel before the train shows
+    trainHorn() { const a = ac; if (!a) return; const t = a.currentTime + 0.3; for (const fq of [311, 370]) { const o = a.createOscillator(), f = filt('lowpass', 1100), g = a.createGain(); o.type = 'sawtooth'; o.frequency.value = fq; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.035, t + 0.06); g.gain.setValueAtTime(0.035, t + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9); o.connect(f).connect(g).connect(conv); o.start(t); o.stop(t + 1); } },
     unlock() { ctx(); if (ac && wantId) this.place(wantId); },
     vol(v) { if (master) master.gain.value = v; },
     /* the location changed (setLocation): its echo for the punches and its ambience (cross-faded). Before the first sound of the
