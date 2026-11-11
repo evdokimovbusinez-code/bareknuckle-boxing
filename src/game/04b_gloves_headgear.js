@@ -127,6 +127,9 @@ function mmaShell(F, mat) {
    x to his left… y up, z to the face), pads are pillows laid on that surface with a small gap. —— */
 function headMap(F) {
   if (GEAR.hmap) return GEAR.hmap;
+  // a hat saved in the look is built at boot, before the first tick has set the head frame (still identity):
+  // measured then, every radius is the distance from the world origin and the cap comes out a metre wide
+  F.group.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert();
   const NA = 72, NE = 36, raw = new Float32Array(NA * NE), gh = GEAR.gh, n = gh.length / 3, p = new V3(), body = F.body, PI = Math.PI;
   for (let i = 0; i < n; i++) { if (gh[i * 3 + 1] !== 5) continue; body.getVertexPosition(i, p); p.applyMatrix4(body.matrixWorld).applyMatrix4(F.headFrameInv).multiplyScalar(100);
     const r = p.length(), ei = clamp(Math.floor((Math.asin(p.y / r) / PI + 0.5) * NE), 0, NE - 1), a = Math.atan2(p.x, p.z) / (2 * PI);
