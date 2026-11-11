@@ -125,6 +125,7 @@ function endReplay() {
 const evades = (att, n, d) => !!d && (att.bodyShot ? d.type === 'lean' : EV[n].includes(d.type));
 function aimFor(att, def) {
   if (!att.cur) return null; const n = att.cur, d = def.dodge;
+  if (MITTS.on) return att === P1 ? att.aimV.copy(MITTS.aim) : null;   // the coach's mitts: the fed pad
   if (BAG.on) return def === P2 ? bagAim(att) : null;   // the heavy bag: the leather, wherever it has swung to
   if (att.bodyShot) return att.aimV.copy(def.ribs[att.ribIdx].w);
   const ev = d && d.t > 0.03 && evades(att, n, d), c = ev ? def.headNeutral : def.headNow, kn = att.knuckle(_v5);
@@ -152,6 +153,7 @@ function whiffPunch(att) {
   if (att === P1) popup(att.knuckle(new V3()), 'мимо', 'dodge');
 }
 function contactTest(att, def) {
+  if (MITTS.on) return att === P1 ? mittContact(att) : null;   // the coach's mitts: the fist on the pad
   if (BAG.on) return bagContact(att);
   const kn = att.knuckle(_v5);
   if (att.bodyShot) { const r = def.ribs[att.ribIdx].w; return kn.distanceTo(r) < 0.1 ? r.clone() : null; }
@@ -188,6 +190,7 @@ function followHit(att, name, contact) {
 function resolveHit(att, name, contact) {
   const def = att.other; if (def.ko || G.state !== 'fight') { if (followOK(att)) followHit(att, name, contact); return; }
   if (BAG.on) { if (att === P1) bagHit(att, name, contact); return; }
+  if (MITTS.on) { if (att === P1) mittHit(att, name, contact); return; }
   const P = PUNCH[name], d = def.dodge, evading = !!d && d.t > 0.05 && d.t < 0.44, body = att.bodyShot;
   const evaded = evading && evades(att, name, d);
   let pos = contact || (body ? def.ribs[att.ribIdx].w.clone() : def.headNow.clone().add(_v3.copy(att.knuckle(_v4)).sub(def.headNow).setLength(0.1)));

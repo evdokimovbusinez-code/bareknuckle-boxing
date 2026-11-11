@@ -66,6 +66,7 @@ function startSpar() { if (G.mode === 'career') { G.diff = G.userDiff; rollOppon
 function startQuick() { if (G.mode === 'career') { G.diff = G.userDiff; rollOpponent(); } G.mode = 'quick'; startFight(true); }
 function startFight(fromMode) {
   if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); }
+  mittStop();   // the coach's mitts (09d_mitts.js) are not a fight
   for (const F of [P1, P2]) F.sparGear(G.mode === 'spar');
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
   if (G.mode !== 'career') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }

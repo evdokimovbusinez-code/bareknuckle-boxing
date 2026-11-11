@@ -9,7 +9,7 @@ const STYLES = {
 };
 const AI = { lat: 0, latT: 0, backT: 0, t: 1.2, combo: 0, seen: -1, dodgeAt: 0, dodgeType: 'duck', blockUntil: 0, feintAt: 0, style: STYLES.brawler };
 function ai(dt) {
-  if (BAG.on) { AI.t = 9; return; }
+  if (BAG.on || MITTS.on) { AI.t = 9; return; }
   const me = P2, pl = P1, D = DIFFS[G.diff], S = AI.style;
   if (me.doomed || me.liver || me.wind > G.t) return;
   me.blocking = G.t < AI.blockUntil;
@@ -74,6 +74,7 @@ function playerInput() {
 function show(id, on) { $(id).hidden = !on; }
 function toMenu() {
   socFlush(); socLeave();   // the frame of the last post; a challenge's place and level go back (15_social.js)
+  mittStop();
   if (G.mode === 'career') G.diff = G.userDiff; BAG.on = false; showP2(true); BAG.g.visible = false; updateMenu(); for (const F of [P1, P2]) F.sparGear(false);
   G.state = 'menu'; G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0; wearReset();
   P1.resetState(); P2.resetState(); rollOpponent();
