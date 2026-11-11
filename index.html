@@ -5321,6 +5321,10 @@ function tatApply(F, L) {
 const _walkQ = [], _ik1 = new Quat(), _ik2 = new Quat(), _ik3 = new Quat(), _po1 = new V3(), _po2 = new V3(), _po3 = new V3(), _po4 = new V3(), _poq1 = new Quat(), _poq2 = new Quat();
 const _pf1 = new V3(), _pf2 = new V3(), _pf3 = new V3(), _pf4 = new V3(), _pfq = new Quat();
 // pinned points of a cloth / strand set follow their targets (used on the frames where the solver is skipped)
+// a skipped frame (GFX.simSkip = 2) carries the free hair points rigidly with the head instead of leaving them behind:
+// left where they were, they trailed every quick head move by a frame and then jumped — the hair looked like it ran at half rate
+const _hcM = new M4(), _hcI = new M4(), _hcV = new V3();
+function simCarry(S, M) { for (const A of [S.p, S.o]) for (let k = 0; k < A.length; k += 3) { _hcV.fromArray(A, k).applyMatrix4(M).toArray(A, k); } }
 function simPin(S) { const p = S.p, t = S.t, inv = S.inv; for (let i = 0, n = inv.length; i < n; i++) if (inv[i] === 0) { const k = 3 * i; p[k] = t[k]; p[k + 1] = t[k + 1]; p[k + 2] = t[k + 2]; } }
 class Fighter {
   constructor(isPlayer) {
@@ -5973,8 +5977,11 @@ class Fighter {
       if (GFX.simSkip < 2 || ((this.simN + (this.isPlayer ? 0 : 1)) & 1) === 0) {
         const sd = Math.min(this.simAcc, 0.05), steps = sd > (GFX.simSkip < 2 ? 0.02 : 0.04) ? 2 : 1, h = sd / steps; this.simAcc = 0;
         for (let s = 0; s < steps; s++) { this.shorts.step(h); if (HS) HS.ps.step(h); for (const t of this.tails) t.ps.step(h); }
-      } else { simPin(this.shorts); this.shorts.constrain(); if (HS) simPin(HS.ps); for (const t of this.tails) simPin(t.ps); }
+      } else { simPin(this.shorts); this.shorts.constrain();
+        if (this._hfP && (HS || this.tails.length)) { _hcM.multiplyMatrices(this.headFrame, _hcI.copy(this._hfP).invert()); if (HS) simCarry(HS.ps, _hcM); for (const t of this.tails) simCarry(t.ps, _hcM); }
+        if (HS) simPin(HS.ps); for (const t of this.tails) simPin(t.ps); }
     }
+    (this._hfP || (this._hfP = new M4())).copy(this.headFrame);
     this.shorts.render(); if (HS) { if (HS.tube) renderTubes(HS); else renderHair(HS); }
     for (const t of this.tails) { t.geo.attributes.position.needsUpdate = true; t.geo.computeVertexNormals(); }
     _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInv);
