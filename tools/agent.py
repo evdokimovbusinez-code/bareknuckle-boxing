@@ -11,7 +11,7 @@ async def main():
     prompt = open(sys.argv[1]).read()
     eff = os.environ.get("BOT_EFFORT") or None   # reasoning effort only for Claude models
     opts = ClaudeAgentOptions(model=os.environ.get("BOT_MODEL", "z-ai/glm-5.3-flash"), effort=eff,
-                              max_budget_usd=float(os.environ.get("BOT_BUDGET", "8")), max_turns=80, max_buffer_size=64 * 1024 * 1024, allowed_tools=TOOLS, permission_mode="acceptEdits",
+                              max_budget_usd=float(os.environ.get("BOT_BUDGET", "8")), max_turns=int(os.environ.get("BOT_TURNS", "100")), max_buffer_size=64 * 1024 * 1024, allowed_tools=TOOLS, permission_mode="acceptEdits",
                               setting_sources=["project"], system_prompt={"type": "preset", "preset": "claude_code"})
     out = {"is_error": True, "result": "no result", "cost": 0, "turns": 0}
     try:
@@ -25,7 +25,8 @@ async def main():
           elif n == "ResultMessage":
               models = ", ".join(sorted((m.model_usage or {}).keys())) or opts.model
               out = {"is_error": bool(m.is_error), "result": m.result or "; ".join(map(str, m.errors or [])) or (m.subtype or ""),
-                     "cost": m.total_cost_usd or 0, "turns": m.num_turns, "model": f"{models} · effort {opts.effort}"}
+                     "cost": m.total_cost_usd or 0, "turns": m.num_turns, "model": f"{models} · effort {opts.effort}",
+                     "usage": m.model_usage or {}, "ms": getattr(m, "duration_ms", 0)}
     except Exception as e:   # keep partial work: the workflow still commits it and reports the error
         out = {**out, "is_error": True, "result": f"SDK error: {str(e)[:300]}"}
     json.dump(out, open(".claude-result.json", "w"), ensure_ascii=False)

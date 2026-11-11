@@ -80,14 +80,21 @@ jobs:
           else   # OpenRouter speaks the Anthropic API: the SDK runs any of its models
             export ANTHROPIC_BASE_URL="https://openrouter.ai/api" ANTHROPIC_AUTH_TOKEN="$OPENROUTER_KEY" ANTHROPIC_API_KEY=""
             export ANTHROPIC_DEFAULT_HAIKU_MODEL="$BOT_MODEL" ANTHROPIC_SMALL_FAST_MODEL="$BOT_MODEL" BOT_EFFORT=""
+            export BOT_BUDGET=100   # the SDK prices unknown models wrongly; the real spend is read from the key below
+            curl -s https://openrouter.ai/api/v1/key -H "Authorization: Bearer $OPENROUTER_KEY" | jq -r '.data.usage' > /tmp/or0 || true
           fi
           python tools/agent.py /tmp/prompt.md
+          if [ -s /tmp/or0 ]; then
+            U1=$(curl -s https://openrouter.ai/api/v1/key -H "Authorization: Bearer $OPENROUTER_KEY" | jq -r '.data.usage')
+            echo "OpenRouter key usage: $(cat /tmp/or0) -> $U1 (shared key: parallel runs overlap)" | tee /tmp/orspend
+          fi
       - name: Commit, push, PR
         if: always()
         run: |
           B="${{ steps.br.outputs.b }}"
           RES=$(jq -r 'if .is_error then "❌ Ошибка: " + .result else "" end' .claude-result.json 2>/dev/null || echo "❌ Бот упал, см. лог")
           COST=$(jq -r '"$" + ((.cost*1000|round)/1000|tostring) + ", ходов: " + (.turns|tostring) + ", модель: " + (.model // "?")' .claude-result.json 2>/dev/null || echo "?")
+          COST="$COST $(cat /tmp/orspend 2>/dev/null) · tokens: $(jq -c '.usage | map_values({in: .inputTokens, out: .outputTokens, cr: .cacheReadInputTokens, cw: .cacheCreationInputTokens})' .claude-result.json 2>/dev/null) · $(jq -r '(.ms/60000|floor|tostring) + " мин"' .claude-result.json 2>/dev/null)"
           SUM=$(cat .claude-summary.md 2>/dev/null || echo "")
           rm -f .claude-summary.md .claude-result.json
           if [ -n "$(git status --porcelain)" ]; then
