@@ -1,0 +1,4 @@
+23|DeepSeek V4.1 Flash|скакалка
+24|GLM-5.3-Flash|скакалка
+26|DeepSeek V4.1 Flash|лапы
+27|GLM-5.3-Flash|лапы
