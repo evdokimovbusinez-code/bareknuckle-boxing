@@ -71,9 +71,12 @@ jobs:
           # [ds] = DeepSeek V4.1 Flash, [mimo] = MiMo-V2.6-Pro, [glm-x] = GLM-5.3-FlashX, [mmx] = MiniMax M3.1 Flash, [hy4] = Tencent Hy4, [terra] = GPT-6.1 Terra, [sonnet] / [opus] / [fable] = Claude through the Anthropic API key
           BOT_MODEL: ${{ contains(github.event.issue.title, '[fable]') && 'claude-fable-5-2' || contains(github.event.issue.title, '[sonnet]') && 'claude-sonnet-5-5' || contains(github.event.issue.title, '[opus]') && 'claude-opus-5-5' || contains(github.event.issue.title, '[ds]') && 'deepseek/deepseek-v4.1-flash' || contains(github.event.issue.title, '[mimo]') && 'xiaomi/mimo-v2.6-pro' || contains(github.event.issue.title, '[glm-x]') && 'z-ai/glm-5.3-flashx' || contains(github.event.issue.title, '[mmx]') && 'minimax/minimax-m3.1-flash' || contains(github.event.issue.title, '[hy4]') && 'tencent/hy4' || contains(github.event.issue.title, '[terra]') && 'openai/gpt-6.1-terra' || 'z-ai/glm-5.3-flash' }}
           BOT_EFFORT: high
+          ISSUE_TITLE: ${{ github.event.issue.title }}   # "[m=vendor/model]" in the title = any OpenRouter model (e.g. a :free one)
           BOT_MINUTES: "80"            # the agent stops itself after this (job limit 100), partial work is committed
           BOT_BUDGET: "8"               # hard cap per task, USD (Claude models; OpenRouter spend is capped by the key's own limit)
         run: |
+          if [[ "$ISSUE_TITLE" =~ \[m=([A-Za-z0-9._:/-]+)\] ]]; then BOT_MODEL="${BASH_REMATCH[1]}"; fi
+          echo "model: $BOT_MODEL"
           pip install -q claude-agent-sdk playwright
           npm i --no-save --silent three@0.160.0 cannon-es@0.20.0
           if [[ "$BOT_MODEL" == claude-* ]]; then
