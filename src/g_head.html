@@ -29,6 +29,11 @@ body{background:var(--ink);color:var(--text);font-family:var(--body);overflow:hi
 #stage.rot{transform-origin:0 0;transform:rotate(90deg) translateY(-100%);
   --pl:max(16px,env(safe-area-inset-top,0px));--pr:max(16px,env(safe-area-inset-bottom,0px));--pt:max(12px,env(safe-area-inset-right,0px));--pb:max(12px,env(safe-area-inset-left,0px))}
 #c{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none}
+/* no page sliding while fighting on a touch screen: the scene and the pad swallow every gesture. Menus keep their own
+   scrolling (shop / creator / settings are siblings of .pad, not its children; the pad is hidden there anyway). */
+html,body,#stage{overscroll-behavior:none}
+#stage,#c,.pad,.pad > *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#c,.pad,.pad *{touch-action:none}
 .vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 95% at 50% 45%,transparent 55%,rgba(0,0,0,.55) 100%)}
 .flash{position:absolute;inset:0;pointer-events:none;background:#fff;opacity:0}
 .flash.on{animation:fl .22s ease-out}
@@ -91,7 +96,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 @keyframes fly{0%{opacity:0;transform:translate(-50%,-20%) scale(.5) rotate(-8deg)}18%{opacity:1;transform:translate(-50%,-80%) scale(1.25) rotate(4deg)}35%{transform:translate(-50%,-100%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-190%) scale(.95)}}
 
 /* pad */
-.pad{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:flex-end;padding:0 var(--pr) var(--pb) var(--pl);pointer-events:none}
+.pad{position:absolute;inset:0;pointer-events:none}
 .pad > *{pointer-events:auto}
 .dpad{display:grid;grid-template-columns:repeat(3,clamp(54px,14vmin,76px));grid-template-rows:repeat(3,clamp(46px,12vmin,64px));gap:3px;align-items:center;justify-items:center}
 .db,.pb{position:relative;display:grid;place-items:center;align-content:center;border-radius:12px;border:1px solid var(--line);background:var(--panel);
@@ -101,18 +106,33 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .db.wk{border-color:rgba(255,255,255,.22);font-size:clamp(10px,2.2vmin,13px)}.db.wk.on{border-color:var(--gold);background:rgba(226,177,74,.18)}.db.bk{grid-column:1;grid-row:3}.db.fw{grid-column:3;grid-row:3}.db.up{grid-column:2;grid-row:1}.db.lf{grid-column:1;grid-row:2}.db.bl{grid-column:2;grid-row:2;border-radius:50%;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}.db.ri{grid-column:3;grid-row:2}.db.dn{grid-column:2;grid-row:3}
 .db small,.pb small{display:block;font-family:var(--mono);font-weight:500;font-size:9px;color:var(--muted);letter-spacing:.04em;margin-top:3px;text-transform:none}
 .db:active,.pb:active,.db.on,.pb.on{transform:scale(.88);border-color:var(--gold);background:rgba(226,177,74,.22)}
-.punches{display:grid;grid-template-columns:repeat(3,clamp(54px,14vmin,76px));grid-auto-rows:auto;gap:3px}
-.punches .ph{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:center}
-.pb{width:100%;height:clamp(44px,11.5vmin,62px);font-size:clamp(11px,2.5vmin,15px)}
-.pb.r{border-color:rgba(226,80,90,.5)}
-.pb.ov{border-color:rgba(226,80,90,.7);background:linear-gradient(180deg,rgba(150,24,40,.6),rgba(13,16,23,.86))}
-.pb.bd,.pb.pw{border-style:dashed}.pb.pw.lit{border-style:solid;border-color:#ff6a3d;background:rgba(255,106,61,.32)}
-.pb.blk{grid-column:1/4;height:clamp(40px,10vmin,54px);border-radius:999px;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}
-.stick{position:relative;width:clamp(120px,30vmin,170px);height:clamp(120px,30vmin,170px);border-radius:50%;border:1px solid rgba(255,255,255,.18);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.55) 70%);touch-action:none}
+/* the punch zone (right) is a circular pad about the size of the stick; БЛОК sits under it, for the right thumb */
+.punches{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;flex-direction:column;align-items:center;gap:8px}
+.pzone{position:relative;width:clamp(160px,44vmin,240px);height:clamp(160px,44vmin,240px);border-radius:50%;
+  border:1px solid rgba(255,255,255,.22);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.5) 72%);touch-action:none}
+.pzone .pz-c{position:absolute;left:50%;top:50%;width:17%;height:17%;transform:translate(-50%,-50%);border-radius:50%;border:1px dashed rgba(226,177,74,.4);background:rgba(226,177,74,.07);pointer-events:none}
+.pzone .pl{position:absolute;transform:translate(-50%,-50%);font:600 clamp(9px,2.1vmin,12px) var(--mono);letter-spacing:.04em;color:var(--text);white-space:nowrap;pointer-events:none;opacity:.3;transition:opacity .15s}
+.pzone.bright .pl{opacity:.7}
+.pzone .pl.on{opacity:1;color:var(--gold);text-shadow:0 0 12px rgba(226,177,74,.9)}
+.pzone.nohint .pl{display:none}
+.pzone .pl[data-p="jab"]{left:27%;top:19%}
+.pzone .pl[data-p="cross"]{left:73%;top:19%}
+.pzone .pl[data-p="hookR"]{left:87%;top:50%}
+.pzone .pl[data-p="upperR"]{left:73%;top:81%}
+.pzone .pl[data-p="upperL"]{left:27%;top:81%}
+.pzone .pl[data-p="hookL"]{left:13%;top:50%}
+/* the recognized swipe flashes its caption in the middle of the zone for ~0.3 s */
+.pz-fl{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--display);font-weight:900;font-size:clamp(16px,4.6vmin,28px);color:#fff;text-shadow:0 0 16px rgba(226,177,74,.95);white-space:nowrap;pointer-events:none;opacity:0}
+.pz-fl.on{animation:flrec .3s ease-out}
+@keyframes flrec{0%{opacity:0}15%{opacity:1}70%{opacity:1}100%{opacity:0}}
+.pb.blk{width:clamp(120px,32vmin,175px);height:clamp(42px,11vmin,56px);border-radius:999px;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}
+/* the floating stick: no fixed home, a faint hint at rest, solid under the thumb; the document catches the left-half touch */
+.stick{position:absolute;left:15%;top:78%;width:clamp(160px,44vmin,240px);height:clamp(160px,44vmin,240px);transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(255,255,255,.18);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.55) 70%);touch-action:none;pointer-events:none;opacity:.26;transition:opacity .14s}
+.stick.on{opacity:1}
 .stick .knob{position:absolute;left:50%;top:50%;width:42%;height:42%;margin:-21% 0 0 -21%;border-radius:50%;background:rgba(226,177,74,.28);border:1px solid rgba(226,177,74,.6);transition:transform .08s}
 .stick.on .knob{transition:none;background:rgba(226,177,74,.45)}
-.stick .sl{position:absolute;left:0;right:0;bottom:-15px;text-align:center;font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.06em}
-.pb.bd.lit{border-style:solid;border-color:var(--gold);background:rgba(226,177,74,.3)}
+.stick .sl{position:absolute;left:0;right:0;bottom:-15px;text-align:center;font:9px var(--mono);color:var(--muted);letter-spacing:.06em;white-space:nowrap}
+.stick.on .sl{display:none}
 /* replay + result */
 .rec{position:absolute;left:var(--pl);top:calc(var(--pt) + 4px);display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;letter-spacing:.14em}
 .rec i{width:10px;height:10px;border-radius:50%;background:var(--blood);animation:blink 1s steps(2) infinite}
@@ -165,8 +185,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .keys{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.5}
 .kbar{display:none}
 #stage.desk .stick,#stage.desk .punches{display:none}
-#stage.desk .pad{justify-content:center}
-#stage.desk .pad > .kbar{pointer-events:none;display:flex;flex-wrap:wrap;justify-content:center;gap:3px 14px;max-width:min(980px,92%);font-family:var(--mono);font-size:11px;color:var(--muted);background:rgba(10,12,17,.6);border:1px solid var(--line);border-radius:6px;padding:6px 14px;margin-bottom:6px}
+#stage.desk .pad > .kbar{position:absolute;left:50%;bottom:calc(var(--pb) + 6px);transform:translateX(-50%);pointer-events:none;display:flex;flex-wrap:wrap;justify-content:center;gap:3px 14px;max-width:min(980px,92%);font-family:var(--mono);font-size:11px;color:var(--muted);background:rgba(10,12,17,.6);border:1px solid var(--line);border-radius:6px;padding:6px 14px}
+#stage.desk .pad > .kbar{opacity:0;transition:opacity .3s}#stage.desk .pad > .kbar.show{opacity:.95}
 .kbar b{color:var(--text);font-weight:600}.kbar span.lit,.kbar span.lit b{color:var(--gold)}
 .gfx .sw{flex-wrap:wrap}
 
@@ -292,7 +312,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .mnav.c button:hover,.mnav.c button:focus{transform:none;text-shadow:0 0 18px rgba(255,59,78,.9)}
 .pz{pointer-events:auto;position:relative;display:block;margin:6px auto 0;width:36px;height:30px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
 .pz::before{content:'';position:absolute;left:50%;top:50%;box-sizing:content-box;width:4px;height:12px;margin:-6px 0 0 -6px;border-left:4px solid var(--text);border-right:4px solid var(--text)}
-#stage.desk .pz{display:none}
+.fs{pointer-events:auto;display:block;margin:6px auto 0;padding:2px 9px;border:1px solid var(--line);border-radius:5px;background:var(--panel);font:500 13px var(--body);color:var(--muted);line-height:1.2}
+#stage.desk .pz,#stage.desk .fs{display:none}
 #stage.desk.nokeys .pad > .kbar{display:none}
 #stage:not(.desk) .khint{display:none}
 #stage.short .logo h1{flex-direction:row;font-size:40px}
@@ -325,7 +346,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="st"><i id="s1"></i></div>
       <div class="counter" id="cnt" hidden>КОНТРУДАР ×1.5</div>
     </div>
-    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><button class="pz" id="pause-btn" aria-label="Пауза"></button></div>
+    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><button class="pz" id="pause-btn" aria-label="Пауза"></button><button class="fs" id="fs-btn" aria-label="На весь экран" title="На весь экран" hidden>⛶</button></div>
     <div class="side r">
       <div class="nm"><b id="n2">Соперник</b><span id="w2">побед 0</span><span id="st2" style="opacity:.7"></span></div>
       <div class="hp" id="hpb2"><i class="ghost" id="g2"></i><i class="fill" id="h2"></i></div>
@@ -342,19 +363,12 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <div class="pad" id="pad" hidden>
     <div class="stick" id="stick" aria-label="Стик: ходить; быстрый рывок = уклон"><i class="knob"></i><span class="sl">ходьба · рывок = уклон</span></div>
     <div class="punches">
-      <span class="ph">левая</span><span class="ph">правая</span><span></span>
-      <button class="pb st" data-punch="jab">Джеб<small>J</small></button>
-      <button class="pb st r" data-punch="cross">Кросс<small>K</small></button>
-      <button class="pb ov r" data-punch="over">Овер&shy;хенд<small>O</small></button>
-      <button class="pb" data-punch="hookL">Хук<small>U</small></button>
-      <button class="pb r" data-punch="hookR">Хук<small>I</small></button>
-      <button class="pb bd" id="body-btn" aria-label="Следующий удар в корпус">Корпус<small>Shift</small></button>
-      <button class="pb" data-punch="upperL">Аппер<small>M</small></button>
-      <button class="pb r" data-punch="upperR">Аппер<small>,</small></button>
-      <button class="pb pw" id="pow-btn" aria-label="Следующий удар — сильный">Сила<small>F</small></button>
-      <button class="pb blk" id="block-btn" aria-label="Блок: держи">Блок<small>пробел</small></button>
+      <div class="pzone" id="pzone" aria-label="Зона ударов: свайп в сторону удара, тап = джеб"><i class="pz-c"></i>
+        <span class="pl" data-p="jab">↖ ДЖЕБ</span><span class="pl" data-p="cross">КРОСС ↗</span><span class="pl" data-p="hookL">← ХУК</span>
+        <span class="pl" data-p="hookR">ХУК →</span><span class="pl" data-p="upperL">↙ АППЕР</span><span class="pl" data-p="upperR">АППЕР ↘</span><b class="pz-fl"></b></div>
+      <button class="pb blk" id="block-btn" aria-label="Блок: держи">Блок</button>
     </div>
-    <div class="kbar" id="kbar"><span><b>WASD</b> ходьба</span><span><b>ЛКМ·J</b> джеб</span><span><b>ПКМ·K</b> кросс</span><span><b>U I</b> хуки</span><span><b>M ,</b> апперы</span><span><b>O·СКМ</b> оверхенд</span><span id="kb-body"><b>Shift</b>+удар = корпус</span><span id="kb-pow"><b>F</b> сила</span><span><b>Q E</b> слипы</span><span><b>C</b> нырок</span><span><b>X</b> отклон</span><span id="kb-blk"><b>Пробел</b> блок</span></div>
+    <div class="kbar" id="kbar"><span><b>WASD</b> ходьба</span><span><b>U/ЛКМ</b> джеб</span><span><b>I/ПКМ</b> кросс</span><span><b>J K</b> хуки</span><span><b>N M</b> апперы</span><span id="kb-body"><b>+S</b> корпус</span><span id="kb-pow"><b>+W</b> сила</span><span><b>Q E C</b> уклоны</span><span id="kb-blk"><b>пробел</b> блок</span></div>
   </div>
 
   <div class="hl" id="hl" hidden><b>Лучшее в раунде</b><span id="hl-s"></span></div>
@@ -499,7 +513,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           <li><b>Блок</b> держи: снимает большую часть урона, апперкот и корпус проходят. Держи блок и тяни в сторону, будет уклон туда.</li>
           <li>Удары встают в очередь до трёх. После удачного уклона удар ×1.5.</li>
         </ul>
-        <div class="keys">WASD / стрелки ходьба · ЛКМ или J джеб · ПКМ или K кросс · U I хуки · M , апперкоты · O или колесо оверхенд · Shift + удар в корпус · F сильный · Q E слипы · C нырок · X отклон · пробел блок · Esc пауза</div>
+        <div class="keys">WASD / стрелки ходьба · ЛКМ или U джеб · ПКМ или I кросс · J K хуки (левый / правый) · N M апперкоты (левый / правый) · зажатая S/↓ + удар в корпус · зажатая W/↑ + удар силовой · Q E C уклоны · пробел блок · Esc пауза</div>
       </div>
       <div class="pfoot"><button class="btn pri" id="set-back">Назад</button></div>
     </div>
