@@ -2,5 +2,6 @@
 24|GLM-5.3-Flash|скакалка
 26|DeepSeek V4.1 Flash|лапы
 27|GLM-5.3-Flash|лапы
+29|MiniMax M3.1 Flash|скакалка
 31|Tencent Hy4|скакалка
 32|Tencent Hy4|лапы
