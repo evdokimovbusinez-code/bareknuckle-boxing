@@ -111,7 +111,7 @@ const setMove = () => { if (!P1) return; const x = MV.kx || MV.sx, y = MV.ky || 
    local frame exactly as camera layout rotates it. pointer-events:none on the stick lets the document see the touch. */
 {
   const el = $('stick'), knob = el.querySelector('.knob');
-  const stickR = () => Math.min(240, Math.max(160, 0.44 * Math.min(window.innerWidth, window.innerHeight))) / 2;
+  const stickR = () => Math.min(290, Math.max(180, 0.52 * Math.min(window.innerWidth, window.innerHeight))) / 2;
   const toLocal = (vx, vy) => stage.classList.contains('rot') ? { x: vy, y: VH - vx } : (() => { const r = stage.getBoundingClientRect(); return { x: vx - r.left, y: vy - r.top }; })();
   const place = (x, y) => { el.style.left = x + 'px'; el.style.top = y + 'px'; };
   const idle = () => { const r = stickR() + 16; place(r, VH - r); el.classList.remove('on'); knob.style.transform = ''; MV.sx = MV.sy = 0; setMove(); };
@@ -156,6 +156,19 @@ for (const ev of ['touchmove', 'gesturestart']) document.addEventListener(ev, e 
   if (btn) { btn.hidden = !(TOUCH && req);
     btn.addEventListener('click', e => { e.preventDefault();
       try { const p = !inFs() && req ? req.call(root) : inFs() && exit ? exit.call(document) : null; p && p.catch && p.catch(() => {}); } catch (_) {} }); }
+  // a bout started by a tap goes full screen and locks landscape by itself (Android; startFight runs inside the tap)
+  window.goFull = () => { if (!TOUCH || !req || inFs()) return;
+    try { const p = req.call(root); p && p.then && p.then(() => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (_) {} }).catch(() => {}); } catch (_) {} };
+  // iPhone / iPad Safari has no full screen for pages: once, in the menu, tell how to put it on the Home Screen
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  let seen = false; try { seen = localStorage.getItem('bx_a2hs') === '1'; } catch (_) {}
+  if (ios && !standalone && !seen) {
+    const b = document.createElement('div'); b.className = 'a2hs';
+    b.innerHTML = 'На весь экран: <b>Поделиться</b> → <b>На экран «Домой»</b>, и открывай игру оттуда <button type="button" aria-label="Закрыть">✕</button>';
+    b.querySelector('button').addEventListener('click', () => { b.remove(); try { localStorage.setItem('bx_a2hs', '1'); } catch (_) {} });
+    stage.appendChild(b);
+  }
 }
 /* desktop: WASD / arrows walk, U I straights (top row: jab / cross), J K hooks (middle row), N M uppercuts (bottom row) —
    the same geometry as the swipes. Mouse LMB jab / RMB cross, Q E slips, C duck, Space block; W / S held at the punch
