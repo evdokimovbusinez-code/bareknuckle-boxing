@@ -12,66 +12,125 @@ function swatches(id, list, get, set, txt, noLook) {
   }
 }
 /* (the menu screens themselves — buildMenu, creator, settings, pause — are in 14_screens.js) */
-/* the four punches: a hook / uppercut picks its hand on the fly — the opposite of the previous punch if it was < 1 s ago, else the lead (left) hand.
+/* two hand buttons: a tap = a straight, a sideways swipe = a hook, an up swipe = an uppercut — all of the hand that was touched.
    window.__ctl is the control log for the issue-40 check: the last ten punches as the queue saw them ({ name, body, pow }). */
 window.__ctl = { last: [] };
-let lastHand = null, lastPunchT = -9;
-const punchName = n => {
-  if (n === 'hook' || n === 'upper') n += lastHand && G.real - lastPunchT < 1 ? (lastHand === 'L' ? 'R' : 'L') : 'L';
-  if (PUNCH[n]) { lastHand = PUNCH[n].arm; lastPunchT = G.real; }
-  return n;
-};
-/* body / power are now a direction held at the very moment of the punch: S / ↓ (or the stick pushed down) = to the body,
+const ctlLog = (name, body, pow) => { const L = window.__ctl.last; L.push({ name, body, pow }); if (L.length > 10) L.shift(); };
+/* body / power are a direction held at the very moment of the punch: S / ↓ (or the stick pushed down) = to the body,
    W / ↑ (or the stick pushed up) = power. W / S still walk him round the ring; the stick's flick-and-release still dodges. */
 const punchMod = () => {
   let up = HELD.has('KeyW') || HELD.has('ArrowUp'), down = HELD.has('KeyS') || HELD.has('ArrowDown');
   if (Math.abs(MV.sy) > 0.5 && Math.abs(MV.sy) > Math.abs(MV.sx)) { if (MV.sy > 0) up = true; else down = true; }
   return { body: down, pow: up };
 };
+const blip = (el, ms = 110) => { if (!el) return; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), ms); };
 const press = (type, n, el) => {
   if (G.paused) return;
-  if (G.state === 'kd' && G.kd && G.kd.def === P1 && type === 'punch') { G.kd.mash = Math.min(G.kd.mash + 0.3, 6); if (el) { el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 110); } return; }
+  if (G.state === 'kd' && G.kd && G.kd.def === P1 && type === 'punch') { G.kd.mash = Math.min(G.kd.mash + 0.3, 6); blip(el); return; }
   if (G.state !== 'fight' && !(type === 'punch' && followOK(P1))) return;
-  let name = n, body = false, pow = false;
-  if (type === 'punch') {
-    name = punchName(n); const m = punchMod(); body = m.body; pow = m.pow;
-    const L = window.__ctl.last; L.push({ name, body, pow }); if (L.length > 10) L.shift();
-  }
+  let body = false, pow = false;
+  if (type === 'punch') { const m = punchMod(); body = m.body; pow = m.pow; ctlLog(n, body, pow); }
   if (type === 'dodge') Q.length = 0;
-  if (Q.length < 3) Q.push({ type, name, at: G.real, body, pow });
-  if (el) { el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 110); }
+  if (Q.length < 3) Q.push({ type, name: n, at: G.real, body, pow });
+  blip(el);
 };
-document.querySelectorAll('[data-punch]').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); press('punch', b.dataset.punch, b); }));
+/* the hand is chosen by the button, never guessed: L taps to a jab, R to a cross; hooks / uppercuts keep that hand */
+const HAND = { L: { tap: 'jab', hook: 'hookL', upper: 'upperL' }, R: { tap: 'cross', hook: 'hookR', upper: 'upperR' } };
+document.querySelectorAll('[data-hand]').forEach(b => {
+  const P = HAND[b.dataset.hand], fl = b.querySelector('.fl'); let g = null;
+  const fire = (name, label) => {
+    press('punch', name, b);
+    if (label && fl) {   // a short flash of the recognized swipe on the button
+      fl.textContent = label; fl.classList.remove('on'); void fl.offsetWidth; fl.classList.add('on');
+      clearTimeout(fl._t); fl._t = setTimeout(() => fl.classList.remove('on'), 320);
+    }
+  };
+  // the same rotation transform the stick uses: after it, dx/dy are in the frame the player actually sees
+  const dir = e => { let dx = e.clientX - g.x, dy = e.clientY - g.y;
+    if (stage.classList.contains('rot')) { const t = dx; dx = dy; dy = -t; }
+    return { dx, dy }; };
+  b.addEventListener('pointerdown', e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (_) {}
+    g = { id: e.pointerId, x: e.clientX, y: e.clientY, fired: false, peak: 0 }; });
+  b.addEventListener('pointermove', e => {
+    if (!g || g.fired || e.pointerId !== g.id) return;
+    const { dx, dy } = dir(e), peak = Math.hypot(dx, dy); g.peak = Math.max(g.peak, peak);
+    if (peak > 24) {   // a swipe fires at once, not on release
+      g.fired = true;
+      if (Math.abs(dx) >= Math.abs(dy)) fire(P.hook, 'ХУК');
+      else if (dy < 0) fire(P.upper, 'АППЕР');
+      // a down swipe is consumed: no punch, and no tap when the finger lifts
+    }
+  });
+  for (const ev of ['pointerup', 'pointercancel']) b.addEventListener(ev, e => {
+    if (!g || e.pointerId !== g.id) return;
+    if (!g.fired && g.peak < 18) fire(P.tap, null);   // a quick, still tap = the straight of this hand
+    g = null;
+  });
+});
 const setBlock = v => { if (P1) P1.blocking = v && G.state === 'fight'; const b = $('block-btn'); b && b.classList.toggle('on', !!v); };
 // block: hold the button (or space)
 { const bb = $('block-btn'); bb.addEventListener('pointerdown', e => { e.preventDefault(); try { bb.setPointerCapture(e.pointerId); } catch (_) {} setBlock(true); });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) bb.addEventListener(ev, () => setBlock(false)); }
-/* the body / power toggles and the overhand are gone: those shots now come from the direction held when the punch is pressed (punchMod) */
-document.querySelectorAll('[data-dodge]').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); press('dodge', b.dataset.dodge, b); }));
-/* movement: the left stick (or arrows / Q E) walks — x along the fight line, y circles him; a quick flick of the stick and
+/* movement: the floating left stick (or arrows / Q E) walks — x along the fight line, y circles him; a quick flick and
    release is a dodge: back = lean away, down = duck, up = slip (to the side his punch isn't coming from) */
 const MV = { kx: 0, ky: 0, sx: 0, sy: 0 };
 const setMove = () => { if (!P1) return; const x = MV.kx || MV.sx, y = MV.ky || MV.sy; P1.moveDir = Math.abs(x) > 0.25 ? Math.sign(x) * Math.min(1, Math.abs(x) * 1.25) : 0; P1.moveLat = Math.abs(y) > 0.25 ? Math.sign(y) * Math.min(1, Math.abs(y) * 1.25) : 0; };
+/* the stick has no fixed home: it appears where the left thumb lands (left half, below the HUD) and fades back to a
+   faint hint at rest. Its radius matches the CSS size; on a rotated portrait stage the touch is mapped into the
+   local frame exactly as camera layout rotates it. pointer-events:none on the stick lets the document see the touch. */
 {
-  const el = $('stick'), knob = el.querySelector('.knob'); let st = null;
-  const upd = e => { const r = el.getBoundingClientRect(), R = r.width / 2; let dx = (e.clientX - st.cx) / R, dy = (e.clientY - st.cy) / R;
+  const el = $('stick'), knob = el.querySelector('.knob');
+  const stickR = () => Math.min(240, Math.max(160, 0.44 * Math.min(window.innerWidth, window.innerHeight))) / 2;
+  const toLocal = (vx, vy) => stage.classList.contains('rot') ? { x: vy, y: VH - vx } : (() => { const r = stage.getBoundingClientRect(); return { x: vx - r.left, y: vy - r.top }; })();
+  const place = (x, y) => { el.style.left = x + 'px'; el.style.top = y + 'px'; };
+  const idle = () => { const r = stickR() + 16; place(r, VH - r); el.classList.remove('on'); knob.style.transform = ''; MV.sx = MV.sy = 0; setMove(); };
+  let id = null, st = null;
+  const upd = e => {
+    if (!st) return; const R = stickR();
+    let dx = (e.clientX - st.cx) / R, dy = (e.clientY - st.cy) / R;
     if (stage.classList.contains('rot')) { const t = dx; dx = dy; dy = -t; }
-    const L = Math.hypot(dx, dy); if (L > 1) { dx /= L; dy /= L; } st.dx = dx; st.dy = dy; st.peak = Math.max(st.peak, Math.hypot(dx, dy));
-    knob.style.transform = `translate(${(dx * 60).toFixed(0)}%,${(dy * 60).toFixed(0)}%)`; MV.sx = dx; MV.sy = -dy; setMove(); };
-  el.addEventListener('pointerdown', e => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (_) {} const r = el.getBoundingClientRect(); st = { cx: r.left + r.width / 2, cy: r.top + r.height / 2, t: G.real, peak: 0, dx: 0, dy: 0 }; el.classList.add('on'); upd(e); });
-  el.addEventListener('pointermove', e => { if (st) upd(e); });
-  for (const ev of ['pointerup', 'pointercancel']) el.addEventListener(ev, () => {
+    const L = Math.hypot(dx, dy); if (L > 1) { dx /= L; dy /= L; }
+    st.dx = dx; st.dy = dy; st.peak = Math.max(st.peak, Math.hypot(dx, dy));
+    knob.style.transform = `translate(${(dx * 60).toFixed(0)}%,${(dy * 60).toFixed(0)}%)`; MV.sx = dx; MV.sy = -dy; setMove();
+  };
+  const begin = e => {
+    if (!TOUCH || e.pointerType === 'mouse' || $('pad').hidden || st) return;
+    if (e.target.closest && e.target.closest('button,input,.ui,.result,.rec')) return;
+    const p = toLocal(e.clientX, e.clientY);
+    if (p.x > VW * 0.5 || p.y < ($('hud').offsetHeight || 64)) return;   // not the right hand's half, not the top HUD strip
+    id = e.pointerId; place(p.x, p.y); el.classList.add('on');
+    st = { cx: e.clientX, cy: e.clientY, t: G.real, peak: 0, dx: 0, dy: 0 }; upd(e); e.preventDefault();
+  };
+  document.addEventListener('pointerdown', begin);
+  document.addEventListener('pointermove', e => { if (e.pointerId === id) upd(e); });
+  for (const ev of ['pointerup', 'pointercancel']) document.addEventListener(ev, e => {
+    if (e.pointerId !== id) return;
     if (st && G.real - st.t < 0.22 && st.peak > 0.6) {   // a flick
       const ax = st.dx, ay = st.dy; let d = null;
       if (Math.abs(ax) > Math.abs(ay)) d = ax < 0 ? 'lean' : null; else d = ay > 0 ? 'duck' : (P2 && P2.cur && PUNCH[P2.cur].arm === 'L' ? 'slipR' : 'slipL');
       if (d) press('dodge', d);
     }
-    st = null; el.classList.remove('on'); knob.style.transform = ''; MV.sx = MV.sy = 0; setMove(); });
+    id = null; st = null; idle();
+  });
+  window.addEventListener('resize', () => { if (id === null) idle(); });
+  idle();
 }
-/* desktop: WASD / arrows walk (A/D back-forward, W/S circle), J K L I = jab / cross / hook / uppercut, mouse LMB jab / RMB cross,
-   Q E slips, C duck, Space block; W / S held at the moment of a punch make it a power / body shot. Physical keys (e.code): any layout works */
+/* no page sliding while fighting on a touch screen: the scene and the pad swallow every gesture. Menu screens
+   (shop / creator / settings) keep their scrolling — the pad is hidden there, and they are siblings of it. */
+for (const ev of ['touchmove', 'gesturestart']) document.addEventListener(ev, e => { if (TOUCH && !$('pad').hidden) e.preventDefault(); }, { passive: false });
+/* a small fullscreen button in the HUD on touch; iPhones have no Fullscreen API → it stays hidden */
+{ const root = document.documentElement, btn = $('fs-btn');
+  const req = root.requestFullscreen || root.webkitRequestFullscreen, exit = document.exitFullscreen || document.webkitExitFullscreen;
+  const inFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  if (btn) { btn.hidden = !(TOUCH && req);
+    btn.addEventListener('click', e => { e.preventDefault();
+      try { const p = !inFs() && req ? req.call(root) : inFs() && exit ? exit.call(document) : null; p && p.catch && p.catch(() => {}); } catch (_) {} }); }
+}
+/* desktop: WASD / arrows walk, U I hooks, J K straights, N M uppercuts (left column = left hand, right = right),
+   mouse LMB jab / RMB cross, Q E slips, C duck, Space block; W / S held at the punch make it a power / body shot.
+   Physical keys (e.code): any layout works */
 const MV_KEYS = { ArrowLeft: ['kx', -1], ArrowRight: ['kx', 1], KeyA: ['kx', -1], KeyD: ['kx', 1], ArrowUp: ['ky', 1], ArrowDown: ['ky', -1], KeyW: ['ky', 1], KeyS: ['ky', -1] };
-const ACT_KEYS = { KeyJ: ['punch', 'jab'], KeyK: ['punch', 'cross'], KeyL: ['punch', 'hook'], KeyI: ['punch', 'upper'],
+const ACT_KEYS = { KeyU: ['punch', 'hookL'], KeyI: ['punch', 'hookR'], KeyJ: ['punch', 'jab'], KeyK: ['punch', 'cross'], KeyN: ['punch', 'upperL'], KeyM: ['punch', 'upperR'],
   KeyQ: ['dodge', 'slipL'], KeyE: ['dodge', 'slipR'], KeyC: ['dodge', 'duck'] };
 const HELD = new Set();
 const mvKeys = () => { let x = 0, y = 0; for (const c of HELD) { const m = MV_KEYS[c]; if (m) { if (m[0] === 'kx') x += m[1]; else y += m[1]; } } MV.kx = Math.sign(x); MV.ky = Math.sign(y); setMove();
@@ -91,7 +150,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'Space' && G.state === 'fight') { e.preventDefault(); if (!e.repeat) { setBlock(true); kbLit('kb-blk', true); } return; }
   if (MV_KEYS[e.code]) { if (live || e.code.startsWith('Key')) e.preventDefault(); if (!e.repeat) { HELD.add(e.code); mvKeys(); } return; }
   if (e.repeat) return; const k = ACT_KEYS[e.code];
-  if (k) { e.preventDefault(); press(k[0], k[1], document.querySelector(`[data-${k[0]}="${k[1]}"]`)); }
+  if (k) { e.preventDefault(); press(k[0], k[1]); }
   else if ((e.key === 'Enter' || e.key === ' ') && G.state === 'result' && document.activeElement === document.body) startFight();
 });
 stage.addEventListener('pointerdown', e => { if (!(e.target.closest && e.target.closest('button')) && introSkip()) e.preventDefault(); });   // a tap skips the card / the fly-round
@@ -100,7 +159,7 @@ stage.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse' || G.paused || !(G.state === 'fight' || G.state === 'ko' || G.state === 'kd')) return;
   if (e.target.closest && e.target.closest('button,input,.ui,.result,.rec')) return;
   const n = e.button === 0 ? 'jab' : e.button === 2 ? 'cross' : null; if (!n) return;
-  e.preventDefault(); press('punch', n, document.querySelector(`[data-punch="${n}"]`));
+  e.preventDefault(); press('punch', n);
 });
 stage.addEventListener('contextmenu', e => { if (G.state !== 'menu') e.preventDefault(); });
 $('r-again').addEventListener('click', startFight);
