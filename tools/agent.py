@@ -14,7 +14,8 @@ async def main():
                               max_budget_usd=float(os.environ.get("BOT_BUDGET", "8")), max_turns=int(os.environ.get("BOT_TURNS", "100")), max_buffer_size=64 * 1024 * 1024, allowed_tools=TOOLS, permission_mode="acceptEdits",
                               setting_sources=["project"], system_prompt={"type": "preset", "preset": "claude_code"})
     out = {"is_error": True, "result": "no result", "cost": 0, "turns": 0}
-    try:
+    async def run():
+      nonlocal out
       async for m in query(prompt=prompt, options=opts):
           n = type(m).__name__
           if n == "AssistantMessage":
@@ -27,6 +28,10 @@ async def main():
               out = {"is_error": bool(m.is_error), "result": m.result or "; ".join(map(str, m.errors or [])) or (m.subtype or ""),
                      "cost": m.total_cost_usd or 0, "turns": m.num_turns, "model": f"{models} · effort {opts.effort}",
                      "usage": m.model_usage or {}, "ms": getattr(m, "duration_ms", 0)}
+    try:   # stop on our own before the job's timeout so the workflow still commits the partial work
+      await asyncio.wait_for(run(), timeout=float(os.environ.get("BOT_MINUTES", "50")) * 60)
+    except asyncio.TimeoutError:
+        out = {**out, "is_error": True, "result": f"time limit {os.environ.get('BOT_MINUTES', '50')} min reached (partial work kept)"}
     except Exception as e:   # keep partial work: the workflow still commits it and reports the error
         out = {**out, "is_error": True, "result": f"SDK error: {str(e)[:300]}"}
     json.dump(out, open(".claude-result.json", "w"), ensure_ascii=False)

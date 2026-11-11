@@ -19,7 +19,7 @@ jobs:
       ((github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')))
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 100
     permissions:
       contents: write
       pull-requests: write
@@ -71,6 +71,7 @@ jobs:
           # [ds] = DeepSeek V4.1 Flash, [mimo] = MiMo-V2.6-Pro, [glm-x] = GLM-5.3-FlashX, [sonnet] / [opus] / [fable] = Claude through the Anthropic API key
           BOT_MODEL: ${{ contains(github.event.issue.title, '[fable]') && 'claude-fable-5-2' || contains(github.event.issue.title, '[sonnet]') && 'claude-sonnet-5-5' || contains(github.event.issue.title, '[opus]') && 'claude-opus-5-5' || contains(github.event.issue.title, '[ds]') && 'deepseek/deepseek-v4.1-flash' || contains(github.event.issue.title, '[mimo]') && 'xiaomi/mimo-v2.6-pro' || contains(github.event.issue.title, '[glm-x]') && 'z-ai/glm-5.3-flashx' || 'z-ai/glm-5.3-flash' }}
           BOT_EFFORT: high
+          BOT_MINUTES: "80"            # the agent stops itself after this (job limit 100), partial work is committed
           BOT_BUDGET: "8"               # hard cap per task, USD (Claude models; OpenRouter spend is capped by the key's own limit)
         run: |
           pip install -q claude-agent-sdk playwright
