@@ -64,6 +64,7 @@ function frame(now) {
     else if (G.state === 'fight') { playerInput(); ai(dt); }
     else if (G.state === 'ko' || G.state === 'kd') { if (followOK(P1)) playerInput(); aiFollow(); }
     P1.aimTarget = aimFor(P1, P2); P2.aimTarget = aimFor(P2, P1);
+    if (MITTS.on) P1.aimTarget = mittsAim();   // 09d_mitts.js: aim the fist at the presented pad, not at the trainer's head
     P1.update(dt); P2.update(dt);
     // both men are posed: now keep each one's arms out of the other's head and torso (against this frame's head, not last frame's)
     headFrames(P1); headFrames(P2);
@@ -74,7 +75,7 @@ function frame(now) {
   }
   tq = performance.now(); pm.anim += tq - tp - PERF.rag; pm.phys += PERF.rag; tp = tq;
   P1.simulate(simDt); P2.simulate(simDt);
-  ropeTick(simDt); bagStep(simDt);
+  ropeTick(simDt); bagStep(simDt); mittsTick(simDt);   // 09d_mitts.js: pose the trainer's arms / seat the pads after all the fighter code
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
   FX.update(simDt); MIST.update(simDt); wearTick(simDt);
   tq = performance.now(); pm.fx += tq - tp; tp = tq;
