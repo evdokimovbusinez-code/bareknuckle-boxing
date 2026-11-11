@@ -33,6 +33,7 @@ function hintTick() {
   const pz = $('pzone');
   if (pz) { pz.classList.toggle('bright', !!(on && first3)); pz.classList.toggle('nohint', !on); }
 }
+setInterval(hintTick, 400);   // the desktop bar fades in after 8 s without input
 for (const ev of ['pointerdown', 'pointerup', 'pointermove', 'keydown', 'keyup', 'wheel']) document.addEventListener(ev, () => noteAct(), { passive: true });
 /* body / power are a direction held at the very moment of the punch: S / ↓ (or the stick pushed down) = to the body,
    W / ↑ (or the stick pushed up) = power. W / S still walk him round the ring; the stick's flick-and-release still dodges. */

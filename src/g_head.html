@@ -186,6 +186,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .kbar{display:none}
 #stage.desk .stick,#stage.desk .punches{display:none}
 #stage.desk .pad > .kbar{position:absolute;left:50%;bottom:calc(var(--pb) + 6px);transform:translateX(-50%);pointer-events:none;display:flex;flex-wrap:wrap;justify-content:center;gap:3px 14px;max-width:min(980px,92%);font-family:var(--mono);font-size:11px;color:var(--muted);background:rgba(10,12,17,.6);border:1px solid var(--line);border-radius:6px;padding:6px 14px}
+#stage.desk .pad > .kbar{opacity:0;transition:opacity .3s}#stage.desk .pad > .kbar.show{opacity:.95}
 .kbar b{color:var(--text);font-weight:600}.kbar span.lit,.kbar span.lit b{color:var(--gold)}
 .gfx .sw{flex-wrap:wrap}
 
@@ -362,11 +363,12 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <div class="pad" id="pad" hidden>
     <div class="stick" id="stick" aria-label="Стик: ходить; быстрый рывок = уклон"><i class="knob"></i><span class="sl">ходьба · рывок = уклон</span></div>
     <div class="punches">
-      <button class="pb hand" data-hand="L">ЛЕВАЯ<i class="fl"></i></button>
-      <button class="pb hand r" data-hand="R">ПРАВАЯ<i class="fl"></i></button>
+      <div class="pzone" id="pzone" aria-label="Зона ударов: свайп в сторону удара, тап = джеб"><i class="pz-c"></i>
+        <span class="pl" data-p="jab">↖ ДЖЕБ</span><span class="pl" data-p="cross">КРОСС ↗</span><span class="pl" data-p="hookL">← ХУК</span>
+        <span class="pl" data-p="hookR">ХУК →</span><span class="pl" data-p="upperL">↙ АППЕР</span><span class="pl" data-p="upperR">АППЕР ↘</span><b class="pz-fl"></b></div>
       <button class="pb blk" id="block-btn" aria-label="Блок: держи">Блок</button>
     </div>
-    <div class="kbar" id="kbar"><span><b>WASD</b> ходьба</span><span><b>J/ЛКМ</b> джеб</span><span><b>K/ПКМ</b> кросс</span><span><b>U I</b> хуки</span><span><b>N M</b> апперы</span><span id="kb-body"><b>+S</b> корпус</span><span id="kb-pow"><b>+W</b> сила</span><span><b>Q E C</b> уклоны</span><span id="kb-blk"><b>пробел</b> блок</span></div>
+    <div class="kbar" id="kbar"><span><b>WASD</b> ходьба</span><span><b>U/ЛКМ</b> джеб</span><span><b>I/ПКМ</b> кросс</span><span><b>J K</b> хуки</span><span><b>N M</b> апперы</span><span id="kb-body"><b>+S</b> корпус</span><span id="kb-pow"><b>+W</b> сила</span><span><b>Q E C</b> уклоны</span><span id="kb-blk"><b>пробел</b> блок</span></div>
   </div>
 
   <div class="hl" id="hl" hidden><b>Лучшее в раунде</b><span id="hl-s"></span></div>
@@ -511,7 +513,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           <li><b>Блок</b> держи: снимает большую часть урона, апперкот и корпус проходят. Держи блок и тяни в сторону, будет уклон туда.</li>
           <li>Удары встают в очередь до трёх. После удачного уклона удар ×1.5.</li>
         </ul>
-        <div class="keys">WASD / стрелки ходьба · ЛКМ или J джеб · ПКМ или K кросс · U I хуки · N M апперкоты · зажатая S/↓ + удар в корпус · зажатая W/↑ + удар силовой · Q E C уклоны · пробел блок · Esc пауза</div>
+        <div class="keys">WASD / стрелки ходьба · ЛКМ или U джеб · ПКМ или I кросс · J K хуки (левый / правый) · N M апперкоты (левый / правый) · зажатая S/↓ + удар в корпус · зажатая W/↑ + удар силовой · Q E C уклоны · пробел блок · Esc пауза</div>
       </div>
       <div class="pfoot"><button class="btn pri" id="set-back">Назад</button></div>
     </div>
