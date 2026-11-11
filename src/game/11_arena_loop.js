@@ -74,7 +74,7 @@ function frame(now) {
   }
   tq = performance.now(); pm.anim += tq - tp - PERF.rag; pm.phys += PERF.rag; tp = tq;
   P1.simulate(simDt); P2.simulate(simDt);
-  ropeTick(simDt); bagStep(simDt);
+  ropeTick(simDt); bagStep(simDt); if (MITT.on && simDt > 0) mittsTick(simDt);   // focus mitts (09d_mitts.js)
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
   FX.update(simDt); MIST.update(simDt); wearTick(simDt);
   tq = performance.now(); pm.fx += tq - tp; tp = tq;
