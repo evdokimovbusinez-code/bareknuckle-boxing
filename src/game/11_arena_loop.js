@@ -73,6 +73,7 @@ function frame(now) {
     stateTick(dtReal);
   }
   tq = performance.now(); pm.anim += tq - tp - PERF.rag; pm.phys += PERF.rag; tp = tq;
+  jrTick(simDt);                                  // jump-rope demo (09c_rope.js): pose layer + cord physics, before cloth/hair sim
   P1.simulate(simDt); P2.simulate(simDt);
   ropeTick(simDt); bagStep(simDt);
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
