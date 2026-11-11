@@ -70,7 +70,7 @@ function startFight(fromMode) {
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
   if (G.mode !== 'career') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }
   CROWD.fill = G.mode === 'career' ? LADDER[Math.min(G.career, LADDER.length - 1)].crowd ?? 1 : 1;   // the semi-final in the warehouse: a half-empty hall; the title fight: everybody came
-  setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'boxgym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the training gym (13e_loc_boxgym.js); a career fight is where the ladder says
+  setLocation(G.mode === 'spar' || G.mode === 'bag' || G.mode === 'mitts' ? 'boxgym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the training gym (13e_loc_boxgym.js); a career fight is where the ladder says
   G.paused = false; UI.from = null; uiShow(null);
   BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; payShow(null); }
   sfx.unlock(); socStart();   // the hype cools down (15_social.js)

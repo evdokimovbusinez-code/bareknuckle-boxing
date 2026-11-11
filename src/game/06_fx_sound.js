@@ -203,6 +203,13 @@ const sfx = (() => {
       { const n = a.createBufferSource(), f = filt('bandpass', 1500 + 500 * rr(), 0.8), g = a.createGain(); n.buffer = noise; env(g, t, 0.002, 0.03 + 0.012 * k, 0.12 + 0.2 * k); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.08); }
       { const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'lowpass'; f.frequency.setValueAtTime(700 + 600 * k, t); f.frequency.exponentialRampToValueAtTime(110, t + 0.16); env(g, t, 0.004, 0.14 + 0.06 * k, 0.4 + 0.5 * k); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.3); }
       const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(92 + 22 * k, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.24); env(g2, t, 0.005, 0.2 + 0.12 * k, 0.45 + 0.5 * k); o.connect(g2).connect(master); o.start(t); o.stop(t + 0.45); },
+    /* a focus mitt (09d_mitts.js): much shorter and drier than the bag — a leather slap, the foam taking it, and the piping ringing
+       for a moment. p = 0 … 1.6 (the punch's power) */
+    mitt(p) { const a = ac; if (!a) return; const t = a.currentTime, master = bus, k = clamp(p, 0.2, 1.6);
+      { const n = a.createBufferSource(), f = filt('bandpass', 2400 + 900 * rr(), 0.7), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.018 + 0.014 * k, 0.22 + 0.26 * k); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.05); }
+      { const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'lowpass'; f.frequency.setValueAtTime(1500 + 900 * k, t); f.frequency.exponentialRampToValueAtTime(260, t + 0.07); env(g, t, 0.002, 0.05 + 0.03 * k, 0.26 + 0.3 * k); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.16); }
+      { const o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(210 + 40 * k, t); o.frequency.exponentialRampToValueAtTime(88, t + 0.09); env(g, t, 0.002, 0.07 + 0.04 * k, 0.2 + 0.24 * k); o.connect(g).connect(master); o.start(t); o.stop(t + 0.2); }
+      { const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.value = 3000 + rr() * 900; env(g, t, 0.001, 0.03, 0.03 + 0.04 * k); o.connect(g).connect(master); o.start(t); o.stop(t + 0.09); } },
     // its chains: a few links knocking together — short inharmonic pings, quiet; p = 0 … 1, d = delay (s)
     clink(p, d = 0) { const a = ac; if (!a) return; const n = 2 + ((p * 4) | 0);
       for (let i = 0; i < n; i++) { const t = a.currentTime + d + i * (0.018 + rr() * 0.04), f0 = 2300 + rr() * 2600;
