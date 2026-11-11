@@ -68,8 +68,8 @@ jobs:
           ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           # model: GLM-5.3-Flash through OpenRouter by default (cheap); a tag in the issue title picks another:
-          # [glm-x] = GLM-5.3-FlashX, [sonnet] / [opus] / [fable] = Claude through the Anthropic API key
-          BOT_MODEL: ${{ contains(github.event.issue.title, '[fable]') && 'claude-fable-5-2' || contains(github.event.issue.title, '[sonnet]') && 'claude-sonnet-5-5' || contains(github.event.issue.title, '[opus]') && 'claude-opus-5-5' || contains(github.event.issue.title, '[glm-x]') && 'z-ai/glm-5.3-flashx' || 'z-ai/glm-5.3-flash' }}
+          # [ds] = DeepSeek V4.1 Flash, [mimo] = MiMo-V2.6-Pro, [glm-x] = GLM-5.3-FlashX, [sonnet] / [opus] / [fable] = Claude through the Anthropic API key
+          BOT_MODEL: ${{ contains(github.event.issue.title, '[fable]') && 'claude-fable-5-2' || contains(github.event.issue.title, '[sonnet]') && 'claude-sonnet-5-5' || contains(github.event.issue.title, '[opus]') && 'claude-opus-5-5' || contains(github.event.issue.title, '[ds]') && 'deepseek/deepseek-v4.1-flash' || contains(github.event.issue.title, '[mimo]') && 'xiaomi/mimo-v2.6-pro' || contains(github.event.issue.title, '[glm-x]') && 'z-ai/glm-5.3-flashx' || 'z-ai/glm-5.3-flash' }}
           BOT_EFFORT: high
           BOT_BUDGET: "8"               # hard cap per task, USD (Claude models; OpenRouter spend is capped by the key's own limit)
         run: |
