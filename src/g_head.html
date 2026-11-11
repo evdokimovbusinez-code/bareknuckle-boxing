@@ -1,10 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<!-- without this a phone lays the page out 980 px wide and shrinks it: the stick and the buttons came out tiny -->
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0d1017">
+<!-- "Add to Home Screen" opens it without the browser's bars (the only full screen an iPhone allows a web page) -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Нокаут">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
 <title>Нокаут-ринг</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Oswald:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-[hidden]{display:none!important}   /* the hidden attribute must beat every display rule (loading screen, menus, pad) */
+[hidden]{display:none!important}
+.a2hs{position:absolute;left:50%;top:calc(var(--pt,8px) + 6px);transform:translateX(-50%);z-index:60;max-width:92%;padding:8px 12px;border-radius:10px;background:rgba(13,16,23,.92);border:1px solid rgba(226,177,74,.6);color:#eee;font:13px Barlow,system-ui,sans-serif;text-align:center}
+.a2hs b{color:#e2b14a}.a2hs button{margin-left:8px;background:none;border:0;color:#aaa;font-size:14px;cursor:pointer}   /* the hidden attribute must beat every display rule (loading screen, menus, pad) */
 /* Layout: one landscape stage (rotated 90° on a portrait phone). Full-bleed WebGL ring, health bars across the top, dodge pad bottom-left, punch diamond bottom-right. Single dark arena look by design. */
 :root{
   --ink:#0a0c11;
@@ -108,7 +120,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .db:active,.pb:active,.db.on,.pb.on{transform:scale(.88);border-color:var(--gold);background:rgba(226,177,74,.22)}
 /* the punch zone (right) is a circular pad about the size of the stick; БЛОК sits under it, for the right thumb */
 .punches{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;flex-direction:column;align-items:center;gap:8px}
-.pzone{position:relative;width:clamp(160px,44vmin,240px);height:clamp(160px,44vmin,240px);border-radius:50%;
+.pzone{position:relative;width:clamp(180px,52vmin,290px);height:clamp(180px,52vmin,290px);border-radius:50%;
   border:1px solid rgba(255,255,255,.22);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.5) 72%);touch-action:none}
 .pzone .pz-c{position:absolute;left:50%;top:50%;width:17%;height:17%;transform:translate(-50%,-50%);border-radius:50%;border:1px dashed rgba(226,177,74,.4);background:rgba(226,177,74,.07);pointer-events:none}
 .pzone .pl{position:absolute;transform:translate(-50%,-50%);font:600 clamp(9px,2.1vmin,12px) var(--mono);letter-spacing:.04em;color:var(--text);white-space:nowrap;pointer-events:none;opacity:.3;transition:opacity .15s}
@@ -127,7 +139,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 @keyframes flrec{0%{opacity:0}15%{opacity:1}70%{opacity:1}100%{opacity:0}}
 .pb.blk{width:clamp(120px,32vmin,175px);height:clamp(42px,11vmin,56px);border-radius:999px;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}
 /* the floating stick: no fixed home, a faint hint at rest, solid under the thumb; the document catches the left-half touch */
-.stick{position:absolute;left:15%;top:78%;width:clamp(160px,44vmin,240px);height:clamp(160px,44vmin,240px);transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(255,255,255,.18);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.55) 70%);touch-action:none;pointer-events:none;opacity:.26;transition:opacity .14s}
+.stick{position:absolute;left:15%;top:78%;width:clamp(180px,52vmin,290px);height:clamp(180px,52vmin,290px);transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(255,255,255,.18);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.55) 70%);touch-action:none;pointer-events:none;opacity:.26;transition:opacity .14s}
 .stick.on{opacity:1}
 .stick .knob{position:absolute;left:50%;top:50%;width:42%;height:42%;margin:-21% 0 0 -21%;border-radius:50%;background:rgba(226,177,74,.28);border:1px solid rgba(226,177,74,.6);transition:transform .08s}
 .stick.on .knob{transition:none;background:rgba(226,177,74,.45)}

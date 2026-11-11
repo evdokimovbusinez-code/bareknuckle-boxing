@@ -1,10 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<!-- without this a phone lays the page out 980 px wide and shrinks it: the stick and the buttons came out tiny -->
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0d1017">
+<!-- "Add to Home Screen" opens it without the browser's bars (the only full screen an iPhone allows a web page) -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Нокаут">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
 <title>Нокаут-ринг</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Oswald:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-[hidden]{display:none!important}   /* the hidden attribute must beat every display rule (loading screen, menus, pad) */
+[hidden]{display:none!important}
+.a2hs{position:absolute;left:50%;top:calc(var(--pt,8px) + 6px);transform:translateX(-50%);z-index:60;max-width:92%;padding:8px 12px;border-radius:10px;background:rgba(13,16,23,.92);border:1px solid rgba(226,177,74,.6);color:#eee;font:13px Barlow,system-ui,sans-serif;text-align:center}
+.a2hs b{color:#e2b14a}.a2hs button{margin-left:8px;background:none;border:0;color:#aaa;font-size:14px;cursor:pointer}   /* the hidden attribute must beat every display rule (loading screen, menus, pad) */
 /* Layout: one landscape stage (rotated 90° on a portrait phone). Full-bleed WebGL ring, health bars across the top, dodge pad bottom-left, punch diamond bottom-right. Single dark arena look by design. */
 :root{
   --ink:#0a0c11;
@@ -108,7 +120,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .db:active,.pb:active,.db.on,.pb.on{transform:scale(.88);border-color:var(--gold);background:rgba(226,177,74,.22)}
 /* the punch zone (right) is a circular pad about the size of the stick; БЛОК sits under it, for the right thumb */
 .punches{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;flex-direction:column;align-items:center;gap:8px}
-.pzone{position:relative;width:clamp(160px,44vmin,240px);height:clamp(160px,44vmin,240px);border-radius:50%;
+.pzone{position:relative;width:clamp(180px,52vmin,290px);height:clamp(180px,52vmin,290px);border-radius:50%;
   border:1px solid rgba(255,255,255,.22);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.5) 72%);touch-action:none}
 .pzone .pz-c{position:absolute;left:50%;top:50%;width:17%;height:17%;transform:translate(-50%,-50%);border-radius:50%;border:1px dashed rgba(226,177,74,.4);background:rgba(226,177,74,.07);pointer-events:none}
 .pzone .pl{position:absolute;transform:translate(-50%,-50%);font:600 clamp(9px,2.1vmin,12px) var(--mono);letter-spacing:.04em;color:var(--text);white-space:nowrap;pointer-events:none;opacity:.3;transition:opacity .15s}
@@ -127,7 +139,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 @keyframes flrec{0%{opacity:0}15%{opacity:1}70%{opacity:1}100%{opacity:0}}
 .pb.blk{width:clamp(120px,32vmin,175px);height:clamp(42px,11vmin,56px);border-radius:999px;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}
 /* the floating stick: no fixed home, a faint hint at rest, solid under the thumb; the document catches the left-half touch */
-.stick{position:absolute;left:15%;top:78%;width:clamp(160px,44vmin,240px);height:clamp(160px,44vmin,240px);transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(255,255,255,.18);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.55) 70%);touch-action:none;pointer-events:none;opacity:.26;transition:opacity .14s}
+.stick{position:absolute;left:15%;top:78%;width:clamp(180px,52vmin,290px);height:clamp(180px,52vmin,290px);transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(255,255,255,.18);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.55) 70%);touch-action:none;pointer-events:none;opacity:.26;transition:opacity .14s}
 .stick.on{opacity:1}
 .stick .knob{position:absolute;left:50%;top:50%;width:42%;height:42%;margin:-21% 0 0 -21%;border-radius:50%;background:rgba(226,177,74,.28);border:1px solid rgba(226,177,74,.6);transition:transform .08s}
 .stick.on .knob{transition:none;background:rgba(226,177,74,.45)}
@@ -1897,6 +1909,11 @@ const PUNCH = {
   upperR: { arm: 'R', type: 'upper', start: 0.20, impact: 0.70, dmg: 18, sta: 18, rootZ: 1.05, label: 'Апперкот правой' },
   over: { arm: 'R', type: 'over', start: 0.16, impact: 0.67, dmg: 21, sta: 24, rootZ: 1.05, slow: 0.82, label: 'Оверхенд' },
 };
+// seconds from the press to the impact (the wind-up of the clip is played faster to hit these; the follow-through keeps its pace).
+// Was the clip's own pace: jab 0.30, cross 0.49, hooks 0.38/0.48, uppers 0.48/0.50 — it read as lag between the key and the punch.
+const PUNCH_T = { jab: 0.17, cross: 0.24, hookL: 0.26, hookR: 0.30, upperL: 0.29, upperR: 0.30, over: 0.36 };
+const AI_SNAP = 0.85;    // the AI gets 85 % of that speed-up, so its punches stay readable for the player
+const FOLLOW_K = 1.3;    // the follow-through and the way back, a bit quicker than the clip
 // which defence beats which punch (body shots are only beaten by pulling back)
 const EV = { jab: ['slipL', 'slipR', 'duck', 'lean'], cross: ['slipL', 'slipR', 'duck'], hookL: ['duck', 'lean'], hookR: ['duck', 'lean'], upperL: ['slipL', 'slipR', 'lean'], upperR: ['slipL', 'slipR', 'lean'], over: ['lean'] };
 const RJ = ['L_Thigh', 'R_Thigh', 'L_Upperarm', 'R_Upperarm', 'NeckTwist01', 'L_Forearm', 'L_Hand', 'R_Forearm', 'R_Hand', 'L_Calf', 'L_Foot', 'L_ToeBase', 'R_Calf', 'R_Foot', 'R_ToeBase'];
@@ -5628,7 +5645,7 @@ class Fighter {
   /* —— actions —— */
   canAct() { return !this.ko && !this.doomed && !(this.wind > G.t) && G.t >= this.stunUntil && !this.cur && (!this.dodge || this.dodge.t > 0.46); }
   // a combo: the next punch may start as soon as the current one has landed (switching hands is quicker)
-  canChain(next) { if (!this.cur || this.ko || G.t < this.stunUntil || !this.resolved) return false; const P = PUNCH[this.cur]; return this.act[this.cur].time >= P.impact + (next && PUNCH[next] && PUNCH[next].arm === P.arm ? 0.14 : 0.04); }
+  canChain(next) { if (!this.cur || this.ko || G.t < this.stunUntil || !this.resolved) return false; const P = PUNCH[this.cur]; return this.act[this.cur].time >= P.impact + (next && PUNCH[next] && PUNCH[next].arm === P.arm ? 0.07 : 0); }
   /* range: a few tens of centimetres of in-and-out on the line between the two (no walking cycle — the idle bounce carries it):
      you step in behind your punches, big shots knock you back, a pressure fighter keeps walking forward, a counter-puncher drifts off */
   footwork(dt) {
@@ -5684,8 +5701,12 @@ class Fighter {
     // power shot: sits down on it — slower, heavier, costs more breath; and the arms get heavy as the tank empties: the more
     // you throw on empty, the slower and softer every punch gets
     this.heavy = !!this.powerNext; this.powerNext = false;
-    this.fatK = 0.42 + 0.58 * sstep(0, 55, this.stamina); this.punchK = (0.45 + 0.55 * sstep(0, 45, this.stamina)) * (this.heavy ? 1.45 : 1);
-    a.reset(); a.time = P.start; a.setEffectiveTimeScale(this.speed * this.fatK * (this.heavy ? 0.84 : 1) * (P.slow || 1) * (1 - 0.3 * this.daze) * (this.sig && sigOf(n) === this.sig ? 1.08 : 1)); a.play();
+    this.fatK = 0.88 + 0.12 * sstep(0, 55, this.stamina); this.punchK = (0.45 + 0.55 * sstep(0, 45, this.stamina)) * (this.heavy ? 1.45 : 1);
+    // (fatigue was 0.42…1 and daze −30 %: a tired cross took 0.7 s to land; now tiredness mostly costs power and accuracy — punchK, aimJit)
+    this.tsBase = this.speed * this.fatK * (this.heavy ? 0.9 : 1) * (P.slow || 1) * (1 - 0.1 * this.daze) * (this.sig && sigOf(n) === this.sig ? 1.08 : 1);
+    const wind = (P.impact - P.start) / (PUNCH_T[n] || (P.impact - P.start)); this.tsWind = 1 + (wind - 1) * (this === P1 ? 1 : AI_SNAP);
+    a.reset(); a.time = P.start; a.setEffectiveTimeScale(this.tsBase * this.tsWind); a.play();
+    if (this === P1 && !BAG.on) sfx.whoosh(0.3);   // instant feedback on the press, long before the impact
     if (this.fs) this.fs.thr++;
     // out of gas: the fist travels wide and lands roughly where it was meant to
     const ex = this.tired ? 1 : clamp((25 - this.stamina) / 25, 0, 1) * 0.5;
@@ -5763,7 +5784,7 @@ class Fighter {
   tick(dt) {
     if (G.t > this.staT) this.stamina = Math.min(100, this.stamina + 26 * dt * (1 + 0.08 * SK(this, 'sta')));
     if (this.cur) {
-      const P = PUNCH[this.cur], t = this.act[this.cur].time; this.aImpactIn = (P.impact - t) / Math.max(0.3, this.speed);
+      const P = PUNCH[this.cur], t = this.act[this.cur].time, sc = (this.tsBase || 1) * (t < P.impact ? (this.tsWind || 1) : FOLLOW_K); this.act[this.cur].setEffectiveTimeScale(sc); this.aImpactIn = (P.impact - t) / Math.max(0.3, sc);
       // the punch lands when the knuckles actually touch the face (or ribs); if they never do, it is decided at the end of the window
       if (!this.resolved && t >= P.impact - 0.14) { const c = contactTest(this, this.other); if (c || t >= P.impact + 0.06) { this.resolved = true;
         // no touch by the end of the swing: a graze if the knuckles were within a few cm, otherwise it is thin air
@@ -5977,6 +5998,43 @@ class Fighter {
   }
 }
 
+/* ───────── punch smear: a short fading ribbon behind the knuckles while a punch is on its way ─────────
+   A cheap stand-in for motion blur (a full-screen velocity blur costs too much on phones): one camera-facing strip per
+   hand, N samples of the knuckle path, drawn additive, tapering and fading towards the tail. It is on only from the start
+   of the punch to just after the impact, so a snappy punch reads as a streak and the guard never leaves a trace. */
+const TRAIL_N = 9, TRAIL_W = 0.055;
+const TRAIL_VS = `attribute float aA; varying float vA; void main() { vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const TRAIL_FS = `uniform vec3 uC; varying float vA; void main() { gl_FragColor = vec4(uC * vA, vA); }`;
+const TRAILS = [];
+function trailMake(F, side) {
+  const g = new THREE.BufferGeometry(), pos = new Float32Array(TRAIL_N * 2 * 3), al = new Float32Array(TRAIL_N * 2), idx = [];
+  for (let i = 0; i < TRAIL_N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  g.setIndex(idx); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aA', new THREE.BufferAttribute(al, 1));
+  const m = new THREE.ShaderMaterial({ vertexShader: TRAIL_VS, fragmentShader: TRAIL_FS, uniforms: { uC: { value: new THREE.Color(1.0, 0.93, 0.82) } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; mesh.renderOrder = 5; scene.add(mesh);
+  return { F, side, mesh, g, pos, al, pts: [], life: 0 };
+}
+const _tr1 = new V3(), _tr2 = new V3(), _tr3 = new V3();
+function trailTick(dt) {
+  if (!TRAILS.length) { if (!P1 || !P2) return; for (const F of [P1, P2]) for (const s of ['L', 'R']) TRAILS.push(trailMake(F, s)); }
+  const cam = camera.position, on = GFX.level !== 'low';
+  for (const T of TRAILS) {
+    const F = T.F, cur = F.cur && PUNCH[F.cur], act = cur && cur.arm === T.side && F.act[F.cur] && F.act[F.cur].time < cur.impact + 0.05;
+    if (on && act && F.group.visible !== false) {
+      T.pts.unshift(F.bpos(`CC_Base_${T.side}_Mid1`, new V3())); if (T.pts.length > TRAIL_N) T.pts.length = TRAIL_N; T.life = 1;
+    } else { T.life = Math.max(0, T.life - dt * 9); if (T.life === 0) T.pts.length = 0; }
+    const n = T.pts.length; T.mesh.visible = n > 2 && T.life > 0; if (!T.mesh.visible) continue;
+    for (let i = 0; i < TRAIL_N; i++) {
+      const p = T.pts[Math.min(i, n - 1)], q = i < n - 1 ? T.pts[i + 1] : T.pts[n - 2];
+      _tr1.subVectors(q, p); _tr2.subVectors(cam, p); _tr3.crossVectors(_tr1, _tr2).normalize();   // across the path, facing the camera
+      const k = i / (TRAIL_N - 1), w = TRAIL_W * (1 - k) * (i < n ? 1 : 0), a = (1 - k) * (1 - k) * 0.42 * T.life * (i < n ? 1 : 0);
+      T.pos.set([p.x + _tr3.x * w, p.y + _tr3.y * w, p.z + _tr3.z * w, p.x - _tr3.x * w, p.y - _tr3.y * w, p.z - _tr3.z * w], i * 6);
+      T.al[i * 2] = T.al[i * 2 + 1] = a;
+    }
+    T.g.attributes.position.needsUpdate = true; T.g.attributes.aA.needsUpdate = true;
+  }
+}
 /* ───────── blood mist (soft points) ───────── */
 const _xm = new V3(), _xm2 = new V3();
 const MIST = (() => {
@@ -6186,7 +6244,7 @@ const sfx = (() => {
     clink(p, d = 0) { const a = ac; if (!a) return; const n = 2 + ((p * 4) | 0);
       for (let i = 0; i < n; i++) { const t = a.currentTime + d + i * (0.018 + rr() * 0.04), f0 = 2300 + rr() * 2600;
         for (const [m, pk, len] of [[1, 0.035, 0.07], [2.76, 0.018, 0.045], [5.4, 0.008, 0.03]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.value = Math.min(15000, f0 * m); env(g, t, 0.001, len * (0.7 + rr() * 0.6), pk * (0.35 + p)); o.connect(g).connect(bus); o.start(t); o.stop(t + 0.12); } } },
-    whoosh() { const a = ac; if (!a) return; const t = a.currentTime, n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(2200, t + 0.14); env(g, t, 0.03, 0.14, 0.16); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.25); },
+    whoosh(v = 1) { const a = ac; if (!a) return; const t = a.currentTime, n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(2200, t + 0.14); env(g, t, 0.03, 0.14, 0.16 * v); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.25); },
     bell(count) { const a = ac; if (!a) return; for (let k = 0; k < count; k++) { const t = a.currentTime + k * 0.3; for (const [fq, pk] of [[640, 0.22], [1287, 0.12], [1932, 0.07], [2580, 0.04]]) { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = fq; env(g, t, 0.003, 1.3, pk); o.connect(g).connect(master); o.start(t); o.stop(t + 1.5); } } },
     count(n) { const a = ac; if (!a) return; const t = a.currentTime; for (const [fq, pk, d] of [[180, 0.5, 0.09], [1200, 0.08, 0.03]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(fq, t); o.frequency.exponentialRampToValueAtTime(fq * 0.6, t + d); env(g, t, 0.002, d, pk); o.connect(g).connect(master); o.start(t); o.stop(t + d + 0.05); } },
     /* the crowd. crowd(level): a looped murmur (noise through three voice-band filters, its loudness wandering like many people
@@ -6469,7 +6527,10 @@ function resolveHit(att, name, contact) {
   }
   FX.spawn(pos, dir, blocked ? power * 0.4 : power); REC.events.push(ev);
   // contact is soft: a very short freeze, then a moment of slow motion while the head travels with the fist
-  G.hitstop = 0.012 + 0.022 * power; if (G.slowT <= 0.02) { G.slow = 0.4; G.slowT = 0.05 + 0.06 * power; }
+  // was on every hit (0.012–0.034 s freeze + 0.05–0.11 s at 40 % speed) — in a combo that read as stutter. Now: nothing on blocks
+  // and light shots, a short freeze on a clean heavy one, a breath of slow motion only on the really big ones
+  if (!blocked && power > 0.55) G.hitstop = Math.min(0.04, 0.012 + 0.03 * (power - 0.55));
+  if (!blocked && power > 1.05 && G.slowT <= 0.02) { G.slow = 0.6; G.slowT = 0.06; }
   G.shake = Math.max(G.shake, 0.012 + 0.03 * power); sfx.thud(power, body); EVT.emit('hit', { pos, power, blocked });
   popup(pos, String(Math.round(dmg)), counter ? 'crit' : 'hit');
   // feel it: the screen edge flushes red when you are hit, the phone kicks on what you land and harder on what you take
@@ -6677,7 +6738,7 @@ function aiFollow() {   // he doesn't let a falling man go: one or two more on t
 }
 const Q = [];
 function playerInput() {
-  while (Q.length && G.real - Q[0].at > 0.7) Q.shift();
+  while (Q.length && G.real - Q[0].at > 0.35) Q.shift();   // a press older than this is not what he means any more
   if (!Q.length) return; const q = Q[0];
   if (!(P1.canAct() || P1.canChain(q.type === 'punch' ? q.name : null))) return;
   Q.shift();
@@ -6772,7 +6833,7 @@ function startSpar() { if (G.mode === 'career') { G.diff = G.userDiff; rollOppon
 function startQuick() { if (G.mode === 'career') { G.diff = G.userDiff; rollOpponent(); } G.mode = 'quick'; startFight(true); }
 function startFight(fromMode) {
   if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); }
-  hintFightStart();   // control hints: the first three bouts are the learning ones (12_ui.js)
+  hintFightStart(); window.goFull && window.goFull();   // touch: full screen + landscape (12_ui.js)   // control hints: the first three bouts are the learning ones (12_ui.js)
   for (const F of [P1, P2]) F.sparGear(G.mode === 'spar');
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
   if (G.mode !== 'career') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }
@@ -7599,6 +7660,7 @@ function frame(now) {
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
   FX.update(simDt); MIST.update(simDt); wearTick(simDt);
   tq = performance.now(); pm.fx += tq - tp; tp = tq;
+  trailTick(dtReal);   // the punch smear behind the knuckles (05b_trail.js)
   camUpdate(dtReal); locSync(); crowdTick(simDt); hudUpdate(dtReal); resTick(rawDt);   // locSync: the location hides what stands between the camera and the fighters; crowdTick: its crowd (14_crowd.js)
   pm.misc += performance.now() - tp;
   perfTick(rawDt);
@@ -7659,7 +7721,7 @@ const press = (type, n, el) => {
   let body = false, pow = false;
   if (type === 'punch') { const m = punchMod(); body = m.body; pow = m.pow; ctlLog(n, body, pow); }
   if (type === 'dodge') Q.length = 0;
-  if (Q.length < 3) Q.push({ type, name: n, at: G.real, body, pow });
+  if (Q.length < 2) Q.push({ type, name: n, at: G.real, body, pow });
   blip(el);
 };
 /* the punch zone: six 60° sectors, a narrow ±15° band about straight up = cross, about straight down = nothing,
@@ -7719,7 +7781,7 @@ const setMove = () => { if (!P1) return; const x = MV.kx || MV.sx, y = MV.ky || 
    local frame exactly as camera layout rotates it. pointer-events:none on the stick lets the document see the touch. */
 {
   const el = $('stick'), knob = el.querySelector('.knob');
-  const stickR = () => Math.min(240, Math.max(160, 0.44 * Math.min(window.innerWidth, window.innerHeight))) / 2;
+  const stickR = () => Math.min(290, Math.max(180, 0.52 * Math.min(window.innerWidth, window.innerHeight))) / 2;
   const toLocal = (vx, vy) => stage.classList.contains('rot') ? { x: vy, y: VH - vx } : (() => { const r = stage.getBoundingClientRect(); return { x: vx - r.left, y: vy - r.top }; })();
   const place = (x, y) => { el.style.left = x + 'px'; el.style.top = y + 'px'; };
   const idle = () => { const r = stickR() + 16; place(r, VH - r); el.classList.remove('on'); knob.style.transform = ''; MV.sx = MV.sy = 0; setMove(); };
@@ -7764,6 +7826,19 @@ for (const ev of ['touchmove', 'gesturestart']) document.addEventListener(ev, e 
   if (btn) { btn.hidden = !(TOUCH && req);
     btn.addEventListener('click', e => { e.preventDefault();
       try { const p = !inFs() && req ? req.call(root) : inFs() && exit ? exit.call(document) : null; p && p.catch && p.catch(() => {}); } catch (_) {} }); }
+  // a bout started by a tap goes full screen and locks landscape by itself (Android; startFight runs inside the tap)
+  window.goFull = () => { if (!TOUCH || !req || inFs()) return;
+    try { const p = req.call(root); p && p.then && p.then(() => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (_) {} }).catch(() => {}); } catch (_) {} };
+  // iPhone / iPad Safari has no full screen for pages: once, in the menu, tell how to put it on the Home Screen
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  let seen = false; try { seen = localStorage.getItem('bx_a2hs') === '1'; } catch (_) {}
+  if (ios && !standalone && !seen) {
+    const b = document.createElement('div'); b.className = 'a2hs';
+    b.innerHTML = 'На весь экран: <b>Поделиться</b> → <b>На экран «Домой»</b>, и открывай игру оттуда <button type="button" aria-label="Закрыть">✕</button>';
+    b.querySelector('button').addEventListener('click', () => { b.remove(); try { localStorage.setItem('bx_a2hs', '1'); } catch (_) {} });
+    stage.appendChild(b);
+  }
 }
 /* desktop: WASD / arrows walk, U I straights (top row: jab / cross), J K hooks (middle row), N M uppercuts (bottom row) —
    the same geometry as the swipes. Mouse LMB jab / RMB cross, Q E slips, C duck, Space block; W / S held at the punch
