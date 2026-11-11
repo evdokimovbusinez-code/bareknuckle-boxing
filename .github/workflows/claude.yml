@@ -45,7 +45,7 @@ jobs:
           if [ "$IS_PR" = yes ]; then B=$(gh pr view "$N" --json headRefName -q .headRefName); else B="claude/issue-$N"; fi
           if git ls-remote --exit-code --heads origin "$B" >/dev/null; then git checkout -B "$B" "origin/$B"; else git checkout -b "$B"; fi
           # the bot's own tooling always comes from main (an older task branch may carry stale copies)
-          git checkout origin/main -- .github tools CLAUDE.md .gitignore   # .github too: a branch whose workflow differs from main cannot be pushed by Actions
+          git checkout origin/main -- tools CLAUDE.md .gitignore
           echo "b=$B" >> "$GITHUB_OUTPUT"
           gh issue comment "$N" --body "🤖 Взял задачу, работаю в ветке \`$B\`… [ход работы](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
       - name: Build prompt
