@@ -92,7 +92,8 @@ function recFrame() {
   const f = REC.pool.pop() || { t: 0, d: [new Float32Array(REC.N), new Float32Array(REC.N)] };
   f.t = G.t; P1.capture(f.d[0]); P2.capture(f.d[1]); (f.gx || (f.gx = [0, 0]))[0] = P1.group.position.x; f.gx[1] = P2.group.position.x; f.ar =[ARENA.position.x, ARENA.position.z, ARENA.rotation.y];
   const r = f.r || (f.r = new Float32Array(ROPES.length * 4)); ROPES.forEach((R, i) => { r[i * 4] = R.cur.x; r[i * 4 + 1] = R.cur.y; r[i * 4 + 2] = R.cur.z; r[i * 4 + 3] = R.s; });
-  REC.frames.push(f); if (REC.frames.length > 640) REC.pool.push(REC.frames.shift());
+  // keep the last 14 s whatever the frame rate (640 frames was only 5.3 s on a 120 Hz screen), but never more than 2000 frames
+  REC.frames.push(f); while (REC.frames.length > 2000 || (REC.frames.length > 4 && REC.frames[0].t < G.t - 14)) REC.pool.push(REC.frames.shift());
 }
 const RP = { seg: 0, tau: 0, i: 0, segs: [], cut: false, hl: false };   // hl: the segments are the end-of-round highlights (09b_cine.js), not the knockout
 function startReplay() {
@@ -101,9 +102,11 @@ function startReplay() {
   // the knockout from several cameras, like a broadcast: tight on the face, from the canvas looking up, straight down from
   // the lighting rig, over the winner's shoulder, then a wide dolly — each a little longer, so the fall is seen to the end
   const S = (a, b, rate, cam) => ({ from: Math.max(t0, G.koT + a), to: Math.min(t1, G.koT + b), rate, cam });
-  const mid = [S(-0.35, 1.3, 0.4, 'low'), S(-0.2, 1.9, 0.55, 'top'), S(-0.5, 1.5, 0.38, 'shoulder')].sort(() => rr() - 0.5);
-  RP.segs = [S(-0.7, 1.0, 0.27, 'close'), ...mid.slice(0, 2), S(-0.45, 2.4, 0.6, 'wide')];
-  RP.seg = -1; nextSeg();
+  // was 4 shots at 0.27–0.6× (~19 s, mostly a body lying still in slow motion — it read as a frozen screen); now 3 shots, ~10 s
+  const mid = [S(-0.35, 1.3, 0.55, 'low'), S(-0.2, 1.6, 0.65, 'top'), S(-0.5, 1.4, 0.5, 'shoulder')].sort(() => rr() - 0.5);
+  RP.segs = [S(-0.6, 0.9, 0.35, 'close'), mid[0], S(-0.3, 2.0, 0.8, 'wide')].filter(g => g.to > g.from + 0.15);
+  if (!RP.segs.length) return endReplay();   // e.g. a count-out: the knockdown is older than the buffer
+  RP.seg = -1; RP.wd = 0; nextSeg();
   $('rec').hidden = false; $('bar-t').hidden = $('bar-b').hidden = false; $('hud').hidden = true; $('pad').hidden = true; $('result').hidden = true;
 }
 function nextSeg() {
@@ -127,7 +130,8 @@ function stepReplay(dtReal) {
     if (e.spray) F.flesh.spray(e.spray.map(i => F.flesh.wounds[i]).filter(Boolean), e.dir, e.power, F);
     if (e.blocked) sfx.block(clamp(e.power * 2, 0.3, 1.4)); else sfx.thud(e.power * 0.7);
     G.shake = Math.max(G.shake, 0.01 + 0.02 * e.power); EVT.emit('hit', { pos: e.pos, power: e.power, replay: true }); }
-  if (RP.tau >= s.to) nextSeg();
+  RP.wd = sdt > 1e-6 || dtReal === 0 ? 0 : (RP.wd || 0) + dtReal;   // a replay whose clock stopped (bad segment) must not hang the game
+  if (RP.tau >= s.to) nextSeg(); else if (RP.wd > 1.5 && !s.enter) { RP.wd = 0; endReplay(); }
   return sdt;
 }
 function endReplay() {
