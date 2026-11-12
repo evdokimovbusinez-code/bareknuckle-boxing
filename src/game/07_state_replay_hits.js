@@ -250,6 +250,8 @@ function resolveHit(att, name, contact) {
     mult = Math.min(1 + REACT.step * (combo - 1), REACT.max);
   }
   const rx = { mult, combo, heavy: !!isPow, power, rib: att.ribIdx | 0 };
+  // a feeler jab (light, clean, no power): a nod + a blink only — it must not rock him back a step (issue 44 / req. 4)
+  const light = !blocked && !body && !isPow && power < REACT.light;
   if (!blocked) { const was = def.daze; def.daze = Math.min(1, def.daze + power * 0.13 + (def.hp < 30 ? 0.1 : 0)); if (was < 0.55 && def.daze >= 0.55) popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'поплыл', 'crit'); }
   if (breakIt) popup(_v4.copy(pos).add(_v5.set(0, 0.18, 0)), 'блок пробит', 'crit');
   else if (blocked) popup(pos, 'блок', 'dodge');
@@ -267,8 +269,9 @@ function resolveHit(att, name, contact) {
     else def.dmgMul = 0.55;
   }
   if (G.t - (att.lastLand || -9) < 0.2 || G.t - (def.lastLand || -9) < 0.2) { if (!G.tradeT || G.t - G.tradeT > 1) { G.tradeT = G.t; popup(_v4.lerpVectors(att.headNow, def.headNow, 0.5).add(_v5.set(0, 0.3, 0)), 'размен!', 'crit'); G.slow = 0.3; G.slowT = 0.35; } }
-  // the step back grows with the series (a clean shot is scaled by `mult`); from the 2nd hit on he also starts retreating
-  att.lastLand = G.t; def.knock = (def.knock || 0) + (blocked ? 0.25 : mult) * power * (body ? 0.6 : 1) + (combo >= 2 ? REACT.backStep * (combo - 1) : 0);
+  // the step back grows with the series (a clean shot is scaled by `mult`); from the 2nd hit on he also starts retreating.
+  // A light jab takes no step at all (only a nod + a blink); a power / series shot does.
+  att.lastLand = G.t; def.knock = (def.knock || 0) + (blocked ? 0.25 : light ? 0 : mult) * power * (body ? 0.6 : 1) + (combo >= 2 ? REACT.backStep * (combo - 1) : 0);
   def.takeHit(dir, blocked ? power * 0.35 : power, name, pos, body, blocked, rx);
   // how a man reacts depends on what hit him: a single hard one → a step back and a head shake; three landing inside ~1.5 s →
   // he stops punching, covers up and gets out of the corner of it (sideways, back)
@@ -472,9 +475,9 @@ window.__react = {
   series(n, kind, opts) {
     const out = [], N = Math.max(1, n | 0 || 1), name = kind || 'cross', o = opts || {};
     for (let i = 0; i < N; i++) {
-      const r = this._hit(name, o, i === 0);
-      if (r) out.push(r);
-      if (window.__tick) window.__tick(12, 1 / 60);   // 0.2 s between hits — well inside REACT.gap (1 s)
+      if (i && window.__tick) window.__tick(12, 1 / 60);   // 0.2 s BETWEEN hits — well inside REACT.gap (1 s);
+      const r = this._hit(name, o, i === 0);              // no trailing tick: the last hit is left at t=0 of its recoil,
+      if (r) out.push(r);                                 // so __tick(n) can step it to the peak for a screenshot
     }
     return out;
   },

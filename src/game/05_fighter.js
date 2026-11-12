@@ -515,13 +515,16 @@ class Fighter {
       if (typeof sfx !== 'undefined' && sfx.exhale) sfx.exhale(eff);   // short forced breath out
     }
 
-    // debug log (issue 44): type, force, series multiplier, head departure angle, trunk shift, step
-    const wH = 1 / 12.7;   // 1/ω of the head springs (k≈170, c≈7): a velocity kick → predicted peak radians
+    // debug log (issue 44): type, force, series multiplier, head departure angle, trunk shift, step.
+    // bodyDeg is THIS hit's trunk kick, not the instantaneous s.sp.v: for a head shot the trunk is kicked by
+    // rxFollow ~65 ms later, so reading the spring here would wrongly report 0. wB = 1/ω of the trunk spring (k≈90).
+    const wH = 1 / 12.7, wB = 1 / 9.5, kt = 0.25;
+    const dSP = body ? 1.0 * (0.6 + eff) : light ? 0 : (dm.z * 2.4 - dm.y * 1.2) * k * kt;
     this.rxLog = {
-      kind: name, type, body: !!body, blocked: false, heavy, power: +rawP.toFixed(2),
+      kind: name, type, body: !!body, blocked: false, heavy, light, power: +rawP.toFixed(2),
       mult: +mult.toFixed(2), combo, eff: +eff.toFixed(2),
       headDeg: +(Math.hypot(dHP, dHY, dHR) * wH * 57.3).toFixed(1),
-      bodyDeg: +(Math.abs(s.sp.v) * wH * 57.3).toFixed(1),
+      bodyDeg: +(Math.abs(dSP) * wB * 57.3).toFixed(1),
       step: +(this.knock || 0).toFixed(2),
     };
     if (this.cur && !this.resolved) this.cur = null;
