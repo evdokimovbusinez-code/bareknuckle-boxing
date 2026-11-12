@@ -34,7 +34,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.13'   # bpy (Blender as a module) ships cp313 wheels
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -79,6 +79,9 @@ jobs:
           echo "model: $BOT_MODEL"
           pip install -q claude-agent-sdk playwright
           npm i --no-save --silent three@0.160.0 cannon-es@0.20.0
+          if [[ "$ISSUE_TITLE" == *"[assets]"* ]]; then   # asset pipeline tasks: Blender as a module + glTF tooling
+            pip install -q bpy==5.3.0 && npm i --no-save --silent @gltf-transform/cli@4 && export BOT_TURNS=160
+          fi
           if [[ "$BOT_MODEL" == claude-* ]]; then
             export ANTHROPIC_API_KEY="$ANTHROPIC_KEY"
           else   # OpenRouter speaks the Anthropic API: the SDK runs any of its models
