@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """Stage 3 audio, step 2: turn assets/audio/src/ into the files the game loads.
 
-    python3 tools/audio/build.py     # offline, needs ffmpeg with libopus + aac
+    python3 tools/audio/fetch.py     # STEP 1, needs internet: downloads the CC0
+                                     # sources and (re)creates assets/audio/src/
+    python3 tools/audio/build.py     # STEP 2, offline, ffmpeg with libopus + aac
+
+assets/audio/src/ holds only intermediate WAVs and is git-ignored (issue #48:
+the 13 MB of sources are not kept in the repo).  On a fresh checkout run fetch.py
+first, then this script; the game itself never needs src/ (it loads the committed
+sfx.ogg/.m4a, sfx.json and music/ at runtime).
 
 Processing (per issue #48): silence already trimmed by fetch.py, LUFS
 normalisation per clip, mono 48 kHz for the effects, one Ogg Opus sprite sheet
@@ -132,7 +139,9 @@ def main():
     lines += ['', '**Итого эффекты: %.2f МБ** (лимит 1.5 МБ, `sfx.m4a` — запасной для Safari).' %
               (fx_total / 1048576),
               '**Самый большой музыкальный файл: %.2f МБ** (лимит 3 МБ).' % (music_max / 1048576),
-              'Исходники: `assets/audio/src/`, титры: `CREDITS.md` / `credits.json`.', '']
+              'Воспроизведение: `python3 tools/audio/fetch.py` (нужен интернет) создаёт `assets/audio/src/` —',
+              'эти 13 МБ промежуточных WAV в git не хранятся (`.gitignore`); затем этот `build.py` (офлайн).',
+              'Игра грузит только итоговые файлы выше. Титры: `CREDITS.md` / `credits.json`.', '']
     open(os.path.join(AUD, 'SIZES.md'), 'w').write('\n'.join(lines))
     print('\n'.join(lines[2:]))
 

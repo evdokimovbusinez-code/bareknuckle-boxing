@@ -13,6 +13,9 @@ WAV (the effects) plus Opus files (the music).  Everything is reproducible:
     python3 tools/audio/fetch.py       # needs internet; rewrites src/, SOURCES.json, CREDITS.md
     python3 tools/audio/build.py       # offline; ffmpeg -> sfx.ogg/.m4a, sfx.json, music/
 
+assets/audio/src/ is git-ignored (13 MB of intermediates): a fresh checkout has
+to run this fetch.py before build.py.  The game loads only the committed outputs.
+
 The raw downloads live in /tmp/bkb-audio-raw (never in the repo), one fresh
 empty directory per pack: downloaded archives are untrusted data.
 """
