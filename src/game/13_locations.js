@@ -214,6 +214,7 @@ function setLocation(id) {
   const li = L.light; scene.background.set(li.bg); scene.fog.color.set(li.fog[0]); scene.fog.near = li.fog[1]; scene.fog.far = li.fog[2]; renderer.toneMappingExposure = li.exposure;
   hemi.color.set(li.hemi[0]); hemi.groundColor.set(li.hemi[1]); hemi.intensity = li.hemi[2];
   for (const [l, v] of [[key, li.key], [rim, li.rim], [rim2, li.rim2], [fill, li.fill]]) { l.color.set(v[0]); l.intensity = v[1]; }
+  gfxLights(GFX.level);   // #47: a location rebuilds its accent lights — re-apply the low-preset light budget after retuning
   if (was !== L) FX.clearFloor();   // floor stains belong to the floor they fell on
   sfx.place(L.id);   // its ambience and the echo of its walls (06_fx_sound.js)
   ARENA.updateMatrixWorld(true);

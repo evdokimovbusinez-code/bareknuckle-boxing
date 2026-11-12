@@ -56,21 +56,29 @@ function hudUpdate(dt) {
 /* render resolution: a computer renders at the height of the graphics preset (GFX.h; a 5K retina window would otherwise push ~11 Mpx
    through AO + bloom); a phone gets a pixel-ratio cap from the preset. In 'auto' the height and then the preset step down with the frame time */
 const TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || (navigator.maxTouchPoints > 0 && !(window.matchMedia && matchMedia('(hover: hover)').matches));
-let qH = GFX.h; const DR = { acc: 0, n: 0, good: 0, bad: 0, wait: 0, upNeed: 6, lastUp: -1e9 };
+let qH = GFX.h; const DR = { acc: 0, n: 0, good: 0, bad: 0, wait: 0, upNeed: 6, lastUp: -1e9, slow: 0, lastDown: -1e9 };
 const resMax = () => TOUCH ? GFX.h : Math.min(GFX.h, VH * Math.max(1, window.devicePixelRatio || 1));   // the tallest frame this preset gives on this screen
 function applyRes() {
   const dpr = window.devicePixelRatio || 1, pr = TOUCH ? Math.max(0.5, Math.min(dpr, GFX.tpr) * Math.min(1, qH / GFX.h)) : clamp(qH / VH, 0.4, Math.max(1, dpr));
   renderer.setPixelRatio(pr); composer.setPixelRatio(pr); renderer.setSize(VW, VH, false); composer.setSize(VW, VH);
 }
-/* auto: the average frame stays above 22 ms for 3 s → first the render height goes down (to 75 % of the preset's), then the preset itself.
+/* auto: the average frame stays above 20 ms (50 fps) for 3 s → first the render height goes down (to 75 % of the preset's), then the preset itself.
    The height may come back when there is headroom (and waits twice as long after every attempt that did not hold); the preset never climbs
    back on its own, so nothing ping-pongs. The level reached is remembered for the next start (choosing «авто» in the menu again forgets it). */
 function resTick(dt) {
   if (GFX.set !== 'auto' || G.state === 'menu' || dt > 0.25 || dt <= 0 || document.hidden) return;
+  /* Stage 2 (#47): 5 s in a row below 40 fps → step the whole preset down once (a cooldown stops it cascading in one stall).
+     A preset the user picked in settings is never touched — this whole function is skipped above when GFX.set !== 'auto'. */
+  if (dt > 1 / 40) DR.slow += dt; else DR.slow = 0;
+  if (DR.slow >= 5 && G.real - DR.lastDown > 8) {
+    DR.slow = 0; DR.lastDown = G.real;
+    const li = GFX_ORDER.indexOf(GFX.level);
+    if (li > 0) { applyGfx(GFX_ORDER[li - 1]); DR.wait = 2; try { localStorage.setItem('bx_gfx_auto', GFX.level); } catch (_) {} }
+  }
   if (DR.wait > 0) { DR.wait -= dt; return; }   // just changed something: let the shaders compile and the frame time settle
   DR.acc += dt; DR.n++; if (DR.acc < 1) return;
   const avg = DR.acc / DR.n; DR.acc = DR.n = 0;
-  if (avg > 0.022) {
+  if (avg > 1 / 50) {   // hold ≥ 50 fps: 20 ms per frame
     DR.good = 0; if (++DR.bad < 3) return; DR.bad = 0;
     const cur = Math.min(qH, resMax()), floor = Math.max(540, GFX.h * 0.75), li = GFX_ORDER.indexOf(GFX.level);
     if (G.real - DR.lastUp < 15) DR.upNeed = Math.min(DR.upNeed * 2, 48);   // the last step up did not hold

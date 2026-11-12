@@ -1659,9 +1659,12 @@ const GFX_ORDER = ['low', 'medium', 'high', 'ultra'];
 const GFX_LABEL = { auto: 'авто', low: 'низкая', medium: 'средняя', high: 'высокая', ultra: 'ультра' };
 const GFX_PRESET = {
   // h: render height · ao: GTAO samples (0 = off) at aoScale of the frame · msaa: samples of the scene target (0 = FXAA pass instead)
-  // shadow: key light map size, soft = PCFSoft · tpr: pixel-ratio cap on touch devices · simSkip: hair / shorts cloth every Nth frame
-  low:    { h: 720,  ao: 0,  aoScale: 0.5, msaa: 0, bloom: false, shadow: 1024, soft: false, tpr: 1,    simSkip: 2, particles: 0.5, crowd: 0.3 },
-  medium: { h: 900,  ao: 8,  aoScale: 0.5, msaa: 2, bloom: true,  shadow: 1024, soft: true,  tpr: 1.5,  simSkip: 1, particles: 0.8, crowd: 0.6 },
+  // shadow: key light map size (0 = no shadow pass at all), soft = PCFSoft · tpr: pixel-ratio cap on touch devices ·
+  // simSkip: hair / shorts cloth every Nth frame · particles / crowd: budgets of the secondary FX and the crowd (0..1)
+  // Stage 2 (#47), phone targets: low ≤ 150k tris / 70 calls, medium ≤ 280k / 110. GTAO's normal pass redraws the whole scene,
+  // so it is off everywhere below high; the shadow pass (a second render of every fighter) is off on low.
+  low:    { h: 720,  ao: 0,  aoScale: 0.5, msaa: 0, bloom: false, shadow: 0,    soft: false, tpr: 1,    simSkip: 2, particles: 0.3, crowd: 0.4 },
+  medium: { h: 900,  ao: 0,  aoScale: 0.5, msaa: 2, bloom: true,  shadow: 1024, soft: true,  tpr: 1.5,  simSkip: 1, particles: 0.6, crowd: 0.7 },
   high:   { h: 1080, ao: 12, aoScale: 1,   msaa: 4, bloom: true,  shadow: 2048, soft: true,  tpr: 1.75, simSkip: 1, particles: 1,   crowd: 1 },
   ultra:  { h: 1440, ao: 16, aoScale: 1,   msaa: 4, bloom: true,  shadow: 2048, soft: true,  tpr: 2,    simSkip: 1, particles: 1,   crowd: 1 },
 };
@@ -1698,29 +1701,50 @@ function applyGfx(level) {
   const msaa = lowEnd ? Math.min(P.msaa, 2) : P.msaa;
   if (sceneRT.samples !== msaa) { sceneRT.samples = msaa; sceneRT.dispose(); }
   fxaa.enabled = msaa === 0;
+  // shadows: off entirely on the cheapest preset (the shadow pass is a second render of every fighter — ~40–60k tris and a
+  // dozen draw calls). Toggling shadowMap.enabled changes the shader defines of every lit material, so recompile them once.
+  const shadowOn = P.shadow > 0;
+  if (renderer.shadowMap.enabled !== shadowOn || key.castShadow !== shadowOn) {
+    renderer.shadowMap.enabled = shadowOn; key.castShadow = shadowOn;
+    scene.traverse(o => { const m = o.material; if (!m) return; if (Array.isArray(m)) for (const x of m) x.needsUpdate = true; else m.needsUpdate = true; });
+  }
   const type = P.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
   if (renderer.shadowMap.type !== type) {   // the filter is compiled into every lit material
     renderer.shadowMap.type = type;
     scene.traverse(o => { const m = o.material; if (!m) return; if (Array.isArray(m)) for (const x of m) x.needsUpdate = true; else m.needsUpdate = true; });
   }
-  if (key.shadow.mapSize.x !== P.shadow) { key.shadow.mapSize.set(P.shadow, P.shadow); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
+  if (shadowOn && key.shadow.mapSize.x !== P.shadow) { key.shadow.mapSize.set(P.shadow, P.shadow); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
+  gfxLights(level);
   if (GFX.ready) { qH = GFX.h; applyRes(); }
   for (const f of GFX.onChange) f(GFX);
+}
+/* dynamic lights on low: keep the hemisphere, the key spot and one rim (3 shared lights); drop the two extra directional fills.
+   The per-location accent spots/points stay — each location already trims them on low (tires / yard / metro use `lite`) and their
+   glow is baked into emissive cards, so hiding them here would leave those scenes unlit. Called on preset change and after
+   setLocation retunes the lights. */
+function gfxLights(level) {
+  const low = level === 'low';
+  rim2.visible = !low; fill.visible = !low;
 }
 /* menu choice: 'auto' or a fixed level (saved) */
 function setGfx(v) {
   if (v !== 'auto' && !GFX_PRESET[v]) v = 'auto';
   GFX.set = v; try { localStorage.setItem('bx_gfx', v); if (v === 'auto') localStorage.removeItem('bx_gfx_auto'); } catch (_) {}
-  DR.acc = DR.n = DR.good = DR.bad = 0; DR.wait = 1; DR.upNeed = 6;
+  DR.acc = DR.n = DR.good = DR.bad = DR.slow = 0; DR.wait = 1; DR.upNeed = 6;
   applyGfx(v === 'auto' ? GFX.detect : v);
 }
 {
-  // auto starts from 'medium' on integrated / weak / mobile GPUs, otherwise from 'high'; a level the auto mode stepped down to is remembered
+  /* Stage 2 (#47): the first-launch auto choice. A phone (coarse pointer) starts at medium; a weak device — ≤4 cores or
+     ≤4 GB of RAM — starts at low; a weak/integrated GPU falls back to medium; a desktop starts at high. A level auto mode
+     later stepped down to is remembered. A level the user picked in settings always wins (set !== 'auto'). */
   let name = '';
   try { const gl = renderer.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); name = String((e && gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || ''); } catch (_) {}
   GFX.gpu = name;
-  const weak = lowEnd || /intel(?!.*\barc\b)|swiftshader|llvmpipe|software|basic render|mali|adreno|powervr|videocore|radeon(\(tm\))? (r[2-7]|hd|vega [3-8]\b)|geforce (mx|gt |[0-9]{3}m)/i.test(name);
-  GFX.detect = weak ? 'medium' : 'high';
+  const coarse = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0;
+  const cores = navigator.hardwareConcurrency || 8, mem = navigator.deviceMemory || 8;
+  const weakDevice = cores <= 4 || mem <= 4;
+  const weakGPU = lowEnd || /intel(?!.*\barc\b)|swiftshader|llvmpipe|software|basic render|mali|adreno|powervr|videocore|radeon(\(tm\))? (r[2-7]|hd|vega [3-8]\b)|geforce (mx|gt |[0-9]{3}m)/i.test(name);
+  GFX.detect = weakDevice ? 'low' : (coarse || weakGPU) ? 'medium' : 'high';
   let set = 'auto', start = GFX.detect;
   try {
     const old = localStorage.getItem('bx_q'); set = localStorage.getItem('bx_gfx') || (old === '720' ? 'low' : old === '1440' ? 'ultra' : 'auto');
@@ -8172,21 +8196,29 @@ function hudUpdate(dt) {
 /* render resolution: a computer renders at the height of the graphics preset (GFX.h; a 5K retina window would otherwise push ~11 Mpx
    through AO + bloom); a phone gets a pixel-ratio cap from the preset. In 'auto' the height and then the preset step down with the frame time */
 const TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || (navigator.maxTouchPoints > 0 && !(window.matchMedia && matchMedia('(hover: hover)').matches));
-let qH = GFX.h; const DR = { acc: 0, n: 0, good: 0, bad: 0, wait: 0, upNeed: 6, lastUp: -1e9 };
+let qH = GFX.h; const DR = { acc: 0, n: 0, good: 0, bad: 0, wait: 0, upNeed: 6, lastUp: -1e9, slow: 0, lastDown: -1e9 };
 const resMax = () => TOUCH ? GFX.h : Math.min(GFX.h, VH * Math.max(1, window.devicePixelRatio || 1));   // the tallest frame this preset gives on this screen
 function applyRes() {
   const dpr = window.devicePixelRatio || 1, pr = TOUCH ? Math.max(0.5, Math.min(dpr, GFX.tpr) * Math.min(1, qH / GFX.h)) : clamp(qH / VH, 0.4, Math.max(1, dpr));
   renderer.setPixelRatio(pr); composer.setPixelRatio(pr); renderer.setSize(VW, VH, false); composer.setSize(VW, VH);
 }
-/* auto: the average frame stays above 22 ms for 3 s → first the render height goes down (to 75 % of the preset's), then the preset itself.
+/* auto: the average frame stays above 20 ms (50 fps) for 3 s → first the render height goes down (to 75 % of the preset's), then the preset itself.
    The height may come back when there is headroom (and waits twice as long after every attempt that did not hold); the preset never climbs
    back on its own, so nothing ping-pongs. The level reached is remembered for the next start (choosing «авто» in the menu again forgets it). */
 function resTick(dt) {
   if (GFX.set !== 'auto' || G.state === 'menu' || dt > 0.25 || dt <= 0 || document.hidden) return;
+  /* Stage 2 (#47): 5 s in a row below 40 fps → step the whole preset down once (a cooldown stops it cascading in one stall).
+     A preset the user picked in settings is never touched — this whole function is skipped above when GFX.set !== 'auto'. */
+  if (dt > 1 / 40) DR.slow += dt; else DR.slow = 0;
+  if (DR.slow >= 5 && G.real - DR.lastDown > 8) {
+    DR.slow = 0; DR.lastDown = G.real;
+    const li = GFX_ORDER.indexOf(GFX.level);
+    if (li > 0) { applyGfx(GFX_ORDER[li - 1]); DR.wait = 2; try { localStorage.setItem('bx_gfx_auto', GFX.level); } catch (_) {} }
+  }
   if (DR.wait > 0) { DR.wait -= dt; return; }   // just changed something: let the shaders compile and the frame time settle
   DR.acc += dt; DR.n++; if (DR.acc < 1) return;
   const avg = DR.acc / DR.n; DR.acc = DR.n = 0;
-  if (avg > 0.022) {
+  if (avg > 1 / 50) {   // hold ≥ 50 fps: 20 ms per frame
     DR.good = 0; if (++DR.bad < 3) return; DR.bad = 0;
     const cur = Math.min(qH, resMax()), floor = Math.max(540, GFX.h * 0.75), li = GFX_ORDER.indexOf(GFX.level);
     if (G.real - DR.lastUp < 15) DR.upNeed = Math.min(DR.upNeed * 2, 48);   // the last step up did not hold
@@ -8776,6 +8808,7 @@ function setLocation(id) {
   const li = L.light; scene.background.set(li.bg); scene.fog.color.set(li.fog[0]); scene.fog.near = li.fog[1]; scene.fog.far = li.fog[2]; renderer.toneMappingExposure = li.exposure;
   hemi.color.set(li.hemi[0]); hemi.groundColor.set(li.hemi[1]); hemi.intensity = li.hemi[2];
   for (const [l, v] of [[key, li.key], [rim, li.rim], [rim2, li.rim2], [fill, li.fill]]) { l.color.set(v[0]); l.intensity = v[1]; }
+  gfxLights(GFX.level);   // #47: a location rebuilds its accent lights — re-apply the low-preset light budget after retuning
   if (was !== L) FX.clearFloor();   // floor stains belong to the floor they fell on
   sfx.place(L.id);   // its ambience and the echo of its walls (06_fx_sound.js)
   ARENA.updateMatrixWorld(true);
@@ -10211,7 +10244,7 @@ LOCS.boxgym = {
     if (bag !== this.bagOn) this.place(bag);
     g.updateWorldMatrix(true, false); const M = g.matrixWorld, cl = _bgC.copy(cam).applyMatrix4(_bgI.copy(M).invert());   // the camera in floor coordinates
     const inside = cl.x > X0 + 0.15 && cl.x < X1 && cl.z > Z0 && cl.z < Z1 && cl.y < H;
-    this.mir.visible = inside && GFX.level !== 'low'; this.flat.visible = !this.mir.visible;
+    this.mir.visible = inside && (GFX.level === 'high' || GFX.level === 'ultra'); this.flat.visible = !this.mir.visible;   // #47: mirror only on high
     // the ring's lamps: out of the way of the top-down replay shot; in the drill the whole ring goes when the camera is over it
     const over = bag && cl.x < 3.7 && Math.abs(cl.z) < 4.2;
     RINGSET.visible = !over; this.plat.visible = !over; this.rig.visible = !over && cl.y < 3.5;
@@ -10625,7 +10658,7 @@ LOCS.metro = {
       if (h !== c.h) { c.h = h; this.colMesh.setMatrixAt(i, h ? this.zero : c.mat); ch = true; } });
     if (ch) this.colMesh.instanceMatrix.needsUpdate = true;
     this.ceil.visible = this.ceilM.visible = cam.y < 4.0;
-    this.mir.visible = GFX.level !== 'low'; this.uRefl.value = this.mir.visible ? 1 : 0;
+    this.mir.visible = GFX.level === 'high' || GFX.level === 'ultra'; this.uRefl.value = this.mir.visible ? 1 : 0;   // #47: no mirror floor below high
     this.mirU.uMirI.value.copy(M).invert(); this.mirU.uMirC.value.copy(cam).applyMatrix4(this.mirU.uMirI.value);
 
     /* the train: its clock is the crowd's (stops with the pause) */
@@ -10668,8 +10701,10 @@ const _mtM = new M4();
    sleeves are painted per face (tags). Colours are packed per instance (sRGB bytes in a float), build / belly / height vary too.
    The CPU only keeps a few numbers per person (excitement, head yaw, recoil, fade, wince, awe) and packs the visible ones: the crowd
    is split into sectors that are frustum-culled, and whoever stands between the camera and the fighters is dissolved (dither).
-   Density follows GFX.crowd (low ≈ 0.3 of the people, high = all). Reactions come from EVT (07_state_replay_hits.js). */
-const CROWD = { u: { uT: { value: 0 }, uMood: { value: 0.15 }, uPose: { value: null } }, geo: null, mat: null, blobMat: null, blobs: [], mood: 0.15, heat: 0, fill: 1 };   // fill: the share of the crowd that came (a career fight sets it, startFight)
+   Density follows GFX.crowd (0.4 on low, 0.7 on medium, all on high), and the rank sort drops the far rows first. Stage 2 (#47):
+   below high the whole figure also switches to a reduced 918-triangle index (crowdLowIdx), and on low uStill freezes the idle
+   vertex animation while poses and reactions still come from iDyn. Reactions come from EVT (07_state_replay_hits.js). */
+const CROWD = { u: { uT: { value: 0 }, uMood: { value: 0.15 }, uPose: { value: null }, uStill: { value: 0 } }, geo: null, lowIdx: null, mat: null, blobMat: null, blobs: [], mood: 0.15, heat: 0, fill: 1 };   // fill: the share of the crowd that came (a career fight sets it, startFight); lowIdx: the reduced figure's index (#47)
 // bits of the instance mask (bit n ↔ accessory number n in the geometry; BUZZ, OPEN and BALA only repaint faces)
 const CW_HAIR = 2, CW_CAP = 4, CW_HOOD = 8, CW_BALA = 16, CW_SKULL = 32, CW_PHONE = 64, CW_CRATE = 128, CW_BUZZ = 256, CW_AFRO = 512, CW_BUN = 1024, CW_BEANIE = 2048, CW_HOODDN = 4096, CW_OPEN = 8192;
 const CROWD_LOOK = {
@@ -10714,6 +10749,10 @@ const CW_POSES = [
 ];
 const CW_ID = {}; CW_POSES.forEach((p, i) => { CW_ID[p[0]] = i; });
 CROWD.u.uPose.value = new Float32Array(CW_POSES.flatMap(p => [...p[1], ...(p[2] || p[1]), ...p[3]]));
+/* Stage 2 (#47): on low the crowd keeps its poses and its reactions to the fight, but stops drifting / swaying on its own —
+   uStill freezes the vertex shader's clock. applyGfx() already ran at boot, so set the initial value here as well. */
+GFX.onChange.push(g => { CROWD.u.uStill.value = g.level === 'low' ? 1 : 0; });
+CROWD.u.uStill.value = GFX.level === 'low' ? 1 : 0;
 
 /* the figure in its rest pose: 1.76 m, feet at y = 0, facing +z, left arm at +x, arms hanging. Vertex attributes:
    aP = (chain: 0 static, 1 trunk, 2 head, 3 / 4 left / right arm, 5 / 6 left / right leg; accessory number (0 = always shown, −n = hidden
@@ -10831,10 +10870,24 @@ function crowdGeo() {
   return g;
 }
 
+/* Stage 2 (#47): a lighter crowd figure for the cheap presets. The full 1200-triangle figure carries every optional accessory
+   (hair, afro, bun, cap, beanie, hood, balaclava sockets, phone, crate); the shader collapses the ones a person does not wear
+   into degenerate triangles, but they are still submitted. Keep only the always-drawn body (832 tris), brows / mouth (6),
+   short hair (68, the most common head) and the crate under the back rows (12 — without it they would float): 918 tris.
+   Same attributes and same vertex shader, so colours, poses and reactions are unchanged. */
+function crowdLowIdx(base) {
+  const src = base.index.array, ap = base.attributes.aP.array, keep = [];
+  for (let i = 0; i < src.length; i += 3) {
+    const a = ap[src[i] * 4 + 1];
+    if (a === 0 || a === -4 || a === 1 || a === 7) keep.push(src[i], src[i + 1], src[i + 2]);
+  }
+  return new src.constructor(keep);
+}
+
 const CROWD_VP = /* glsl */`
 #ifdef USE_INSTANCING
 attribute vec4 aP, aQ, iVar, iVar2, iDyn, iCol, iCol2; attribute vec2 iDyn2;
-uniform float uT, uMood; uniform vec4 uPose[${CW_POSES.length * 3}];
+uniform float uT, uMood, uStill; uniform vec4 uPose[${CW_POSES.length * 3}];
 vec3 cwRx(vec3 p, float a) { float c = cos(a), s = sin(a); return vec3(p.x, p.y * c + p.z * s, p.z * c - p.y * s); }   // a > 0: a hanging arm swings forward, an upright trunk leans back
 vec3 cwRy(vec3 p, float a) { float c = cos(a), s = sin(a); return vec3(p.x * c + p.z * s, p.y, p.z * c - p.x * s); }
 vec3 cwRz(vec3 p, float a) { float c = cos(a), s = sin(a); return vec3(p.x * c - p.y * s, p.x * s + p.y * c, p.z); }
@@ -10851,7 +10904,7 @@ const CROWD_VS = /* glsl */`
 vec3 cwP = position, cwN = normal; vEm = vec3(0.0); vFade = 1.0; vObj = position; vCl = 0.0;
 #ifdef USE_INSTANCING
 if (iVar.x > 2.5) {
-  float ph = iVar.x - 3.0, ch = aP.x, sl = aP.z, t = uT, ex = smoothstep(0.0, 1.0, iDyn.x), rec = iDyn.z, wn = iDyn2.x, aw = iDyn2.y;
+  float ph = iVar.x - 3.0, ch = aP.x, sl = aP.z, t = uT * (1.0 - uStill), ex = smoothstep(0.0, 1.0, iDyn.x), rec = iDyn.z, wn = iDyn2.x, aw = iDyn2.y;   // #47: uStill freezes the idle animation on low; poses / reactions still come from iDyn
   float h1 = fract(ph * 7.31), h2 = fract(ph * 13.77), h3 = fract(ph * 29.3), h4 = fract(ph * 53.9);
   float tee = step(31.5, iVar.z), pose = iVar.z - 32.0 * tee, mir = step(0.5, iVar2.w), wdir = 1.0 - 2.0 * mir;
   float accN = abs(aP.y), bit = accN < 0.5 ? 1.0 : cwBit(iVar.y, accN), show = aP.y < -0.5 ? 1.0 - bit : bit;
@@ -11045,6 +11098,8 @@ function makeCrowd(o = {}) {
   const base = CROWD.geo || (CROWD.geo = crowdGeo()), geo = new THREE.BufferGeometry();
   for (const k of ['position', 'normal', 'color', 'aP', 'aQ']) geo.setAttribute(k, base.attributes[k]);
   geo.setIndex(base.index);
+  if (!CROWD.lowIdx) CROWD.lowIdx = new THREE.BufferAttribute(crowdLowIdx(base), 1);
+  let lod = '';   // #47: 'lod' = the 918-tri figure on low / medium, 'full' = 1200 tris above them
   const ia = (name, sz) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(N * sz), sz); a.setUsage(THREE.DynamicDrawUsage); geo.setAttribute(name, a); return a; };
   const aCol = [ia('iCol', 4), ia('iCol2', 4)], aVar = [ia('iVar', 4), ia('iVar2', 4)], aDyn = ia('iDyn', 4), aDyn2 = ia('iDyn2', 2);
   if (!CROWD.mat) {
@@ -11070,6 +11125,8 @@ function makeCrowd(o = {}) {
     },
     update(dt) {
       t += dt; g.updateWorldMatrix(true, false); camera.updateMatrixWorld();
+      const want = GFX.level === 'low' || GFX.level === 'medium' ? 'lod' : 'full';
+      if (want !== lod) { lod = want; geo.setIndex(want === 'lod' ? CROWD.lowIdx : base.index); }   // #47: cheaper figure below high
       const M = g.matrixWorld, e = M.elements, cam = camera.position; _cwI.copy(M).invert();
       _cwFr.setFromProjectionMatrix(_cwM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
       for (const G of groups) G.vis = G.n > 0 && _cwFr.intersectsSphere(_cwS.copy(G.sphere).applyMatrix4(M));
@@ -11631,4 +11688,76 @@ function socMenu() { const l = $('soc-lbl'), S = PROF.soc; if (l) l.textContent 
 window.__soc = { get S() { return PROF.soc; }, SOC, SPONSORS, LOC_FANS, socGain, socDM, socSign, socAccept, socRender,
   sim(win, how = 'dec', kd = 0) { P1.fs.land = 40; P1.fs.thr = 90; P1.fs.eva = 6; P1.fs.kd = kd; P2.fs.land = 30; P2.fs.thr = 80; if (G.mode !== 'career') G.mode = 'quick'; if (how !== 'dec') G.round = 2; fightOver(win, false, how); },
   fans(n) { PROF.soc.fans = n; PROF.soc.hist.push(n); save(); socMenu(); }, dm: socDM };
+/* ───────── performance measurement tool: window.__perf.report() ─────────
+   Stage 2 (#47): a reproducible before/after table for the phone presets. For every location × graphics preset it measures, over a
+   number of rendered frames, the triangles and draw calls the whole frame costs (scene + AO/bloom/FXAA/full-screen passes and shadow
+   maps are all counted, because renderer.info.autoReset = false), the number of resident geometries/textures and the average frame
+   time. Everything is measured from one pinned, representative fight camera so the numbers are comparable between presets.
+   Usage (console or the js:// shot scenario):
+     __perf.report()                                   → { rows, csv, table }  (all locations, low/medium/high, 120 frames)
+     __perf.report({ frames: 8 })                     → a quicker pass for iteration
+     __perf.report({ locs: ['parking','metro'], levels: ['low','high'] })
+   The tool restores the location, preset, crowd fill and camera when it is done. */
+(function () {
+  const ALL_LOCS = ['gym', 'parking', 'tires', 'yard', 'warehouse', 'boxgym', 'metro'];
+  const CAM = { p: [0, 1.15, 4.7], l: [0, 0.93, 0] };   // the mid-fight camera (world metres, fighters face each other along x)
+  const pad = (s, n) => String(s).padStart(n);
+
+  function perfReport(opts) {
+    opts = opts || {};
+    const locs = opts.locs || ALL_LOCS, levels = opts.levels || ['low', 'medium', 'high'];
+    const frames = Math.max(1, opts.frames || 120), dt = 1 / 60;
+    // triangles / draw calls do not depend on resolution, so by default we render the timed frames at a small pixel ratio —
+    // this keeps the post-processing (AO / bloom) cheap on software renderers. Pass shrink:1 to time at the preset's real size.
+    const shrink = opts.shrink === undefined ? 0.4 : (opts.shrink === false ? 1 : opts.shrink);
+    // save everything we are about to touch
+    const save = {
+      loc: G.loc, state: G.state, level: GFX.level, set: GFX.set, fill: CROWD.fill,
+      hold: window.__camHold, qH: qH, pr: renderer.getPixelRatio(),
+    };
+    const setMeasurePR = () => { if (shrink >= 1) return; renderer.setPixelRatio(shrink); composer.setPixelRatio(shrink); renderer.setSize(VW, VH, false); composer.setSize(VW, VH); };
+    const rows = [];
+    try {
+      // a stable "in the fight" state: crowd active, everyone came, no cutscene camera
+      G.state = 'fight'; G.paused = false; CROWD.fill = 1;
+      window.__camHold = CAM; camUpdate(dt);   // pins camera.position / camP / camL via the documented debug hook
+      for (const loc of locs) {
+        G.loc = loc; setLocation(loc);
+        for (const level of levels) {
+          applyGfx(level); setMeasurePR();   // applyGfx → applyRes sets the preset's pixel ratio; override it for the timed frames
+          // let the location's sync() apply particle budgets and the crowd's update() apply the density budget, and let any
+          // shader recompilation (shadow filter / MSAA change) happen before the timed frames
+          for (let s = 0; s < 4; s++) { camUpdate(dt); locSync(); if (LOC.crowd) LOC.crowd.update(dt); }
+          for (let w = 0; w < 2; w++) renderFrame();
+          let tris = 0, calls = 0, geoms = 0, textures = 0, ms = 0;
+          for (let i = 0; i < frames; i++) {
+            const a = performance.now();
+            renderFrame();
+            ms += performance.now() - a;
+            const info = renderer.info;
+            tris += info.render.triangles; calls += info.render.calls;
+            geoms = info.memory.geometries; textures = info.memory.textures;
+          }
+          rows.push({ loc, level,
+            tris: Math.round(tris / frames), calls: Math.round(calls / frames),
+            geoms, textures, ms: +(ms / frames).toFixed(2) });
+        }
+      }
+    } finally {
+      // put the game back exactly as we found it
+      G.state = save.state; CROWD.fill = save.fill; window.__camHold = save.hold;
+      GFX.set = save.set; applyGfx(save.level); qH = save.qH; applyRes();
+      G.loc = save.loc; setLocation(save.loc);
+    }
+    const head = 'локация      пресет   треугольники  вызовы  геометрии  текстуры   кадр, мс';
+    const line = '───────────  ───────  ────────────  ──────  ──────────  ─────────  ─────────';
+    const table = [head, line].concat(rows.map(r =>
+      pad(r.loc, 11) + '  ' + pad(r.level, 7) + '  ' + pad(r.tris, 12) + '  ' + pad(r.calls, 6) + '  '
+      + pad(r.geoms, 10) + '  ' + pad(r.textures, 9) + '  ' + pad(r.ms, 8))).join('\n');
+    const csv = 'location,preset,triangles,calls,geometries,textures,frame_ms\n'
+      + rows.map(r => [r.loc, r.level, r.tris, r.calls, r.geoms, r.textures, r.ms].join(',')).join('\n');
+    return { rows, csv, table };
+  }
+  window.__perf = { report: perfReport, CAM };
+})();
 </script>
