@@ -79,6 +79,9 @@ jobs:
           echo "model: $BOT_MODEL"
           pip install -q claude-agent-sdk playwright
           npm i --no-save --silent three@0.160.0 cannon-es@0.20.0
+          if [[ "$ISSUE_TITLE" == *"[audio]"* ]]; then   # sound tasks: ffmpeg to cut / encode, downloads go through python scripts
+            sudo apt-get install -y -qq ffmpeg >/dev/null && export BOT_TURNS=160
+          fi
           if [[ "$ISSUE_TITLE" == *"[assets]"* ]]; then   # asset pipeline tasks: Blender as a module + glTF tooling
             pip install -q bpy==5.3.0 && npm i --no-save --silent @gltf-transform/cli@4 && export BOT_TURNS=160
           fi
