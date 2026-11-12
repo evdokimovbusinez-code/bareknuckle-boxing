@@ -35,6 +35,41 @@ gb = rep(''.join(open(f).read() for f in sorted(glob.glob('game/*.js'))), "/*BOD
 files = ln(210, 241)
 files = rep(files, "upper: 'assets/Punch_Rear_Uppercut_Head.fbx.txt', hook: 'assets/Punch_Lead_Hook_Head.fbx.txt',", "upperR: 'assets/Punch_Rear_Uppercut_Head.fbx.txt', hookL: 'assets/Punch_Lead_Hook_Head.fbx.txt', hookR: 'assets/Punch_Rear_Hook_Head.fbx.txt', upperL: 'assets/Punch_Lead_Uppercut_Head.fbx.txt',")
 files = rep(files, "upper: 439344, hook: 423136 };", "upperR: 439344, hookL: 423136, hookR: 436640, upperL: 439344 };")
+# issue #43: try the compressed GLB pack first, fall back to the original .fbx.txt + .jpg
+files = rep(files, "async function fetchBuf(url) {", "async function fetchBuf(url) {\n  if (PACK && PACK[url]) { bump(PACK[url].byteLength); return PACK[url]; }")
+files = rep(files, "`assets/${name}.jpg`", "`assets/${name}.${PACK ? 'webp' : 'jpg'}`")
+files += r'''
+/* ───────── compressed first-load pack (issue #43) ─────────
+   assets/pack.glb is a glTF 2.0 container: every bufferView holds a zlib-compressed
+   EXACT FBX byte stream, plus the face-shape deltas lifted out of the boxer FBX.
+   GLTFLoader + MeshoptDecoder + KTX2Loader (basis transcoder from the same
+   three@0.160 CDN) parse the container; unzlibSync inflates each view.  Downstream
+   fbx.parse / skinTemplate / bone names / aFM are untouched, hence one-to-one.
+   Missing or broken pack.glb -> PACK stays null and the .fbx.txt + .jpg fallback runs. */
+let PACK = null, FACE_PACK = null;
+const packGLTF = new GLTFLoader();
+packGLTF.setMeshoptDecoder(MeshoptDecoder);
+try {
+  packGLTF.setKTX2Loader(new KTX2Loader()
+    .setTranscoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/basis/')
+    .detectSupport(renderer));
+} catch (e) { console.warn('KTX2:', e); }
+async function loadPack() {
+  try {
+    const res = await fetch('assets/pack.glb'); if (!res.ok) throw new Error(String(res.status));
+    const ab = await res.arrayBuffer(); bump(ab.byteLength);
+    const g = await new Promise((ok, no) => packGLTF.parse(ab, '', ok, no));
+    const j = g.parser.json, map = j.extras && j.extras.pack;
+    if (!map || !j.extras.zlib) throw new Error('pack.glb: no manifest');
+    const out = {};
+    await Promise.all(Object.entries(map).map(async ([k, i]) => {
+      const bv = await g.parser.getDependency('bufferView', i);
+      out[k] = new Uint8Array(unzlibSync(new Uint8Array(bv))).buffer;
+    }));
+    PACK = out; FACE_PACK = out['assets/face.bin'] || null;
+  } catch (e) { console.warn('GLB pack unavailable — FBX fallback:', e); PACK = null; FACE_PACK = null; }
+}
+'''
 post = ln(187, 200).replace("composer.addPass(new RenderPass(scene, camera));", "composer.addPass(new RenderPass(scene, camera));\n// one NaN pixel (a degenerate normal on some GPUs) would be smeared into a black hole by AO and bloom: scrub them first\ncomposer.addPass(new ShaderPass({ uniforms: { tDiffuse: { value: null } }, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }', fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ vec4 c = texture2D(tDiffuse, vUv); bool bad = !(c.r == c.r) || !(c.g == c.g) || !(c.b == c.b) || !(c.a == c.a) || max(max(c.r, c.g), c.b) > 65000.0; gl_FragColor = bad ? vec4(0.0, 0.0, 0.0, 1.0) : c; }' }));")
 js = (open('g_a.js').read() + '\n/* ───────── arena ───────── */\n' + arena + '\n/* ───────── post-processing ───────── */\n' + post + '\n' + files + '\n' + ln(244, 249) + ln(252, 261)
       + ln(276, 284) + ln(287, 302) + open('g_pre.js').read() + '\n' + ln(306, 387) + ln(391, 392) + ln(394, 394) + '\n' + cloth + '\n' + ln(573, 586) + hair + rh + '\n' + shorts + gb)

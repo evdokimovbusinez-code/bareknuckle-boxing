@@ -42,6 +42,7 @@ function paintShorts(c, S) {
 /* ───────── templates: parse once, share geometry between both fighters ───────── */
 function firstBones(obj) { const by = {}; obj.traverse(o => { if (o.isBone && !by[o.name]) by[o.name] = o; }); return by; }
 async function buildTemplates() {
+  await loadPack();   // GLB pack (issue #43); on failure PACK stays null and the FBX/JPG fallback runs below
   const bufs = {};
   await Promise.all(Object.entries(FILES).map(async ([k, u]) => { bufs[k] = await fetchBuf(u); }));
   const tex = {};
@@ -72,7 +73,7 @@ async function buildTemplates() {
 /*BODYBLOCK*/
   skinTemplate(body);   // rest-pose data for tattoos, palms / soles mask (04h_skin_tattoo.js)
   // face blend shapes, read from the FBX itself (the loader's morphs are broken and were dropped above): 03b_face_shapes.js
-  try { T.fm = faceShapes(bufs.boxer, body.geometry); } catch (e) { console.warn('face shapes:', e); T.fm = null; }
+  try { T.fm = FACE_PACK ? faceShapesPacked(FACE_PACK, body.geometry) : faceShapes(bufs.boxer, body.geometry); } catch (e) { console.warn('face shapes:', e); T.fm = null; }
   T.cc = cc;
   T.shortsGeo = makeShorts(body);
   T.shortsNormal = shortsNormal();
