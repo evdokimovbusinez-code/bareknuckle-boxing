@@ -219,6 +219,6 @@ buildTemplates().then(() => {
   P1.applyLook(LOOK); buildMenu(); toMenu();
   /*DBG*/
   $('loading').hidden = true;
-  tutBoot();   // (issue 45) the first-visit offer; wired after /*DBG*/ so window.__manual is set in the debug build
+  tutBoot();   // (issue 45) the first-visit offer; wired after the debug block so window.__manual is set in the debug build
   requestAnimationFrame(t => { last = t; frame(t); });
 }).catch(e => { console.error(e); ldText.textContent = 'Не удалось загрузить бойцов. Обнови страницу.'; ldText.className = 'err'; });

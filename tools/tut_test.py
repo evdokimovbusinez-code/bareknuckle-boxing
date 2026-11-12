@@ -94,7 +94,7 @@ JS = r"""(touch) => {
 
 async def run():
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=ROOT)
-    srv = http.server.ThreadingTCPServer(('127.0.0.1', 0), handler)
+    srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), handler)
     srv.daemon_threads = True
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     port = srv.server_address[1]

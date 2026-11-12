@@ -352,7 +352,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .modal-b{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .tut{position:absolute;left:50%;top:calc(var(--pt) + 8px);transform:translateX(-50%);z-index:6;width:min(680px,92%);box-sizing:border-box;text-align:center;
   background:linear-gradient(180deg,rgba(13,16,23,.95),rgba(13,16,23,.84));border:1px solid var(--line);border-top:3px solid var(--gold);border-radius:8px;
-  padding:clamp(8px,1.8vmin,12px) 18px clamp(10px,2vmin,14px);box-shadow:0 12px 40px -10px rgba(0,0,0,.85);transition:border-top-color .2s}
+  padding:clamp(8px,1.8vmin,12px) 18px clamp(10px,2vmin,14px);box-shadow:0 12px 40px -10px rgba(0,0,0,.85);text-shadow:0 1px 3px rgba(0,0,0,.85);transition:border-top-color .2s}
 .tut.done{border-top-color:#8fd49a}
 .tut-n{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
 .tut-h{font-family:var(--display);font-weight:900;font-size:clamp(20px,4.4vmin,34px);line-height:1.05;text-transform:uppercase;letter-spacing:.02em;margin:2px 0 6px}
@@ -360,18 +360,20 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .tut-chip{font-size:clamp(11px,2.3vmin,14px);border:1px solid rgba(255,255,255,.16);border-radius:5px;padding:3px 10px;background:rgba(255,255,255,.04);color:var(--muted);white-space:nowrap}
 .tut-chip.prim{border-color:rgba(226,177,74,.65);background:rgba(226,177,74,.12);color:var(--text)}
 .tut-chip b{color:var(--gold);font-family:var(--mono);font-weight:600}
-.tut-p{font:500 12px var(--mono);letter-spacing:.06em;color:var(--muted);margin-top:7px}
+.tut-foot{display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:7px}
+.tut-p{font:500 12px var(--mono);letter-spacing:.06em;color:var(--muted)}
 .tut-p b{color:var(--text)}
-.tut-btns{display:flex;gap:8px;justify-content:center;margin-top:8px}
+.tut-btns{display:flex;gap:8px;justify-content:center}
 .tut-btns .btn{font-size:clamp(11px,2.1vmin,13px);padding:5px 12px}
 .tut-ok{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.4);font-size:clamp(56px,14vmin,120px);font-weight:900;color:#8fd49a;text-shadow:0 0 30px rgba(143,212,154,.85);pointer-events:none;opacity:0}
 .tut-ok.on{animation:tutok .7s ease-out}
 @keyframes tutok{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}60%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.06)}}
-#stage.short .tut{padding:6px 12px 8px;width:min(620px,94%)}
-#stage.short .tut-h{font-size:clamp(17px,3.8vmin,24px);margin:1px 0 4px}
+#stage.short .tut{top:2px;padding:4px 12px 5px;width:min(620px,94%);background:linear-gradient(180deg,rgba(13,16,23,.86),rgba(13,16,23,.68))}
+#stage.short .tut-n{font-size:9px;line-height:1}
+#stage.short .tut-h{font-size:clamp(17px,3.8vmin,24px);margin:1px 0 3px}
 #stage.short .tut-chip{font-size:11px;padding:2px 8px}
-#stage.short .tut-p{margin-top:5px}
-#stage.short .tut-btns{margin-top:5px}
+#stage.short .tut-foot{gap:8px;margin-top:3px}
+#stage.short .tut-btns .btn{font-size:11px;padding:3px 9px}
 </style>
 
 <div id="stage">
@@ -572,7 +574,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 
   <!-- issue 45: the first-visit offer, the lesson's top hint bar and the final card -->
   <div class="modal" id="tut-ask" hidden><div class="modal-c">
-    <div class="eyebrow">первый раз здесь?</div>
+    <div class="eyebrow">первый раз здесь? · 1 мин</div>
     <h2>Пройти обучение?</h2>
     <p>Покажем управление: удары, свайпы на телефоне, блок и уклоны. Около минуты, в зале со спарринг-партнёром.</p>
     <div class="modal-b"><button class="btn pri" id="tut-yes">Да</button><button class="btn" id="tut-no">Пропустить</button></div>
@@ -582,9 +584,9 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="tut-n" id="tut-n"></div>
     <div class="tut-h" id="tut-h"></div>
     <div class="tut-how"><span class="tut-chip" id="tut-k"></span><span class="tut-chip" id="tut-g"></span></div>
-    <div class="tut-p" id="tut-p"></div>
+    <div class="tut-foot"><div class="tut-p" id="tut-p"></div>
+      <div class="tut-btns"><button class="btn sm" id="tut-skip">Пропустить шаг</button><button class="btn sm" id="tut-exit">Выйти ✕</button></div></div>
     <div class="tut-ok" id="tut-ok">✓</div>
-    <div class="tut-btns"><button class="btn sm" id="tut-skip">Пропустить шаг</button><button class="btn sm" id="tut-exit">Выйти ✕</button></div>
   </div>
 
   <div class="modal" id="tut-end" hidden><div class="modal-c">
