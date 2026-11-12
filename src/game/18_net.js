@@ -52,13 +52,13 @@ function netBoot() {
   }
   window.__mp = {
     host: netCreate, join: netJoin, code: () => NET.code, link: () => NET.link, close: netClose,
-    stat: () => ({ role: NET.role, started: NET.started, over: NET.over, snaps: NET.snaps.length, playT: NET.playT,
+    stat: () => ({ role: NET.role, started: NET.started, over: NET.over, buf: NET.snaps.length, playT: NET.playT,
       ping: NET.ping, dropT: NET.dropT, ready: !!(NET.peer && NET.peer.open), conn: !!(NET.conn && NET.conn.open), ...NET.stat }),
     hp: () => [P1.hp, P2.hp], state: () => [G.state, G.round, G.roundT, G.t],
     punch: (n, body, pow) => netSendPress('punch', n || 'jab', !!body, !!pow),
     dodge: n => netSendPress('dodge', n || 'duck', false, false),
     move: (x, y) => { MV.kx = x || 0; MV.ky = y || 0; netMove(); },
-    drop: () => { if (NET.conn) NET.conn.close(); },
+    drop: () => { NET.closing = true; if (NET.conn) NET.conn.close(); },   // a hard drop: no auto-reconnect, so the host's banner stays
     net: () => NET,
   };
 }
@@ -70,8 +70,7 @@ function netHome() {
 }
 function netSt(text, bad) {
   const el = $('net-st'); el.textContent = text; el.style.color = bad ? 'var(--neon)' : '';
-  $('net-wait').textContent = text;
-}
+}   // the room's «Ждём соперника…» line stays put — only the status above it changes
 function netRoomUI(code) {
   show('net-home', false); show('net-room', true); NET.roomShown = true;
   NET.link = location.href.split('?')[0].split('#')[0] + '?room=' + code;
@@ -148,7 +147,7 @@ function netBind(c) {
 }
 function netOpen(c) {
   if (NET.conn && NET.conn !== c && NET.conn.open) { try { c.close(); } catch (_) {} return; }
-  NET.conn = c; NET.closing = false; NET.dropT = 0; clearTimeout(NET.retryT);
+  NET.conn = c; NET.closing = false; NET.dropT = 0; NET.silent = 0; clearTimeout(NET.retryT);
   show('net-drop', false);
   if (!NET.started) netBeginMatch(); else netSt('Соперник вернулся');
   netSend({ c: 'hello', look: LOOK, nm: myName() });
@@ -182,6 +181,9 @@ function netHostStart() {
 }
 function netGuestSetup() {
   showP2(true);
+  // issue 49: here the local player's man is P2 (left on the mirrored camera); hello sends LOOK,
+  // so dress him in that same look instead of the random opponent left over from the menu boot
+  P2.applyLook(LOOK);
   for (const F of [P1, P2]) F.sparGear(false);
   P1.stat = PROF.stats; P2.stat = lvlStats(1); P1.speed = 1.5; P2.speed = DIFFS.normal.speed;
   P1.resetState(); P2.resetState();
@@ -278,6 +280,7 @@ function netSnapshot() {
   netSend(m);
 }
 function netOnSnapshot(m) {
+  NET.stat.recv++;
   m.d[0] = Float32Array.from(m.d[0]); m.d[1] = Float32Array.from(m.d[1]);
   NET.snaps.push(m); if (NET.snaps.length > 90) NET.snaps.shift();
   for (const e of m.ev) NET.evs.push(e);
@@ -348,6 +351,7 @@ function netGuestCam(dt, cp, cl) {
 /* ── messages, ping, result, rematch ── */
 function netMsg(m) {
   if (!m || !m.c) return;
+  NET.silent = 0;   // any inbound traffic proves the link is alive (issue 49 watchdog)
   if (m.c === 'hello') {
     try { if (NET.host) P2.applyLook(m.look); else P1.applyLook(m.look); } catch (e) {}
     NET.nm = m.nm || '';
@@ -406,13 +410,18 @@ function netTick(dt) {
     if (NET.dropT <= 0) return netWinByDrop();
   }
   if (!NET.conn || !NET.conn.open || !NET.started) return;
+  NET.silent += Math.min(dt, 0.25);   // cap one stalled frame so a slow render cannot look like a dropout
   NET.pingAcc += dt;
   if (NET.pingAcc >= 1) { NET.pingAcc = 0; netSend({ c: 'ping', t: performance.now() }); }
   if (NET.over) return;
+  // a lost link does not always raise PeerJS's remote 'close' (crashed tab, dead NAT mapping):
+  // if nothing has arrived for silenceMax seconds, open the 10 s recovery window on our own
+  if (NET.dropT === 0 && NET.silent > NET.silenceMax) return netLost(NET.conn);
   NET.acc += dt;
   if (NET.acc >= NET.rate) { NET.acc = 0; if (NET.host) netSnapshot(); else netFlushInput(); }
 }
 function netLost(c) {
+  NET.stat.closes++;
   if (NET.closing || NET.over) return;
   if (NET.conn && NET.conn !== c && NET.conn.open) return;
   if (NET.conn === c) NET.conn = null;
@@ -423,7 +432,7 @@ function netLost(c) {
 }
 function netRetry() {
   clearTimeout(NET.retryT);
-  if (!NET.guest || !NET.peer || NET.dropT <= 0 || NET.over || (NET.conn && NET.conn.open)) return;
+  if (!NET.guest || !NET.peer || NET.peer.destroyed || NET.dropT <= 0 || NET.over || NET.closing || (NET.conn && NET.conn.open)) return;
   try { netBind(NET.peer.connect('bk-' + NET.code, { serialization: 'json' })); } catch (e) {}
   NET.retryT = setTimeout(netRetry, 1500);
 }

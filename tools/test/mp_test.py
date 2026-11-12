@@ -59,19 +59,28 @@ async def run():
         await A.screenshot(path=path('room'), **FMT)
         print('  снимок:', path('room'))
 
-        # ── B: the shared link auto-joins by code ──
-        await B.goto(url + '?room=' + code)
-        await wait(B, "document.getElementById('loading').hidden || document.querySelector('.err')", 240)
-        await wait(A, "__mp.stat().started && __mp.stat().conn", 60)
-        await wait(B, "__mp.stat().started && __mp.stat().conn && __mp.stat().snaps >= 2", 60)
-        print('  оба подключены:', await A.evaluate('__mp.stat()'), await B.evaluate('__mp.stat()'))
-
         # ── step both sims; the host ticks, the guest plays the snapshots back ──
+        # gtest.html is a MANUAL debug build: window.__manual disables requestAnimationFrame, so
+        # frame() (and with it the host's netTick → 30 Hz snapshots) only runs while we tick it.
+        # WebRTC data lands on the browser's own event loop, hence the small real-time sleeps.
         async def step(n=30, pause=0.10):
             await A.evaluate(f'__tick({n}, 1/60)')
             await asyncio.sleep(pause)
             await B.evaluate(f'__step({n}, 1/60)')
             await asyncio.sleep(0.04)
+
+        # ── B: the shared link auto-joins by code ──
+        await B.goto(url + '?room=' + code)
+        await wait(B, "document.getElementById('loading').hidden || document.querySelector('.err')", 240)
+        await wait(A, "__mp.stat().started && __mp.stat().conn", 60)
+        # pump the host so it actually emits snapshots; the guest receives them on its event loop
+        for _ in range(12):
+            await step()
+            if await B.evaluate("__mp.stat().started && __mp.stat().conn && __mp.stat().recv >= 2"):
+                break
+        await wait(A, "__mp.stat().started && __mp.stat().conn", 60)
+        await wait(B, "__mp.stat().started && __mp.stat().conn && __mp.stat().recv >= 2", 60)
+        print('  оба подключены:', await A.evaluate('__mp.stat()'), await B.evaluate('__mp.stat()'))
 
         for _ in range(3):
             await step()          # intro → fight
@@ -95,7 +104,7 @@ async def run():
         stA, stB = await A.evaluate('__mp.stat()'), await B.evaluate('__mp.stat()')
         print('  HP хост / гость:', hpA, hpB)
         print('  снимки хост:', stA['snaps'], 'байт:', stA['bytes'], 'макс. снимок:', stA['max'], 'пинг:', stA['ping'], 'мс')
-        print('  снимков в буфере гостя:', stB['snaps'], 'playT:', round(stB['playT'], 3), 'пинг:', stB['ping'], 'мс')
+        print('  снимков принято гостем:', stB['recv'], 'в буфере:', stB['buf'], 'playT:', round(stB['playT'], 3), 'пинг:', stB['ping'], 'мс')
         if abs(hpA[0] - hpB[0]) > 1 or abs(hpA[1] - hpB[1]) > 1:
             print('  ✗ HP расходятся больше чем на 1'); bad += 1
         else:
@@ -104,7 +113,7 @@ async def run():
             print('  ✗ удары гостя не дошли до бойца хоста'); bad += 1
         else:
             print('  ✓ удары гостя попали по P1 хоста, hp =', round(hpA[0], 1))
-        if stA['snaps'] < 20 or stB['snaps'] < 2:
+        if stA['snaps'] < 20 or stB['recv'] < 2:
             print('  ✗ снимки не ходят'); bad += 1
         else:
             print('  ✓ снимки идут в обе стороны')
@@ -118,10 +127,12 @@ async def run():
         print('  снимки:', path('host'), path('guest'))
 
         # ── the guest drops: the host shows the banner and the 10 s countdown ──
+        # the debug build is manual, so tick the host ~2 s of sim: the silence watchdog then
+        # notices that no input/snapshots arrive (WebRTC's remote 'close' is not guaranteed)
         await B.evaluate('__mp.drop()')
         await asyncio.sleep(0.5)
-        await A.evaluate('__step(1, 1/60)')
-        drop = await A.evaluate("({ hidden: document.getElementById('net-drop').hidden, t: document.getElementById('net-drop-t').textContent, dropT: __mp.stat().dropT })")
+        await A.evaluate('__step(120, 1/60)')
+        drop = await A.evaluate("({ hidden: document.getElementById('net-drop').hidden, t: document.getElementById('net-drop-t').textContent, dropT: __mp.stat().dropT, closes: __mp.stat().closes })")
         print('  отключение:', drop)
         if drop['hidden'] or 'Соперник отключился' not in await A.evaluate("document.getElementById('net-drop').textContent"):
             print('  ✗ баннер «Соперник отключился» не показан'); bad += 1
