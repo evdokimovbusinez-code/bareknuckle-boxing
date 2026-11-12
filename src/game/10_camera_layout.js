@@ -5,6 +5,7 @@ function camUpdate(dt) {
   camClock += dt; let k = 4;
   // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
   if (window.__camHold) { const h = window.__camHold; camera.position.set(h.p[0], h.p[1], h.p[2]); camera.lookAt(h.l[0], h.l[1], h.l[2]); camP.copy(camera.position); camL.set(h.l[0], h.l[1], h.l[2]); return; }
+  if (NET.guest && NET.started) return netGuestCam(dt, _cp, _cl);   // issue 49: the guest sees the fight from behind his own man
   const far = VW / VH < 1.45 ? 5.0 : 4.5;
   if (G.state === 'menu') { menuCam(dt, _cp, _cl); k = 1e3; }   // already eased inside menuCam (orbit about P1, 14_screens.js): taken as is
   else if (G.state === 'replay' && RP.segs[RP.seg].hlc) { k = hlCam(RP.segs[RP.seg]); if (RP.cut) { camCut = true; RP.cut = false; } }   // the highlights of a round (09b_cine.js)
@@ -66,8 +67,10 @@ function camUpdate(dt) {
 const HUD_BARS = ['h1', 'g1', 'h2', 'g2', 's1', 's2'].map(id => ({ el: $(id), v: -1 }));   // the DOM is touched only when a bar really changes
 function hudBar(i, v) { const b = HUD_BARS[i]; v = Math.round(clamp(v, 0, 1) * 1000); if (b.v !== v) { b.v = v; b.el.style.transform = `scaleX(${(v / 1000).toFixed(3)})`; } }
 function hudUpdate(dt) {
-  hudBar(0, P1.hp / 100); hudBar(1, P1.hp / 100); hudBar(2, P2.hp / 100); hudBar(3, P2.hp / 100); hudBar(4, P1.stamina / 100); hudBar(5, P2.stamina / 100);
-  $('cnt').hidden = !(G.state === 'fight' && P1.counterUntil > G.t);
+  // issue 49: the guest's own man is P2 (left on his mirrored camera), so the bars are swapped, not the fighters
+  const ME = NET.guest && NET.started ? P2 : P1, OP = ME === P1 ? P2 : P1;
+  hudBar(0, ME.hp / 100); hudBar(1, ME.hp / 100); hudBar(2, OP.hp / 100); hudBar(3, OP.hp / 100); hudBar(4, ME.stamina / 100); hudBar(5, OP.stamina / 100);
+  $('cnt').hidden = !(G.state === 'fight' && ME.counterUntil > G.t);
   if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), txt = `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`; if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
   const k = Math.min(1, dt * 3); P1.u.uDmg.value += (clamp(1 - P1.hp / 100, 0, 1) - P1.u.uDmg.value) * k; P2.u.uDmg.value += (clamp(1 - P2.hp / 100, 0, 1) - P2.u.uDmg.value) * k;
   // (issue 46) the get-up bar during the referee's count: how close the man is to beating it (mashing punches adds)

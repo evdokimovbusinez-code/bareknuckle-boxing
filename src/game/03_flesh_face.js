@@ -241,7 +241,7 @@ class Face {
     this.jawV += (onJaw ? 9 : 4) * power;
   }
   update(dt) {
-    const F = this.F; if (G.state === 'replay') return;   // replay plays back the recorded lids and bones
+    const F = this.F; if (G.state === 'replay' || NET.guest) return;   // issue 49: the guest's lids come from the snapshot, like a replay
     this.t += dt; const ko = F.rag.on && F.rag.mode === 'ko' && !F.rag.prof.conscious, dz = F.daze || 0, tired = Math.max(clamp((40 - F.stamina) / 40, 0, 1), G.state === 'rend' ? F.pant || 0 : 0);   // (the end-of-round close-up: mouth breathing)
     if (ko) this.koT += dt; else this.koT = 0;
     // blinks

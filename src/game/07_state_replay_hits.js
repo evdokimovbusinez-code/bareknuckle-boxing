@@ -60,6 +60,7 @@ const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1
 // «Склад · аншлаг»: the place of career fight i as the menu, the card and the result screen name it
 const careerPlace = (i = G.career) => { const L = LADDER[Math.min(i, LADDER.length - 1)]; return (LOCS[L.loc] ? LOCS[L.loc].label : LOC.label) + (L.champ ? ' · аншлаг' : ''); };
 function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | 'tko' (the doctor stops it) — the purse depends on it
+  if (NET.role) { NET.over = { win, draw, how }; return; }   // issue 49: a P2P bout pays nothing and does not touch the career
   fightTable();
   const stage = Math.min(G.career, LADDER.length - 1), before = careerWins();
   if (draw) { const p = payOut(false, true, how, stage, before); p.soc = socFight(false, true, how, stage); payShow(p); save(); return; }
@@ -79,6 +80,7 @@ const D_SEP = 1.15;
 const elMsg = $('msg'), elPops = $('pops');
 function msg(text, cls = '') { elMsg.className = 'msg ' + cls; elMsg.textContent = text; void elMsg.offsetWidth; elMsg.classList.add('show'); }
 function popup(pos, text, cls) {
+  if (NET.host) netCapturePopup(pos, text, cls);   // issue 49: captions are sent with the next snapshot
   const v = _v6.copy(pos).project(camera), el = document.createElement('div');
   el.className = 'popn ' + cls; el.textContent = text; el.style.left = ((v.x * 0.5 + 0.5) * VW).toFixed(0) + 'px'; el.style.top = ((1 - (v.y * 0.5 + 0.5)) * VH - 26).toFixed(0) + 'px';
   elPops.appendChild(el); setTimeout(() => el.remove(), 820);
@@ -97,6 +99,7 @@ function recFrame() {
 }
 const RP = { seg: 0, tau: 0, i: 0, segs: [], cut: false, hl: false };   // hl: the segments are the end-of-round highlights (09b_cine.js), not the knockout
 function startReplay() {
+  if (NET.role) return netResult();   // issue 49: a P2P bout goes straight from the «Нокаут!» plate to the result screen
   if (REC.frames.length < 4) return endReplay();
   G.state = 'replay'; RP.hl = false; const F = REC.frames, t0 = F[0].t, t1 = F[F.length - 1].t;
   // the knockout from several cameras, like a broadcast: tight on the face, from the canvas looking up, straight down from

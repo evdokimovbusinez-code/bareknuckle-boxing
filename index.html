@@ -356,6 +356,25 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 @media (hover:none){.db small,.pb small,.keys{display:none}}
 @media (prefers-reduced-motion:reduce){.msg.show,.popn,.rt,.hp.hit,.counter{animation-duration:.01s}}
 
+/* ── issue 49: «Бой с другом» — room screen, ping badge, disconnect banner ── */
+.net-st{font:500 12px var(--mono);letter-spacing:.06em;color:var(--muted);line-height:1.5}
+.net-st b{color:var(--gold)}
+.net-home{display:flex;flex-direction:column;gap:10px}
+.net-home .btn{width:100%}
+.net-code{font:700 clamp(30px,7vmin,52px) var(--mono);letter-spacing:.22em;color:var(--gold);text-align:center;padding:10px 0;border:1px dashed rgba(226,177,74,.5);border-radius:4px;background:rgba(226,177,74,.06);-webkit-user-select:text;user-select:text}
+.net-link{font:500 11px var(--mono);letter-spacing:.02em;color:var(--muted);word-break:break-all;line-height:1.5;padding:7px 9px;border:1px solid rgba(255,255,255,.14);border-radius:2px;background:rgba(0,0,0,.3);-webkit-user-select:text;user-select:text;min-height:14px}
+.net-acts{display:flex;gap:8px}.net-acts .btn{flex:1}
+.net-wait{font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--gold);text-align:center;padding-top:6px}
+.net-wait::before{content:'';display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--gold);animation:locpulse 1s ease-in-out infinite;vertical-align:middle}
+.net-ping{pointer-events:none;display:block;margin:4px auto 0;font:500 10px var(--mono);letter-spacing:.06em;color:#8fd49a;white-space:nowrap}
+.net-ping.bad{color:var(--gold)}
+.net-ping[hidden]{display:none}
+.net-drop{position:absolute;left:50%;top:calc(var(--pt,8px) + 78px);transform:translateX(-50%);z-index:12;min-width:min(420px,86%);box-sizing:border-box;text-align:center;
+  background:rgba(13,16,23,.95);border:1px solid rgba(255,59,78,.7);border-top:3px solid var(--neon);border-radius:8px;padding:12px 18px;box-shadow:0 14px 44px -12px rgba(0,0,0,.9)}
+.net-drop b{display:block;font-family:var(--display);font-weight:900;font-size:clamp(18px,4vmin,28px);text-transform:uppercase;letter-spacing:.03em}
+.net-drop small{display:block;margin-top:4px;font:500 11px var(--mono);letter-spacing:.06em;color:var(--muted)}
+.net-drop[hidden]{display:none}
+
 /* ── issue 45: the beginner's tutorial — first-visit offer, top hint bar, final card ── */
 .modal{position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:rgba(5,6,9,.72);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .modal-c{width:min(430px,86%);box-sizing:border-box;text-align:center;background:linear-gradient(180deg,#1b1d22,#0c0d11);border:1px solid rgba(226,177,74,.5);border-top:3px solid var(--gold);border-radius:10px;padding:clamp(16px,3.4vmin,26px) clamp(18px,4vmin,28px);box-shadow:0 22px 64px -14px rgba(0,0,0,.92);animation:pop2 .4s cubic-bezier(.2,1.6,.4,1)}
@@ -402,7 +421,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="st"><i id="s1"></i></div>
       <div class="counter" id="cnt" hidden>КОНТРУДАР ×1.5</div>
     </div>
-    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><button class="pz" id="pause-btn" aria-label="Пауза"></button><button class="fs" id="fs-btn" aria-label="На весь экран" title="На весь экран" hidden>⛶</button></div>
+    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><span class="net-ping" id="net-ping" hidden></span><button class="pz" id="pause-btn" aria-label="Пауза"></button><button class="fs" id="fs-btn" aria-label="На весь экран" title="На весь экран" hidden>⛶</button></div>
     <div class="side r">
       <div class="nm"><b id="n2">Соперник</b><span id="w2">побед 0</span><span id="st2" style="opacity:.7"></span></div>
       <div class="hp" id="hpb2"><i class="ghost" id="g2"></i><i class="fill" id="h2"></i></div>
@@ -412,6 +431,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 
   <div class="pops" id="pops"></div>
   <div class="msg" id="msg"></div>
+  <!-- issue 49: «Соперник отключился» — ten seconds to reconnect, then a win to the man left standing -->
+  <div class="net-drop" id="net-drop" hidden><b>Соперник отключился</b><small id="net-drop-t">Ждём восстановления… 10 с</small></div>
   <div class="kdbar" id="kdbar" hidden><div class="kdbar-t"><span id="kdtxt">ВСТАВАЙ · ЖМИ УДАРЫ</span><span id="kdn"></span></div><div class="kdbar-r"><i id="kdfill"></i></div></div>
 
   <!-- the card of a career opponent before the fight (fightCard): name and nickname, style · place · level, his legend -->
@@ -451,6 +472,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
         <button id="go-shop"><i>05</i><b>Магазин</b><small id="shop-lbl"></small></button>
         <button id="go-social"><i>06</i><b>Соцсети</b><small id="soc-lbl"></small></button>
         <button id="go-set"><i>07</i><b>Настройки</b></button>
+        <button id="go-net"><i>08</i><b>Бой с другом</b><small>по ссылке · P2P</small></button>
       </nav>
       <nav class="mnav" id="nav-train" hidden>
         <button id="go-bag"><i>01</i><b>Груша</b><small id="bag-lbl"></small></button>
@@ -472,6 +494,30 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
         <div class="fld"><span>соперник</span><div class="sw" id="o-diff"></div></div>
       </div>
       <div class="pfoot"><button class="btn" id="quick-back">Назад</button><button class="btn pri" id="go">В бой</button></div>
+    </div>
+  </div>
+
+  <!-- issue 49: «Бой с другом» — create a room / join by code, share the link, P2P over PeerJS -->
+  <div class="ui scr" id="net" hidden>
+    <div class="panel wide">
+      <div class="ptitle"><small>мультиплеер · P2P</small>Бой с другом</div>
+      <div class="pbody">
+        <div class="net-st" id="net-st">Бой 1 на 1 по ссылке. Хост считает бой, гость видит его со своей стороны. Без регистрации и своих серверов.</div>
+        <div class="net-home" id="net-home">
+          <button class="btn pri" id="net-create">Создать комнату</button>
+          <div class="fld"><span>или войти по коду</span>
+            <input class="inp" id="net-code-in" maxlength="6" placeholder="КОД" autocomplete="off" spellcheck="false">
+            <button class="btn" id="net-join">Войти по коду</button>
+          </div>
+        </div>
+        <div id="net-room" hidden>
+          <div class="fld"><span>код комнаты</span><div class="net-code" id="net-code">------</div></div>
+          <div class="fld"><span>ссылка другу</span><div class="net-link" id="net-link"></div></div>
+          <div class="net-acts"><button class="btn" id="net-copy">Копировать</button><button class="btn" id="net-share">Поделиться</button></div>
+          <div class="net-wait" id="net-wait">Ждём соперника…</div>
+        </div>
+      </div>
+      <div class="pfoot"><button class="btn" id="net-back">Назад</button></div>
     </div>
   </div>
 
@@ -2051,6 +2097,34 @@ const FOLLOW_K = 1.3;    // the follow-through and the way back, a bit quicker t
 const EV = { jab: ['slipL', 'slipR', 'duck', 'lean'], cross: ['slipL', 'slipR', 'duck'], hookL: ['duck', 'lean'], hookR: ['duck', 'lean'], upperL: ['slipL', 'slipR', 'lean'], upperR: ['slipL', 'slipR', 'lean'], over: ['lean'] };
 const RJ = ['L_Thigh', 'R_Thigh', 'L_Upperarm', 'R_Upperarm', 'NeckTwist01', 'L_Forearm', 'L_Hand', 'R_Forearm', 'R_Hand', 'L_Calf', 'L_Foot', 'L_ToeBase', 'R_Calf', 'R_Foot', 'R_ToeBase'];
 
+/* ───────── issue 49: shared P2P state, declared in one ES module scope ─────────
+   This lives in an early NN_ file on purpose: 12_ui.js calls setMove() → idle() at module-evaluation time, and that
+   reads NET.guest. A const declared in 18_net.js (the last file) would still be in its temporal dead zone there.
+   All the behaviour (hoisted functions) stays in 18_net.js. */
+const NET = {
+  role: null, host: false, guest: false, started: false, closing: false,
+  peer: null, conn: null, loading: null, code: '', link: '', nm: '',
+  saved: null, over: null,
+  rate: 1 / 30, buf: 0.10, acc: 0, pingAcc: 0, ping: 0,
+  snaps: [], evs: [], pops: [], playT: 0, first: true,
+  mv: { x: 0, y: 0, b: false }, blk: false, q: [], iq: [], evI: 0, pop: [],
+  dropT: 0, retryT: null, roomShown: false,
+  stat: { snaps: 0, bytes: 0, max: 0, ins: 0 },
+  tmp: null,
+};
+const NET_PEER_URL = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+const NET_ICE = { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:global.stun.twilio.com:3478' },
+] };   // public STUN only; a TURN relay would need a server (known limitation)
+const NET_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no O/0/I/1: a code read aloud over the phone
+const NET_ERR = {
+  'peer-unavailable': 'Комната не найдена. Проверь код и попроси друга открыть комнату.',
+  'unavailable-id': 'Этот код уже занят. Создай комнату заново.',
+  'network': 'Нет связи с сервером PeerJS.', 'server-error': 'Сервер PeerJS недоступен.',
+  'socket-error': 'Соединение с сервером прервано.', 'webrtc': 'Не удалось пробить P2P-соединение (строгий NAT).',
+};
 /* ───────── ragdoll: rigid bodies (cannon-es) with soft joint limits and muscle tone toward the neutral body posture ─────────
    Every joint has three anatomical axes taken from the bind pose: flex (child swings forward; for the knee "+" is hyperextension),
    side (left limbs: "+" = adduction toward the midline) and twist (about the bone). Inside the limits a weak tone pulls toward the
@@ -3207,7 +3281,7 @@ class Face {
     this.jawV += (onJaw ? 9 : 4) * power;
   }
   update(dt) {
-    const F = this.F; if (G.state === 'replay') return;   // replay plays back the recorded lids and bones
+    const F = this.F; if (G.state === 'replay' || NET.guest) return;   // issue 49: the guest's lids come from the snapshot, like a replay
     this.t += dt; const ko = F.rag.on && F.rag.mode === 'ko' && !F.rag.prof.conscious, dz = F.daze || 0, tired = Math.max(clamp((40 - F.stamina) / 40, 0, 1), G.state === 'rend' ? F.pant || 0 : 0);   // (the end-of-round close-up: mouth breathing)
     if (ko) this.koT += dt; else this.koT = 0;
     // blinks
@@ -5900,7 +5974,7 @@ class Fighter {
     }
     const dist = Math.abs(o.group.position.x - this.group.position.x), tiredK = 0.65 + 0.35 * clamp(this.stamina / 40, 0, 1);
     let a = this.adv || 0;
-    if (this === P1 && fight && (this.moveDir || 0) !== 0) {   // he can walk behind his guard, just slower
+    if ((this === P1 || (NET.host && this === P2)) && fight && (this.moveDir || 0) !== 0) {   // issue 49: the guest's feet drive P2 as well
       // the player walks: ~1.5 m/s in and out (a step takes you out of his reach), slower punching or tired
       const v = this.moveDir * 1.5 * tiredK * (this.cur ? 0.45 : 1) * (this.blocking ? 0.55 : 1);
       this.advV += (v - this.advV) * Math.min(1, dt * 12); this.hold = null;
@@ -5929,8 +6003,8 @@ class Fighter {
     this.group.position.x = this.mark.x + fwd * this.adv; this.group.updateMatrixWorld(true);
     // sideways: circling around the other man (the ring frame turns about him)
     let lat = 0;
-    if (fight && this === P1) lat = (this.moveLat || 0) * 1.15 * tiredK * (this.cur ? 0.4 : 1) * (this.blocking ? 0.55 : 1);
-    if (fight && this === P2) lat = (AI.lat || 0) * tiredK;
+    if (fight && (this === P1 || (NET.host && this === P2))) lat = (this.moveLat || 0) * 1.15 * tiredK * (this.cur ? 0.4 : 1) * (this.blocking ? 0.55 : 1);
+    if (fight && this === P2 && !(NET.host && (this.moveLat || 0) !== 0)) lat = (AI.lat || 0) * tiredK;
     this.latV = (this.latV || 0) + (lat - (this.latV || 0)) * Math.min(1, dt * 10);
     if (Math.abs(this.latV) > 0.01 && !circleStep(this, this.latV * dt)) this.latV *= 0.5;
   }
@@ -6804,6 +6878,7 @@ const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1
 // «Склад · аншлаг»: the place of career fight i as the menu, the card and the result screen name it
 const careerPlace = (i = G.career) => { const L = LADDER[Math.min(i, LADDER.length - 1)]; return (LOCS[L.loc] ? LOCS[L.loc].label : LOC.label) + (L.champ ? ' · аншлаг' : ''); };
 function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | 'tko' (the doctor stops it) — the purse depends on it
+  if (NET.role) { NET.over = { win, draw, how }; return; }   // issue 49: a P2P bout pays nothing and does not touch the career
   fightTable();
   const stage = Math.min(G.career, LADDER.length - 1), before = careerWins();
   if (draw) { const p = payOut(false, true, how, stage, before); p.soc = socFight(false, true, how, stage); payShow(p); save(); return; }
@@ -6823,6 +6898,7 @@ const D_SEP = 1.15;
 const elMsg = $('msg'), elPops = $('pops');
 function msg(text, cls = '') { elMsg.className = 'msg ' + cls; elMsg.textContent = text; void elMsg.offsetWidth; elMsg.classList.add('show'); }
 function popup(pos, text, cls) {
+  if (NET.host) netCapturePopup(pos, text, cls);   // issue 49: captions are sent with the next snapshot
   const v = _v6.copy(pos).project(camera), el = document.createElement('div');
   el.className = 'popn ' + cls; el.textContent = text; el.style.left = ((v.x * 0.5 + 0.5) * VW).toFixed(0) + 'px'; el.style.top = ((1 - (v.y * 0.5 + 0.5)) * VH - 26).toFixed(0) + 'px';
   elPops.appendChild(el); setTimeout(() => el.remove(), 820);
@@ -6841,6 +6917,7 @@ function recFrame() {
 }
 const RP = { seg: 0, tau: 0, i: 0, segs: [], cut: false, hl: false };   // hl: the segments are the end-of-round highlights (09b_cine.js), not the knockout
 function startReplay() {
+  if (NET.role) return netResult();   // issue 49: a P2P bout goes straight from the «Нокаут!» plate to the result screen
   if (REC.frames.length < 4) return endReplay();
   G.state = 'replay'; RP.hl = false; const F = REC.frames, t0 = F[0].t, t1 = F[F.length - 1].t;
   // the knockout from several cameras, like a broadcast: tight on the face, from the canvas looking up, straight down from
@@ -7366,7 +7443,7 @@ function payShow(p) {
 /* ───────── AI ───────── */
 /* opponent styles, after how bare-knuckle bouts actually go: short range, lots of hooks and overhands, fighters who stand and trade,
    counter-punchers who make you miss and make you pay, and pressure fighters who walk you to the ropes with combinations and body shots */
-const ROUND_LEN = 120, ROUNDS = 5, BREAK_LEN = 7;
+const ROUND_LEN = 120, BREAK_LEN = 7; let ROUNDS = 5;   // issue 49: a P2P match is 3 rounds (was a const = 5)
 const STYLES = {
   brawler: { label: 'рубака', gap: 0.72, w: { jab: 2, cross: 3, hookL: 3.5, hookR: 3.2, upperL: 1, upperR: 1.4, over: 2.4 }, dodge: 0.55, block: 0.5, combo: 0.55, trade: 0.55, feint: 0.03, body: 0.15, adv: 0.05, counter: 0.15 },
   counter: { label: 'контрпанчер', gap: 1.35, w: { jab: 4, cross: 3.5, hookL: 2.5, hookR: 1.2, upperL: 1.4, upperR: 1.8, over: 0.6 }, dodge: 1.35, block: 0.9, combo: 0.3, trade: 0.12, feint: 0.16, body: 0.12, adv: -0.06, counter: 0.6 },
@@ -7375,6 +7452,7 @@ const STYLES = {
 const AI = { lat: 0, latT: 0, backT: 0, t: 1.2, combo: 0, seen: -1, dodgeAt: 0, dodgeType: 'duck', blockUntil: 0, feintAt: 0, style: STYLES.brawler };
 function ai(dt) {
   if (window.__tutOn) return;   // (issue 45) the sparring partner stands and waits (his slow block-step punches come from tutTick)
+  if (NET.host) return netHostAI(dt);   // issue 49: P2 is the guest's man, not the AI
   if (BAG.on) { AI.t = 9; return; }
   const me = P2, pl = P1, D = DIFFS[G.diff], S = AI.style;
   if (me.doomed || me.liver || me.wind > G.t) return;
@@ -7424,6 +7502,7 @@ function ai(dt) {
   }
 }
 function aiFollow() {   // he doesn't let a falling man go: one or two more on the way down
+  if (NET.host) return;   // issue 49: the guest drives P2 himself
   if (!followOK(P2) || !P2.canAct() || (AI.fol = (AI.fol || 0)) >= 2 || G.t < (AI.folT || 0)) return;
   AI.fol++; AI.folT = G.t + 0.25 + rr() * 0.2; P2.wantBody = false; P2.powerNext = true; P2.startPunch(rr() < 0.5 ? 'hookL' : rr() < 0.6 ? 'cross' : 'over');
 }
@@ -7439,6 +7518,7 @@ function playerInput() {
 /* ───────── flow ───────── */
 function show(id, on) { $(id).hidden = !on; }
 function toMenu() {
+  if (NET.role) netClose();   // issue 49: leaving the match tears the P2P connection down
   if (window.__tutOn) tutEnd();   // (issue 45) leaving through the pause «Сдаться / Выйти» also closes the lesson
   socFlush(); socLeave();   // the frame of the last post; a challenge's place and level go back (15_social.js)
   if (G.mode === 'career') G.diff = G.userDiff; BAG.on = false; showP2(true); BAG.g.visible = false; updateMenu(); for (const F of [P1, P2]) F.sparGear(false);
@@ -8348,6 +8428,7 @@ function camUpdate(dt) {
   camClock += dt; let k = 4;
   // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
   if (window.__camHold) { const h = window.__camHold; camera.position.set(h.p[0], h.p[1], h.p[2]); camera.lookAt(h.l[0], h.l[1], h.l[2]); camP.copy(camera.position); camL.set(h.l[0], h.l[1], h.l[2]); return; }
+  if (NET.guest && NET.started) return netGuestCam(dt, _cp, _cl);   // issue 49: the guest sees the fight from behind his own man
   const far = VW / VH < 1.45 ? 5.0 : 4.5;
   if (G.state === 'menu') { menuCam(dt, _cp, _cl); k = 1e3; }   // already eased inside menuCam (orbit about P1, 14_screens.js): taken as is
   else if (G.state === 'replay' && RP.segs[RP.seg].hlc) { k = hlCam(RP.segs[RP.seg]); if (RP.cut) { camCut = true; RP.cut = false; } }   // the highlights of a round (09b_cine.js)
@@ -8409,8 +8490,10 @@ function camUpdate(dt) {
 const HUD_BARS = ['h1', 'g1', 'h2', 'g2', 's1', 's2'].map(id => ({ el: $(id), v: -1 }));   // the DOM is touched only when a bar really changes
 function hudBar(i, v) { const b = HUD_BARS[i]; v = Math.round(clamp(v, 0, 1) * 1000); if (b.v !== v) { b.v = v; b.el.style.transform = `scaleX(${(v / 1000).toFixed(3)})`; } }
 function hudUpdate(dt) {
-  hudBar(0, P1.hp / 100); hudBar(1, P1.hp / 100); hudBar(2, P2.hp / 100); hudBar(3, P2.hp / 100); hudBar(4, P1.stamina / 100); hudBar(5, P2.stamina / 100);
-  $('cnt').hidden = !(G.state === 'fight' && P1.counterUntil > G.t);
+  // issue 49: the guest's own man is P2 (left on his mirrored camera), so the bars are swapped, not the fighters
+  const ME = NET.guest && NET.started ? P2 : P1, OP = ME === P1 ? P2 : P1;
+  hudBar(0, ME.hp / 100); hudBar(1, ME.hp / 100); hudBar(2, OP.hp / 100); hudBar(3, OP.hp / 100); hudBar(4, ME.stamina / 100); hudBar(5, OP.stamina / 100);
+  $('cnt').hidden = !(G.state === 'fight' && ME.counterUntil > G.t);
   if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), txt = `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`; if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
   const k = Math.min(1, dt * 3); P1.u.uDmg.value += (clamp(1 - P1.hp / 100, 0, 1) - P1.u.uDmg.value) * k; P2.u.uDmg.value += (clamp(1 - P2.hp / 100, 0, 1) - P2.u.uDmg.value) * k;
   // (issue 46) the get-up bar during the referee's count: how close the man is to beating it (mashing punches adds)
@@ -8566,10 +8649,13 @@ for (const k of ['step', 'hitStep']) { const fn = Ragdoll.prototype[k]; Ragdoll.
 function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
 function frame(now) {
   const rawDt = (now - last) / 1000, dtReal = G.paused ? 0 : Math.min(0.05, rawDt); last = now; G.real += dtReal;   // pause: everything below runs with dt = 0 (as in a hit-stop frame)
+  if (NET.role) netTick(rawDt);   // issue 49: snapshots / input / ping / the disconnect clock
   const pm = PERF.m; let tp = performance.now(), tq; PERF.rag = 0;   // CPU split for the F3 overlay
   let simDt = 0;
-  if (G.state === 'replay') simDt = stepReplay(dtReal);
-  if (G.state !== 'replay') {
+  const guestLive = NET.guest && NET.started;
+  if (guestLive) simDt = netGuestStep(dtReal);
+  else if (G.state === 'replay') simDt = stepReplay(dtReal);
+  if (!guestLive && G.state !== 'replay') {
     if (G.slowT > 0) { G.slowT -= dtReal; if (G.slowT <= 0) G.slow = 1; }
     let dt = dtReal * G.slow; if (G.hitstop > 0) { G.hitstop -= dtReal; dt = 0; }
     G.t += dt; simDt = dt;
@@ -8652,6 +8738,7 @@ const press = (type, n, el) => {
   let body = false, pow = false;
   if (type === 'punch') { const m = punchMod(); body = m.body; pow = m.pow; ctlLog(n, body, pow); }
   if (type === 'dodge') { Q.length = 0; tutAct('dodge', n); }   // (issue 45) the tutorial reads dodges here too
+  if (NET.guest) { netSendPress(type, n, body, pow); blip(el); return; }   // issue 49: the guest's press goes to the host, not into Q
   if (Q.length < 2) Q.push({ type, name: n, at: G.real, body, pow });
   blip(el);
 };
@@ -8699,14 +8786,14 @@ const punchFromSwipe = (dx, dy) => {
     });
   }
 }
-const setBlock = v => { if (P1) P1.blocking = v && G.state === 'fight'; const b = $('block-btn'); b && b.classList.toggle('on', !!v); };
+const setBlock = v => { if (NET.guest) netBlock(v); if (P1) P1.blocking = v && G.state === 'fight'; const b = $('block-btn'); b && b.classList.toggle('on', !!v); };
 // block: hold the button (or space)
 { const bb = $('block-btn'); bb.addEventListener('pointerdown', e => { e.preventDefault(); try { bb.setPointerCapture(e.pointerId); } catch (_) {} setBlock(true); });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) bb.addEventListener(ev, () => setBlock(false)); }
 /* movement: the floating left stick (or arrows / Q E) walks — x along the fight line, y circles him; a quick flick and
    release is a dodge: back = lean away, down = duck, up = slip (to the side his punch isn't coming from) */
 const MV = { kx: 0, ky: 0, sx: 0, sy: 0 };
-const setMove = () => { if (!P1) return; const x = MV.kx || MV.sx, y = MV.ky || MV.sy; P1.moveDir = Math.abs(x) > 0.25 ? Math.sign(x) * Math.min(1, Math.abs(x) * 1.25) : 0; P1.moveLat = Math.abs(y) > 0.25 ? Math.sign(y) * Math.min(1, Math.abs(y) * 1.25) : 0; };
+const setMove = () => { if (NET.guest) netMove(); if (!P1) return; const x = MV.kx || MV.sx, y = MV.ky || MV.sy; P1.moveDir = Math.abs(x) > 0.25 ? Math.sign(x) * Math.min(1, Math.abs(x) * 1.25) : 0; P1.moveLat = Math.abs(y) > 0.25 ? Math.sign(y) * Math.min(1, Math.abs(y) * 1.25) : 0; };
 /* the stick has no fixed home: it appears where the left thumb lands (left half, below the HUD) and fades back to a
    faint hint at rest. Its radius matches the CSS size; on a rotated portrait stage the touch is mapped into the
    local frame exactly as camera layout rotates it. pointer-events:none on the stick lets the document see the touch. */
@@ -8796,7 +8883,7 @@ window.addEventListener('keydown', e => {
   if (MV_KEYS[e.code]) { if (live || e.code.startsWith('Key')) e.preventDefault(); if (!e.repeat) { HELD.add(e.code); mvKeys(); } return; }
   if (e.repeat) return; const k = ACT_KEYS[e.code];
   if (k) { e.preventDefault(); press(k[0], k[1]); }
-  else if ((e.key === 'Enter' || e.key === ' ') && G.state === 'result' && document.activeElement === document.body) startFight();
+  else if ((e.key === 'Enter' || e.key === ' ') && G.state === 'result' && document.activeElement === document.body) (NET.role ? netRematch() : startFight());
 });
 stage.addEventListener('pointerdown', e => { if (!(e.target.closest && e.target.closest('button')) && introSkip()) e.preventDefault(); });   // a tap skips the card / the fly-round
 // mouse punches anywhere on the ring (not on menus / buttons)
@@ -8807,7 +8894,7 @@ stage.addEventListener('pointerdown', e => {
   e.preventDefault(); press('punch', n);
 });
 stage.addEventListener('contextmenu', e => { if (G.state !== 'menu') e.preventDefault(); });
-$('r-again').addEventListener('click', startFight);
+$('r-again').addEventListener('click', () => NET.role ? netRematch() : startFight());
 $('r-menu').addEventListener('click', toMenu);
 $('r-replay').addEventListener('click', startReplay);
 $('skip').addEventListener('click', endReplay);
@@ -8821,6 +8908,7 @@ buildTemplates().then(() => {
   /*DBG*/
   $('loading').hidden = true;
   tutBoot();   // (issue 45) the first-visit offer; wired after the debug block so window.__manual is set in the debug build
+  netBoot();   // issue 49: the «Бой с другом» screen and the ?room= link
   requestAnimationFrame(t => { last = t; frame(t); });
 }).catch(e => { console.error(e); ldText.textContent = 'Не удалось загрузить бойцов. Обнови страницу.'; ldText.className = 'err'; });
 /* ───────── locations: where the fight takes place ─────────
@@ -11450,7 +11538,7 @@ EVT.on((type, e) => {
    All of them except the pause (and the settings opened from it) live in G.state === 'menu'; the pause sets G.paused, frame() then
    runs with dt = 0. The menu camera (menuCam) orbits P1: the creator turns it by dragging, the other screens just frame him. */
 const UI = { scr: null, from: null, cat: 'name', spar: false, mouth: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };   // mouth: the gum-shield close-up of the creator (he bares his teeth: Face.update)
-const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', pause: 'pause' };
+const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', pause: 'pause', net: 'net' };   // issue 49: «Бой с другом»
 const VIEW_MOUTH = { yaw: 1.38, zoom: 0 }, _mouthP = new V3(), VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
 const VIEW_BACK = { yaw: -2.3, zoom: 0.55 };   // his back (the back tattoo)
 const myName = () => PROF.nick || PROF.name || 'Ты';
@@ -11458,7 +11546,7 @@ function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [..
 function uiShow(scr, focusId) {
   if (UI.scr === 'shop' && scr !== 'shop') shopLeave();   // a try-on that was not bought comes off (14b_shop.js)
   UI.scr = scr; const on = scr ? UI_IDS[scr] : null;
-  for (const id of ['menu', 'quick', 'creator', 'shop', 'social', 'settings', 'pause']) $(id).hidden = id !== on;
+  for (const id of ['menu', 'quick', 'creator', 'shop', 'social', 'settings', 'pause', 'net']) $(id).hidden = id !== on;
   if (on === 'menu') { $('nav-main').hidden = scr !== 'main'; $('nav-train').hidden = scr !== 'train'; }
   if (scr === 'settings') { const p = UI.from === 'pause'; $('settings').classList.toggle('dim', p); $('reset-row').hidden = p; buildSettings(); setTab('opt'); }
   if (scr === 'pause') $('p-quit-l').textContent = BAG.on ? 'Выйти' : 'Сдаться';
@@ -11472,7 +11560,7 @@ function uiShow(scr, focusId) {
 function uiBack() {
   if (UI.scr === 'settings' && UI.from === 'pause') return uiShow('pause', 'p-set');
   if (UI.scr === 'main' || G.state !== 'menu') return;
-  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', social: 'go-social', settings: 'go-set' }[UI.scr];
+  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', social: 'go-social', settings: 'go-set', net: 'go-net' }[UI.scr];
   updateMenu(); uiShow('main', back);
 }
 /* keys of the screens; true = the key is taken (12_ui.js then leaves it alone). Esc: back / pause / skip the replay / leave the result */
@@ -12191,4 +12279,458 @@ if (window.__perf) window.__perf.locReport = locReport;
 Object.assign(window.__loc || (window.__loc = {}), { prefetch: locPrefetch, kick: locPrefetchKick, next: locNext,
   dispose: locDispose, warm: locWarm, busy: locBusy, report: locReport,
   cold: id => { const L = LOCS[id]; if (L && L.group) locDispose(L); setLocation(id); } });   // keep __loc.set/get/LOCS of dbg_extra.js
+/* ───────── issue 49: «Бой с другом» — PeerJS P2P, host-authoritative 1v1 ─────────
+   One ES module scope with all the other game files, so everything here is a hoisted function. The host keeps running the
+   fight exactly as it does against the AI; netHostAI() only replaces ai() as the source of P2's decisions (08_ai_flow.js).
+   The guest simulates nothing: it gets ~30 Hz snapshots of Fighter.capture() poses and plays them back with a ~100 ms
+   buffer, the same way stepReplay() plays REC.frames. Its own Q / MV / block never reach the local fighters — they are
+   sent to the host from press()/setMove()/setBlock() in 12_ui.js.
+
+   Wire format (all plain JSON-safe values; PeerJS connection uses serialization:'json'):
+     hello  {c:'hello', look, nm}               once, on open — each side gets the other's fighter look
+     in     {c:'in', x, y, b, q:[{t,n,body,pow}]}  guest → host, 30 Hz + immediately on every press
+     s      {c:'s', t, st, d:[[..],[..]], gx:[x,x], ar:[x,z,ry], r:[..], h:[hp,hp], e:[sta,sta], rd, rt, ev:[..], p:[..]}
+                                              host → guest, 30 Hz (1/30 s), ~3–5 KB each
+     ping   {c:'ping', t} / {c:'pong', t}       both ways, 1 Hz; RTT in ms, yellow above 200
+     over   {c:'over', w:0|1, d:0|1}           host → guest at the result (w = host's P1 won)
+     again  {c:'again'}                        either side → the other, one-button rematch
+   ev items: {t, w, b, p, s:[x,y,z], d:[x,y,z], m?} (hit / block / knockdown); p items: {t, p:[x,y,z], s, c} (captions).
+   No TURN server: symmetric NAT / strict firewalls cannot connect — see .claude-summary.md. */
+
+/* NET and the ICE/code tables are declared in 00a_net_state.js (an early file: see the note there). */
+const r3 = v => Math.round(v * 1000) / 1000;
+function netCode() {
+  const a = new Uint8Array(6);
+  try { crypto.getRandomValues(a); } catch (e) { for (let i = 0; i < 6; i++) a[i] = (Math.random() * 256) | 0; }
+  return [...a].map(n => NET_ALPHA[n % NET_ALPHA.length]).join('');
+}
+function netSend(m) {
+  const c = NET.conn;
+  if (!c || !c.open) return;
+  try {
+    if (m.c === 's') { const n = JSON.stringify(m).length; NET.stat.snaps++; NET.stat.bytes += n; NET.stat.max = Math.max(NET.stat.max, n); }
+    if (m.c === 'in') NET.stat.ins++;
+    c.send(m);
+  } catch (e) { /* a message lost in a closing connection is not worth a crash */ }
+}
+
+/* ── the menu screen ── */
+function netBoot() {
+  $('go-net').addEventListener('click', () => { uiShow('net'); netHome(); });
+  $('net-back').addEventListener('click', uiBack);
+  $('net-create').addEventListener('click', netCreate);
+  $('net-join').addEventListener('click', () => netJoin($('net-code-in').value));
+  $('net-code-in').addEventListener('keydown', e => { if (e.key === 'Enter') netJoin($('net-code-in').value); });
+  $('net-copy').addEventListener('click', netCopy);
+  $('net-share').addEventListener('click', netShare);
+  // ?room=КОД — the shared link joins on its own
+  const room = new URLSearchParams(location.search).get('room');
+  if (room !== null) {
+    uiShow('net'); netHome();
+    const c = room.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 6);
+    if (c.length === 6) setTimeout(() => netJoin(c), 60);
+    else netSt('Неверный код в ссылке', true);
+  }
+  window.__mp = {
+    host: netCreate, join: netJoin, code: () => NET.code, link: () => NET.link, close: netClose,
+    stat: () => ({ role: NET.role, started: NET.started, over: NET.over, snaps: NET.snaps.length, playT: NET.playT,
+      ping: NET.ping, dropT: NET.dropT, ready: !!(NET.peer && NET.peer.open), conn: !!(NET.conn && NET.conn.open), ...NET.stat }),
+    hp: () => [P1.hp, P2.hp], state: () => [G.state, G.round, G.roundT, G.t],
+    punch: (n, body, pow) => netSendPress('punch', n || 'jab', !!body, !!pow),
+    dodge: n => netSendPress('dodge', n || 'duck', false, false),
+    move: (x, y) => { MV.kx = x || 0; MV.ky = y || 0; netMove(); },
+    drop: () => { if (NET.conn) NET.conn.close(); },
+    net: () => NET,
+  };
+}
+function netHome() {
+  show('net-room', false); show('net-home', true); NET.roomShown = false;
+  $('net-code-in').value = '';
+  $('net-st').textContent = 'Бой 1 на 1 по ссылке. Хост считает бой, гость видит его со своей стороны. Без регистрации и своих серверов.';
+  $('net-st').style.color = '';
+}
+function netSt(text, bad) {
+  const el = $('net-st'); el.textContent = text; el.style.color = bad ? 'var(--neon)' : '';
+  $('net-wait').textContent = text;
+}
+function netRoomUI(code) {
+  show('net-home', false); show('net-room', true); NET.roomShown = true;
+  NET.link = location.href.split('?')[0].split('#')[0] + '?room=' + code;
+  $('net-code').textContent = code;
+  $('net-link').textContent = NET.link;
+  $('net-wait').textContent = NET.host ? 'Ждём соперника…' : 'Подключаемся…';
+}
+async function netCopy() {
+  const b = $('net-copy');
+  try { await navigator.clipboard.writeText(NET.link); b.textContent = 'Скопировано'; }
+  catch (e) {
+    const rg = document.createRange(); rg.selectNodeContents($('net-link'));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(rg); b.textContent = 'Выдели ссылку';
+  }
+  setTimeout(() => { b.textContent = 'Копировать'; }, 1600);
+}
+async function netShare() {
+  if (navigator.share) { try { await navigator.share({ title: 'Бой с другом', text: 'Бой 1 на 1', url: NET.link }); } catch (e) {} }
+  else netCopy();
+}
+
+/* ── PeerJS is loaded only when the player opens «Бой с другом» ── */
+function netLoadPeer() {
+  if (window.Peer) return Promise.resolve();
+  if (NET.loading) return NET.loading;
+  NET.loading = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = NET_PEER_URL;
+    s.onload = () => window.Peer ? res() : rej(new Error('PeerJS'));
+    s.onerror = () => rej(new Error('PeerJS'));
+    document.head.appendChild(s);
+  });
+  return NET.loading;
+}
+async function netCreate() {
+  if (NET.role) return;
+  netSt('Загружаем PeerJS…');
+  try { await netLoadPeer(); } catch (e) { NET.loading = null; return netSt('Не удалось загрузить PeerJS. Нужен интернет.', true); }
+  NET.role = 'host'; NET.host = true; NET.guest = false;
+  NET.code = netCode(); NET.saved = null;
+  uiShow('net'); netRoomUI(NET.code); netSt('Создаём комнату…');
+  const peer = new Peer('bk-' + NET.code, { config: NET_ICE, debug: 0 });
+  NET.peer = peer;
+  peer.on('open', () => netSt('Комната открыта. Ждём соперника…'));
+  peer.on('connection', c => netHostConn(c));
+  peer.on('error', e => netErr(e));
+  peer.on('disconnected', () => { try { peer.reconnect(); } catch (_) {} });
+}
+async function netJoin(code) {
+  if (NET.role) return;
+  code = String(code || '').toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 6);
+  uiShow('net');
+  if (code.length !== 6) return netSt('Нужен код из 6 символов', true);
+  netSt('Загружаем PeerJS…');
+  try { await netLoadPeer(); } catch (e) { NET.loading = null; return netSt('Не удалось загрузить PeerJS. Нужен интернет.', true); }
+  NET.role = 'guest'; NET.host = false; NET.guest = true; NET.code = code;
+  netRoomUI(code); netSt('Подключаемся к комнате ' + code + '…');
+  const peer = new Peer({ config: NET_ICE, debug: 0 });
+  NET.peer = peer;
+  peer.on('open', () => netBind(peer.connect('bk-' + code, { serialization: 'json' })));
+  peer.on('error', e => netErr(e));
+  peer.on('disconnected', () => { try { peer.reconnect(); } catch (_) {} });
+}
+function netHostConn(c) {
+  if (NET.conn && NET.conn.open && NET.conn !== c) { try { c.close(); } catch (_) {} return; }
+  netBind(c);
+}
+function netBind(c) {
+  c.on('data', m => netMsg(m));
+  c.on('open', () => netOpen(c));
+  c.on('close', () => netLost(c));
+  c.on('error', e => netErr(e));
+  if (c.open) netOpen(c);   // an incoming connection may already be open when peer.on('connection') fires
+}
+function netOpen(c) {
+  if (NET.conn && NET.conn !== c && NET.conn.open) { try { c.close(); } catch (_) {} return; }
+  NET.conn = c; NET.closing = false; NET.dropT = 0; clearTimeout(NET.retryT);
+  show('net-drop', false);
+  if (!NET.started) netBeginMatch(); else netSt('Соперник вернулся');
+  netSend({ c: 'hello', look: LOOK, nm: myName() });
+}
+function netErr(e) {
+  const t = (e && (e.type || e.message)) || '';
+  const txt = NET_ERR[t] || ('Ошибка связи: ' + (t || 'неизвестно'));
+  if (t === 'unavailable-id' || t === 'peer-unavailable') { netClose(); netSt(txt, true); return; }
+  netSt(txt, true);
+  if (NET.started) msg(txt, 'tip');
+}
+
+/* ── starting a match ── */
+function netBeginMatch() {
+  if (NET.started) return;
+  NET.started = true;
+  NET.saved = { loc: G.loc, cine: OPT.cine, rounds: ROUNDS, diff: G.diff, mode: G.mode };
+  G.mode = 'net'; G.loc = 'gym'; G.diff = 'normal'; ROUNDS = 3; OPT.cine = false;
+  try { setLocation('gym'); } catch (e) {}
+  uiShow(null); show('net-drop', false); $('net-ping').hidden = false; $('net-ping').textContent = '… мс';
+  camCut = true;
+  if (NET.host) netHostStart(); else netGuestSetup();
+}
+function netHostStart() {
+  showP2(true);
+  for (const F of [P1, P2]) F.sparGear(false);
+  rollOpponent();   // a stand-in until the guest's hello arrives with his own look
+  startFight(true);
+  NET.evI = REC.events.length; NET.pop.length = 0; NET.q.length = 0; NET.acc = 0; NET.pingAcc = 0; NET.first = true;
+  netLabels();
+}
+function netGuestSetup() {
+  showP2(true);
+  for (const F of [P1, P2]) F.sparGear(false);
+  P1.stat = PROF.stats; P2.stat = lvlStats(1); P1.speed = 1.5; P2.speed = DIFFS.normal.speed;
+  P1.resetState(); P2.resetState();
+  P1.place(-D_SEP / 2, Math.PI / 2, false); P2.place(D_SEP / 2, -Math.PI / 2, true);
+  FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0; wearReset();
+  Q.length = 0; HELD.clear(); MV.kx = MV.ky = MV.sx = MV.sy = 0;
+  ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0;
+  G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0; G.t = 0;
+  G.state = 'intro'; G.introT = 0; G.stareT = 0; G.stare = 0; G.rend = null; RP.hl = false;
+  G.round = 1; G.roundT = ROUND_LEN; G.hudTxt = '';
+  NET.snaps.length = 0; NET.evs.length = 0; NET.pops.length = 0; NET.first = true; NET.playT = 0;
+  NET.mv = { x: 0, y: 0, b: false }; NET.blk = false; NET.q.length = 0; NET.iq.length = 0;
+  NET.acc = 0; NET.pingAcc = 0;
+  uiShow(null);
+  show('hud', true); show('pad', TOUCH); show('vs', false); show('result', false); show('rec', false);
+  show('bar-t', false); show('bar-b', false); show('net-drop', false); show('loading', false);
+  $('net-ping').hidden = false;
+  camCut = true; msg('Готовься');
+  netLabels();
+}
+function netLabels() {
+  $('n1').textContent = 'ТЫ'; $('n2').textContent = 'СОПЕРНИК';
+  $('w1').textContent = NET.host ? 'хост' : 'гость';
+  $('w2').textContent = NET.host ? 'гость' : 'хост';
+  $('st2').textContent = '';
+  $('r-again').textContent = 'Реванш';
+  $('r-replay').hidden = true;
+}
+
+/* ── guest input → host ── */
+function netMove() { NET.mv = { x: MV.kx || MV.sx, y: MV.ky || MV.sy, b: !!NET.blk }; }
+function netBlock(v) {
+  NET.blk = !!v; netMove();
+  netSend({ c: 'in', x: NET.mv.x, y: NET.mv.y, b: NET.blk, q: [] });
+}
+function netSendPress(t, n, body, pow) {
+  NET.iq.push({ t, n, body: !!body, pow: !!pow });
+  netMove();
+  netSend({ c: 'in', x: NET.mv.x, y: NET.mv.y, b: NET.blk, q: NET.iq.splice(0) });
+}
+function netFlushInput() {
+  netMove();
+  netSend({ c: 'in', x: NET.mv.x, y: NET.mv.y, b: NET.blk, q: NET.iq.splice(0) });
+}
+function netInput(m) {
+  if (!NET.host) return;
+  if (m.x !== undefined) NET.mv = { x: clamp(m.x, -1, 1), y: clamp(m.y, -1, 1), b: !!m.b };
+  if (m.q) for (const p of m.q) if (NET.q.length < 6) NET.q.push({ t: p.t, n: p.n, body: !!p.body, pow: !!p.pow, at: G.real });
+}
+function netHostAI(dt) {   // called from ai(dt) instead of the AI (08_ai_flow.js)
+  const me = P2, m = NET.mv;
+  me.moveDir = m.x; me.moveLat = -m.y;   // mirrored camera: the guest's right is toward the opponent, up circles the other way
+  me.blocking = !!m.b && G.state === 'fight';
+  AI.lat = 0;   // the AI's own circling must not fight the guest's stick
+  while (NET.q.length) {
+    const q = NET.q[0];
+    if (G.real - q.at > 0.4) { NET.q.shift(); continue; }
+    if (!(me.canAct() || me.canChain(q.t === 'punch' ? q.n : null))) break;
+    NET.q.shift();
+    if (q.t === 'punch') { me.wantBody = q.body; me.powerNext = q.pow; me.startPunch(q.n); }
+    else me.startDodge(q.n);
+  }
+}
+
+/* ── host snapshots ── */
+function netEv(e) {
+  if (e.wear) return null;   // knocked-off hats / cracked glasses stay host-side in this version
+  const o = { t: r3(e.t), w: e.who | 0, b: e.blocked ? 1 : 0, p: r3(e.power || 0) };
+  if (e.pos) o.s = [r3(e.pos.x), r3(e.pos.y), r3(e.pos.z)]; else o.s = [0, 0, 0];
+  if (e.dir) o.d = [r3(e.dir.x), r3(e.dir.y), r3(e.dir.z)]; else o.d = [0, 0, 1];
+  if (e.mist) o.m = r3(e.mist);
+  return o;
+}
+function netCapturePopup(pos, text, cls) {
+  if (!NET.started) return;
+  NET.pop.push({ t: r3(G.t), p: [r3(pos.x), r3(pos.y), r3(pos.z)], s: String(text), c: cls });
+  if (NET.pop.length > 32) NET.pop.shift();
+}
+function netSnapshot() {
+  const f = NET.tmp || (NET.tmp = { d: [new Float32Array(REC.N), new Float32Array(REC.N)] });
+  P1.capture(f.d[0]); P2.capture(f.d[1]);
+  const m = {
+    c: 's', t: r3(G.t), st: G.state,
+    d: [Array.from(f.d[0], r3), Array.from(f.d[1], r3)],
+    gx: [r3(P1.group.position.x), r3(P2.group.position.x)],
+    ar: [r3(ARENA.position.x), r3(ARENA.position.z), r3(ARENA.rotation.y)],
+    r: ROPES.map(R => [r3(R.cur.x), r3(R.cur.y), r3(R.cur.z), r3(R.s)]).flat(),
+    h: [r3(P1.hp), r3(P2.hp)], e: [r3(P1.stamina), r3(P2.stamina)],
+    rd: G.round, rt: r3(G.roundT), ev: [], p: NET.pop.slice(),
+  };
+  NET.pop.length = 0;
+  for (let i = NET.evI; i < REC.events.length; i++) { const e = netEv(REC.events[i]); if (e) m.ev.push(e); }
+  NET.evI = REC.events.length;
+  netSend(m);
+}
+function netOnSnapshot(m) {
+  m.d[0] = Float32Array.from(m.d[0]); m.d[1] = Float32Array.from(m.d[1]);
+  NET.snaps.push(m); if (NET.snaps.length > 90) NET.snaps.shift();
+  for (const e of m.ev) NET.evs.push(e);
+  for (const p of m.p) NET.pops.push(p);
+  if (NET.first) { NET.first = false; NET.playT = m.t - NET.buf; }
+  netApplyState(m);
+}
+function netApplyState(m) {
+  const prev = G.state;
+  G.t = m.t; G.round = m.rd; G.roundT = m.rt;
+  P1.hp = m.h[0]; P2.hp = m.h[1]; P1.stamina = m.e[0]; P2.stamina = m.e[1];
+  if (m.st !== 'result' || NET.over) G.state = m.st;
+  // captions / bells / crowd follow the host's state, exactly like the events in a replay
+  if (m.st !== prev) {
+    if (m.st === 'intro') msg('Готовься');
+    else if (m.st === 'fight') { msg('Раунд ' + G.round); roundSnd(); show('pad', true); EVT.emit('round'); }
+    else if (m.st === 'break') msg('Перерыв');
+    else if (m.st === 'ko') msg('Нокаут', 'ko');
+  }
+}
+
+/* ── guest playback (a thin replay client) ── */
+function netGuestStep(dtReal) {
+  if (NET.over || !NET.started) return 0;
+  const S = NET.snaps;
+  if (S.length < 2) return 0;
+  const last = S[S.length - 1], prev = NET.playT;
+  NET.playT += dtReal * (NET.playT < last.t - 0.24 ? 1.12 : NET.playT > last.t - 0.06 ? 0.88 : 1);
+  NET.playT = clamp(NET.playT, S[0].t, Math.max(S[0].t, last.t - 0.06));
+  let i = 0; while (i < S.length - 2 && S[i + 1].t <= NET.playT) i++;
+  const a = S[i], b = S[i + 1] || a;
+  const k = clamp((NET.playT - a.t) / Math.max(1e-5, b.t - a.t), 0, 1), sdt = Math.max(0, NET.playT - prev);
+  if (a.gx && b.gx) {
+    P1.group.position.x = lerp(a.gx[0], b.gx[0], k); P2.group.position.x = lerp(a.gx[1], b.gx[1], k);
+    P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true);
+  }
+  P1.restore(a.d[0], b.d[0], k); P2.restore(a.d[1], b.d[1], k);
+  P1.afterPose(sdt); P2.afterPose(sdt);
+  if (a.ar && b.ar) { ARENA.position.set(lerp(a.ar[0], b.ar[0], k), 0, lerp(a.ar[1], b.ar[1], k)); ARENA.rotation.y = lerp(a.ar[2], b.ar[2], k); }
+  if (a.r && b.r) ROPES.forEach((R, j) => { const o = j * 4; R.hit = (R.hit || new V3()).set(lerp(a.r[o], b.r[o], k), lerp(a.r[o + 1], b.r[o + 1], k), lerp(a.r[o + 2], b.r[o + 2], k)); R.s = lerp(a.r[o + 3], b.r[o + 3], k); });
+  while (NET.evs.length && NET.evs[0].t <= NET.playT) netPlayEvent(NET.evs.shift());
+  while (NET.pops.length && NET.pops[0].t <= NET.playT) { const p = NET.pops.shift(); popup(new V3(p.p[0], p.p[1], p.p[2]), p.s, p.c); }
+  if (i > 1) S.splice(0, i - 1);
+  return sdt;
+}
+function netPlayEvent(e) {
+  const pos = new V3(e.s[0], e.s[1], e.s[2]), dir = new V3(e.d[0], e.d[1], e.d[2]);
+  FX.spawn(pos, dir, e.b ? e.p * 0.4 : e.p);
+  if (e.m) FX.mist(pos, dir, e.p, e.m);
+  if (e.b) sfx.block(clamp(e.p * 2, 0.3, 1.4)); else sfx.thud(e.p * 0.7);
+  G.shake = Math.max(G.shake, 0.01 + 0.02 * e.p);
+  EVT.emit('hit', { pos, power: e.p, blocked: !!e.b });
+  const hb = $(e.w ? 'hpb2' : 'hpb1'); if (hb) { hb.classList.remove('hit'); void hb.offsetWidth; hb.classList.add('hit'); }
+}
+/* the guest's camera sits at −z: screen-right is world −x, so P2 (the guest's own man) is on the left */
+function netGuestCam(dt, cp, cl) {
+  const far = VW / VH < 1.45 ? 5.0 : 4.5;
+  const mx = (P1.headNow.x + P2.headNow.x) * 0.5, sep = Math.abs(P1.headNow.x - P2.headNow.x), hurt = Math.max(P1.daze || 0, P2.daze || 0);
+  const z = far + 0.2 - clamp((1.0 - sep) * 0.6, 0, 0.35) - 0.2 * hurt + Math.max(0, sep - 1.0) * 1.1, drift = 0.18 * Math.sin(camClock * 0.13);
+  cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), -z); cl.set(mx + drift * 0.3, 0.93, 0);
+  if (camCut) { camP.copy(cp); camL.copy(cl); camCut = false; }
+  else { const a = 1 - Math.exp(-dt * 3.5); camP.lerp(cp, a); camL.lerp(cl, a); }
+  camera.position.copy(camP); if (!OPT.shake) G.shake = 0;
+  if (G.shake > 0.0005 && dt > 0) { camera.position.x += (rr() - 0.5) * G.shake; camera.position.y += (rr() - 0.5) * G.shake; G.shake *= Math.exp(-dt * 9); }
+  camera.lookAt(camL);
+}
+
+/* ── messages, ping, result, rematch ── */
+function netMsg(m) {
+  if (!m || !m.c) return;
+  if (m.c === 'hello') {
+    try { if (NET.host) P2.applyLook(m.look); else P1.applyLook(m.look); } catch (e) {}
+    NET.nm = m.nm || '';
+  } else if (m.c === 'in') netInput(m);
+  else if (m.c === 's') { if (NET.guest) netOnSnapshot(m); }
+  else if (m.c === 'ping') netSend({ c: 'pong', t: m.t });
+  else if (m.c === 'pong') netPing(performance.now() - m.t);
+  else if (m.c === 'over') { if (NET.guest) netGuestOver(m); }
+  else if (m.c === 'again') netRestart();
+}
+function netPing(rtt) {
+  NET.ping = Math.round(rtt);
+  const el = $('net-ping'); el.hidden = false; el.textContent = NET.ping + ' мс';
+  el.classList.toggle('bad', NET.ping > 200);
+}
+function netShowResult(win, draw) {
+  show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', false); show('pad', false);
+  show('result', true); show('net-drop', false);
+  $('r-car').textContent = ''; $('r-stats').innerHTML = '';
+  try { payShow(null); } catch (e) {}
+  $('r-replay').hidden = true; $('r-again').textContent = 'Реванш';
+  $('r-title').textContent = draw ? 'Ничья' : win ? 'Победа' : 'Нокаут';
+  $('r-title').className = 'rt ' + (draw ? '' : win ? 'win' : 'lose');
+  $('r-sub').textContent = draw ? 'решение судей' : win ? 'соперник на полу' : 'ты на полу';
+}
+function netResult() {   // host: startReplay() is diverted here (07_state_replay_hits.js)
+  if (NET.over && NET.over.sent) return;
+  const o = NET.over || { win: G.winner === P1, draw: false, how: 'dec' };
+  o.sent = true; NET.over = o; G.state = 'result'; G.paused = false;
+  netShowResult(!!o.win, !!o.draw);
+  netSend({ c: 'over', w: o.win ? 1 : 0, d: o.draw ? 1 : 0 });
+}
+function netGuestOver(m) {
+  NET.over = { win: !m.w, draw: !!m.d, how: 'dec' };   // the guest's man is P2: invert the host's result
+  G.state = 'result'; G.paused = false;
+  netShowResult(!m.w, !!m.d);
+}
+function netRematch() {
+  if (!NET.role || !NET.over) return;
+  netSend({ c: 'again' }); netRestart();
+}
+function netRestart() {
+  NET.over = null; show('result', false);
+  NET.snaps.length = 0; NET.evs.length = 0; NET.pops.length = 0; NET.pop.length = 0;
+  NET.first = true; NET.playT = 0; NET.q.length = 0; NET.iq.length = 0; NET.acc = 0; NET.evI = 0;
+  NET.mv = { x: 0, y: 0, b: false }; NET.blk = false;
+  if (NET.host) netHostStart(); else netGuestSetup();
+  $('net-ping').hidden = false;
+}
+
+/* ── disconnect: ten seconds to recover, then a win to the man left standing ── */
+function netTick(dt) {
+  if (NET.dropT > 0) {
+    NET.dropT -= dt;
+    $('net-drop-t').textContent = 'Ждём восстановления… ' + Math.max(0, Math.ceil(NET.dropT)) + ' с';
+    if (NET.dropT <= 0) return netWinByDrop();
+  }
+  if (!NET.conn || !NET.conn.open || !NET.started) return;
+  NET.pingAcc += dt;
+  if (NET.pingAcc >= 1) { NET.pingAcc = 0; netSend({ c: 'ping', t: performance.now() }); }
+  if (NET.over) return;
+  NET.acc += dt;
+  if (NET.acc >= NET.rate) { NET.acc = 0; if (NET.host) netSnapshot(); else netFlushInput(); }
+}
+function netLost(c) {
+  if (NET.closing || NET.over) return;
+  if (NET.conn && NET.conn !== c && NET.conn.open) return;
+  if (NET.conn === c) NET.conn = null;
+  if (!NET.role) return;
+  $('net-drop-t').textContent = 'Ждём восстановления… 10 с'; show('net-drop', true);
+  NET.dropT = 10;
+  if (NET.guest) netRetry();   // a new DataConnection to the same room id; the host keeps listening
+}
+function netRetry() {
+  clearTimeout(NET.retryT);
+  if (!NET.guest || !NET.peer || NET.dropT <= 0 || NET.over || (NET.conn && NET.conn.open)) return;
+  try { netBind(NET.peer.connect('bk-' + NET.code, { serialization: 'json' })); } catch (e) {}
+  NET.retryT = setTimeout(netRetry, 1500);
+}
+function netWinByDrop() {
+  NET.dropT = 0; show('net-drop', false); clearTimeout(NET.retryT);
+  const started = NET.started;
+  if (started) { G.wins++; try { save(); } catch (e) {} }
+  netClose(); toMenu();
+  msg(started ? 'Победа — соперник отключился' : 'Соперник отключился', 'tip');
+}
+function netClose() {
+  const had = !!NET.role;
+  clearTimeout(NET.retryT);
+  NET.role = null; NET.host = false; NET.guest = false; NET.started = false; NET.over = null;
+  NET.conn = null; NET.dropT = 0; NET.closing = true; NET.roomShown = false;
+  show('net-drop', false); $('net-ping').hidden = true; $('net-ping').textContent = '';
+  if (NET.saved) {
+    G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
+    NET.saved = null; try { setLocation(G.loc); } catch (e) {}
+  }
+  try { if (NET.peer && !NET.peer.destroyed) NET.peer.destroy(); } catch (e) {}
+  NET.peer = null; NET.loading = null;
+  NET.snaps.length = 0; NET.evs.length = 0; NET.pops.length = 0; NET.pop.length = 0; NET.q.length = 0; NET.iq.length = 0;
+  NET.first = true; NET.evI = 0; NET.acc = 0; NET.pingAcc = 0;
+  $('n1').textContent = myName(); $('st2').textContent = '';
+  if (had) netHome();
+  setTimeout(() => { NET.closing = false; }, 0);
+}
 </script>

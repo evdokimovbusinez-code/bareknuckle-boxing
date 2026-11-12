@@ -396,7 +396,7 @@ class Fighter {
     }
     const dist = Math.abs(o.group.position.x - this.group.position.x), tiredK = 0.65 + 0.35 * clamp(this.stamina / 40, 0, 1);
     let a = this.adv || 0;
-    if (this === P1 && fight && (this.moveDir || 0) !== 0) {   // he can walk behind his guard, just slower
+    if ((this === P1 || (NET.host && this === P2)) && fight && (this.moveDir || 0) !== 0) {   // issue 49: the guest's feet drive P2 as well
       // the player walks: ~1.5 m/s in and out (a step takes you out of his reach), slower punching or tired
       const v = this.moveDir * 1.5 * tiredK * (this.cur ? 0.45 : 1) * (this.blocking ? 0.55 : 1);
       this.advV += (v - this.advV) * Math.min(1, dt * 12); this.hold = null;
@@ -425,8 +425,8 @@ class Fighter {
     this.group.position.x = this.mark.x + fwd * this.adv; this.group.updateMatrixWorld(true);
     // sideways: circling around the other man (the ring frame turns about him)
     let lat = 0;
-    if (fight && this === P1) lat = (this.moveLat || 0) * 1.15 * tiredK * (this.cur ? 0.4 : 1) * (this.blocking ? 0.55 : 1);
-    if (fight && this === P2) lat = (AI.lat || 0) * tiredK;
+    if (fight && (this === P1 || (NET.host && this === P2))) lat = (this.moveLat || 0) * 1.15 * tiredK * (this.cur ? 0.4 : 1) * (this.blocking ? 0.55 : 1);
+    if (fight && this === P2 && !(NET.host && (this.moveLat || 0) !== 0)) lat = (AI.lat || 0) * tiredK;
     this.latV = (this.latV || 0) + (lat - (this.latV || 0)) * Math.min(1, dt * 10);
     if (Math.abs(this.latV) > 0.01 && !circleStep(this, this.latV * dt)) this.latV *= 0.5;
   }

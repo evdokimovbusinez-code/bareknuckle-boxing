@@ -53,10 +53,13 @@ for (const k of ['step', 'hitStep']) { const fn = Ragdoll.prototype[k]; Ragdoll.
 function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
 function frame(now) {
   const rawDt = (now - last) / 1000, dtReal = G.paused ? 0 : Math.min(0.05, rawDt); last = now; G.real += dtReal;   // pause: everything below runs with dt = 0 (as in a hit-stop frame)
+  if (NET.role) netTick(rawDt);   // issue 49: snapshots / input / ping / the disconnect clock
   const pm = PERF.m; let tp = performance.now(), tq; PERF.rag = 0;   // CPU split for the F3 overlay
   let simDt = 0;
-  if (G.state === 'replay') simDt = stepReplay(dtReal);
-  if (G.state !== 'replay') {
+  const guestLive = NET.guest && NET.started;
+  if (guestLive) simDt = netGuestStep(dtReal);
+  else if (G.state === 'replay') simDt = stepReplay(dtReal);
+  if (!guestLive && G.state !== 'replay') {
     if (G.slowT > 0) { G.slowT -= dtReal; if (G.slowT <= 0) G.slow = 1; }
     let dt = dtReal * G.slow; if (G.hitstop > 0) { G.hitstop -= dtReal; dt = 0; }
     G.t += dt; simDt = dt;
