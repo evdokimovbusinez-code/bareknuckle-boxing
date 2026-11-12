@@ -204,18 +204,33 @@ const LOCS = {
   },
 };
 let LOC = LOCS.gym;
-/* switch the location: build its set on first use, show it (and the ring props if it has a ring), retune the shared lights */
+/* #47 (stage 2, discussion): timings of a cold build for __perf.locReport(). The canvasTex wrapper in 17_loc_load.js
+   accumulates into .tex/.texN while .active is set; .last is the last build; .noTrim suspends the low-preset cache cap
+   while the report forces rebuilds. */
+const LOCPROF = { last: null, active: false, tex: 0, texN: 0, noTrim: false };
+let LOCSTAMP = 0;   // last-used stamp for the low-preset LRU cache
+/* switch the location: build its set on first use, show it (and the ring props if it has a ring), retune the shared lights.
+   The set is built once and then only hidden/shown (LOC.group is the cache); on low at most 2 stay resident (locTrim, 17). */
 function setLocation(id) {
   const L = LOCS[id] || LOCS.gym, was = LOC; LOC = L;
-  if (!L.group) { L.group = L.build(); ARENA.add(L.group); }
+  if (!L.group) {
+    const b0 = performance.now(); LOCPROF.tex = 0; LOCPROF.texN = 0; LOCPROF.active = true;
+    let g; try { g = L.build(); } finally { LOCPROF.active = false; }
+    L.group = g; ARENA.add(g);
+    LOCPROF.last = { id: L.id, build: +(performance.now() - b0).toFixed(1), tex: +LOCPROF.tex.toFixed(1), texN: LOCPROF.texN };
+    locBusyFlash();   // a cold build is a brief wait: «Готовим площадку…» (17_loc_load.js)
+  }
+  L.stamp = ++LOCSTAMP;
   for (const o of Object.values(LOCS)) { if (o.group) o.group.visible = o === L; for (const w of o.world || []) w.visible = o === L; }
   RINGSET.visible = L.ring;
   if (was !== L && was.leave) was.leave(); if (L.enter) L.enter();   // a location that moves or hides shared things puts them back (13e_loc_boxgym.js)
   const li = L.light; scene.background.set(li.bg); scene.fog.color.set(li.fog[0]); scene.fog.near = li.fog[1]; scene.fog.far = li.fog[2]; renderer.toneMappingExposure = li.exposure;
   hemi.color.set(li.hemi[0]); hemi.groundColor.set(li.hemi[1]); hemi.intensity = li.hemi[2];
   for (const [l, v] of [[key, li.key], [rim, li.rim], [rim2, li.rim2], [fill, li.fill]]) { l.color.set(v[0]); l.intensity = v[1]; }
+  gfxLights(GFX.level);   // #47: a location rebuilds its accent lights — re-apply the low-preset light budget after retuning
   if (was !== L) FX.clearFloor();   // floor stains belong to the floor they fell on
   sfx.place(L.id);   // its ambience and the echo of its walls (06_fx_sound.js)
   ARENA.updateMatrixWorld(true);
+  locTrim();   // #47: on low keep at most 2 built sets (evict the least-recently-used, never the current one)
 }
 function locSync() { if (LOC.sync && LOC.group) LOC.sync(); }

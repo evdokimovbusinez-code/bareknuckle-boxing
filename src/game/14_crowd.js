@@ -11,8 +11,10 @@
    sleeves are painted per face (tags). Colours are packed per instance (sRGB bytes in a float), build / belly / height vary too.
    The CPU only keeps a few numbers per person (excitement, head yaw, recoil, fade, wince, awe) and packs the visible ones: the crowd
    is split into sectors that are frustum-culled, and whoever stands between the camera and the fighters is dissolved (dither).
-   Density follows GFX.crowd (low ≈ 0.3 of the people, high = all). Reactions come from EVT (07_state_replay_hits.js). */
-const CROWD = { u: { uT: { value: 0 }, uMood: { value: 0.15 }, uPose: { value: null } }, geo: null, mat: null, blobMat: null, blobs: [], mood: 0.15, heat: 0, fill: 1 };   // fill: the share of the crowd that came (a career fight sets it, startFight)
+   Density follows GFX.crowd (0.4 on low, 0.7 on medium, all on high), and the rank sort drops the far rows first. Stage 2 (#47):
+   below high the whole figure also switches to a reduced 918-triangle index (crowdLowIdx), and on low uStill freezes the idle
+   vertex animation while poses and reactions still come from iDyn. Reactions come from EVT (07_state_replay_hits.js). */
+const CROWD = { u: { uT: { value: 0 }, uMood: { value: 0.15 }, uPose: { value: null }, uStill: { value: 0 } }, geo: null, lowIdx: null, mat: null, blobMat: null, blobs: [], mood: 0.15, heat: 0, fill: 1 };   // fill: the share of the crowd that came (a career fight sets it, startFight); lowIdx: the reduced figure's index (#47)
 // bits of the instance mask (bit n ↔ accessory number n in the geometry; BUZZ, OPEN and BALA only repaint faces)
 const CW_HAIR = 2, CW_CAP = 4, CW_HOOD = 8, CW_BALA = 16, CW_SKULL = 32, CW_PHONE = 64, CW_CRATE = 128, CW_BUZZ = 256, CW_AFRO = 512, CW_BUN = 1024, CW_BEANIE = 2048, CW_HOODDN = 4096, CW_OPEN = 8192;
 const CROWD_LOOK = {
@@ -57,6 +59,10 @@ const CW_POSES = [
 ];
 const CW_ID = {}; CW_POSES.forEach((p, i) => { CW_ID[p[0]] = i; });
 CROWD.u.uPose.value = new Float32Array(CW_POSES.flatMap(p => [...p[1], ...(p[2] || p[1]), ...p[3]]));
+/* Stage 2 (#47): on low the crowd keeps its poses and its reactions to the fight, but stops drifting / swaying on its own —
+   uStill freezes the vertex shader's clock. applyGfx() already ran at boot, so set the initial value here as well. */
+GFX.onChange.push(g => { CROWD.u.uStill.value = g.level === 'low' ? 1 : 0; });
+CROWD.u.uStill.value = GFX.level === 'low' ? 1 : 0;
 
 /* the figure in its rest pose: 1.76 m, feet at y = 0, facing +z, left arm at +x, arms hanging. Vertex attributes:
    aP = (chain: 0 static, 1 trunk, 2 head, 3 / 4 left / right arm, 5 / 6 left / right leg; accessory number (0 = always shown, −n = hidden
@@ -174,10 +180,24 @@ function crowdGeo() {
   return g;
 }
 
+/* Stage 2 (#47): a lighter crowd figure for the cheap presets. The full 1200-triangle figure carries every optional accessory
+   (hair, afro, bun, cap, beanie, hood, balaclava sockets, phone, crate); the shader collapses the ones a person does not wear
+   into degenerate triangles, but they are still submitted. Keep only the always-drawn body (832 tris), brows / mouth (6),
+   short hair (68, the most common head) and the crate under the back rows (12 — without it they would float): 918 tris.
+   Same attributes and same vertex shader, so colours, poses and reactions are unchanged. */
+function crowdLowIdx(base) {
+  const src = base.index.array, ap = base.attributes.aP.array, keep = [];
+  for (let i = 0; i < src.length; i += 3) {
+    const a = ap[src[i] * 4 + 1];
+    if (a === 0 || a === -4 || a === 1 || a === 7) keep.push(src[i], src[i + 1], src[i + 2]);
+  }
+  return new src.constructor(keep);
+}
+
 const CROWD_VP = /* glsl */`
 #ifdef USE_INSTANCING
 attribute vec4 aP, aQ, iVar, iVar2, iDyn, iCol, iCol2; attribute vec2 iDyn2;
-uniform float uT, uMood; uniform vec4 uPose[${CW_POSES.length * 3}];
+uniform float uT, uMood, uStill; uniform vec4 uPose[${CW_POSES.length * 3}];
 vec3 cwRx(vec3 p, float a) { float c = cos(a), s = sin(a); return vec3(p.x, p.y * c + p.z * s, p.z * c - p.y * s); }   // a > 0: a hanging arm swings forward, an upright trunk leans back
 vec3 cwRy(vec3 p, float a) { float c = cos(a), s = sin(a); return vec3(p.x * c + p.z * s, p.y, p.z * c - p.x * s); }
 vec3 cwRz(vec3 p, float a) { float c = cos(a), s = sin(a); return vec3(p.x * c - p.y * s, p.x * s + p.y * c, p.z); }
@@ -194,7 +214,7 @@ const CROWD_VS = /* glsl */`
 vec3 cwP = position, cwN = normal; vEm = vec3(0.0); vFade = 1.0; vObj = position; vCl = 0.0;
 #ifdef USE_INSTANCING
 if (iVar.x > 2.5) {
-  float ph = iVar.x - 3.0, ch = aP.x, sl = aP.z, t = uT, ex = smoothstep(0.0, 1.0, iDyn.x), rec = iDyn.z, wn = iDyn2.x, aw = iDyn2.y;
+  float ph = iVar.x - 3.0, ch = aP.x, sl = aP.z, t = uT * (1.0 - uStill), ex = smoothstep(0.0, 1.0, iDyn.x), rec = iDyn.z, wn = iDyn2.x, aw = iDyn2.y;   // #47: uStill freezes the idle animation on low; poses / reactions still come from iDyn
   float h1 = fract(ph * 7.31), h2 = fract(ph * 13.77), h3 = fract(ph * 29.3), h4 = fract(ph * 53.9);
   float tee = step(31.5, iVar.z), pose = iVar.z - 32.0 * tee, mir = step(0.5, iVar2.w), wdir = 1.0 - 2.0 * mir;
   float accN = abs(aP.y), bit = accN < 0.5 ? 1.0 : cwBit(iVar.y, accN), show = aP.y < -0.5 ? 1.0 - bit : bit;
@@ -388,6 +408,8 @@ function makeCrowd(o = {}) {
   const base = CROWD.geo || (CROWD.geo = crowdGeo()), geo = new THREE.BufferGeometry();
   for (const k of ['position', 'normal', 'color', 'aP', 'aQ']) geo.setAttribute(k, base.attributes[k]);
   geo.setIndex(base.index);
+  if (!CROWD.lowIdx) CROWD.lowIdx = new THREE.BufferAttribute(crowdLowIdx(base), 1);
+  let lod = '';   // #47: 'lod' = the 918-tri figure on low / medium, 'full' = 1200 tris above them
   const ia = (name, sz) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(N * sz), sz); a.setUsage(THREE.DynamicDrawUsage); geo.setAttribute(name, a); return a; };
   const aCol = [ia('iCol', 4), ia('iCol2', 4)], aVar = [ia('iVar', 4), ia('iVar2', 4)], aDyn = ia('iDyn', 4), aDyn2 = ia('iDyn2', 2);
   if (!CROWD.mat) {
@@ -413,6 +435,8 @@ function makeCrowd(o = {}) {
     },
     update(dt) {
       t += dt; g.updateWorldMatrix(true, false); camera.updateMatrixWorld();
+      const want = GFX.level === 'low' || GFX.level === 'medium' ? 'lod' : 'full';
+      if (want !== lod) { lod = want; geo.setIndex(want === 'lod' ? CROWD.lowIdx : base.index); }   // #47: cheaper figure below high
       const M = g.matrixWorld, e = M.elements, cam = camera.position; _cwI.copy(M).invert();
       _cwFr.setFromProjectionMatrix(_cwM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
       for (const G of groups) G.vis = G.n > 0 && _cwFr.intersectsSphere(_cwS.copy(G.sphere).applyMatrix4(M));

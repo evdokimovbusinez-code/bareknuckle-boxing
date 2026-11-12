@@ -380,7 +380,7 @@ LOCS.metro = {
       if (h !== c.h) { c.h = h; this.colMesh.setMatrixAt(i, h ? this.zero : c.mat); ch = true; } });
     if (ch) this.colMesh.instanceMatrix.needsUpdate = true;
     this.ceil.visible = this.ceilM.visible = cam.y < 4.0;
-    this.mir.visible = GFX.level !== 'low'; this.uRefl.value = this.mir.visible ? 1 : 0;
+    this.mir.visible = GFX.level === 'high' || GFX.level === 'ultra'; this.uRefl.value = this.mir.visible ? 1 : 0;   // #47: no mirror floor below high
     this.mirU.uMirI.value.copy(M).invert(); this.mirU.uMirC.value.copy(cam).applyMatrix4(this.mirU.uMirI.value);
 
     /* the train: its clock is the crowd's (stops with the pause) */

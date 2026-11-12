@@ -82,6 +82,7 @@ function toMenu() {
   G.stareOn = false; G.stare = 0; G.rend = null; RP.hl = false; show('hl', false); P1.pant = P2.pant = 0;
   CROWD.fill = 1; UI.from = null; uiShow('main'); show('vs', false); show('hud', false); show('pad', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false);
   camCut = true; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; setLocation(G.loc);
+  locPrefetchKick();   // #47: in idle, prebuild the place of the next fight (17_loc_load.js)
   showP2(false);   // the menu shows the player's man alone (startFight brings the opponent back)
 }
 const NAMES = ['Грек', 'Молот', 'Кабан', 'Шрам', 'Лом', 'Бизон', 'Кувалда', 'Седой'];

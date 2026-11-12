@@ -438,7 +438,7 @@ LOCS.boxgym = {
     if (bag !== this.bagOn) this.place(bag);
     g.updateWorldMatrix(true, false); const M = g.matrixWorld, cl = _bgC.copy(cam).applyMatrix4(_bgI.copy(M).invert());   // the camera in floor coordinates
     const inside = cl.x > X0 + 0.15 && cl.x < X1 && cl.z > Z0 && cl.z < Z1 && cl.y < H;
-    this.mir.visible = inside && GFX.level !== 'low'; this.flat.visible = !this.mir.visible;
+    this.mir.visible = inside && (GFX.level === 'high' || GFX.level === 'ultra'); this.flat.visible = !this.mir.visible;   // #47: mirror only on high
     // the ring's lamps: out of the way of the top-down replay shot; in the drill the whole ring goes when the camera is over it
     const over = bag && cl.x < 3.7 && Math.abs(cl.z) < 4.2;
     RINGSET.visible = !over; this.plat.visible = !over; this.rig.visible = !over && cl.y < 3.5;

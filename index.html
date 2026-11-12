@@ -345,6 +345,11 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .loading .box{display:flex;flex-direction:column;gap:10px;width:min(320px,70%);font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted)}
 .loading .bar{height:4px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden}
 .loading .bar span{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+/* #47: short status while a cold location set is built (17_loc_load.js) */
+.locbusy{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:9px 16px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(12,14,18,.86);font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);z-index:60;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.45)}
+.locbusy i{width:9px;height:9px;border-radius:50%;background:var(--gold);animation:locpulse 1s ease-in-out infinite}
+.locbusy[hidden]{display:none}
+@keyframes locpulse{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
 .err{color:#ff9b8a}
 #stage.short .rules,#stage.short .keys{display:none}
 #stage.short .sw button:not(.txt){width:24px;height:24px}
@@ -605,6 +610,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   </div></div>
 
   <div class="loading" id="loading"><div class="box"><span id="ld-text">Загружаю бойцов…</span><div class="bar"><span id="ld-bar"></span></div></div></div>
+  <div class="locbusy" id="loc-busy" hidden><i></i><span>Готовим площадку…</span></div>
 </div>
 
 <script>
@@ -1704,9 +1710,12 @@ const GFX_ORDER = ['low', 'medium', 'high', 'ultra'];
 const GFX_LABEL = { auto: 'авто', low: 'низкая', medium: 'средняя', high: 'высокая', ultra: 'ультра' };
 const GFX_PRESET = {
   // h: render height · ao: GTAO samples (0 = off) at aoScale of the frame · msaa: samples of the scene target (0 = FXAA pass instead)
-  // shadow: key light map size, soft = PCFSoft · tpr: pixel-ratio cap on touch devices · simSkip: hair / shorts cloth every Nth frame
-  low:    { h: 720,  ao: 0,  aoScale: 0.5, msaa: 0, bloom: false, shadow: 1024, soft: false, tpr: 1,    simSkip: 2, particles: 0.5, crowd: 0.3 },
-  medium: { h: 900,  ao: 8,  aoScale: 0.5, msaa: 2, bloom: true,  shadow: 1024, soft: true,  tpr: 1.5,  simSkip: 1, particles: 0.8, crowd: 0.6 },
+  // shadow: key light map size (0 = no shadow pass at all), soft = PCFSoft · tpr: pixel-ratio cap on touch devices ·
+  // simSkip: hair / shorts cloth every Nth frame · particles / crowd: budgets of the secondary FX and the crowd (0..1)
+  // Stage 2 (#47), phone targets: low ≤ 150k tris / 70 calls, medium ≤ 280k / 110. GTAO's normal pass redraws the whole scene,
+  // so it is off everywhere below high; the shadow pass (a second render of every fighter) is off on low.
+  low:    { h: 720,  ao: 0,  aoScale: 0.5, msaa: 0, bloom: false, shadow: 0,    soft: false, tpr: 1,    simSkip: 2, particles: 0.3, crowd: 0.4 },
+  medium: { h: 900,  ao: 0,  aoScale: 0.5, msaa: 2, bloom: true,  shadow: 1024, soft: true,  tpr: 1.5,  simSkip: 1, particles: 0.6, crowd: 0.7 },
   high:   { h: 1080, ao: 12, aoScale: 1,   msaa: 4, bloom: true,  shadow: 2048, soft: true,  tpr: 1.75, simSkip: 1, particles: 1,   crowd: 1 },
   ultra:  { h: 1440, ao: 16, aoScale: 1,   msaa: 4, bloom: true,  shadow: 2048, soft: true,  tpr: 2,    simSkip: 1, particles: 1,   crowd: 1 },
 };
@@ -1743,29 +1752,50 @@ function applyGfx(level) {
   const msaa = lowEnd ? Math.min(P.msaa, 2) : P.msaa;
   if (sceneRT.samples !== msaa) { sceneRT.samples = msaa; sceneRT.dispose(); }
   fxaa.enabled = msaa === 0;
+  // shadows: off entirely on the cheapest preset (the shadow pass is a second render of every fighter — ~40–60k tris and a
+  // dozen draw calls). Toggling shadowMap.enabled changes the shader defines of every lit material, so recompile them once.
+  const shadowOn = P.shadow > 0;
+  if (renderer.shadowMap.enabled !== shadowOn || key.castShadow !== shadowOn) {
+    renderer.shadowMap.enabled = shadowOn; key.castShadow = shadowOn;
+    scene.traverse(o => { const m = o.material; if (!m) return; if (Array.isArray(m)) for (const x of m) x.needsUpdate = true; else m.needsUpdate = true; });
+  }
   const type = P.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
   if (renderer.shadowMap.type !== type) {   // the filter is compiled into every lit material
     renderer.shadowMap.type = type;
     scene.traverse(o => { const m = o.material; if (!m) return; if (Array.isArray(m)) for (const x of m) x.needsUpdate = true; else m.needsUpdate = true; });
   }
-  if (key.shadow.mapSize.x !== P.shadow) { key.shadow.mapSize.set(P.shadow, P.shadow); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
+  if (shadowOn && key.shadow.mapSize.x !== P.shadow) { key.shadow.mapSize.set(P.shadow, P.shadow); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
+  gfxLights(level);
   if (GFX.ready) { qH = GFX.h; applyRes(); }
   for (const f of GFX.onChange) f(GFX);
+}
+/* dynamic lights on low: keep the hemisphere, the key spot and one rim (3 shared lights); drop the two extra directional fills.
+   The per-location accent spots/points stay — each location already trims them on low (tires / yard / metro use `lite`) and their
+   glow is baked into emissive cards, so hiding them here would leave those scenes unlit. Called on preset change and after
+   setLocation retunes the lights. */
+function gfxLights(level) {
+  const low = level === 'low';
+  rim2.visible = !low; fill.visible = !low;
 }
 /* menu choice: 'auto' or a fixed level (saved) */
 function setGfx(v) {
   if (v !== 'auto' && !GFX_PRESET[v]) v = 'auto';
   GFX.set = v; try { localStorage.setItem('bx_gfx', v); if (v === 'auto') localStorage.removeItem('bx_gfx_auto'); } catch (_) {}
-  DR.acc = DR.n = DR.good = DR.bad = 0; DR.wait = 1; DR.upNeed = 6;
+  DR.acc = DR.n = DR.good = DR.bad = DR.slow = 0; DR.wait = 1; DR.upNeed = 6;
   applyGfx(v === 'auto' ? GFX.detect : v);
 }
 {
-  // auto starts from 'medium' on integrated / weak / mobile GPUs, otherwise from 'high'; a level the auto mode stepped down to is remembered
+  /* Stage 2 (#47): the first-launch auto choice. A phone (coarse pointer) starts at medium; a weak device — ≤4 cores or
+     ≤4 GB of RAM — starts at low; a weak/integrated GPU falls back to medium; a desktop starts at high. A level auto mode
+     later stepped down to is remembered. A level the user picked in settings always wins (set !== 'auto'). */
   let name = '';
   try { const gl = renderer.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); name = String((e && gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || ''); } catch (_) {}
   GFX.gpu = name;
-  const weak = lowEnd || /intel(?!.*\barc\b)|swiftshader|llvmpipe|software|basic render|mali|adreno|powervr|videocore|radeon(\(tm\))? (r[2-7]|hd|vega [3-8]\b)|geforce (mx|gt |[0-9]{3}m)/i.test(name);
-  GFX.detect = weak ? 'medium' : 'high';
+  const coarse = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0;
+  const cores = navigator.hardwareConcurrency || 8, mem = navigator.deviceMemory || 8;
+  const weakDevice = cores <= 4 || mem <= 4;
+  const weakGPU = lowEnd || /intel(?!.*\barc\b)|swiftshader|llvmpipe|software|basic render|mali|adreno|powervr|videocore|radeon(\(tm\))? (r[2-7]|hd|vega [3-8]\b)|geforce (mx|gt |[0-9]{3}m)/i.test(name);
+  GFX.detect = weakDevice ? 'low' : (coarse || weakGPU) ? 'medium' : 'high';
   let set = 'auto', start = GFX.detect;
   try {
     const old = localStorage.getItem('bx_q'); set = localStorage.getItem('bx_gfx') || (old === '720' ? 'low' : old === '1440' ? 'ultra' : 'auto');
@@ -7417,6 +7447,7 @@ function toMenu() {
   G.stareOn = false; G.stare = 0; G.rend = null; RP.hl = false; show('hl', false); P1.pant = P2.pant = 0;
   CROWD.fill = 1; UI.from = null; uiShow('main'); show('vs', false); show('hud', false); show('pad', false); show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false);
   camCut = true; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; setLocation(G.loc);
+  locPrefetchKick();   // #47: in idle, prebuild the place of the next fight (17_loc_load.js)
   showP2(false);   // the menu shows the player's man alone (startFight brings the opponent back)
 }
 const NAMES = ['Грек', 'Молот', 'Кабан', 'Шрам', 'Лом', 'Бизон', 'Кувалда', 'Седой'];
@@ -8396,21 +8427,29 @@ function hudUpdate(dt) {
 /* render resolution: a computer renders at the height of the graphics preset (GFX.h; a 5K retina window would otherwise push ~11 Mpx
    through AO + bloom); a phone gets a pixel-ratio cap from the preset. In 'auto' the height and then the preset step down with the frame time */
 const TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || (navigator.maxTouchPoints > 0 && !(window.matchMedia && matchMedia('(hover: hover)').matches));
-let qH = GFX.h; const DR = { acc: 0, n: 0, good: 0, bad: 0, wait: 0, upNeed: 6, lastUp: -1e9 };
+let qH = GFX.h; const DR = { acc: 0, n: 0, good: 0, bad: 0, wait: 0, upNeed: 6, lastUp: -1e9, slow: 0, lastDown: -1e9 };
 const resMax = () => TOUCH ? GFX.h : Math.min(GFX.h, VH * Math.max(1, window.devicePixelRatio || 1));   // the tallest frame this preset gives on this screen
 function applyRes() {
   const dpr = window.devicePixelRatio || 1, pr = TOUCH ? Math.max(0.5, Math.min(dpr, GFX.tpr) * Math.min(1, qH / GFX.h)) : clamp(qH / VH, 0.4, Math.max(1, dpr));
   renderer.setPixelRatio(pr); composer.setPixelRatio(pr); renderer.setSize(VW, VH, false); composer.setSize(VW, VH);
 }
-/* auto: the average frame stays above 22 ms for 3 s → first the render height goes down (to 75 % of the preset's), then the preset itself.
+/* auto: the average frame stays above 20 ms (50 fps) for 3 s → first the render height goes down (to 75 % of the preset's), then the preset itself.
    The height may come back when there is headroom (and waits twice as long after every attempt that did not hold); the preset never climbs
    back on its own, so nothing ping-pongs. The level reached is remembered for the next start (choosing «авто» in the menu again forgets it). */
 function resTick(dt) {
   if (GFX.set !== 'auto' || G.state === 'menu' || dt > 0.25 || dt <= 0 || document.hidden) return;
+  /* Stage 2 (#47): 5 s in a row below 40 fps → step the whole preset down once (a cooldown stops it cascading in one stall).
+     A preset the user picked in settings is never touched — this whole function is skipped above when GFX.set !== 'auto'. */
+  if (dt > 1 / 40) DR.slow += dt; else DR.slow = 0;
+  if (DR.slow >= 5 && G.real - DR.lastDown > 8) {
+    DR.slow = 0; DR.lastDown = G.real;
+    const li = GFX_ORDER.indexOf(GFX.level);
+    if (li > 0) { applyGfx(GFX_ORDER[li - 1]); DR.wait = 2; try { localStorage.setItem('bx_gfx_auto', GFX.level); } catch (_) {} }
+  }
   if (DR.wait > 0) { DR.wait -= dt; return; }   // just changed something: let the shaders compile and the frame time settle
   DR.acc += dt; DR.n++; if (DR.acc < 1) return;
   const avg = DR.acc / DR.n; DR.acc = DR.n = 0;
-  if (avg > 0.022) {
+  if (avg > 1 / 50) {   // hold ≥ 50 fps: 20 ms per frame
     DR.good = 0; if (++DR.bad < 3) return; DR.bad = 0;
     const cur = Math.min(qH, resMax()), floor = Math.max(540, GFX.h * 0.75), li = GFX_ORDER.indexOf(GFX.level);
     if (G.real - DR.lastUp < 15) DR.upNeed = Math.min(DR.upNeed * 2, 48);   // the last step up did not hold
@@ -8990,19 +9029,34 @@ const LOCS = {
   },
 };
 let LOC = LOCS.gym;
-/* switch the location: build its set on first use, show it (and the ring props if it has a ring), retune the shared lights */
+/* #47 (stage 2, discussion): timings of a cold build for __perf.locReport(). The canvasTex wrapper in 17_loc_load.js
+   accumulates into .tex/.texN while .active is set; .last is the last build; .noTrim suspends the low-preset cache cap
+   while the report forces rebuilds. */
+const LOCPROF = { last: null, active: false, tex: 0, texN: 0, noTrim: false };
+let LOCSTAMP = 0;   // last-used stamp for the low-preset LRU cache
+/* switch the location: build its set on first use, show it (and the ring props if it has a ring), retune the shared lights.
+   The set is built once and then only hidden/shown (LOC.group is the cache); on low at most 2 stay resident (locTrim, 17). */
 function setLocation(id) {
   const L = LOCS[id] || LOCS.gym, was = LOC; LOC = L;
-  if (!L.group) { L.group = L.build(); ARENA.add(L.group); }
+  if (!L.group) {
+    const b0 = performance.now(); LOCPROF.tex = 0; LOCPROF.texN = 0; LOCPROF.active = true;
+    let g; try { g = L.build(); } finally { LOCPROF.active = false; }
+    L.group = g; ARENA.add(g);
+    LOCPROF.last = { id: L.id, build: +(performance.now() - b0).toFixed(1), tex: +LOCPROF.tex.toFixed(1), texN: LOCPROF.texN };
+    locBusyFlash();   // a cold build is a brief wait: «Готовим площадку…» (17_loc_load.js)
+  }
+  L.stamp = ++LOCSTAMP;
   for (const o of Object.values(LOCS)) { if (o.group) o.group.visible = o === L; for (const w of o.world || []) w.visible = o === L; }
   RINGSET.visible = L.ring;
   if (was !== L && was.leave) was.leave(); if (L.enter) L.enter();   // a location that moves or hides shared things puts them back (13e_loc_boxgym.js)
   const li = L.light; scene.background.set(li.bg); scene.fog.color.set(li.fog[0]); scene.fog.near = li.fog[1]; scene.fog.far = li.fog[2]; renderer.toneMappingExposure = li.exposure;
   hemi.color.set(li.hemi[0]); hemi.groundColor.set(li.hemi[1]); hemi.intensity = li.hemi[2];
   for (const [l, v] of [[key, li.key], [rim, li.rim], [rim2, li.rim2], [fill, li.fill]]) { l.color.set(v[0]); l.intensity = v[1]; }
+  gfxLights(GFX.level);   // #47: a location rebuilds its accent lights — re-apply the low-preset light budget after retuning
   if (was !== L) FX.clearFloor();   // floor stains belong to the floor they fell on
   sfx.place(L.id);   // its ambience and the echo of its walls (06_fx_sound.js)
   ARENA.updateMatrixWorld(true);
+  locTrim();   // #47: on low keep at most 2 built sets (evict the least-recently-used, never the current one)
 }
 function locSync() { if (LOC.sync && LOC.group) LOC.sync(); }
 /* ───────── location «Шины и огонь»: a night yard in an industrial zone ─────────
@@ -10435,7 +10489,7 @@ LOCS.boxgym = {
     if (bag !== this.bagOn) this.place(bag);
     g.updateWorldMatrix(true, false); const M = g.matrixWorld, cl = _bgC.copy(cam).applyMatrix4(_bgI.copy(M).invert());   // the camera in floor coordinates
     const inside = cl.x > X0 + 0.15 && cl.x < X1 && cl.z > Z0 && cl.z < Z1 && cl.y < H;
-    this.mir.visible = inside && GFX.level !== 'low'; this.flat.visible = !this.mir.visible;
+    this.mir.visible = inside && (GFX.level === 'high' || GFX.level === 'ultra'); this.flat.visible = !this.mir.visible;   // #47: mirror only on high
     // the ring's lamps: out of the way of the top-down replay shot; in the drill the whole ring goes when the camera is over it
     const over = bag && cl.x < 3.7 && Math.abs(cl.z) < 4.2;
     RINGSET.visible = !over; this.plat.visible = !over; this.rig.visible = !over && cl.y < 3.5;
@@ -10849,7 +10903,7 @@ LOCS.metro = {
       if (h !== c.h) { c.h = h; this.colMesh.setMatrixAt(i, h ? this.zero : c.mat); ch = true; } });
     if (ch) this.colMesh.instanceMatrix.needsUpdate = true;
     this.ceil.visible = this.ceilM.visible = cam.y < 4.0;
-    this.mir.visible = GFX.level !== 'low'; this.uRefl.value = this.mir.visible ? 1 : 0;
+    this.mir.visible = GFX.level === 'high' || GFX.level === 'ultra'; this.uRefl.value = this.mir.visible ? 1 : 0;   // #47: no mirror floor below high
     this.mirU.uMirI.value.copy(M).invert(); this.mirU.uMirC.value.copy(cam).applyMatrix4(this.mirU.uMirI.value);
 
     /* the train: its clock is the crowd's (stops with the pause) */
@@ -10892,8 +10946,10 @@ const _mtM = new M4();
    sleeves are painted per face (tags). Colours are packed per instance (sRGB bytes in a float), build / belly / height vary too.
    The CPU only keeps a few numbers per person (excitement, head yaw, recoil, fade, wince, awe) and packs the visible ones: the crowd
    is split into sectors that are frustum-culled, and whoever stands between the camera and the fighters is dissolved (dither).
-   Density follows GFX.crowd (low ≈ 0.3 of the people, high = all). Reactions come from EVT (07_state_replay_hits.js). */
-const CROWD = { u: { uT: { value: 0 }, uMood: { value: 0.15 }, uPose: { value: null } }, geo: null, mat: null, blobMat: null, blobs: [], mood: 0.15, heat: 0, fill: 1 };   // fill: the share of the crowd that came (a career fight sets it, startFight)
+   Density follows GFX.crowd (0.4 on low, 0.7 on medium, all on high), and the rank sort drops the far rows first. Stage 2 (#47):
+   below high the whole figure also switches to a reduced 918-triangle index (crowdLowIdx), and on low uStill freezes the idle
+   vertex animation while poses and reactions still come from iDyn. Reactions come from EVT (07_state_replay_hits.js). */
+const CROWD = { u: { uT: { value: 0 }, uMood: { value: 0.15 }, uPose: { value: null }, uStill: { value: 0 } }, geo: null, lowIdx: null, mat: null, blobMat: null, blobs: [], mood: 0.15, heat: 0, fill: 1 };   // fill: the share of the crowd that came (a career fight sets it, startFight); lowIdx: the reduced figure's index (#47)
 // bits of the instance mask (bit n ↔ accessory number n in the geometry; BUZZ, OPEN and BALA only repaint faces)
 const CW_HAIR = 2, CW_CAP = 4, CW_HOOD = 8, CW_BALA = 16, CW_SKULL = 32, CW_PHONE = 64, CW_CRATE = 128, CW_BUZZ = 256, CW_AFRO = 512, CW_BUN = 1024, CW_BEANIE = 2048, CW_HOODDN = 4096, CW_OPEN = 8192;
 const CROWD_LOOK = {
@@ -10938,6 +10994,10 @@ const CW_POSES = [
 ];
 const CW_ID = {}; CW_POSES.forEach((p, i) => { CW_ID[p[0]] = i; });
 CROWD.u.uPose.value = new Float32Array(CW_POSES.flatMap(p => [...p[1], ...(p[2] || p[1]), ...p[3]]));
+/* Stage 2 (#47): on low the crowd keeps its poses and its reactions to the fight, but stops drifting / swaying on its own —
+   uStill freezes the vertex shader's clock. applyGfx() already ran at boot, so set the initial value here as well. */
+GFX.onChange.push(g => { CROWD.u.uStill.value = g.level === 'low' ? 1 : 0; });
+CROWD.u.uStill.value = GFX.level === 'low' ? 1 : 0;
 
 /* the figure in its rest pose: 1.76 m, feet at y = 0, facing +z, left arm at +x, arms hanging. Vertex attributes:
    aP = (chain: 0 static, 1 trunk, 2 head, 3 / 4 left / right arm, 5 / 6 left / right leg; accessory number (0 = always shown, −n = hidden
@@ -11055,10 +11115,24 @@ function crowdGeo() {
   return g;
 }
 
+/* Stage 2 (#47): a lighter crowd figure for the cheap presets. The full 1200-triangle figure carries every optional accessory
+   (hair, afro, bun, cap, beanie, hood, balaclava sockets, phone, crate); the shader collapses the ones a person does not wear
+   into degenerate triangles, but they are still submitted. Keep only the always-drawn body (832 tris), brows / mouth (6),
+   short hair (68, the most common head) and the crate under the back rows (12 — without it they would float): 918 tris.
+   Same attributes and same vertex shader, so colours, poses and reactions are unchanged. */
+function crowdLowIdx(base) {
+  const src = base.index.array, ap = base.attributes.aP.array, keep = [];
+  for (let i = 0; i < src.length; i += 3) {
+    const a = ap[src[i] * 4 + 1];
+    if (a === 0 || a === -4 || a === 1 || a === 7) keep.push(src[i], src[i + 1], src[i + 2]);
+  }
+  return new src.constructor(keep);
+}
+
 const CROWD_VP = /* glsl */`
 #ifdef USE_INSTANCING
 attribute vec4 aP, aQ, iVar, iVar2, iDyn, iCol, iCol2; attribute vec2 iDyn2;
-uniform float uT, uMood; uniform vec4 uPose[${CW_POSES.length * 3}];
+uniform float uT, uMood, uStill; uniform vec4 uPose[${CW_POSES.length * 3}];
 vec3 cwRx(vec3 p, float a) { float c = cos(a), s = sin(a); return vec3(p.x, p.y * c + p.z * s, p.z * c - p.y * s); }   // a > 0: a hanging arm swings forward, an upright trunk leans back
 vec3 cwRy(vec3 p, float a) { float c = cos(a), s = sin(a); return vec3(p.x * c + p.z * s, p.y, p.z * c - p.x * s); }
 vec3 cwRz(vec3 p, float a) { float c = cos(a), s = sin(a); return vec3(p.x * c - p.y * s, p.x * s + p.y * c, p.z); }
@@ -11075,7 +11149,7 @@ const CROWD_VS = /* glsl */`
 vec3 cwP = position, cwN = normal; vEm = vec3(0.0); vFade = 1.0; vObj = position; vCl = 0.0;
 #ifdef USE_INSTANCING
 if (iVar.x > 2.5) {
-  float ph = iVar.x - 3.0, ch = aP.x, sl = aP.z, t = uT, ex = smoothstep(0.0, 1.0, iDyn.x), rec = iDyn.z, wn = iDyn2.x, aw = iDyn2.y;
+  float ph = iVar.x - 3.0, ch = aP.x, sl = aP.z, t = uT * (1.0 - uStill), ex = smoothstep(0.0, 1.0, iDyn.x), rec = iDyn.z, wn = iDyn2.x, aw = iDyn2.y;   // #47: uStill freezes the idle animation on low; poses / reactions still come from iDyn
   float h1 = fract(ph * 7.31), h2 = fract(ph * 13.77), h3 = fract(ph * 29.3), h4 = fract(ph * 53.9);
   float tee = step(31.5, iVar.z), pose = iVar.z - 32.0 * tee, mir = step(0.5, iVar2.w), wdir = 1.0 - 2.0 * mir;
   float accN = abs(aP.y), bit = accN < 0.5 ? 1.0 : cwBit(iVar.y, accN), show = aP.y < -0.5 ? 1.0 - bit : bit;
@@ -11269,6 +11343,8 @@ function makeCrowd(o = {}) {
   const base = CROWD.geo || (CROWD.geo = crowdGeo()), geo = new THREE.BufferGeometry();
   for (const k of ['position', 'normal', 'color', 'aP', 'aQ']) geo.setAttribute(k, base.attributes[k]);
   geo.setIndex(base.index);
+  if (!CROWD.lowIdx) CROWD.lowIdx = new THREE.BufferAttribute(crowdLowIdx(base), 1);
+  let lod = '';   // #47: 'lod' = the 918-tri figure on low / medium, 'full' = 1200 tris above them
   const ia = (name, sz) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(N * sz), sz); a.setUsage(THREE.DynamicDrawUsage); geo.setAttribute(name, a); return a; };
   const aCol = [ia('iCol', 4), ia('iCol2', 4)], aVar = [ia('iVar', 4), ia('iVar2', 4)], aDyn = ia('iDyn', 4), aDyn2 = ia('iDyn2', 2);
   if (!CROWD.mat) {
@@ -11294,6 +11370,8 @@ function makeCrowd(o = {}) {
     },
     update(dt) {
       t += dt; g.updateWorldMatrix(true, false); camera.updateMatrixWorld();
+      const want = GFX.level === 'low' || GFX.level === 'medium' ? 'lod' : 'full';
+      if (want !== lod) { lod = want; geo.setIndex(want === 'lod' ? CROWD.lowIdx : base.index); }   // #47: cheaper figure below high
       const M = g.matrixWorld, e = M.elements, cam = camera.position; _cwI.copy(M).invert();
       _cwFr.setFromProjectionMatrix(_cwM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
       for (const G of groups) G.vis = G.n > 0 && _cwFr.intersectsSphere(_cwS.copy(G.sphere).applyMatrix4(M));
@@ -11529,7 +11607,15 @@ function buildQuick() {
   if (!locOpen(G.loc)) G.loc = 'gym';
   for (const L of Object.values(LOCS)) { if (L.train) continue;   // the training gym is not a place for fights; a place can wait for followers (LOC_FANS, 15_social.js)
     const open = locOpen(L.id), b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${open ? L.desc || '' : '🔒 от ' + numF(LOC_FANS[L.id]) + ' подписчиков'}</small>`; b.setAttribute('aria-pressed', String(G.loc === L.id)); b.disabled = !open;
-    b.onclick = () => { G.loc = L.id; setLocation(L.id); save(); for (const o of box.children) o.setAttribute('aria-pressed', String(o === b)); };
+    // #47: hover prebuilds the place while the player is still reading the list; a cold click first paints the
+    // «Готовим площадку…» pill, then builds on the next macrotask so the frozen frame is never silent.
+    if (open) b.addEventListener('pointerenter', () => locPrefetchOne(L.id));
+    b.onclick = () => {
+      G.loc = L.id; save(); for (const o of box.children) o.setAttribute('aria-pressed', String(o === b));
+      const cold = !LOCS[L.id].group;
+      if (cold) locBusy(true);
+      setTimeout(() => { try { setLocation(L.id); } catch (e) { console.error(e); } finally { if (cold) locBusy(false); } }, 0);
+    };
     box.appendChild(b);
   }
 }
@@ -11856,4 +11942,253 @@ function socMenu() { const l = $('soc-lbl'), S = PROF.soc; if (l) l.textContent 
 window.__soc = { get S() { return PROF.soc; }, SOC, SPONSORS, LOC_FANS, socGain, socDM, socSign, socAccept, socRender,
   sim(win, how = 'dec', kd = 0) { P1.fs.land = 40; P1.fs.thr = 90; P1.fs.eva = 6; P1.fs.kd = kd; P2.fs.land = 30; P2.fs.thr = 80; if (G.mode !== 'career') G.mode = 'quick'; if (how !== 'dec') G.round = 2; fightOver(win, false, how); },
   fans(n) { PROF.soc.fans = n; PROF.soc.hist.push(n); save(); socMenu(); }, dm: socDM };
+/* ───────── performance measurement tool: window.__perf.report() ─────────
+   Stage 2 (#47): a reproducible before/after table for the phone presets. For every location × graphics preset it measures, over a
+   number of rendered frames, the triangles and draw calls the whole frame costs (scene + AO/bloom/FXAA/full-screen passes and shadow
+   maps are all counted, because renderer.info.autoReset = false), the number of resident geometries/textures and the average frame
+   time. Everything is measured from one pinned, representative fight camera so the numbers are comparable between presets.
+   Usage (console or the js:// shot scenario):
+     __perf.report()                                   → { rows, csv, table }  (all locations, low/medium/high, 120 frames)
+     __perf.report({ frames: 8 })                     → a quicker pass for iteration
+     __perf.report({ locs: ['parking','metro'], levels: ['low','high'] })
+   The tool restores the location, preset, crowd fill and camera when it is done. */
+(function () {
+  const ALL_LOCS = ['gym', 'parking', 'tires', 'yard', 'warehouse', 'boxgym', 'metro'];
+  const CAM = { p: [0, 1.15, 4.7], l: [0, 0.93, 0] };   // the mid-fight camera (world metres, fighters face each other along x)
+  const pad = (s, n) => String(s).padStart(n);
+
+  function perfReport(opts) {
+    opts = opts || {};
+    const locs = opts.locs || ALL_LOCS, levels = opts.levels || ['low', 'medium', 'high'];
+    const frames = Math.max(1, opts.frames || 120), dt = 1 / 60;
+    // triangles / draw calls do not depend on resolution, so by default we render the timed frames at a small pixel ratio —
+    // this keeps the post-processing (AO / bloom) cheap on software renderers. Pass shrink:1 to time at the preset's real size.
+    const shrink = opts.shrink === undefined ? 0.4 : (opts.shrink === false ? 1 : opts.shrink);
+    // save everything we are about to touch
+    const save = {
+      loc: G.loc, state: G.state, level: GFX.level, set: GFX.set, fill: CROWD.fill,
+      hold: window.__camHold, qH: qH, pr: renderer.getPixelRatio(),
+    };
+    const setMeasurePR = () => { if (shrink >= 1) return; renderer.setPixelRatio(shrink); composer.setPixelRatio(shrink); renderer.setSize(VW, VH, false); composer.setSize(VW, VH); };
+    const rows = [];
+    try {
+      // a stable "in the fight" state: crowd active, everyone came, no cutscene camera
+      G.state = 'fight'; G.paused = false; CROWD.fill = 1;
+      window.__camHold = CAM; camUpdate(dt);   // pins camera.position / camP / camL via the documented debug hook
+      for (const loc of locs) {
+        G.loc = loc; setLocation(loc);
+        for (const level of levels) {
+          applyGfx(level); setMeasurePR();   // applyGfx → applyRes sets the preset's pixel ratio; override it for the timed frames
+          // let the location's sync() apply particle budgets and the crowd's update() apply the density budget, and let any
+          // shader recompilation (shadow filter / MSAA change) happen before the timed frames
+          for (let s = 0; s < 4; s++) { camUpdate(dt); locSync(); if (LOC.crowd) LOC.crowd.update(dt); }
+          for (let w = 0; w < 2; w++) renderFrame();
+          let tris = 0, calls = 0, geoms = 0, textures = 0, ms = 0;
+          for (let i = 0; i < frames; i++) {
+            const a = performance.now();
+            renderFrame();
+            ms += performance.now() - a;
+            const info = renderer.info;
+            tris += info.render.triangles; calls += info.render.calls;
+            geoms = info.memory.geometries; textures = info.memory.textures;
+          }
+          rows.push({ loc, level,
+            tris: Math.round(tris / frames), calls: Math.round(calls / frames),
+            geoms, textures, ms: +(ms / frames).toFixed(2) });
+        }
+      }
+    } finally {
+      // put the game back exactly as we found it
+      G.state = save.state; CROWD.fill = save.fill; window.__camHold = save.hold;
+      GFX.set = save.set; applyGfx(save.level); qH = save.qH; applyRes();
+      G.loc = save.loc; setLocation(save.loc);
+    }
+    const head = 'локация      пресет   треугольники  вызовы  геометрии  текстуры   кадр, мс';
+    const line = '───────────  ───────  ────────────  ──────  ──────────  ─────────  ─────────';
+    const table = [head, line].concat(rows.map(r =>
+      pad(r.loc, 11) + '  ' + pad(r.level, 7) + '  ' + pad(r.tris, 12) + '  ' + pad(r.calls, 6) + '  '
+      + pad(r.geoms, 10) + '  ' + pad(r.textures, 9) + '  ' + pad(r.ms, 8))).join('\n');
+    const csv = 'location,preset,triangles,calls,geometries,textures,frame_ms\n'
+      + rows.map(r => [r.loc, r.level, r.tris, r.calls, r.geoms, r.textures, r.ms].join(',')).join('\n');
+    return { rows, csv, table };
+  }
+  window.__perf = { report: perfReport, CAM };
+})();
+/* ───────── Stage 2 (#47), discussion: fast, hitch-free location switching ─────────
+   The complaint was that entering a fight / picking a new place froze for a moment. A location set is expensive to make
+   (procedural geometry + many canvas textures) and used to be built on the very frame the player pressed «Бой». Here:
+     1. the built set was already cached (13_locations.js); on low it is now capped at 2 resident sets (locTrim, LRU,
+        eviction frees only the resources that the set owns — crowd geometry/materials/attributes are shared and kept);
+     2. after the menu settles we prebuild in the background, one location per idle macrotask, the place of the NEXT
+        fight (careerLoc() for a career, G.loc for a quick fight, the gym for sparring / the bag) and warm its shaders
+        with renderer.compileAsync; hovering a place in the quick-fight list prebuilds that one on demand;
+     3. a cold build that still has to happen shows «Готовим площадку…» instead of a silent frozen frame.
+   Debug: window.__loc = { prefetch, kick, next, dispose, warm, busy, cold, report }; __perf.locReport() prints the table. */
+const LOC_IDS = ['gym', 'parking', 'tires', 'yard', 'warehouse', 'boxgym', 'metro'];
+
+/* instrument canvasTex once (a hoisted function declaration in boxer.html, → a mutable module binding). LOCPROF.active
+   is true only while a set is being built, so outside a build this costs one boolean check. The numbers go into
+   LOCPROF.last, which both setLocation() and __perf.locReport() expose. */
+const _canvasTex0 = canvasTex;
+canvasTex = function (w, h, draw) {
+  if (!LOCPROF.active) return _canvasTex0(w, h, draw);
+  const t = performance.now(), r = _canvasTex0(w, h, draw);
+  LOCPROF.tex += performance.now() - t; LOCPROF.texN++; return r;
+};
+
+function locBusy(on) {
+  const el = $('loc-busy'); if (!el) return;
+  el.hidden = !on || !$('loading').hidden;   // never cover the boot loading screen
+}
+let locBusyT = 0;
+function locBusyFlash() {   // one shared timer, so several cold builds in a row do not fight over the toast (13_locations.js)
+  locBusy(true); clearTimeout(locBusyT); locBusyT = setTimeout(() => locBusy(false), 500);
+}
+
+/* GPU objects shared by EVERY location: the crowd figure (CROWD.geo + its attributes), the reduced index, the two
+   crowd materials and their blob texture. Freeing any of them on an eviction would blank the other locations. */
+function locShared() {
+  const s = new Set([CROWD.mat, CROWD.blobMat, CROWD.geo, CROWD.lowIdx]);
+  if (CROWD.geo) { if (CROWD.geo.index) s.add(CROWD.geo.index); for (const k in CROWD.geo.attributes) s.add(CROWD.geo.attributes[k]); }
+  if (CROWD.blobMat && CROWD.blobMat.map) s.add(CROWD.blobMat.map);
+  return s;
+}
+/* Free ONE built set: detach its group, remove its scene-level lights / puffs, and dispose what it owns. three's
+   geometry.dispose() removes the GL buffer of EACH attribute — a crowd geometry borrows its attributes from
+   CROWD.geo, so any geometry that references a shared attribute is deliberately left alone (small CPU leak, no
+   broken crowds). Owned canvas textures are found on the owned materials and in their ShaderMaterial uniforms. */
+function locDispose(L) {
+  const g = L.group; if (!g) return;
+  const shared = locShared(), own = new Set(), dead = new Set();
+  const collect = o => {
+    dead.add(o);
+    const mats = !o.material ? [] : (Array.isArray(o.material) ? o.material : [o.material]);
+    const geo = o.geometry;
+    if (geo && !shared.has(geo) && !shared.has(geo.index) && !Object.values(geo.attributes).some(a => shared.has(a))) own.add(geo);
+    for (const m of mats) {
+      if (!m || shared.has(m)) continue;
+      own.add(m);
+      for (const v of Object.values(m)) {
+        if (v && v.isCanvasTexture && !shared.has(v)) own.add(v);
+        else if (v && typeof v === 'object' && !Array.isArray(v))   // ShaderMaterial.uniforms → { value: tex }
+          for (const u of Object.values(v)) if (u && u.value && u.value.isCanvasTexture && !shared.has(u.value)) own.add(u.value);
+      }
+    }
+  };
+  try {
+    ARENA.remove(g);
+    g.traverse(collect);
+    for (const w of L.world || []) { dead.add(w); w.traverse && w.traverse(collect); scene.remove(w); }
+    for (const r of own) { try { r.dispose(); } catch (_) {} }
+    CROWD.blobs = CROWD.blobs.filter(b => !dead.has(b));   // floor halos / breath puffs of this location
+  } catch (e) { /* an eviction must never break the scene it is freeing */ }
+  L.group = null;
+}
+/* low: keep the current set + one spare (≤ 2). Never evict the set the player is looking at. */
+function locTrim() {
+  if (GFX.level !== 'low' || LOCPROF.noTrim) return;
+  const spare = Object.values(LOCS).filter(o => o.group && o !== LOC).sort((a, b) => (a.stamp || 0) - (b.stamp || 0));
+  while (spare.length > 1) locDispose(spare.shift());
+}
+
+/* build a set in the background (without switching LOC): hide the group and its scene-level lights. */
+function locBuildIdle(L) {
+  if (L.group) return;
+  const b0 = performance.now(); LOCPROF.tex = 0; LOCPROF.texN = 0; LOCPROF.active = true;
+  let g; try { g = L.build(); } catch (e) { console.error('locPrefetch', L.id, e); return; } finally { LOCPROF.active = false; }
+  L.group = g; ARENA.add(g); g.visible = false;
+  for (const w of L.world || []) w.visible = false;
+  LOCPROF.last = { id: L.id, build: +(performance.now() - b0).toFixed(1), tex: +LOCPROF.tex.toFixed(1), texN: LOCPROF.texN };
+  locTrim();
+}
+/* warm the shader programs for a set's own light rig. compile() gathers lights from scene.traverseVisible but prepares
+   materials from scene.traverse, so temporarily show only this location's lights (three r160). */
+function locWarm(L) {
+  if (!renderer.compileAsync) return;
+  const saved = [];
+  try {
+    if (L) for (const o of Object.values(LOCS)) {
+      if (o.group) { saved.push([o.group, o.group.visible]); o.group.visible = (o === L); }
+      for (const w of o.world || []) { saved.push([w, w.visible]); w.visible = (o === L); }
+    }
+    const p = renderer.compileAsync(scene, camera);
+    if (p && p.catch) p.catch(() => {});   // fire and forget (KHR_parallel_shader_compile keeps it off the frame where supported)
+  } catch (_) {} finally { for (const [o, v] of saved) o.visible = v; }
+}
+
+/* ── idle scheduler: one job per macrotask, so a heavy build never shares a frame with menu input ── */
+const LOCQ = []; let locIdleOn = false;
+/* only start a job in an ≥ 8 ms idle window (a build() is atomic and cannot be paused mid-way, so the chunk is one
+   location per idle macrotask); the timeout guarantees didTimeout so a busy menu never starves the queue. */
+function locYield(fn) {
+  if (!window.requestIdleCallback) { setTimeout(fn, 16); return; }
+  requestIdleCallback(d => { if (d.timeRemaining() < 8 && !d.didTimeout) locYield(fn); else fn(); }, { timeout: 1200 });
+}
+function locPump() {
+  locIdleOn = false;
+  if (!LOCQ.length) return;
+  const job = LOCQ.shift(); try { job(); } catch (e) { console.error('locJob', e); }
+  if (LOCQ.length) { locIdleOn = true; locYield(locPump); }
+}
+function locQueue(job) { LOCQ.push(job); if (!locIdleOn) { locIdleOn = true; locYield(locPump); } }
+function locNext() {
+  try {
+    if (G.mode === 'career') return careerLoc();
+    if (G.mode === 'spar' || G.mode === 'bag') return 'boxgym';
+    return G.loc || 'gym';                             // quick fight: the place picked / hovered in the list
+  } catch (_) { return G.loc || 'gym'; }
+}
+function locPrefetchOne(id) { const L = LOCS[id]; if (L && !L.group) locQueue(() => locBuildIdle(L)); }
+function locPrefetch() {
+  LOCQ.length = 0;                                   // a re-entry into the menu supersedes the old queue
+  const want = [], add = id => { if (LOCS[id] && !LOCS[id].group && !want.includes(id)) want.push(id); };
+  let car = null; try { car = careerLoc(); } catch (_) {}
+  add(car); add(locNext()); add(G.loc); add('boxgym');   // the career place, the last mode's place, the picked place, the gym
+  const order = want.slice(0, GFX.level === 'low' ? 1 : 2);   // low holds current + one spare
+  for (const id of order) locPrefetchOne(id);
+  locQueue(() => locWarm(null));                    // the menu's own first frame
+  locQueue(() => locWarm(LOCS[order[0] || locNext()]));   // the intro's first frame, with the next fight's lights
+}
+let locKickT = 0;
+function locPrefetchKick() { clearTimeout(locKickT); locKickT = setTimeout(locPrefetch, 900); }   // after the menu settles
+
+/* ── measurement: cold (build + first frame) vs warm (cached) entry, per location ── */
+function locPrograms() { return renderer.info && renderer.info.programs ? renderer.info.programs.length : 0; }
+function locReport(opts) {
+  opts = opts || {};
+  const ids = opts.locs || LOC_IDS, save = { loc: G.loc, state: G.state, hold: window.__camHold, place: sfx.place };
+  sfx.place = () => {};                            // ambience / convolver is not part of the set's build cost
+  LOCPROF.noTrim = true; G.state = 'fight'; window.__camHold = { p: [0, 1.15, 4.7], l: [0, 0.93, 0] };
+  camUpdate(1 / 60);
+  const p0 = locPrograms(), rows = [], warm = {};
+  try {
+    for (const id of ids) {
+      const L = LOCS[id]; if (!L) continue;
+      if (L.group) locDispose(L);                 // force a cold build even for an already cached / prefetched set
+      const t0 = performance.now(); setLocation(id); const cold = performance.now() - t0;
+      const f0 = performance.now(); renderFrame(); const first = performance.now() - f0;
+      const b = LOCPROF.last || {};
+      rows.push({ id, cold: +cold.toFixed(1), build: b.build || 0, tex: b.tex || 0, texN: b.texN || 0,
+        first: +first.toFixed(1), progs: locPrograms() });
+    }
+    for (const id of ids) { const t = performance.now(); setLocation(id); warm[id] = +(performance.now() - t).toFixed(2); }
+  } finally {
+    sfx.place = save.place; LOCPROF.noTrim = false;
+    G.state = save.state; window.__camHold = save.hold; setLocation(save.loc || 'gym'); locTrim();
+  }
+  for (const r of rows) r.warm = warm[r.id];
+  const pad = (s, n) => String(s).padStart(n);
+  const head = 'локация      вход(хол), мс  build, мс  canvas, мс (N)  1-й кадр, мс  повтор, мс  программ';
+  const line = '───────────  ────────────  ─────────  ─────────────  ───────────  ─────────  ─────────';
+  const table = [`шейдерных программ в начале: ${p0}`, head, line].concat(rows.map(r =>
+    pad(r.id, 11) + '  ' + pad(r.cold, 12) + '  ' + pad(r.build, 9) + '  ' + pad(`${r.tex} (${r.texN})`, 14) + '  '
+    + pad(r.first, 12) + '  ' + pad(r.warm, 10) + '  ' + pad(r.progs, 9))).join('\n');
+  const csv = 'location,cold_ms,build_ms,canvas_tex_ms,canvas_tex_n,first_frame_ms,warm_entry_ms,programs\n'
+    + rows.map(r => [r.id, r.cold, r.build, r.tex, r.texN, r.first, r.warm, r.progs].join(',')).join('\n');
+  return { p0, rows, csv, table };
+}
+if (window.__perf) window.__perf.locReport = locReport;
+Object.assign(window.__loc || (window.__loc = {}), { prefetch: locPrefetch, kick: locPrefetchKick, next: locNext,
+  dispose: locDispose, warm: locWarm, busy: locBusy, report: locReport,
+  cold: id => { const L = LOCS[id]; if (L && L.group) locDispose(L); setLocation(id); } });   // keep __loc.set/get/LOCS of dbg_extra.js
 </script>

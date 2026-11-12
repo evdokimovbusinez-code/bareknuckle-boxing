@@ -6,9 +6,12 @@ const GFX_ORDER = ['low', 'medium', 'high', 'ultra'];
 const GFX_LABEL = { auto: 'авто', low: 'низкая', medium: 'средняя', high: 'высокая', ultra: 'ультра' };
 const GFX_PRESET = {
   // h: render height · ao: GTAO samples (0 = off) at aoScale of the frame · msaa: samples of the scene target (0 = FXAA pass instead)
-  // shadow: key light map size, soft = PCFSoft · tpr: pixel-ratio cap on touch devices · simSkip: hair / shorts cloth every Nth frame
-  low:    { h: 720,  ao: 0,  aoScale: 0.5, msaa: 0, bloom: false, shadow: 1024, soft: false, tpr: 1,    simSkip: 2, particles: 0.5, crowd: 0.3 },
-  medium: { h: 900,  ao: 8,  aoScale: 0.5, msaa: 2, bloom: true,  shadow: 1024, soft: true,  tpr: 1.5,  simSkip: 1, particles: 0.8, crowd: 0.6 },
+  // shadow: key light map size (0 = no shadow pass at all), soft = PCFSoft · tpr: pixel-ratio cap on touch devices ·
+  // simSkip: hair / shorts cloth every Nth frame · particles / crowd: budgets of the secondary FX and the crowd (0..1)
+  // Stage 2 (#47), phone targets: low ≤ 150k tris / 70 calls, medium ≤ 280k / 110. GTAO's normal pass redraws the whole scene,
+  // so it is off everywhere below high; the shadow pass (a second render of every fighter) is off on low.
+  low:    { h: 720,  ao: 0,  aoScale: 0.5, msaa: 0, bloom: false, shadow: 0,    soft: false, tpr: 1,    simSkip: 2, particles: 0.3, crowd: 0.4 },
+  medium: { h: 900,  ao: 0,  aoScale: 0.5, msaa: 2, bloom: true,  shadow: 1024, soft: true,  tpr: 1.5,  simSkip: 1, particles: 0.6, crowd: 0.7 },
   high:   { h: 1080, ao: 12, aoScale: 1,   msaa: 4, bloom: true,  shadow: 2048, soft: true,  tpr: 1.75, simSkip: 1, particles: 1,   crowd: 1 },
   ultra:  { h: 1440, ao: 16, aoScale: 1,   msaa: 4, bloom: true,  shadow: 2048, soft: true,  tpr: 2,    simSkip: 1, particles: 1,   crowd: 1 },
 };
@@ -45,29 +48,50 @@ function applyGfx(level) {
   const msaa = lowEnd ? Math.min(P.msaa, 2) : P.msaa;
   if (sceneRT.samples !== msaa) { sceneRT.samples = msaa; sceneRT.dispose(); }
   fxaa.enabled = msaa === 0;
+  // shadows: off entirely on the cheapest preset (the shadow pass is a second render of every fighter — ~40–60k tris and a
+  // dozen draw calls). Toggling shadowMap.enabled changes the shader defines of every lit material, so recompile them once.
+  const shadowOn = P.shadow > 0;
+  if (renderer.shadowMap.enabled !== shadowOn || key.castShadow !== shadowOn) {
+    renderer.shadowMap.enabled = shadowOn; key.castShadow = shadowOn;
+    scene.traverse(o => { const m = o.material; if (!m) return; if (Array.isArray(m)) for (const x of m) x.needsUpdate = true; else m.needsUpdate = true; });
+  }
   const type = P.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
   if (renderer.shadowMap.type !== type) {   // the filter is compiled into every lit material
     renderer.shadowMap.type = type;
     scene.traverse(o => { const m = o.material; if (!m) return; if (Array.isArray(m)) for (const x of m) x.needsUpdate = true; else m.needsUpdate = true; });
   }
-  if (key.shadow.mapSize.x !== P.shadow) { key.shadow.mapSize.set(P.shadow, P.shadow); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
+  if (shadowOn && key.shadow.mapSize.x !== P.shadow) { key.shadow.mapSize.set(P.shadow, P.shadow); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
+  gfxLights(level);
   if (GFX.ready) { qH = GFX.h; applyRes(); }
   for (const f of GFX.onChange) f(GFX);
+}
+/* dynamic lights on low: keep the hemisphere, the key spot and one rim (3 shared lights); drop the two extra directional fills.
+   The per-location accent spots/points stay — each location already trims them on low (tires / yard / metro use `lite`) and their
+   glow is baked into emissive cards, so hiding them here would leave those scenes unlit. Called on preset change and after
+   setLocation retunes the lights. */
+function gfxLights(level) {
+  const low = level === 'low';
+  rim2.visible = !low; fill.visible = !low;
 }
 /* menu choice: 'auto' or a fixed level (saved) */
 function setGfx(v) {
   if (v !== 'auto' && !GFX_PRESET[v]) v = 'auto';
   GFX.set = v; try { localStorage.setItem('bx_gfx', v); if (v === 'auto') localStorage.removeItem('bx_gfx_auto'); } catch (_) {}
-  DR.acc = DR.n = DR.good = DR.bad = 0; DR.wait = 1; DR.upNeed = 6;
+  DR.acc = DR.n = DR.good = DR.bad = DR.slow = 0; DR.wait = 1; DR.upNeed = 6;
   applyGfx(v === 'auto' ? GFX.detect : v);
 }
 {
-  // auto starts from 'medium' on integrated / weak / mobile GPUs, otherwise from 'high'; a level the auto mode stepped down to is remembered
+  /* Stage 2 (#47): the first-launch auto choice. A phone (coarse pointer) starts at medium; a weak device — ≤4 cores or
+     ≤4 GB of RAM — starts at low; a weak/integrated GPU falls back to medium; a desktop starts at high. A level auto mode
+     later stepped down to is remembered. A level the user picked in settings always wins (set !== 'auto'). */
   let name = '';
   try { const gl = renderer.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info'); name = String((e && gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || ''); } catch (_) {}
   GFX.gpu = name;
-  const weak = lowEnd || /intel(?!.*\barc\b)|swiftshader|llvmpipe|software|basic render|mali|adreno|powervr|videocore|radeon(\(tm\))? (r[2-7]|hd|vega [3-8]\b)|geforce (mx|gt |[0-9]{3}m)/i.test(name);
-  GFX.detect = weak ? 'medium' : 'high';
+  const coarse = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0;
+  const cores = navigator.hardwareConcurrency || 8, mem = navigator.deviceMemory || 8;
+  const weakDevice = cores <= 4 || mem <= 4;
+  const weakGPU = lowEnd || /intel(?!.*\barc\b)|swiftshader|llvmpipe|software|basic render|mali|adreno|powervr|videocore|radeon(\(tm\))? (r[2-7]|hd|vega [3-8]\b)|geforce (mx|gt |[0-9]{3}m)/i.test(name);
+  GFX.detect = weakDevice ? 'low' : (coarse || weakGPU) ? 'medium' : 'high';
   let set = 'auto', start = GFX.detect;
   try {
     const old = localStorage.getItem('bx_q'); set = localStorage.getItem('bx_gfx') || (old === '720' ? 'low' : old === '1440' ? 'ultra' : 'auto');
