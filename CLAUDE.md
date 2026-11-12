@@ -12,6 +12,18 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
   placed in the right order (things it uses must be defined earlier or be hoisted functions).
 - `src/bench.js` / `src/dbg_extra.js` only go into the debug build `gtest.html` (git-ignored).
 
+## Assets (issue #43)
+- First load: `assets/pack.glb` (3.35 MB) + 13 `.webp` (2.46 MB) instead of 9 `.fbx.txt` + 13 `.jpg` (20.9 MB).
+  The GLB keeps the **exact** FBX byte streams (zlib per bufferView) plus `face.bin` — the game still parses them with
+  `FBXLoader`, so `skinTemplate`, bone names, bind matrices and face morphs are byte-for-byte the same. Only the 300 unused
+  Shape geometry bodies are stripped; their 32 kept `FACE_SHAPES` deltas live in `face.bin` (`faceShapesPacked()` in `03b_face_shapes.js`).
+- **Rebuild the pack from the original `.fbx.txt` / `.jpg`:**
+  `python3 tools/assets/convert.py` — needs Blender's `bpy` (WebP encoder). It reads `assets/`, writes `assets/pack.glb`
+  and the 13 `.webp`, prints the before/after size table. There is no other build step and no npm/gltf-transform step.
+- The old `.fbx.txt` / `.jpg` files are kept: if `pack.glb` is missing or broken, `loadPack()` (`src/assemble.py`) silently
+  falls back to them and `T.fm` is built by `faceShapes()` instead of `faceShapesPacked()`. KTX2 was not used — no
+  toktx/basisu encoder in this environment, WebP is the allowed fallback.
+
 ## Looking at the game (do this for every visual change)
 - `bash tools/shot.sh /tmp/shots/a.jpg fight 4` — quick fight, 4 s in. `... menu` — the menu. `... js "CODE"` — run CODE first
   (`window.__g` exposes `G, P1, P2, camera, scene, ARENA, ...`; `__tick(n, dt)` steps the sim, e.g. `__tick(300, 1/60)`).

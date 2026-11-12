@@ -51,7 +51,31 @@ function fbxShapes(buf, meshName, want) {
 }
 // the face rig of the welded body geometry: aFM (slot per vertex) + the delta texture; null when the file has none of the shapes
 function faceShapes(buf, geo) {
-  const t0 = performance.now(), S = fbxShapes(buf, 'CC_Base_Body', FACE_SHAPES), NS = FACE_SHAPES.length, cp = new Float32Array(S.cp), ncp = cp.length / 3, MIN = 0.01;   // cm
+  return faceShapesFrom(fbxShapes(buf, 'CC_Base_Body', FACE_SHAPES), geo);
+}
+// issue #43: the packed build strips the FBX Shape bodies and carries the same sparse
+// deltas in assets/face.bin (BKFC: f32 control points, then i32 Indexes + f64 Vertices
+// per shape).  Both paths feed the identical faceShapesFrom(), so aFM / the delta
+// texture come out bit-for-bit the same.
+function faceShapesPacked(buf, geo) {
+  const dv = new DataView(buf);
+  if (dv.getUint32(0, true) !== 0x43464b42) throw new Error('face.bin: bad magic');   // 'BKFC'
+  const NS = dv.getUint32(4, true), ncp = dv.getUint32(8, true);
+  let o = 12;
+  const cp = new Float32Array(buf.slice(o, o + ncp * 12)); o += ncp * 12;
+  const shapes = {};
+  for (let si = 0; si < NS; si++) {
+    if (!dv.getUint32(o, true)) { o += 4; continue; }
+    o += 4;
+    const nI = dv.getUint32(o, true), nV = dv.getUint32(o + 4, true); o += 8;
+    const I = new Int32Array(buf.slice(o, o + nI * 4)); o += nI * 4;
+    const V = new Float64Array(buf.slice(o, o + nV * 8)); o += nV * 8;
+    shapes[FACE_SHAPES[si]] = { I, V };
+  }
+  return faceShapesFrom({ cp, shapes }, geo);
+}
+function faceShapesFrom(S, geo) {
+  const t0 = performance.now(), NS = FACE_SHAPES.length, cp = new Float32Array(S.cp), ncp = cp.length / 3, MIN = 0.01;   // cm
   const slot = new Int32Array(ncp).fill(-1); let n = 0;
   const big = (V, j) => Math.hypot(V[3 * j], V[3 * j + 1], V[3 * j + 2]) >= MIN;
   for (const nm of FACE_SHAPES) { const s = S.shapes[nm]; if (s) for (let j = 0; j < s.I.length; j++) if (slot[s.I[j]] < 0 && big(s.V, j)) slot[s.I[j]] = n++; }

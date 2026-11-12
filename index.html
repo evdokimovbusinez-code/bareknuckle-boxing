@@ -625,6 +625,11 @@ window.__errs = [];
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+// compressed first-load pack: GLTFLoader reads the GLB container, meshopt / KTX2 decoders
+// stay registered for future meshopt- or KTX2-encoded packs (three 0.160, same CDN).
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
@@ -739,6 +744,7 @@ let loaded = 0;
 const bar = $('ld-bar'), ldText = $('ld-text');
 const bump = n => { loaded += n; bar.style.width = Math.min(100, loaded / TOTAL * 100).toFixed(1) + '%'; };
 async function fetchBuf(url) {
+  if (PACK && PACK[url]) { bump(PACK[url].byteLength); return PACK[url]; }
   const res = await fetch(url); if (!res.ok) throw new Error(`${url}: ${res.status}`);
   if (!res.body) { const t = await res.text(); bump(t.length); const bin = atob(t), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b.buffer; }
   const reader = res.body.getReader(), chunks = []; let n = 0;
@@ -755,9 +761,40 @@ manager.setURLModifier(u => /\.(jpg)(\?|$)/i.test(u) || u.startsWith('data:') ||
 const fbx = new FBXLoader(manager);
 const texLoader = new THREE.TextureLoader();
 function loadTex(name, srgb) {
-  return new Promise((res, rej) => texLoader.load(`assets/${name}.jpg`, t => {
+  return new Promise((res, rej) => texLoader.load(`assets/${name}.${PACK ? 'webp' : 'jpg'}`, t => {
     t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.flipY = true; bump(330000); res(t);
   }, undefined, rej));
+}
+
+/* ───────── compressed first-load pack (issue #43) ─────────
+   assets/pack.glb is a glTF 2.0 container: every bufferView holds a zlib-compressed
+   EXACT FBX byte stream, plus the face-shape deltas lifted out of the boxer FBX.
+   GLTFLoader + MeshoptDecoder + KTX2Loader (basis transcoder from the same
+   three@0.160 CDN) parse the container; unzlibSync inflates each view.  Downstream
+   fbx.parse / skinTemplate / bone names / aFM are untouched, hence one-to-one.
+   Missing or broken pack.glb -> PACK stays null and the .fbx.txt + .jpg fallback runs. */
+let PACK = null, FACE_PACK = null;
+const packGLTF = new GLTFLoader();
+packGLTF.setMeshoptDecoder(MeshoptDecoder);
+try {
+  packGLTF.setKTX2Loader(new KTX2Loader()
+    .setTranscoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/basis/')
+    .detectSupport(renderer));
+} catch (e) { console.warn('KTX2:', e); }
+async function loadPack() {
+  try {
+    const res = await fetch('assets/pack.glb'); if (!res.ok) throw new Error(String(res.status));
+    const ab = await res.arrayBuffer(); bump(ab.byteLength);
+    const g = await new Promise((ok, no) => packGLTF.parse(ab, '', ok, no));
+    const j = g.parser.json, map = j.extras && j.extras.pack;
+    if (!map || !j.extras.zlib) throw new Error('pack.glb: no manifest');
+    const out = {};
+    await Promise.all(Object.entries(map).map(async ([k, i]) => {
+      const bv = await g.parser.getDependency('bufferView', i);
+      out[k] = new Uint8Array(unzlibSync(new Uint8Array(bv))).buffer;
+    }));
+    PACK = out; FACE_PACK = out['assets/face.bin'] || null;
+  } catch (e) { console.warn('GLB pack unavailable — FBX fallback:', e); PACK = null; FACE_PACK = null; }
 }
 
 const SSS_CHUNK = THREE.ShaderChunk.lights_physical_pars_fragment.replace(
@@ -1806,6 +1843,7 @@ function paintShorts(c, S) {
 /* ───────── templates: parse once, share geometry between both fighters ───────── */
 function firstBones(obj) { const by = {}; obj.traverse(o => { if (o.isBone && !by[o.name]) by[o.name] = o; }); return by; }
 async function buildTemplates() {
+  await loadPack();   // GLB pack (issue #43); on failure PACK stays null and the FBX/JPG fallback runs below
   const bufs = {};
   await Promise.all(Object.entries(FILES).map(async ([k, u]) => { bufs[k] = await fetchBuf(u); }));
   const tex = {};
@@ -1914,7 +1952,7 @@ async function buildTemplates() {
 
   skinTemplate(body);   // rest-pose data for tattoos, palms / soles mask (04h_skin_tattoo.js)
   // face blend shapes, read from the FBX itself (the loader's morphs are broken and were dropped above): 03b_face_shapes.js
-  try { T.fm = faceShapes(bufs.boxer, body.geometry); } catch (e) { console.warn('face shapes:', e); T.fm = null; }
+  try { T.fm = FACE_PACK ? faceShapesPacked(FACE_PACK, body.geometry) : faceShapes(bufs.boxer, body.geometry); } catch (e) { console.warn('face shapes:', e); T.fm = null; }
   T.cc = cc;
   T.shortsGeo = makeShorts(body);
   T.shortsNormal = shortsNormal();
@@ -3259,7 +3297,31 @@ function fbxShapes(buf, meshName, want) {
 }
 // the face rig of the welded body geometry: aFM (slot per vertex) + the delta texture; null when the file has none of the shapes
 function faceShapes(buf, geo) {
-  const t0 = performance.now(), S = fbxShapes(buf, 'CC_Base_Body', FACE_SHAPES), NS = FACE_SHAPES.length, cp = new Float32Array(S.cp), ncp = cp.length / 3, MIN = 0.01;   // cm
+  return faceShapesFrom(fbxShapes(buf, 'CC_Base_Body', FACE_SHAPES), geo);
+}
+// issue #43: the packed build strips the FBX Shape bodies and carries the same sparse
+// deltas in assets/face.bin (BKFC: f32 control points, then i32 Indexes + f64 Vertices
+// per shape).  Both paths feed the identical faceShapesFrom(), so aFM / the delta
+// texture come out bit-for-bit the same.
+function faceShapesPacked(buf, geo) {
+  const dv = new DataView(buf);
+  if (dv.getUint32(0, true) !== 0x43464b42) throw new Error('face.bin: bad magic');   // 'BKFC'
+  const NS = dv.getUint32(4, true), ncp = dv.getUint32(8, true);
+  let o = 12;
+  const cp = new Float32Array(buf.slice(o, o + ncp * 12)); o += ncp * 12;
+  const shapes = {};
+  for (let si = 0; si < NS; si++) {
+    if (!dv.getUint32(o, true)) { o += 4; continue; }
+    o += 4;
+    const nI = dv.getUint32(o, true), nV = dv.getUint32(o + 4, true); o += 8;
+    const I = new Int32Array(buf.slice(o, o + nI * 4)); o += nI * 4;
+    const V = new Float64Array(buf.slice(o, o + nV * 8)); o += nV * 8;
+    shapes[FACE_SHAPES[si]] = { I, V };
+  }
+  return faceShapesFrom({ cp, shapes }, geo);
+}
+function faceShapesFrom(S, geo) {
+  const t0 = performance.now(), NS = FACE_SHAPES.length, cp = new Float32Array(S.cp), ncp = cp.length / 3, MIN = 0.01;   // cm
   const slot = new Int32Array(ncp).fill(-1); let n = 0;
   const big = (V, j) => Math.hypot(V[3 * j], V[3 * j + 1], V[3 * j + 2]) >= MIN;
   for (const nm of FACE_SHAPES) { const s = S.shapes[nm]; if (s) for (let j = 0; j < s.I.length; j++) if (slot[s.I[j]] < 0 && big(s.V, j)) slot[s.I[j]] = n++; }
