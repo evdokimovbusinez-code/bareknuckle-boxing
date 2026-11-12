@@ -35,6 +35,15 @@ function camUpdate(dt) {
       _cp.set(lerp(mx, fx, push), lerp(1.4, 1.12 - 0.1 * (1 - drop), push), lerp(far - 0.25, kd ? 3.5 : 3.2, push));
       _cl.set(lerp(mx, fx, push), lerp(Math.max(0.62, h.y * 0.45 + 0.42), Math.max(0.46, h.y * 0.4 + 0.42), push), 0);
       k = lerp(2.2, kd ? 3 : 3.6, push);
+      if (!kd) {
+        // (issue 46) after ~1.5 s alone on the downed man, ease back to a two-shot: the winner's short
+        // gesture — arms lifting, chin up (cineLayer, 09b_cine.js) — is in frame when «Нокаут!» lands.
+        // Higher + farther than the push-in: a standing man is ~1.8 m tall, a close low camera cuts his head off.
+        const reveal = sstep(1.45, 2.25, age), two = (fx + w.x) * 0.5;
+        _cp.x = lerp(_cp.x, two, reveal); _cp.y = lerp(_cp.y, 1.5, reveal); _cp.z = lerp(_cp.z, 4.3, reveal);
+        _cl.x = lerp(_cl.x, two, reveal); _cl.y = lerp(_cl.y, 0.95, reveal);
+        k = lerp(k, 3.2, reveal);
+      }
     }
   } else {   // the fight: framed on the pair, pushed in a little when they trade up close, a slow drift so the shot never sits dead
     const mx = (P1.headNow.x + P2.headNow.x) * 0.5, sep = Math.abs(P1.headNow.x - P2.headNow.x), hurt = Math.max(P1.daze || 0, P2.daze || 0);
