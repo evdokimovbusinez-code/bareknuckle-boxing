@@ -60,6 +60,7 @@ function capSpin(defs) {
 class Ragdoll {
   constructor(F) {
     this.F = F; this.on = false; this.hitOn = false; this.tone = 1;
+    this.rxRecK = 1;   // issue 44: muscles recover slower while a series is piling up (1 normally, 1.8 from the 2nd hit on)
     const B = F.bones, up = new V3(0, 1, 0), fwd = new V3(0, 0, 1);
     const pt = k => k === '@head' ? new V3(HEAD.C.x, HEAD.C.y, HEAD.C.z) : F.mpos(B['CC_Base_' + k], new V3());   // bind pose = model rest
     this.defs = RAG_J.map(([key, parent, bone, mass, fl, sd, tw]) => {
@@ -264,10 +265,13 @@ class Ragdoll {
     this.tone = 1; this.on = true;
   }
   /* standing hit: upper body becomes physical, muscles track the animation; strength drops in the hit zone and recovers */
-  hit(impModel, pointModel, zone, power) {
+  hit(impModel, pointModel, zone, power, rx) {
     if (this.on) return;
     if (!this.hitOn) { this.mode = 'hit'; if ((window.__tw || {}).hitCannon) this.build(this.hitDefs, false); else this.buildHitX(); this.hitOn = true; this.blend = 1; }
     this.since = 0; this.blend = 1;
+    // issue 44: a series keeps the struck part soft for longer — the impulse and the strength drop already scale with `power`,
+    // which resolveHit now multiplies by the series multiplier, so only the recovery time needs the combo here.
+    this.rxRecK = rx && rx.combo >= 2 ? 1.8 : 1;
     // strength profile: on impact the struck part goes soft for a moment and comes back (a fighter stays tense — mostly the neck gives;
     // the arms shake loose a little; a body shot folds the trunk instead)
     const drop = zone === 'body' ? { chest: 0.55, waist: 0.55, neck: 0.8, head: 0.85, uarmL: 0.75, uarmR: 0.75, farmL: 0.8, farmR: 0.8 }
@@ -311,7 +315,7 @@ class Ragdoll {
       if (d.kin) { d.kA.p.copy(d.kB.p); d.kA.q.copy(d.kB.q); d.kB.q.copy(d.qa); d.kB.p.copy(d.off).applyQuaternion(d.qa).negate().add(F.mpos(d.bone, _v4)); continue; }
       const D = _qp.copy(d.p.qa).multiply(_j1q.copy(d.qPbind).invert()), R = _qc.copy(D).invert().multiply(d.qa).multiply(_j1q.copy(d.qBind).invert());
       rotVec(R, d.tgt);
-      if (this.since > 0.05) d.str = Math.min(1, d.str + dt / 0.3);
+      if (this.since > 0.05) d.str = Math.min(1, d.str + dt / (0.3 * this.rxRecK));
     }
     let sub = 0; const T = dt;
     this.world.step(dt, h => {
@@ -358,7 +362,7 @@ class Ragdoll {
       }
       const D = _qp.copy(d.p.qa).multiply(_j1q.copy(d.qPbind).invert()), R = _qc.copy(D).invert().multiply(d.qa).multiply(_j1q.copy(d.qBind).invert());
       rotVec(R, d.tgt);
-      if (this.since > 0.05) d.str = Math.min(1, d.str + dt / 0.28);
+      if (this.since > 0.05) d.str = Math.min(1, d.str + dt / (0.28 * this.rxRecK));
     }
     this.acc = Math.min(this.acc + dt, 6 / 120);
     while (this.acc >= 1 / 120) {

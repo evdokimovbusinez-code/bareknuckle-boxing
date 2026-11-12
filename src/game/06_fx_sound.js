@@ -204,6 +204,14 @@ const sfx = (() => {
       { const n = a.createBufferSource(), f = filt('lowpass', 780 + 420 * k, 0.9), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.018 + 0.012 * k, (0.22 + 0.26 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // muffled slap of leather on leather
       { const n = a.createBufferSource(), f = filt('lowpass', 380, 0.8), g = a.createGain(); n.buffer = noise; env(g, t, 0.002, 0.03 + 0.02 * k, (0.16 + 0.2 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.09); }   // the dull knock behind it
       const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(112 + 26 * k, t); o.frequency.exponentialRampToValueAtTime(52, t + 0.07); env(g2, t, 0.002, 0.06, (0.2 + 0.18 * k) * L); o.connect(g2).connect(out); o.start(t); o.stop(t + 0.09); },
+    /* A clean body shot forces the air out of him (issue 44): a short breath — noise through a bandpass falling
+       900 → 320 Hz, straight to master (no room echo: close to the mic), plus a faint chest thump. p = effective power. */
+    exhale(p) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.2, 1.6);
+      const n = a.createBufferSource(), f = filt('bandpass', 900, 0.7), g = a.createGain(); n.buffer = noise;
+      f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(320, t + 0.2);
+      env(g, t, 0.012, 0.22, 0.13 + 0.12 * k); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.3);
+      const o = a.createOscillator(), g2 = a.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.18);
+      env(g2, t, 0.01, 0.18, 0.06 + 0.05 * k); o.connect(g2).connect(master); o.start(t); o.stop(t + 0.25); },
     /* the heavy bag: a deep thump of 40 kg of filling (sine dropping from ~95 Hz + a low-passed burst), the slap of knuckles on
        leather on top; p = power 0.2 … 1.6 */
     bag(p) { const a = ac; if (!a) return; const t = a.currentTime, master = bus, k = clamp(p, 0.2, 1.6);
@@ -216,6 +224,8 @@ const sfx = (() => {
         for (const [m, pk, len] of [[1, 0.035, 0.07], [2.76, 0.018, 0.045], [5.4, 0.008, 0.03]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.value = Math.min(15000, f0 * m); env(g, t, 0.001, len * (0.7 + rr() * 0.6), pk * (0.35 + p)); o.connect(g).connect(bus); o.start(t); o.stop(t + 0.12); } } },
     whoosh(v = 1) { const a = ac; if (!a) return; const t = a.currentTime, n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(2200, t + 0.14); env(g, t, 0.03, 0.14, 0.16 * v); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.25); },
     bell(count) { const a = ac; if (!a) return; for (let k = 0; k < count; k++) { const t = a.currentTime + k * 0.3; for (const [fq, pk] of [[640, 0.22], [1287, 0.12], [1932, 0.07], [2580, 0.04]]) { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = fq; env(g, t, 0.003, 1.3, pk); o.connect(g).connect(master); o.start(t); o.stop(t + 1.5); } } },
+    /* (issue 45) the short «step counted» chime of the tutorial: two quiet sine notes, well under a bell */
+    ping() { const a = ac; if (!a) return; const t = a.currentTime; for (const [fq, d, pk] of [[880, 0, 0.14], [1320, 0.07, 0.11]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.value = fq; env(g, t + d, 0.002, 0.13, pk); o.connect(g).connect(master); o.start(t + d); o.stop(t + d + 0.2); } },
     count(n) { const a = ac; if (!a) return; const t = a.currentTime; for (const [fq, pk, d] of [[180, 0.5, 0.09], [1200, 0.08, 0.03]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(fq, t); o.frequency.exponentialRampToValueAtTime(fq * 0.6, t + d); env(g, t, 0.002, d, pk); o.connect(g).connect(master); o.start(t); o.stop(t + d + 0.05); } },
     /* the crowd. crowd(level): a looped murmur (noise through three voice-band filters, its loudness wandering like many people
        talking) whose level follows the reaction, 0 = nobody there. roar(p): the shout on a big shot — a swell of noise and a few voices */

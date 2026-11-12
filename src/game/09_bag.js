@@ -169,6 +169,7 @@ function cutCheck() {
   }
 }
 function stateTick(dtReal) {
+  if (window.__tutOn) tutTick(dtReal);   // (issue 45) the lesson's own clock, fresh stamina and step checks
   hlTick();
   if (G.state === 'intro') introTick(dtReal);
   else if (G.state === 'rend') rendTick(dtReal);
