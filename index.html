@@ -324,6 +324,13 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .tabs2{display:flex;gap:4px}.tabs2 button{flex:1;border:0;border-bottom:2px solid rgba(255,255,255,.14);background:none;padding:5px 4px;font-family:var(--poster);font-weight:700;font-size:clamp(13px,2.4vmin,15px);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .tabs2 button[aria-pressed="true"]{color:#fff;border-bottom-color:var(--neon)}.tabs2 button:focus{outline:none;color:var(--text)}
 .vol{display:flex;align-items:center;gap:10px;min-width:0}.vol input{width:clamp(110px,22vmin,170px);accent-color:var(--neon)}.vol b{width:38px;text-align:right;font:500 12px var(--mono)}
+/* credits screen: one CC0 source per row */
+.cr-note{font-size:12px;line-height:1.45;color:var(--muted);margin:0 0 2px}
+.cr-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:7px 9px;border-left:2px solid var(--gold);background:rgba(255,255,255,.035);text-decoration:none}
+.cr-row:hover,.cr-row:focus{border-left-color:var(--neon);background:rgba(255,255,255,.08);outline:none}
+.cr-row b{font-family:var(--poster);font-size:14px;letter-spacing:.03em;color:var(--text)}
+.cr-row span{font:500 11px var(--mono);color:var(--muted)}
+.cr-row span::after{content:' ↗';color:var(--gold)}
 .pause{display:grid;place-items:center;background:rgba(5,6,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .pbox{display:flex;flex-direction:column;align-items:center;gap:clamp(6px,2.4vmin,20px);animation:mFade .2s both}
 .ptitle.big{font-size:clamp(44px,14vmin,104px);color:transparent;-webkit-text-stroke:2px var(--neon);text-shadow:0 0 16px rgba(255,59,78,.8),0 0 56px rgba(255,59,78,.4)}
@@ -556,7 +563,10 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="tabs2" id="set-tabs"><button data-t="opt" aria-pressed="true">Параметры</button><button data-t="how">Как драться</button></div>
       <div class="pbody" data-t="opt">
         <div class="fld"><span>графика</span><div class="sw" id="o-gfx"></div><small class="note" id="gfx-note"></small></div>
-        <div class="fld row"><span>громкость</span><div class="vol"><input type="range" id="o-vol" min="0" max="100" step="5" aria-label="Громкость"><b id="vol-v"></b></div></div>
+        <div class="fld row"><span>общая громкость</span><div class="vol"><input type="range" id="o-vol" min="0" max="100" step="5" aria-label="Общая громкость"><b id="vol-v"></b></div></div>
+        <div class="fld row"><span>музыка</span><div class="vol"><input type="range" id="o-music" min="0" max="100" step="5" aria-label="Громкость музыки"><b id="music-v"></b></div></div>
+        <div class="fld row"><span>эффекты</span><div class="vol"><input type="range" id="o-sfx" min="0" max="100" step="5" aria-label="Громкость эффектов"><b id="sfx-v"></b></div></div>
+        <div class="fld row"><span>музыка в бою</span><div class="sw" id="o-music-fight"></div></div>
         <div class="fld row"><span>тряска камеры</span><div class="sw" id="o-shake"></div></div>
         <div class="fld row"><span>катсцены: стердаун, итоги раунда</span><div class="sw" id="o-cine"></div></div>
         <div class="fld row"><span>подсказка клавиш в бою</span><div class="sw" id="o-keys"></div></div>
@@ -573,7 +583,16 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
         </ul>
         <div class="keys">WASD / стрелки ходьба · ЛКМ или U джеб · ПКМ или I кросс · J K хуки (левый / правый) · N M апперкоты (левый / правый) · зажатая S/↓ + удар в корпус · зажатая W/↑ + удар силовой · Q E C уклоны · пробел блок · Esc пауза</div>
       </div>
-      <div class="pfoot"><button class="btn pri" id="set-back">Назад</button></div>
+      <div class="pfoot"><button class="btn" id="set-credits">Титры</button><button class="btn pri" id="set-back">Назад</button></div>
+    </div>
+  </div>
+
+  <!-- credits: the CC0 / public-domain recordings used by the game -->
+  <div class="ui scr" id="credits" hidden>
+    <div class="panel wide">
+      <div class="ptitle"><small>звук · музыка · лицензии</small>Титры</div>
+      <div class="pbody cr-list" id="cr-list"></div>
+      <div class="pfoot"><button class="btn pri" id="cr-back">Назад</button></div>
     </div>
   </div>
 
@@ -6563,9 +6582,11 @@ const FX = (() => {
 
 /* ───────── sound (synthesised) ───────── */
 const sfx = (() => {
-  let ac = null, noise = null, master = null, crowdG = null;   // master: everything goes through one gain — the volume of the settings screen (OPT.vol)
+  let ac = null, noise = null, master = null, top = null, crowdG = null;   // top = OPT.vol (everything), master = OPT.sfxVol (the game sounds); music goes straight to top
   let bus = null, conv = null, wet = null, amb = null, ambId = null, wantId = null; const IR = {}, BUF = {};   // bus: the punches, sent on to master and through the echo of the place (conv → wet)
-  const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } master = ac.createGain(); master.gain.value = OPT.vol; master.connect(ac.destination);
+  const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+    top = ac.createGain(); top.gain.value = OPT.vol; top.connect(ac.destination);
+    master = ac.createGain(); master.gain.value = OPT.sfxVol; master.connect(top);
     bus = ac.createGain(); conv = ac.createConvolver(); conv.normalize = false; wet = ac.createGain(); wet.gain.value = 0; bus.connect(master); bus.connect(conv).connect(wet).connect(master); const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; noise = b; } if (ac.state === 'suspended') ac.resume(); return ac; };
   const env = (g, t, a, d, peak) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
   /* ── the place: the echo of its walls and its ambience ──
@@ -6658,7 +6679,10 @@ const sfx = (() => {
     // the horn out of the tunnel before the train shows
     trainHorn() { const a = ac; if (!a) return; const t = a.currentTime + 0.3; for (const fq of [311, 370]) { const o = a.createOscillator(), f = filt('lowpass', 1100), g = a.createGain(); o.type = 'sawtooth'; o.frequency.value = fq; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.035, t + 0.06); g.gain.setValueAtTime(0.035, t + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9); o.connect(f).connect(g).connect(conv); o.start(t); o.stop(t + 1); } },
     unlock() { ctx(); if (ac && wantId) this.place(wantId); },
-    vol(v) { if (master) master.gain.value = v; },
+    vol(v) { if (top) top.gain.value = v; },                 // the master slider in settings
+    sfxVol(v) { if (master) master.gain.value = v; },        // the effects slider: leaves the music alone
+    // live nodes for the recorded-sound layer (06b_audio.js); all null until unlock()
+    _nodes() { return { ac, bus, master, top, conv, wet, noise, SPACE, IR, gain, filt, env, impulse }; },
     /* the location changed (setLocation): its echo for the punches and its ambience (cross-faded). Before the first sound of the
        game there is no audio context yet — the place is remembered and set by unlock() */
     place(id) { wantId = id; const a = ac; if (!a || id === ambId) return; ambId = id; const t = a.currentTime, S = SPACE[id] || SPACE.gym;
@@ -6742,6 +6766,236 @@ const sfx = (() => {
   };
 })();
 
+/* ───────── recorded sound layer, issue #48 ─────────
+   CC0 recordings live in one Opus sprite (assets/audio/sfx.ogg + sfx.json) and in
+   three streaming music tracks.  Nothing here runs at startup: the sprite is fetched
+   only on the first tap/keypress (the AudioContext cannot start earlier anyway) and
+   the music is an <audio> element played through MediaElementSource, never decoded.
+
+   Hybrid: a recorded hit is layered over a short synthesised sub-bass for weight,
+   and everything goes into the existing bus / convolution reverb of 06_fx_sound.js.
+   If a file is missing or fails to decode, every call falls back to the synthesis
+   that was here before — the game is never silent.  */
+const AUDIO = (() => {
+  const URL = 'assets/audio/';
+  const canOgg = (() => { try { return !!new Audio().canPlayType('audio/ogg; codecs=opus'); } catch (e) { return false; } })();
+  const ext = canOgg ? '.ogg' : '.m4a';            // Safari gets the AAC twin
+  let N = null, buf = null, man = null, rgn = {}, state = 'idle', lastPick = {};
+  let wantAmb = 'gym', prevState = null;
+  let musicEl = null, musicG = null, musicI = -1, musicStarted = false, musicWant = -1, armed = false;
+  const loops = {};                                  // key -> { src, g, name }
+  const AMBMAP = {                                  // real room tone under the synthesised bed
+    gym: null, boxgym: null,                        // the crowd loop (sfx.crowd) is the hall
+    yard: 'ambOutdoor', tires: 'ambWind', parking: 'ambIndoor',
+    warehouse: 'ambWind', metro: 'ambIndoor',
+  };
+  const CREDITS = [
+    ['Punch', 'qubodup', 'CC0', 'https://opengameart.org/content/punch'],
+    ['37 hits/punches', 'Independent.nu (ljudbank)', 'CC0', 'https://opengameart.org/content/37-hitspunches'],
+    ['Impact Sounds', 'Kenney', 'CC0', 'https://kenney.nl/assets/impact-sounds'],
+    ['10 Impact/Shield Blocks', 'StarNinjas', 'CC0', 'https://opengameart.org/content/10-impactshield-blocks'],
+    ['12 wet towel hitting/falling/punching floor sounds', 'qubodup', 'CC0', 'https://opengameart.org/content/12-wet-towel-hittingfallingpunching-floor-sounds'],
+    ['Swishes Sound Pack', 'artisticdude', 'CC0', 'https://opengameart.org/content/swishes-sound-pack'],
+    ['Air whoosh', 'pyranostudios', 'CC0', 'https://opengameart.org/content/air-whoosh'],
+    ['Bell dings/chimes', 'PWL', 'CC0', 'https://opengameart.org/content/bell-dingschimes'],
+    ['grunts of male death and pain', 'thebardofblasphemy', 'CC0', 'https://opengameart.org/content/grunts-male-death-and-pain'],
+    ['Crowd Shouting/Speaking Ambience', 'StarNinjas', 'CC0', 'https://opengameart.org/content/crowd-shoutingspeaking-ambience'],
+    ['OoOoOoOoOoOoOo', 'Nocturnal_Vanguard', 'CC0', 'https://opengameart.org/content/oooooooooooooo'],
+    ['Applause in a large hall or church', 'eXpl0it3r', 'CC0', 'https://opengameart.org/content/applause-in-a-large-hall-or-church'],
+    ['Park ambiences', 'Thimras', 'CC0', 'https://opengameart.org/content/park-ambiences'],
+    ['Loopable Dungeon Ambience', 'JaggedStone', 'CC0', 'https://opengameart.org/content/loopable-dungeon-ambience'],
+    ['windy ambient noise', 'Some Weirdo', 'CC0', 'https://opengameart.org/content/windy-ambient-noise'],
+    ['Electric Rock', 'Pro Sensory', 'CC0', 'https://opengameart.org/content/electric-rock'],
+    ['Clean Rock', 'Pro Sensory', 'CC0', 'https://opengameart.org/node/174329'],
+    ['rocky musicloop', 'johndekale', 'CC0', 'https://opengameart.org/content/rocky-musicloop'],
+  ];
+
+  const decode = (ac, ab) => new Promise((ok, no) => {
+    try { const p = ac.decodeAudioData(ab, ok, no); if (p && p.then) p.then(ok, no); } catch (e) { no(e); }
+  });
+
+  function load() {
+    if (state !== 'idle') return;
+    N = sfx._nodes(); if (!N.ac) return;
+    state = 'loading';
+    musicSetup();
+    fetch(URL + 'sfx.json').then(r => { if (!r.ok) throw new Error('sfx.json ' + r.status); return r.json(); })
+      .catch(() => ({ names: {}, music: ['rock1', 'rock2', 'rock3'] }))
+      .then(j => {
+        man = j; rgn = j.names || {};
+        musicStart();                              // the playlist is known: streaming, not decoded
+        return fetch(URL + 'sfx' + ext).then(r => { if (!r.ok) throw new Error('sprite ' + r.status); return r.arrayBuffer(); })
+          .then(ab => decode(N.ac, ab));
+      })
+      .then(b => {
+        buf = b; state = 'ready'; N = sfx._nodes();
+        console.log('[audio] загружено: ' + ext + ', ' + Object.keys(rgn).length + ' звуков, ' +
+                    Object.values(rgn).reduce((n, v) => n + v.length, 0) + ' вариантов, ' + b.duration.toFixed(1) + ' с');
+        ambApply();                                // the location was chosen before the load finished
+      })
+      .catch(e => { state = 'failed'; console.warn('[audio] записи не загрузились, остаётся синтез:', e.message || e); });
+  }
+
+  /* one region of the sprite: random variation, ±5 % pitch, ±12 % level, no immediate repeat */
+  function play(name, o = {}) {
+    if (state !== 'ready' || !buf || !N.ac) return false;
+    const list = rgn[name]; if (!list || !list.length) return false;
+    let i = (Math.random() * list.length) | 0;
+    if (list.length > 1 && i === lastPick[name]) i = (i + 1) % list.length;
+    lastPick[name] = i;
+    const r = list[i], a = N.ac, t = a.currentTime + (o.delay || 0);
+    const src = a.createBufferSource(), g = a.createGain();
+    src.buffer = buf;
+    src.playbackRate.value = 1 + (Math.random() * 2 - 1) * 0.05;
+    g.gain.value = (o.vol === undefined ? 1 : o.vol) * (0.88 + Math.random() * 0.24);
+    src.connect(g).connect(o.dry ? N.master : N.bus);   // bus = the location's convolution reverb
+    if (o.loop) { src.loop = true; src.loopStart = r.s; src.loopEnd = r.s + r.d; src.start(t, r.s); }
+    else { src.start(t, r.s, r.d); src.stop(t + r.d + 0.02); }
+    return { src, g, r };
+  }
+
+  /* a short sine drop under a recorded hit — the "weight" the small speakers lose */
+  function sub(p, body) {
+    if (!N || !N.ac) return;
+    const t = N.ac.currentTime, o = N.ac.createOscillator(), g = N.ac.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(body ? 105 : 148, t);
+    o.frequency.exponentialRampToValueAtTime(body ? 44 : 56, t + 0.18);
+    N.env(g, t, 0.004, 0.2, 0.16 + 0.2 * clamp(p, 0, 1.5));
+    o.connect(g).connect(N.bus); o.start(t); o.stop(t + 0.26);
+  }
+
+  /* a persistent looping bed: the crowd murmur or a location's room tone */
+  function loopVoice(key, name, target) {
+    if (state !== 'ready' || !rgn[name]) return false;
+    const a = N.ac, t = a.currentTime;
+    let L = loops[key];
+    if (!L && target <= 0) return true;             // silence: don't even start a source
+    if (L && L.name !== name) { fadeOut(L); L = null; }
+    if (!L) {
+      const v = play(name, { loop: true, vol: 1, dry: true });
+      if (!v) return false;
+      v.g.gain.value = 0;
+      L = loops[key] = { src: v.src, g: v.g, name };
+    }
+    L.g.gain.setTargetAtTime(target, t, target <= 0 ? 0.3 : 0.7);
+    return true;
+  }
+  function fadeOut(L) { if (!L || !N.ac) return; const t = N.ac.currentTime;
+    L.g.gain.setTargetAtTime(0, t, 0.25);
+    setTimeout(() => { try { L.src.stop(); } catch (e) {} try { L.g.disconnect(); } catch (e) {} }, 1400); }
+
+  function ambApply() {
+    if (state !== 'ready') return;
+    const name = AMBMAP[wantAmb];
+    if (!name) { if (loops.loc) { fadeOut(loops.loc); delete loops.loc; } return; }
+    loopVoice('loc', name, 0.42);
+  }
+
+  /* ── streaming music: never decoded, one element reused for the whole playlist ── */
+  function musicSetup() {
+    if (musicEl || !N || !N.top) return;
+    musicG = N.ac.createGain(); musicG.gain.value = 0; musicG.connect(N.top);
+    musicEl = new Audio(); musicEl.preload = 'metadata';
+    musicEl.addEventListener('ended', musicNext);
+    musicEl.addEventListener('error', () => { if (musicEl) musicNext(); });
+    try { N.ac.createMediaElementSource(musicEl).connect(musicG); } catch (e) { musicEl = null; return; }
+  }
+  function musicNext() {
+    if (!musicEl || !man || !man.music || !man.music.length) return;
+    musicI = (musicI + 1) % man.music.length;
+    musicEl.src = URL + 'music/' + man.music[musicI] + ext;
+    const p = musicEl.play(); if (p && p.catch) p.catch(() => {});
+  }
+  function musicStart() { musicSetup(); if (musicStarted || !musicEl || !man) return; musicStarted = true; musicNext(); }
+  function musicTarget() {
+    if (!musicG || !N.ac) return;
+    const st = G.state; let k = 1;
+    if (st === 'ko' || st === 'kd') k = 0;                       // fade out on a knockout
+    else if (st === 'fight') k = OPT.musicFight ? 0.316 : 0;      // −10 dB or off during the fight
+    else if (st === 'intro' || st === 'rend' || st === 'replay') k = 0.55;
+    const v = OPT.musicVol * k;
+    if (Math.abs(v - musicWant) < 0.002) return;      // tick() runs 60 Hz: don't pile up automation events
+    musicWant = v;
+    musicG.gain.setTargetAtTime(v, N.ac.currentTime, k === 0 ? 0.18 : 0.35);
+  }
+
+  function onUnlock() { load(); musicSetup(); musicStart(); musicTarget(); }
+  function onPlace(id) { wantAmb = id; ambApply(); }
+
+  /* ── wrap the synthesis: sample + sub, or the original synthesis as fallback ── */
+  function hook(name, pick, keep) {
+    const orig = sfx[name];
+    sfx[name] = function (...a) {
+      const o = pick(a); let ok = false;
+      for (let k = 0; k < (o.rep || 1); k++)
+        if (play(o.name, Object.assign({}, o, { delay: (o.delay || 0) + k * (o.gap || 0.3) }))) ok = true;
+      if (ok && o.extra) play(o.extra, { vol: 0.6, delay: 0.07 });
+      if (!ok && !keep) return orig.apply(sfx, a);
+      if (keep) orig.apply(sfx, a);
+      if (ok && o.sub !== undefined) sub(o.sub, o.body);
+    };
+  }
+  hook('thud', a => ({ name: a[1] ? 'body' : (a[0] > 0.95 ? 'faceHeavy' : 'faceLight'),
+                       vol: 0.75 + 0.35 * clamp(a[0], 0, 1.5), sub: a[0], body: !!a[1] }));
+  hook('block', a => ({ name: 'block', vol: 0.5 + 0.25 * clamp(a[0], 0.2, 1.6) *
+                        clamp(a[1] === undefined ? 1 : a[1], 1, 2), sub: a[0] * 0.55 }));
+  hook('whoosh', a => ({ name: 'whoosh', vol: 0.65 * (a[0] === undefined ? 1 : a[0]), dry: true }));
+  hook('fall', () => ({ name: 'fall', vol: 0.95, sub: 1.15 }));
+  hook('exhale', () => ({ name: 'exhale', vol: 0.6, dry: true }));
+  hook('bag', a => ({ name: 'body', vol: 0.6 + 0.28 * clamp(a[0], 0.2, 1.6), sub: a[0] }));
+  hook('clink', a => ({ name: 'clink', vol: 0.5, delay: a[1] || 0 }));
+  hook('bell', a => ({ name: 'bell', vol: 1.05, rep: a[0] || 1, gap: 0.3, dry: true }));
+  hook('count', () => ({ name: 'count', vol: 0.85 }));
+  hook('clap', () => ({ name: 'block', vol: 0.75 }));
+  hook('koHit', () => ({ name: 'faceHeavy', vol: 0.85 }), true);   // its synthesised sub stays: a hybrid
+  hook('ping', () => ({ name: 'count', vol: 0.35, dry: true }));
+  hook('roar', a => ({ name: 'roar', vol: 0.9, extra: a[0] > 0.6 ? 'wave' : null }));
+
+  const origCrowd = sfx.crowd;
+  sfx.crowd = function (level) {
+    if (loopVoice('crowd', 'crowd', 0.34 * clamp(level, 0, 1.5))) return;
+    origCrowd.call(sfx, level);
+  };
+  sfx.applause = function (p = 1) { play('applause', { vol: 0.65 * clamp(p, 0, 1.5), dry: true }); };   // a bonus layer: no synthesis existed for applause
+
+  const origUnlock = sfx.unlock, origPlace = sfx.place;
+  sfx.unlock = function () { origUnlock.call(sfx); onUnlock(); };
+  sfx.place = function (id) { origPlace.call(sfx, id); onPlace(id); };
+
+  /* the first gesture anywhere in the game: an AudioContext may only start there */
+  const arm = () => { if (armed) return; armed = true; sfx.unlock(); };
+  window.addEventListener('pointerdown', arm, { once: true, passive: true });
+  window.addEventListener('keydown', arm, { once: true, passive: true });
+
+  /* ── debug: __sfx.play(name) / __sfx.play() lists every sound and its load state ── */
+  sfx.play = name => {
+    const keys = man ? Object.keys(man.names) : [];
+    if (!name) {
+      for (const k of keys) console.log('[audio]', k, (buf && rgn[k]) ? rgn[k].length + ' вариантов: загружен' : 'НЕ загружен — синтез');
+      console.log('[audio] состояние:', state, ext, 'всего', keys.length, 'звуков');
+      return keys;
+    }
+    const ok = !!play(name);
+    console.log('[audio]', name, ok ? 'загружен, играет' : 'НЕ загружен — синтез');
+    return ok;
+  };
+  sfx.audio = () => ({ state, ext, loaded: !!buf, seconds: buf ? +buf.duration.toFixed(2) : 0,
+                       sounds: rgn, music: man ? man.music : [], track: musicI, credits: CREDITS });
+  window.__sfx = sfx;
+
+  return {
+    get state() { return state; },
+    credits: () => CREDITS,
+    setVolumes() { sfx.vol(OPT.vol); sfx.sfxVol(OPT.sfxVol); musicTarget(); },
+    tick() {
+      musicTarget();
+      if (G.state !== prevState) {
+        if (prevState && (G.state === 'break' || G.state === 'result')) play('applause', { vol: 0.7, dry: true });
+        prevState = G.state;
+      }
+    },
+  };
+})();
 /* ───────── game state ───────── */
 /* damage per landed punch is scaled so a fight lasts: ~25–35 clean head shots to empty a full bar, so cuts and swelling
    have time to show (BKFC bouts that end inside the distance mostly end in rounds 1–3, not in the first ten seconds) */
@@ -6772,9 +7026,9 @@ const EVT = { subs: [], on(f) { this.subs.push(f); }, emit(type, e) { for (const
 const LOOK = { hair: 'brown', skin: 'light', beard: false, bottom: { id: 'shorts', color: 'red' }, guard: 'clear' };   // clothes: { id, color } per category of the registry (04e_wardrobe.js)
 try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { Object.assign(LOOK, s.look || {}); G.diff = DIFFS[s.diff] ? s.diff : 'normal'; G.wins = s.wins | 0; G.losses = s.losses | 0; } } catch (e) {}
 G.mode = 'quick'; G.career = 0; G.bagBest = 0; G.userDiff = G.diff; G.loc = 'gym';
-const OPT = { vol: 1, shake: true, keys: true, cine: true };   // settings screen: master volume 0..1, camera shake, the key hint bar in a fight, cutscenes (stare-down, end-of-round close-up + highlights)
+const OPT = { vol: 1, sfxVol: 1, musicVol: 0.7, musicFight: true, shake: true, keys: true, cine: true };   // settings: master / effects / music volume, music during a fight, camera shake, key hints, cutscenes
 const PROF = { name: '', nick: '', sig: null, stats: { pow: 0, spd: 0, chin: 0, sta: 0 }, pts: 1, champ: 0, cash: 0, own: {}, eco: 0, soc: null };   // cash, own (bought items), eco (the money system has seen this save): 07b_economy.js
-try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; OPT.cine = s.opt.cine !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
+try { const s = JSON.parse(localStorage.getItem('ko-ring') || 'null'); if (s) { G.career = s.career | 0; G.bagBest = s.bagBest | 0; if (typeof s.loc === 'string') G.loc = s.loc; if (s.opt) { OPT.vol = clamp(+s.opt.vol || 0, 0, 1); OPT.sfxVol = clamp(s.opt.sfxVol === undefined ? 1 : +s.opt.sfxVol, 0, 1); OPT.musicVol = clamp(s.opt.musicVol === undefined ? 0.7 : +s.opt.musicVol, 0, 1); OPT.musicFight = s.opt.musicFight !== false; OPT.shake = s.opt.shake !== false; OPT.keys = s.opt.keys !== false; OPT.cine = s.opt.cine !== false; } if (s.prof) Object.assign(PROF, s.prof, { stats: Object.assign(PROF.stats, s.prof.stats || {}) }); } } catch (e) {}
 wearMigrate(LOOK);   // old saves kept plain ids (top: 'teeB', shorts: 'red')
 const save = () => { try { localStorage.setItem('ko-ring', JSON.stringify({ look: LOOK, diff: G.mode === 'career' || G.prev ? G.userDiff : G.diff, wins: G.wins, losses: G.losses, career: G.career, bagBest: G.bagBest, prof: PROF, loc: G.prev ? G.prev.loc : G.loc, opt: OPT })); } catch (e) {} };
 const careerWins = () => G.career + PROF.champ * LADDER.length;   // wraps unlock by career wins ever
@@ -8592,7 +8846,7 @@ function frame(now) {
   FX.update(simDt); MIST.update(simDt); wearTick(simDt);
   tq = performance.now(); pm.fx += tq - tp; tp = tq;
   trailTick(dtReal);   // the punch smear behind the knuckles (05b_trail.js)
-  camUpdate(dtReal); locSync(); crowdTick(simDt); hudUpdate(dtReal); resTick(rawDt);   // locSync: the location hides what stands between the camera and the fighters; crowdTick: its crowd (14_crowd.js)
+  camUpdate(dtReal); locSync(); crowdTick(simDt); hudUpdate(dtReal); resTick(rawDt); AUDIO.tick();   // locSync: the location hides what stands between the camera and the fighters; crowdTick: its crowd (14_crowd.js); AUDIO.tick: music ducking (06b_audio.js)
   pm.misc += performance.now() - tp;
   perfTick(rawDt);
   renderFrame(rawDt);
@@ -11450,7 +11704,7 @@ EVT.on((type, e) => {
    All of them except the pause (and the settings opened from it) live in G.state === 'menu'; the pause sets G.paused, frame() then
    runs with dt = 0. The menu camera (menuCam) orbits P1: the creator turns it by dragging, the other screens just frame him. */
 const UI = { scr: null, from: null, cat: 'name', spar: false, mouth: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };   // mouth: the gum-shield close-up of the creator (he bares his teeth: Face.update)
-const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', pause: 'pause' };
+const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', credits: 'credits', pause: 'pause' };
 const VIEW_MOUTH = { yaw: 1.38, zoom: 0 }, _mouthP = new V3(), VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
 const VIEW_BACK = { yaw: -2.3, zoom: 0.55 };   // his back (the back tattoo)
 const myName = () => PROF.nick || PROF.name || 'Ты';
@@ -11458,9 +11712,10 @@ function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [..
 function uiShow(scr, focusId) {
   if (UI.scr === 'shop' && scr !== 'shop') shopLeave();   // a try-on that was not bought comes off (14b_shop.js)
   UI.scr = scr; const on = scr ? UI_IDS[scr] : null;
-  for (const id of ['menu', 'quick', 'creator', 'shop', 'social', 'settings', 'pause']) $(id).hidden = id !== on;
+  for (const id of ['menu', 'quick', 'creator', 'shop', 'social', 'settings', 'credits', 'pause']) $(id).hidden = id !== on;
   if (on === 'menu') { $('nav-main').hidden = scr !== 'main'; $('nav-train').hidden = scr !== 'train'; }
   if (scr === 'settings') { const p = UI.from === 'pause'; $('settings').classList.toggle('dim', p); $('reset-row').hidden = p; buildSettings(); setTab('opt'); }
+  if (scr === 'credits') buildCredits();
   if (scr === 'pause') $('p-quit-l').textContent = BAG.on ? 'Выйти' : 'Сдаться';
   if (scr === 'shop') shopEnter();
   if (scr === 'social') socEnter();
@@ -11470,6 +11725,7 @@ function uiShow(scr, focusId) {
   if (!TOUCH && scr && scr !== 'creator') { const b = (focusId && $(focusId)) || (scr === 'main' || scr === 'train' || scr === 'pause' ? uiItems()[0] : null); b && b.focus({ preventScroll: true }); }
 }
 function uiBack() {
+  if (UI.scr === 'credits') return uiShow('settings', 'set-credits');
   if (UI.scr === 'settings' && UI.from === 'pause') return uiShow('pause', 'p-set');
   if (UI.scr === 'main' || G.state !== 'menu') return;
   const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', social: 'go-social', settings: 'go-set' }[UI.scr];
@@ -11574,7 +11830,7 @@ function renderStats() {
 
 /* settings */
 const ONOFF = [{ id: 'on', label: 'вкл' }, { id: 'off', label: 'выкл' }];
-function applyOpt() { stage.classList.toggle('nokeys', !OPT.keys); sfx.vol(OPT.vol); }
+function applyOpt() { stage.classList.toggle('nokeys', !OPT.keys); AUDIO.setVolumes(); }
 function setTab(t) { for (const b of $('set-tabs').children) b.setAttribute('aria-pressed', String(b.dataset.t === t)); for (const p of document.querySelectorAll('#settings .pbody')) p.hidden = p.dataset.t !== t; }
 function gfxNote() { $('gfx-note').textContent = `сейчас: ${GFX_LABEL[GFX.level]}, ${GFX.h}p${GFX.set === 'auto' ? ' — авто подстраивает уровень под частоту кадров' : ''}`; }
 function buildSettings() {
@@ -11583,10 +11839,30 @@ function buildSettings() {
   swatches('o-cine', ONOFF, () => OPT.cine ? 'on' : 'off', v => { OPT.cine = v === 'on'; }, true, true);
   swatches('o-keys', ONOFF, () => OPT.keys ? 'on' : 'off', v => { OPT.keys = v === 'on'; applyOpt(); }, true, true);
   swatches('o-fps', ONOFF, () => PERF.on ? 'on' : 'off', v => perfToggle(v === 'on'), true, true);
-  const vol = $('o-vol'), vv = $('vol-v'); vol.value = Math.round(OPT.vol * 100); vv.textContent = vol.value + '%';
-  vol.oninput = () => { OPT.vol = clamp(vol.value / 100, 0, 1); vv.textContent = vol.value + '%'; applyOpt(); save(); };
-  vol.onchange = () => { sfx.unlock(); sfx.vol(OPT.vol); sfx.thud(0.5, false); };   // a punch at the new level
+  swatches('o-music-fight', ONOFF, () => OPT.musicFight ? 'on' : 'off', v => { OPT.musicFight = v === 'on'; AUDIO.setVolumes(); }, true, true);
+  const slider = (id, label, key, test) => {
+    const el = $(id), vv = $(label); el.value = Math.round(OPT[key] * 100); vv.textContent = el.value + '%';
+    el.oninput = () => { OPT[key] = clamp(el.value / 100, 0, 1); vv.textContent = el.value + '%'; applyOpt(); save(); };
+    el.onchange = () => { sfx.unlock(); applyOpt(); if (test) sfx.thud(0.5, false); };
+  };
+  slider('o-vol', 'vol-v', 'vol', true);        // общая громкость (top)
+  slider('o-music', 'music-v', 'musicVol');     // музыка (streaming <audio>)
+  slider('o-sfx', 'sfx-v', 'sfxVol');           // эффекты (master)
   resetAsk(false);
+}
+/* «Титры»: the CC0 list from 06b_audio.js (the same data as assets/audio/CREDITS.md) */
+function buildCredits() {
+  const box = $('cr-list'); box.textContent = '';
+  const note = document.createElement('p'); note.className = 'cr-note';
+  note.textContent = 'Все записи — CC0 / общественное достояние. Лицензия каждого файла проверена на странице источника перед скачиванием. Полный список: assets/audio/CREDITS.md.';
+  box.appendChild(note);
+  for (const [title, author, lic, page] of AUDIO.credits()) {
+    const row = document.createElement('a'); row.className = 'cr-row';
+    row.href = page; row.target = '_blank'; row.rel = 'noopener noreferrer';
+    const b = document.createElement('b'); b.textContent = title;
+    const s = document.createElement('span'); s.textContent = author + ' · ' + lic;
+    row.append(b, s); box.appendChild(row);
+  }
 }
 function resetAsk(sure) {   // wiping the progress takes a second, explicit press
   const box = $('o-reset'); box.textContent = '';
@@ -11635,6 +11911,7 @@ function buildMenu() {
   on('cr-done', uiBack); on('cr-rand', randomLook); on('v-face', () => setView(VIEW_FACE)); on('v-full', () => setView(VIEW_FULL));
   for (const b of $('cats').children) b.addEventListener('click', () => setCat(b.dataset.cat));
   on('go-set', () => { UI.from = 'menu'; uiShow('settings'); }); on('set-back', uiBack);
+  on('set-credits', () => uiShow('credits', 'cr-back')); on('cr-back', uiBack);
   for (const b of $('set-tabs').children) b.addEventListener('click', () => setTab(b.dataset.t));
   on('p-resume', resumeGame); on('p-set', () => uiShow('settings')); on('p-quit', surrender); on('pause-btn', pauseGame);
   if (TOUCH) $('cr-hint').textContent = 'тяни — вращать · щипок — зум';

@@ -3,7 +3,7 @@
    All of them except the pause (and the settings opened from it) live in G.state === 'menu'; the pause sets G.paused, frame() then
    runs with dt = 0. The menu camera (menuCam) orbits P1: the creator turns it by dragging, the other screens just frame him. */
 const UI = { scr: null, from: null, cat: 'name', spar: false, mouth: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };   // mouth: the gum-shield close-up of the creator (he bares his teeth: Face.update)
-const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', pause: 'pause' };
+const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', credits: 'credits', pause: 'pause' };
 const VIEW_MOUTH = { yaw: 1.38, zoom: 0 }, _mouthP = new V3(), VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
 const VIEW_BACK = { yaw: -2.3, zoom: 0.55 };   // his back (the back tattoo)
 const myName = () => PROF.nick || PROF.name || 'Ты';
@@ -11,9 +11,10 @@ function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [..
 function uiShow(scr, focusId) {
   if (UI.scr === 'shop' && scr !== 'shop') shopLeave();   // a try-on that was not bought comes off (14b_shop.js)
   UI.scr = scr; const on = scr ? UI_IDS[scr] : null;
-  for (const id of ['menu', 'quick', 'creator', 'shop', 'social', 'settings', 'pause']) $(id).hidden = id !== on;
+  for (const id of ['menu', 'quick', 'creator', 'shop', 'social', 'settings', 'credits', 'pause']) $(id).hidden = id !== on;
   if (on === 'menu') { $('nav-main').hidden = scr !== 'main'; $('nav-train').hidden = scr !== 'train'; }
   if (scr === 'settings') { const p = UI.from === 'pause'; $('settings').classList.toggle('dim', p); $('reset-row').hidden = p; buildSettings(); setTab('opt'); }
+  if (scr === 'credits') buildCredits();
   if (scr === 'pause') $('p-quit-l').textContent = BAG.on ? 'Выйти' : 'Сдаться';
   if (scr === 'shop') shopEnter();
   if (scr === 'social') socEnter();
@@ -23,6 +24,7 @@ function uiShow(scr, focusId) {
   if (!TOUCH && scr && scr !== 'creator') { const b = (focusId && $(focusId)) || (scr === 'main' || scr === 'train' || scr === 'pause' ? uiItems()[0] : null); b && b.focus({ preventScroll: true }); }
 }
 function uiBack() {
+  if (UI.scr === 'credits') return uiShow('settings', 'set-credits');
   if (UI.scr === 'settings' && UI.from === 'pause') return uiShow('pause', 'p-set');
   if (UI.scr === 'main' || G.state !== 'menu') return;
   const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', social: 'go-social', settings: 'go-set' }[UI.scr];
@@ -127,7 +129,7 @@ function renderStats() {
 
 /* settings */
 const ONOFF = [{ id: 'on', label: 'вкл' }, { id: 'off', label: 'выкл' }];
-function applyOpt() { stage.classList.toggle('nokeys', !OPT.keys); sfx.vol(OPT.vol); }
+function applyOpt() { stage.classList.toggle('nokeys', !OPT.keys); AUDIO.setVolumes(); }
 function setTab(t) { for (const b of $('set-tabs').children) b.setAttribute('aria-pressed', String(b.dataset.t === t)); for (const p of document.querySelectorAll('#settings .pbody')) p.hidden = p.dataset.t !== t; }
 function gfxNote() { $('gfx-note').textContent = `сейчас: ${GFX_LABEL[GFX.level]}, ${GFX.h}p${GFX.set === 'auto' ? ' — авто подстраивает уровень под частоту кадров' : ''}`; }
 function buildSettings() {
@@ -136,10 +138,30 @@ function buildSettings() {
   swatches('o-cine', ONOFF, () => OPT.cine ? 'on' : 'off', v => { OPT.cine = v === 'on'; }, true, true);
   swatches('o-keys', ONOFF, () => OPT.keys ? 'on' : 'off', v => { OPT.keys = v === 'on'; applyOpt(); }, true, true);
   swatches('o-fps', ONOFF, () => PERF.on ? 'on' : 'off', v => perfToggle(v === 'on'), true, true);
-  const vol = $('o-vol'), vv = $('vol-v'); vol.value = Math.round(OPT.vol * 100); vv.textContent = vol.value + '%';
-  vol.oninput = () => { OPT.vol = clamp(vol.value / 100, 0, 1); vv.textContent = vol.value + '%'; applyOpt(); save(); };
-  vol.onchange = () => { sfx.unlock(); sfx.vol(OPT.vol); sfx.thud(0.5, false); };   // a punch at the new level
+  swatches('o-music-fight', ONOFF, () => OPT.musicFight ? 'on' : 'off', v => { OPT.musicFight = v === 'on'; AUDIO.setVolumes(); }, true, true);
+  const slider = (id, label, key, test) => {
+    const el = $(id), vv = $(label); el.value = Math.round(OPT[key] * 100); vv.textContent = el.value + '%';
+    el.oninput = () => { OPT[key] = clamp(el.value / 100, 0, 1); vv.textContent = el.value + '%'; applyOpt(); save(); };
+    el.onchange = () => { sfx.unlock(); applyOpt(); if (test) sfx.thud(0.5, false); };
+  };
+  slider('o-vol', 'vol-v', 'vol', true);        // общая громкость (top)
+  slider('o-music', 'music-v', 'musicVol');     // музыка (streaming <audio>)
+  slider('o-sfx', 'sfx-v', 'sfxVol');           // эффекты (master)
   resetAsk(false);
+}
+/* «Титры»: the CC0 list from 06b_audio.js (the same data as assets/audio/CREDITS.md) */
+function buildCredits() {
+  const box = $('cr-list'); box.textContent = '';
+  const note = document.createElement('p'); note.className = 'cr-note';
+  note.textContent = 'Все записи — CC0 / общественное достояние. Лицензия каждого файла проверена на странице источника перед скачиванием. Полный список: assets/audio/CREDITS.md.';
+  box.appendChild(note);
+  for (const [title, author, lic, page] of AUDIO.credits()) {
+    const row = document.createElement('a'); row.className = 'cr-row';
+    row.href = page; row.target = '_blank'; row.rel = 'noopener noreferrer';
+    const b = document.createElement('b'); b.textContent = title;
+    const s = document.createElement('span'); s.textContent = author + ' · ' + lic;
+    row.append(b, s); box.appendChild(row);
+  }
 }
 function resetAsk(sure) {   // wiping the progress takes a second, explicit press
   const box = $('o-reset'); box.textContent = '';
@@ -188,6 +210,7 @@ function buildMenu() {
   on('cr-done', uiBack); on('cr-rand', randomLook); on('v-face', () => setView(VIEW_FACE)); on('v-full', () => setView(VIEW_FULL));
   for (const b of $('cats').children) b.addEventListener('click', () => setCat(b.dataset.cat));
   on('go-set', () => { UI.from = 'menu'; uiShow('settings'); }); on('set-back', uiBack);
+  on('set-credits', () => uiShow('credits', 'cr-back')); on('cr-back', uiBack);
   for (const b of $('set-tabs').children) b.addEventListener('click', () => setTab(b.dataset.t));
   on('p-resume', resumeGame); on('p-set', () => uiShow('settings')); on('p-quit', surrender); on('pause-btn', pauseGame);
   if (TOUCH) $('cr-hint').textContent = 'тяни — вращать · щипок — зум';

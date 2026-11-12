@@ -79,7 +79,7 @@ function frame(now) {
   FX.update(simDt); MIST.update(simDt); wearTick(simDt);
   tq = performance.now(); pm.fx += tq - tp; tp = tq;
   trailTick(dtReal);   // the punch smear behind the knuckles (05b_trail.js)
-  camUpdate(dtReal); locSync(); crowdTick(simDt); hudUpdate(dtReal); resTick(rawDt);   // locSync: the location hides what stands between the camera and the fighters; crowdTick: its crowd (14_crowd.js)
+  camUpdate(dtReal); locSync(); crowdTick(simDt); hudUpdate(dtReal); resTick(rawDt); AUDIO.tick();   // locSync: the location hides what stands between the camera and the fighters; crowdTick: its crowd (14_crowd.js); AUDIO.tick: music ducking (06b_audio.js)
   pm.misc += performance.now() - tp;
   perfTick(rawDt);
   renderFrame(rawDt);
