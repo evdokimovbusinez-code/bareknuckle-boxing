@@ -226,7 +226,24 @@ const sfx = (() => {
     bell(count) { const a = ac; if (!a) return; for (let k = 0; k < count; k++) { const t = a.currentTime + k * 0.3; for (const [fq, pk] of [[640, 0.22], [1287, 0.12], [1932, 0.07], [2580, 0.04]]) { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = fq; env(g, t, 0.003, 1.3, pk); o.connect(g).connect(master); o.start(t); o.stop(t + 1.5); } } },
     /* (issue 45) the short «step counted» chime of the tutorial: two quiet sine notes, well under a bell */
     ping() { const a = ac; if (!a) return; const t = a.currentTime; for (const [fq, d, pk] of [[880, 0, 0.14], [1320, 0.07, 0.11]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.value = fq; env(g, t + d, 0.002, 0.13, pk); o.connect(g).connect(master); o.start(t + d); o.stop(t + d + 0.2); } },
-    count(n) { const a = ac; if (!a) return; const t = a.currentTime; for (const [fq, pk, d] of [[180, 0.5, 0.09], [1200, 0.08, 0.03]]) { const o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(fq, t); o.frequency.exponentialRampToValueAtTime(fq * 0.6, t + d); env(g, t, 0.002, d, pk); o.connect(g).connect(master); o.start(t); o.stop(t + d + 0.05); } },
+    /* (issue 46) the referee's count: a small gong (inharmonic partials through the room echo) plus a spoken-ish
+       vowel — a sawtooth through two parallel band-pass formants — a step higher as the count rises. */
+    count(n) { const a = ac; if (!a) return; const t = a.currentTime, k = 0.8 + 0.2 * clamp(n, 1, 10);
+      for (const [m, pk, len] of [[1, 0.16, 0.5], [1.49, 0.09, 0.38], [2.23, 0.05, 0.3], [3.12, 0.025, 0.22]]) {
+        const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.value = 196 * m;
+        env(g, t, 0.003, len, pk * k); o.connect(g).connect(bus); o.start(t); o.stop(t + len + 0.1); }
+      { const o = a.createOscillator(), g = a.createGain(); o.type = 'sawtooth';
+        o.frequency.setValueAtTime(110 + n * 3, t); o.frequency.linearRampToValueAtTime(96 + n * 3, t + 0.22);
+        env(g, t, 0.02, 0.2, 0.05);
+        for (const [fq, q, lv] of [[620, 5, 1], [1150, 7, 0.7]]) { const f = filt('bandpass', fq, q), fg = gain(lv); o.connect(f).connect(fg).connect(g); }
+        g.connect(bus); o.start(t); o.stop(t + 0.3); } },
+    /* (issue 46) the moment the lights go out: a deep, dull impact under the punch's crack — a low sine dropping
+       125 → 34 Hz and a short low-passed noise thump, both into the room echo. p ≈ 1.2 for a KO, 0.7 for a knockdown. */
+    koHit(p = 1) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.4, 1.4);
+      const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(125, t); o.frequency.exponentialRampToValueAtTime(34, t + 0.28);
+      env(g, t, 0.006, 0.34, 0.55 * k); o.connect(g).connect(bus); o.start(t); o.stop(t + 0.4);
+      const n = a.createBufferSource(), f = filt('lowpass', 420), ng = a.createGain(); n.buffer = noise;
+      env(ng, t, 0.002, 0.12, 0.3 * k); n.connect(f).connect(ng).connect(bus); n.start(t, rr() * 0.4); n.stop(t + 0.16); },
     /* the crowd. crowd(level): a looped murmur (noise through three voice-band filters, its loudness wandering like many people
        talking) whose level follows the reaction, 0 = nobody there. roar(p): the shout on a big shot — a swell of noise and a few voices */
     crowd(level) { const a = ac; if (!a) return;

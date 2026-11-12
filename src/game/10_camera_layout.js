@@ -23,8 +23,19 @@ function camUpdate(dt) {
     else { const c = G.loser.jp[0]; _cp.set(c.x - side * 1.7, 1.6, 3.5); _cl.set(c.x * 0.7, Math.max(0.55, h.y * 0.55 + 0.3), 0); k = 4; }
     if (RP.cut) { camCut = true; RP.cut = false; }
   } else if (G.state === 'ko' || G.state === 'result' || G.state === 'kd') {
-    const L = G.state === 'kd' ? G.kd.def : G.loser, W = G.state === 'kd' ? G.kd.att : G.winner, h = L.headNow, c = L.jp[0], w = W.headNow, mx = (c.x + h.x) * 0.5 * 0.65 + w.x * 0.35;
+    const kd = G.state === 'kd', L = kd ? G.kd.def : G.loser, W = kd ? G.kd.att : G.winner;
+    const h = L.headNow, c = L.jp[0], w = W.headNow, mx = (c.x + h.x) * 0.5 * 0.65 + w.x * 0.35;
     _cp.set(mx, 1.4, far - 0.25); _cl.set(mx, Math.max(0.62, h.y * 0.45 + 0.42), 0); k = 2.2;
+    if (kd || G.state === 'ko') {
+      // (issue 46) wide at the drop, then a slow push in that follows him down to the canvas and holds on the head.
+      // The clock is sim time, so the 0.1 s freeze and the 0.35× slow motion carry into the camera move.
+      const age = Math.max(0, G.t - (kd ? G.kd.t0 : G.koCine));
+      const push = sstep(0, kd ? 0.55 : KO_CINE.push, age) * (kd ? 0.6 : 1);
+      const drop = clamp(h.y / 1.65, 0, 1), fx = (c.x + h.x) * 0.5;   // centre on the body, not the head: he is ~1.7 m long on the canvas
+      _cp.set(lerp(mx, fx, push), lerp(1.4, 1.12 - 0.1 * (1 - drop), push), lerp(far - 0.25, kd ? 3.5 : 3.2, push));
+      _cl.set(lerp(mx, fx, push), lerp(Math.max(0.62, h.y * 0.45 + 0.42), Math.max(0.46, h.y * 0.4 + 0.42), push), 0);
+      k = lerp(2.2, kd ? 3 : 3.6, push);
+    }
   } else {   // the fight: framed on the pair, pushed in a little when they trade up close, a slow drift so the shot never sits dead
     const mx = (P1.headNow.x + P2.headNow.x) * 0.5, sep = Math.abs(P1.headNow.x - P2.headNow.x), hurt = Math.max(P1.daze || 0, P2.daze || 0);
     const z = far + 0.2 - clamp((1.0 - sep) * 0.6, 0, 0.35) - 0.2 * hurt + Math.max(0, sep - 1.0) * 1.1, drift = 0.18 * Math.sin(camClock * 0.13);
@@ -50,6 +61,14 @@ function hudUpdate(dt) {
   $('cnt').hidden = !(G.state === 'fight' && P1.counterUntil > G.t);
   if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), txt = `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`; if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
   const k = Math.min(1, dt * 3); P1.u.uDmg.value += (clamp(1 - P1.hp / 100, 0, 1) - P1.u.uDmg.value) * k; P2.u.uDmg.value += (clamp(1 - P2.hp / 100, 0, 1) - P2.u.uDmg.value) * k;
+  // (issue 46) the get-up bar during the referee's count: how close the man is to beating it (mashing punches adds)
+  const kb = $('kdbar');
+  if (G.state === 'kd' && G.kd) {
+    const K = G.kd; kb.hidden = false;
+    $('kdfill').style.transform = `scaleX(${kdProgress(K).toFixed(3)})`;
+    $('kdn').textContent = K.n ? K.n + ' / 10' : '';
+    $('kdtxt').textContent = K.def === P1 ? 'ВСТАВАЙ · ЖМИ УДАРЫ' : 'ОТСЧЁТ РЕФЕРИ';
+  } else kb.hidden = true;
 }
 
 /* ───────── layout: always landscape; a portrait phone gets the stage rotated ───────── */

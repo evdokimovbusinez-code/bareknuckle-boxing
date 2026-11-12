@@ -16,7 +16,12 @@ const REACT = {
   backStep: 0.14,  // extra knock-back per hit from the 2nd one on (he starts retreating)
 };
 const DIFFS = { easy: { label: 'Лёгкий', dodge: 0.18, read: 0.5, gap: 1.9, speed: 1.0, toAI: 1.25, toMe: 0.75 }, normal: { label: 'Норм', dodge: 0.4, read: 0.7, gap: 1.35, speed: 1.15, toAI: 1, toMe: 1 }, hard: { label: 'Жёсткий', dodge: 0.6, read: 0.86, gap: 0.95, speed: 1.3, toAI: 0.9, toMe: 1.15 } };
-const G = { state: 'load', t: 0, real: 0, hitstop: 0, slow: 1, slowT: 0, shake: 0, koT: 0, introT: 0, winner: null, loser: null, wins: 0, losses: 0, diff: 'normal', fallSnd: false };
+const G = { state: 'load', t: 0, real: 0, hitstop: 0, slow: 1, slowT: 0, shake: 0, koT: 0, koCine: 0, koTitle: false, introT: 0, winner: null, loser: null, wins: 0, losses: 0, diff: 'normal', fallSnd: false };
+/* issue 46 — the knockout / knockdown cutscene, in seconds and fractions of speed.
+   was: KO hitstop 0.09 / 0.3× for 0.75 s, the «Нокаут!» plate at the punch, the replay at koT + 2.3 s;
+   KD had no freeze and 0.5× for 0.35 s. Now a 0.1 s freeze + 0.35× for 0.7 s, the camera pushes in over 0.7 s
+   and holds the man on the canvas, then the plate and the replay. `koT` still anchors the replay to the punch. */
+const KO_CINE = { freeze: 0.1, slow: 0.35, slowT: 0.7, kdFreeze: 0.055, kdSlow: 0.6, kdSlowT: 0.28, push: 0.7, hold: 2.9, title: 2.4 };
 let P1, P2, VW = 1, VH = 1, inp = null;
 /* game events other systems listen to (the crowd): EVT.on((type, e) => …); types: 'hit' { pos, power, blocked, replay }, 'kd', 'ko', 'up' { pos }, 'round' */
 const EVT = { subs: [], on(f) { this.subs.push(f); }, emit(type, e) { for (const f of this.subs) f(type, e || {}); } };
@@ -316,7 +321,7 @@ function resolveHit(att, name, contact) {
   if (def === P1 && !blocked) { const h = $('hurt'); if (h) { h.style.setProperty('--k', power); h.classList.remove('on'); void h.offsetWidth; h.classList.add('on'); } }
   try { if (navigator.vibrate) navigator.vibrate(blocked ? 8 : def === P1 ? 25 + 40 * power : 10 + 18 * power); } catch (e) {}
   const hb = $(def === P1 ? 'hpb1' : 'hpb2'); hb.classList.remove('hit'); void hb.offsetWidth; hb.classList.add('hit');
-  if (def.hp <= 0) return knockout(att, def, dir, power, name, fwd);
+  if (def.hp <= 0) return knockout(att, def, dir, power, name, fwd, false, body);
   // to the body: a hook into the liver (right side, i.e. his left hook) shuts him down a beat later — vagal reflex, legs go, he folds
   // and can't get his breath; a straight shot into the solar plexus knocks the wind out of him (bent over a second or two)
   if (body && !blocked && G.state === 'fight' && !window.__noKD) {
@@ -332,46 +337,67 @@ function resolveHit(att, name, contact) {
     if (sev > 0.85 && rr() < 0.55) { def.wobble = Math.max(def.wobble, 0.9 + 0.9 * rr()); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'повело', 'crit'); }
   }
 }
+/* (issue 46) which way he goes down is read off the punch, not rolled afresh: an uppercut snaps the head back
+   and he lands on his back, a hook twists him onto his side, an overhand / a body shot folds him forward.
+   Deterministic so the count and the camera push-in are the same for a given punch; the ragdoll adds the variation. */
+function koFall(name, body) {
+  const T = (PUNCH[name] || {}).type || 'straight';
+  if (body) return 'fwd';
+  if (T === 'upper') return 'back';
+  if (T === 'hook') return 'side';
+  if (T === 'over') return 'fwd';
+  return 'back';
+}
+/* 0…1 for the get-up bar: the count that has passed plus the player's mashing, over how long he is out (07b/12_ui.js) */
+function kdProgress(K) {
+  const frac = K.n > 0 ? clamp(G.t - (K.nT - 1), 0, 1) : 0;
+  return clamp((K.n + frac + K.mash) / K.up, 0, 1);
+}
 /* knockdown: down but conscious — a knee taken, or a flash fall. The referee counts (BKFC: 10 s to stand; the other man to a neutral spot) */
-function knockdown(att, def, dir, power, name, fwd, sev, kind) {
+function knockdown(att, def, dir, power, name, fwd, sev, kind, bodyArg) {
   if (att.fs) att.fs.kd++;
   G.state = 'kd'; def.kdCount = (def.kdCount || 0) + 1; if (G.rkd) G.rkd[def === P1 ? 0 : 1]++;
-  const type = kind || window.__kdType || (sev > 1.8 || rr() < 0.4 ? 'fall' : 'knee');
+  const body = !!bodyArg || kind === 'liver';
+  const type = kind || window.__kdType || (body ? 'liver' : (sev > 1.8 || rr() < 0.4 ? 'fall' : 'knee'));
   // how long he stays down: the harder the shot and the more knockdowns already, the longer; past 9 he won't beat the count
   let up = 2 + (sev - 1) * 3 + (def.kdCount - 1) * 1.5 + (1 - def.hp / 100) * 3.2 + rr() * 1.5;
   if (type === 'knee') up = Math.min(up, 7.5);
   if (type === 'liver') up = 5 + (1 - def.hp / 100) * 4 + rr() * 3.5;   // a liver shot often keeps a man down past ten
-  AI.fol = 0; G.kd = { def, att, t0: G.t, type, n: 0, nT: 0, down: false, up: clamp(up, 2, 11.5), mash: 0, done: false };
+  AI.fol = 0; G.kd = { def, att, t0: G.t, type, n: 0, nT: 0, down: false, fallSnd: false, up: clamp(up, 2, 11.5), mash: 0, done: false };
   def.cur = null; def.dodge = null; def.blocking = false; Q.length = 0; def.daze = Math.max(def.daze, 0.8);
   if (type === 'fall') {
-    const T = PUNCH[name].type, imp = dir.clone().multiplyScalar(0.9 + 0.5 * power); imp.y = Math.min(imp.y, 0.2);
-    const u = rr(), fall = T === 'hook' ? (u < 0.5 ? 'side' : 'drop') : T === 'over' ? (u < 0.6 ? 'fwd' : 'drop') : (u < 0.55 ? 'back' : 'drop');
-    def.rag.start(imp, def.lastContact, fall, new V3(-fwd, 0, 0), true);
+    const imp = dir.clone().multiplyScalar(0.9 + 0.5 * power); imp.y = Math.min(imp.y, 0.2);
+    def.rag.start(imp, def.lastContact, window.__fall || koFall(name, body), new V3(-fwd, 0, 0), true);
   } else def.takeKnee(type === 'liver' ? 'liver' : 'knee');
-  G.slow = 0.5; G.slowT = 0.35; G.shake = 0.04;
-  msg('Нокдаун', 'ko'); sfx.fall(); EVT.emit('kd', { pos: def.headNow });
+  // a shorter, softer version of the KO beat: no long slow motion, just a breath of it and a dull thud under the fall.
+  // KD keeps his hands out to break the fall (rag.start(..., true)); the KO below switches them off.
+  G.hitstop = KO_CINE.kdFreeze; G.slow = KO_CINE.kdSlow; G.slowT = KO_CINE.kdSlowT; G.shake = 0.035; sfx.koHit(0.7);
+  msg('Нокдаун', 'ko'); EVT.emit('kd', { pos: def.headNow });
   if (def === P1) setTimeout(() => { if (G.state === 'kd' && G.kd.def === P1 && !P1.gu) msg('Жми удары — вставай!', 'tip kdp'); }, 900);
 }
 function kdTick(dt) {
   const K = G.kd, D = K.def;
+  if (!K.fallSnd && D.headNow.y < 0.3) { K.fallSnd = true; sfx.fall(); }   // the thump when he actually reaches the canvas
   if (!K.down) { if (G.t - K.t0 > (K.type === 'knee' ? 0.55 : 0.9)) { K.down = true; K.nT = G.t + 0.4; } return; }
   const rising = (D.gu && D.gu.stage !== 'hold' && D.gu.stage !== 'drop') || (D.rag.on && D.rag.prof && D.rag.prof.getup);
   if (K.done) { if (!D.gu && G.t > K.done) { G.state = 'fight'; G.kd = null; msg('Бой!'); EVT.emit('up', { pos: D.headNow }); } return; }
   if (rising) return;
   if (G.t >= K.nT) {
     K.n++; K.nT = G.t + 1.0; msg(String(K.n), 'count'); sfx.count(K.n);
+    EVT.emit('count', { n: K.n, pos: D.headNow });   // the crowd holds its breath, then hums a little louder each digit
     if (K.n >= 10) return countOut(K);
   }
-  if (K.n + (G.t - (K.nT - 1)) >= K.up - K.mash) D.startGetUp(K.type === 'fall' ? 'fall' : 'knee');
+  if (kdProgress(K) >= 1) D.startGetUp(K.type === 'fall' ? 'fall' : 'knee');
 }
 function countOut(K) {
-  const D = K.def, A = K.att; D.ko = true; G.state = 'ko'; G.koT = K.t0; G.winner = A; G.loser = D; G.fallSnd = true; G.kd = null;
+  const D = K.def, A = K.att; D.ko = true; G.state = 'ko'; G.koT = K.t0; G.koCine = G.t; G.koTitle = false;
+  G.winner = A; G.loser = D; G.fallSnd = true; G.kd = null;
   if (D.rag.on) D.rag.prof.conscious = false;   // he stops trying
   else D.collapse();
   fightOver(A === P1, false, 'ko');
-  msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 300); EVT.emit('ko', { pos: D.headNow }); $('pad').hidden = true; Q.length = 0;
+  EVT.emit('ko', { pos: D.headNow }); $('pad').hidden = true; Q.length = 0;
 }
-function knockout(att, def, dir, power, name, fwd, forced) {
+function knockout(att, def, dir, power, name, fwd, forced, bodyArg) {
   // the delayed knockout (rare, but it happens — Barboza–Burgos): still on his feet, he backs up on rubber legs for a second or three and
   // then goes. Another clean shot meanwhile finishes it at once.
   if (!forced && !def.doomed && PUNCH[name].type !== 'upper' && power < 1.15 && rr() < (window.__koVar === 'stagger' ? 1 : window.__koVar ? 0 : 0.14)) {
@@ -379,7 +405,9 @@ function knockout(att, def, dir, power, name, fwd, forced) {
     popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'поплыл', 'crit'); return;
   }
   def.doomed = null;
-  def.ko = true; G.state = 'ko'; G.koT = G.t; AI.fol = 0; G.winner = att; G.loser = def; G.fallSnd = false;
+  const body = !!bodyArg;
+  def.ko = true; G.state = 'ko'; G.koT = G.t; G.koCine = G.t; G.koTitle = false;
+  AI.fol = 0; G.winner = att; G.loser = def; G.fallSnd = false;
   // keep the fall in the side-on plane: mostly away from the attacker, a little toward/away from camera
   // momentum check: a punch (~5–9 kg effective mass at 8–10 m/s) can give the 5 kg head several m/s, but the whole 80 kg body well under 1 m/s.
   // The fall itself comes from the legs giving way under the body's own lean; the punch only tips it and whips the head.
@@ -387,17 +415,19 @@ function knockout(att, def, dir, power, name, fwd, forced) {
   // body up and over into a backflip. 0.45 still snaps the head up under the chin; the fall stays a sag, not a toss.
   const T = PUNCH[name].type, imp = dir.clone().multiplyScalar(1.5 + 0.9 * power); imp.y = T === 'upper' ? 0.45 : Math.max(-0.6, Math.min(imp.y, 0.3));
   const along = imp.x * fwd, minAlong = T === 'hook' ? 0.3 + 0.4 * power : T === 'over' ? 0 : 0.9 + 0.6 * power; if (along < minAlong) imp.x += fwd * (minAlong - along);
-  // how the body goes down (from KO footage): straight shots to an upright fighter tip him back; hooks and overhands, landing on a man
-  // who is coming forward, usually fold him forward or onto his side; any of them can simply drop him where he stands
-  const u = rr(), fall = T === 'over' ? (u < 0.6 ? 'fwd' : u < 0.85 ? 'drop' : 'back') : T === 'hook' ? (u < 0.4 ? 'side' : u < 0.7 ? 'fwd' : u < 0.85 ? 'drop' : 'back')
-    : T === 'upper' ? (u < 0.65 ? 'back' : u < 0.85 ? 'drop' : 'fwd') : (u < 0.5 ? 'back' : u < 0.75 ? 'drop' : u < 0.9 ? 'fwd' : 'side');
   // frozen knockout: out on his feet — locked in place for a few tenths of a second (tonic), then he goes over like a tree
   const frozen = !forced && (window.__koVar === 'frozen' || (!window.__koVar && rr() < 0.15));
-  def.rag.start(forced ? imp.multiplyScalar(0.3) : imp, def.lastContact, window.__fall || (forced ? (rr() < 0.5 ? 'fwd' : 'drop') : frozen ? (rr() < 0.65 ? 'back' : 'fwd') : fall), new V3(-fwd, 0, 0), false, frozen ? 0.35 + rr() * 0.5 : 0);
-  G.slow = 0.3; G.slowT = 0.75; G.hitstop = 0.09; G.shake = 0.06; flash();
+  // issue 46: the fall follows the punch (koFall); one time in five he simply drops or tips the other way, so a whole
+  // fight never reads as one animation. A body-shot KO folds forward with the hands switched off (no bracing, see rag.start below).
+  const base = koFall(name, body), u = rr();
+  const fall = window.__fall || (forced ? (rr() < 0.5 ? 'fwd' : 'drop') : frozen ? (rr() < 0.65 ? 'back' : 'fwd')
+    : u < 0.8 ? base : u < 0.9 ? 'drop' : base === 'back' ? 'fwd' : 'back');
+  def.rag.start(forced ? imp.multiplyScalar(0.3) : imp, def.lastContact, fall, new V3(-fwd, 0, 0), false, frozen ? 0.35 + rr() * 0.5 : 0);
+  G.hitstop = KO_CINE.freeze; G.slow = KO_CINE.slow; G.slowT = KO_CINE.slowT; G.shake = 0.06; flash(); sfx.koHit(1.2);
   if (def.flesh.wounds.length) def.flesh.spray(def.flesh.wounds, dir, 1.4, def);
   fightOver(att === P1, false, 'ko');
-  msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 500); EVT.emit('ko', { pos: def.headNow });
+  // the «Нокаут!» plate and the bell now come after the camera has held the downed man (stateTick, 09_bag.js)
+  EVT.emit('ko', { pos: def.headNow });
   $('pad').hidden = true; Q.length = 0;
 }
 
@@ -481,6 +511,54 @@ window.__react = {
       if (r) out.push(r);                                 // so __tick(n) can step it to the peak for a screenshot
     }
     return out;
+  },
+};
+
+/* ── debug hook (issue 46): down(kind) / out(kind) — P1 immediately puts P2 in a knockdown / knockout with
+   'upperR', 'hookL', 'cross' or 'body'. The intro, the AI and leftovers from a previous shot are quieted and the
+   fall direction is pinned to the punch, so the impact / mid-fall / floor / count / get-up frames are repeatable.
+   Then __tick(n, 1/60) advances the sim: 6 = impact, 30 = mid-fall, 75 = on the canvas, 150 = count "2", ... */
+window.__kd = {
+  _setup() {
+    if (!P1 || !P2) return false;
+    if (G.state === 'menu' || G.state === 'result' || G.state === 'load') startFight(true);
+    G.state = 'fight'; G.introT = 9; G.stareT = 0; G.stare = 0; G.stareOn = false; G.paused = false;
+    G.hitstop = 0; G.slow = 1; G.slowT = 0; G.shake = 0; G.tradeT = 0;
+    show('hud', true); show('bar-t', false); show('bar-b', false);   // startFight's stare-down may have left the letterbox on
+    window.__noKD = false; window.__koVar = 'none'; window.__fall = null; window.__kdType = null;
+    delete window.__camHold;
+    if (typeof AI !== 'undefined' && AI) { AI.t = 99; AI.blockUntil = 0; AI.backT = 0; AI.lat = 0; AI.latT = 0; AI.fol = 0; AI.folT = 0; }
+    if (P2 && !P2._kdQuiet) { P2._kdQuiet = true; P2.startDodge = () => {}; }
+    for (const F of [P1, P2]) {
+      F.ko = false; F.frozen = false; F.gu = null; F.doomed = null; F.liver = null; F.wind = 0; F.daze = 0; F.wobble = 0;
+      F.cur = null; F.dodge = null; F.blocking = false; F.blockW = 0; F.slide = null; F.hp = 100; F.hpCap = 100; F.stamina = 100;
+      F.rag.stop();
+    }
+    Q.length = 0;
+    if (window.__tick) window.__tick(8, 1 / 60);   // seat the bones, headNow and the rib colliders
+    return true;
+  },
+  _punch(kind) {
+    const body = kind === 'body';
+    return { body, name: PUNCH[kind] ? kind : body ? 'hookL' : 'cross' };
+  },
+  down(kind = 'cross') {
+    if (!this._setup()) return null;
+    const { body, name } = this._punch(kind), fall = koFall(name, body);
+    P2.lastContact = P2.headNow.clone();
+    window.__fall = fall;   // pin the fall for a repeatable frame; consumed by rag.start inside knockdown
+    knockdown(P1, P2, new V3(1, 0.2, 0).normalize(), 1.2, name, 1, 1.9, body ? 'liver' : 'fall', body);
+    delete window.__fall;
+    return { kind, name, type: G.kd.type, fall, up: +G.kd.up.toFixed(2), state: G.state };
+  },
+  out(kind = 'cross') {
+    if (!this._setup()) return null;
+    const { body, name } = this._punch(kind), fall = koFall(name, body);
+    P2.lastContact = P2.headNow.clone();
+    window.__fall = fall;
+    knockout(P1, P2, new V3(1, 0.2, 0).normalize(), 1.3, name, 1, false, body);
+    delete window.__fall;
+    return { kind, name, fall, state: G.state, koT: +G.koT.toFixed(2) };
   },
 };
 

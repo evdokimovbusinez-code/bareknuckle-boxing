@@ -200,6 +200,10 @@ const POSES = {
     thighL: [90, 5, 0], shinL: [-138, 0, 0], footL: [25, 0, 0], thighR: [0, 6, 0], shinR: [-106, 0, 0], footR: [-44, 0, 0] }, 8),
   oneKnee: F => F.keyPose({ waist: [8, 0, 0], chest: [6, 0, 0], neck: [10, 0, 0], head: [4, 0, 0], uarmL: [48, -14, 0], farmL: [75, 0, 30], uarmR: [28, -12, 0], farmR: [62, 0, 25],
     thighL: [98, 4, 0], shinL: [-106, 0, 0], footL: [10, 0, 0], thighR: [-6, 6, 0], shinR: [-100, 0, 0], footR: [-42, 0, 0] }, 4),
+  // (issue 46) hand support between the knee and standing: still on one knee, leaning forward, the left glove
+  // reaching down to the canvas to push off — the get-up must read as effort, not a teleport
+  push: F => F.keyPose({ waist: [16, 0, 0], chest: [14, 0, 0], neck: [12, 0, 0], head: [6, 0, 0], uarmL: [64, -12, 0], farmL: [70, 0, 28], uarmR: [22, -12, 0], farmR: [58, 0, 25],
+    thighL: [98, 4, 0], shinL: [-106, 0, 0], footL: [10, 0, 0], thighR: [-6, 6, 0], shinR: [-100, 0, 0], footR: [-42, 0, 0] }, 8),
 };
 /* ───────── face: gaze, blinks, lids, jaw ─────────
    • eye contact: fighters hold each other's eyes; small saccades every 0.2–1.5 s, the eyes lead the head

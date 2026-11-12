@@ -32,6 +32,17 @@ function stareCam(k) {
    after the bell the chest heaves, the head hangs a little, the shoulders rise and fall */
 Fighter.prototype.cineLayer = function () {
   const B = this.bones, t = G.t, P = this.ph || 0;
+  if (G.state === 'ko' || G.state === 'result') {
+    // (issue 46) the winner's short gesture while the camera holds the downed man: chest opens, chin up,
+    // both arms lift a little, then settle. A pose layer, so it rides on top of the live idle animation.
+    if (G.winner === this) {
+      const a = G.t - (G.koCine || G.koT), u = sstep(0.25, 1.0, a) * (1 - 0.35 * sstep(2.2, 3.4, a));
+      this.rot(B.CC_Base_Spine02, -0.09 * u, 0, 0); this.rot(this.head, -0.14 * u, 0, 0);
+      for (const S of ['L', 'R']) this.rot(B[`CC_Base_${S}_Upperarm`], -0.08 * u, 0, (S === 'L' ? 1 : -1) * 0.55 * u);
+    }
+    this.cc.updateMatrixWorld(true);
+    return;
+  }
   if (G.state === 'intro') {
     const k = G.stare, sw = Math.sin(t * 1.1 + P);
     this.rot(B.CC_Base_Waist, 0.14 * k, 0, 0.02 * k * sw); this.rot(B.CC_Base_Spine02, 0.1 * k, 0, 0.025 * k * sw);
