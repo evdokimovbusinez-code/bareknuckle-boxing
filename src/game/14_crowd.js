@@ -482,6 +482,7 @@ EVT.on((type, e) => {
   if (type === 'hit') { if (e.blocked) return; CROWD.heat = Math.min(0.4, CROWD.heat + 0.04 + 0.08 * p); if (p > 0.6) { const k = clamp((p - 0.45) * 1.1, 0.2, 0.8); c.cheer(k, e.pos, 0.1); sfx.roar(k * 0.6); } if (p > 0.78) c.cheer(clamp(p, 0, 1), e.pos, 0.3, 2); }
   else if (type === 'kd') { c.cheer(0.9, e.pos, 1.4, 1); sfx.roar(0.8); CROWD.heat = 0.4; }
   else if (type === 'ko') { c.cheer(1, e.pos, 4, 1); sfx.roar(1); CROWD.heat = 0.5; }
+  else if (type === 'count') CROWD.heat = Math.max(CROWD.heat, 0.18 + 0.02 * (e.n || 0));   // (issue 46) the hum rises on every digit
   else if (type === 'up') { c.cheer(0.5, e.pos, 0.4); sfx.roar(0.35); }
   else if (type === 'round') { c.cheer(0.4, null, 0.5); sfx.roar(0.3); }
 });

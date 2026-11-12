@@ -88,6 +88,13 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .msg.count{color:#fff;font-size:min(22vw,150px);text-shadow:0 6px 0 rgba(0,0,0,.6),0 0 40px rgba(255,255,255,.25)}
 .msg.place{top:auto;bottom:15%;font-size:min(7vw,58px);letter-spacing:.1em;color:#f1e3c2}   /* the name of the place during the fly-round */
 .msg.place.show{animation:pop 2.6s cubic-bezier(.2,1.6,.4,1) forwards}
+/* (issue 46) the get-up bar during the referee's count: how close the man is to beating it; mashing punches fills it */
+.kdbar{position:absolute;left:50%;bottom:11%;transform:translateX(-50%);width:min(58vw,520px);pointer-events:none;
+  font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#f1e3c2;text-shadow:0 2px 0 rgba(0,0,0,.7)}
+.kdbar-t{display:flex;justify-content:space-between;margin-bottom:6px}
+.kdbar-r{height:11px;border:1px solid rgba(241,227,194,.45);border-radius:2px;background:rgba(5,6,9,.65);overflow:hidden}
+.kdbar-r i{display:block;height:100%;transform:scaleX(0);transform-origin:left;background:linear-gradient(90deg,#c22235,#e2b14a 65%,#fff3c4)}
+#stage.short .kdbar{bottom:7%}
 /* the card of a career opponent before the fight: a lower third over the place */
 .vs{position:absolute;inset:0;display:flex;align-items:flex-end;cursor:pointer;background:linear-gradient(0deg,rgba(5,6,9,.95),rgba(5,6,9,.7) 32%,rgba(5,6,9,0) 68%);padding:0 var(--pr) calc(var(--pb) + 4vmin) calc(var(--pl) + 4vmin)}
 .vs-b{max-width:min(780px,94%);border-left:4px solid var(--blood);padding-left:clamp(12px,2.4vmin,22px)}
@@ -400,6 +407,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 
   <div class="pops" id="pops"></div>
   <div class="msg" id="msg"></div>
+  <div class="kdbar" id="kdbar" hidden><div class="kdbar-t"><span id="kdtxt">ВСТАВАЙ · ЖМИ УДАРЫ</span><span id="kdn"></span></div><div class="kdbar-r"><i id="kdfill"></i></div></div>
 
   <!-- the card of a career opponent before the fight (fightCard): name and nickname, style · place · level, his legend -->
   <div class="vs" id="vs" hidden><div class="vs-b"><div class="vs-k" id="vs-k"></div><div class="vs-n" id="vs-n"></div><div class="vs-m" id="vs-m"></div><div class="vs-l" id="vs-l"></div><div class="vs-h" id="vs-h"></div></div></div>

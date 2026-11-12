@@ -184,7 +184,10 @@ function stateTick(dtReal) {
   }
   else if (G.state === 'ko') {
     if (!G.fallSnd && G.loser.headNow.y < 0.3) { G.fallSnd = true; sfx.fall(); G.shake = Math.max(G.shake, 0.03); }
-    if (G.t > G.koT + 2.3) startReplay();
+    // (issue 46) the camera holds the downed man for ~2–3 s, then the «Нокаут!» plate, the bell and the replay.
+    // koCine (not koT) starts the shot: on a count-out koT is the knockdown, ten seconds earlier.
+    if (!G.koTitle && G.t > G.koCine + KO_CINE.title) { G.koTitle = true; msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 180); }
+    if (G.t > G.koCine + KO_CINE.hold) startReplay();
   }
 }
 

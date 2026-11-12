@@ -240,7 +240,8 @@ class Fighter {
     const S = this.capturePose();
     if (this.rag.on) { for (const S2 of this.shoulder) if (S2.clBase) S2.cl.quaternion.copy(S2.clBase); this.rag.stop(); }
     const g = this.gu = { mode, t: 0, A: S.q, hipA: S.hip, off: new V3(S.hip.x - this.hipModel.x, 0, S.hip.z - this.hipModel.z) };
-    if (mode === 'knee') { g.stage = 'rise'; g.B = null; g.riseFrom = S; }
+    // (issue 46) a knee is not a teleport: one hand goes down to the canvas, he pushes off it, THEN rises.
+    if (mode === 'knee') { g.stage = 'push'; g.B = POSES.push(this); g.hipB = S.hip.clone(); }
     else if (mode === 'fours') { g.stage = 'up0'; g.B = POSES.fours(this); g.hipB = S.hip.clone().setY(0.5); }
     else { g.stage = 'up1'; g.B = POSES.kneel(this); g.hipB = S.hip.clone().setY(0.45); }
   }
@@ -269,6 +270,12 @@ class Fighter {
       this.rot(this.head, 0.18 + 0.06 * Math.sin(G.t * 2.1), 0.05 * Math.sin(G.t * 0.7), 0); this.lifeLayer(g, 0.3);
       return;
     }
+    if (g.stage === 'push') {   // (issue 46) one hand plants on the canvas, he pushes up off it before standing
+      g.T = 0.5; this.blendPose(g.A, g.B, g.hipA, g.hipB, w, sstep(0, 0.5, g.t / g.T), 0.6, 0.6);
+      this.lifeLayer(g, 0.55 * Math.sin(Math.PI * clamp(g.t / g.T, 0, 1)));
+      if (g.t >= g.T) { g.stage = 'rise'; g.t = 0; g.B = null; g.riseFrom = this.capturePose(); }
+      return;
+    }
     if (g.stage === 'up0') {   // whatever the physics left him in → hands and knees
       g.T = 0.7; this.blendPose(g.A, g.B, g.hipA, g.hipB, w, sstep(0, 0.4, g.t / g.T), 1, sstep(0.15, 0.7, g.t / g.T)); this.lifeLayer(g, Math.sin(Math.PI * clamp(g.t / g.T, 0, 1)));
       if (g.t >= g.T) { g.stage = 'up1'; g.t = 0; g.A = g.B; g.hipA = this.mpos(this.hip, new V3()); g.B = POSES.kneel(this); g.hipB = g.hipA.clone(); g.fromFours = true; } return;
@@ -295,7 +302,7 @@ class Fighter {
         if (!this.mark) this.mark = this.group.position.clone();
         const o = this.group.localToWorld(g.off.clone()).sub(this.group.localToWorld(new V3()));
         this.slide = { t: 0, from: this.group.position.clone().add(o) }; this.group.position.copy(this.slide.from); this.group.updateMatrixWorld(true);
-        this.gu = null; this.daze = Math.max(this.daze, 0.5); this.wobble = 1.6; this.stunUntil = G.t + 0.4;
+        this.gu = null; this.daze = Math.max(this.daze, 0.7); this.wobble = 1.8; this.stunUntil = G.t + 0.4;   // (issue 46) ~2 s of wobble; the guard comes back up as it fades
         if (G.kd) G.kd.done = G.t + 0.7;
       }
     }
@@ -868,7 +875,9 @@ class Fighter {
     this.animate(dt); this.retarget(); this.cc.updateMatrixWorld(true);
     this.headNeutral.setFromMatrixPosition(_m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInvT));
     this.pose(dt);
-    if ((G.stare > 0.001 && G.state === 'intro') || (this.pant > 0.001 && G.state === 'rend')) this.cineLayer();   // stare-down lean / heavy breathing (09b_cine.js)
+    // stare-down lean / heavy breathing / the winner's short gesture after a KO (09b_cine.js)
+    if ((G.stare > 0.001 && G.state === 'intro') || (this.pant > 0.001 && G.state === 'rend')
+      || ((G.state === 'ko' || G.state === 'result') && G.winner === this && !this.rag.on)) this.cineLayer();
     if (this.rag.hitOn) this.rag.hitStep(dt);
     this.spreadTwist(); this.cc.updateMatrixWorld(true);
     this.afterPose(dt);
