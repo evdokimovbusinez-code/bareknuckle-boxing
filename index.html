@@ -412,6 +412,47 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 #stage.short .tut-chip{font-size:11px;padding:2px 8px}
 #stage.short .tut-foot{gap:8px;margin-top:3px}
 #stage.short .tut-btns .btn{font-size:11px;padding:3px 9px}
+/* issue 50: training mini-games — a full-screen HUD with the shrinking rhythm ring and the rules / result cards */
+.tr{position:absolute;inset:0;z-index:5;pointer-events:none;color:#f1e3c2;font-family:var(--body)}
+.tr button{pointer-events:auto}
+.tr-top{position:absolute;top:calc(var(--pt) + 10px);left:0;right:0;display:flex;justify-content:center;gap:clamp(14px,4vmin,48px);text-align:center}
+.tr-stat small{display:block;font:600 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.tr-stat b{display:block;font-family:var(--display);font-weight:900;font-size:clamp(20px,4.6vmin,36px);line-height:1;color:var(--gold);text-shadow:0 2px 0 rgba(0,0,0,.6)}
+.tr-mid{position:absolute;inset:0}
+.tr-ring{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:clamp(70px,13vmin,130px);height:clamp(70px,13vmin,130px);border:2px solid rgba(226,177,74,.5);border-radius:50%;display:grid;place-items:center;opacity:0;transition:opacity .15s}
+.tr-ring.on{opacity:1}
+.tr-ring.hot{border-color:#fff;box-shadow:0 0 26px rgba(226,177,74,.85),inset 0 0 18px rgba(226,177,74,.4)}
+.tr-ring i{position:absolute;inset:8%;border:2px dashed rgba(226,177,74,.65);border-radius:50%}
+.tr-ring span{position:relative;font-family:var(--display);font-weight:900;font-size:clamp(22px,4.6vmin,40px);color:#fff;text-shadow:0 0 14px rgba(0,0,0,.9)}
+.tr-fb{position:absolute;left:0;right:0;top:64%;text-align:center;font-family:var(--display);font-weight:900;text-transform:uppercase;font-size:clamp(18px,4vmin,34px);color:var(--gold);opacity:0;transition:opacity .18s;text-shadow:0 3px 0 rgba(0,0,0,.6)}
+.tr-fb.on{opacity:1}
+.tr-combo{position:absolute;top:calc(var(--pt) + 68px);left:50%;transform:translateX(-50%);display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.tr-combo i{font-style:normal;font:700 clamp(13px,2.6vmin,20px) var(--poster);letter-spacing:.06em;border:1px solid rgba(255,255,255,.22);background:rgba(10,12,17,.72);border-radius:5px;padding:3px 12px;color:#cfc8ba}
+.tr-combo i.on{border-color:var(--gold);color:#0a0c11;background:var(--gold);box-shadow:0 0 16px rgba(226,177,74,.6)}
+.tr-count{position:absolute;left:0;right:0;top:38%;text-align:center;font-family:var(--display);font-weight:900;font-size:min(24vw,170px);line-height:1;color:#fff;text-shadow:0 6px 0 rgba(0,0,0,.6),0 0 44px rgba(255,255,255,.3)}
+.tr-bot{position:absolute;left:0;right:0;bottom:calc(var(--pb) + 10px);display:flex;justify-content:center;align-items:center;gap:14px;flex-wrap:wrap}
+.tr-bot span{font:500 clamp(11px,2vmin,14px) var(--mono);color:var(--muted);letter-spacing:.04em;text-align:center}
+.tr-bot .btn{font-size:clamp(11px,2vmin,14px);padding:5px 12px}
+.tr-card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,88%);box-sizing:border-box;text-align:center;pointer-events:none;
+  background:linear-gradient(180deg,rgba(27,29,34,.96),rgba(12,13,17,.97));border:1px solid rgba(226,177,74,.5);border-top:3px solid var(--gold);border-radius:10px;
+  padding:clamp(16px,3.4vmin,28px) clamp(18px,4vmin,30px);box-shadow:0 22px 64px -14px rgba(0,0,0,.92)}
+.tr-card h2{font-family:var(--display);font-weight:800;font-size:clamp(16px,3vmin,23px);line-height:1.25;text-transform:none;margin:8px 0 10px;color:#fff}
+.tr-card p{font-size:clamp(12px,2.2vmin,15px);line-height:1.45;color:#d8d2c6;margin:0 0 12px}
+.tr-card .eyebrow{display:block;margin-bottom:4px}
+.tr-rew{font:600 clamp(11px,2.2vmin,14px) var(--mono);color:var(--gold);letter-spacing:.03em;margin:0 0 14px}
+.tr-grade{font-family:var(--display);font-weight:900;font-size:clamp(72px,16vmin,150px);line-height:.9;color:var(--gold);text-shadow:0 5px 0 rgba(0,0,0,.6),0 0 50px rgba(226,177,74,.5)}
+.tr-grade.a{color:#8fd49a;text-shadow:0 5px 0 rgba(0,0,0,.6),0 0 50px rgba(143,212,154,.5)}
+.tr-grade.b{color:#8ab6e8}.tr-grade.c{color:#cfc8ba}
+.tr-res{font:500 clamp(12px,2.4vmin,15px) var(--mono);line-height:1.7;color:#d8d2c6;margin:8px 0}
+.tr-res b{color:var(--gold)}
+.tr-res .gain{display:block;color:var(--gold);font-size:clamp(14px,2.8vmin,19px);margin:6px 0}
+.tr-card .modal-b{margin-top:6px}
+#stage.short .tr-card{width:min(520px,92%);padding:10px 16px}
+#stage.short .tr-grade{font-size:clamp(44px,12vmin,80px)}
+#stage.short .tr-card h2{font-size:clamp(13px,2.6vmin,18px);margin:4px 0 6px}
+#stage.short .tr-card p{font-size:12px;margin:0 0 8px}
+#stage.short .tr-top{top:2px}
+#stage.short .tr-combo{top:40px}
 </style>
 
 <div id="stage">
@@ -483,8 +524,10 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       </nav>
       <nav class="mnav" id="nav-train" hidden>
         <button id="go-bag"><i>01</i><b>Груша</b><small id="bag-lbl"></small></button>
-        <button id="go-spar"><i>02</i><b>Спарринг</b><small>шлем и перчатки · зал</small></button>
-        <button id="go-tutorial"><i>03</i><b>Обучение</b><small>управление · 1 мин</small></button>
+        <button id="go-rope"><i>02</i><b>Скакалка</b><small>ритм · дыхалка + скорость</small></button>
+        <button id="go-mitts"><i>03</i><b>Лапы</b><small>комбо · скорость + сила</small></button>
+        <button id="go-spar"><i>04</i><b>Спарринг</b><small>шлем и перчатки · зал</small></button>
+        <button id="go-tutorial"><i>05</i><b>Обучение</b><small>управление · 1 мин</small></button>
         <button id="train-back"><i>←</i><b>Назад</b></button>
       </nav>
       <div class="mfoot"><div class="ladder" id="ladder"></div><div class="rec-line" id="rec-line"></div></div>
@@ -8675,6 +8718,870 @@ window.__tut = {
   block: v => setBlock(v),
   dodge: n => press('dodge', n),
 };
+/* ───────── training mini-games: the shared shell (issue 50) ─────────
+   One loop for the jump rope and the focus mitts: a one-line rules splash → 3-2-1 → a 30…45 s drill →
+   the result card (score, grade C/B/A/S, «+N к характеристике», the best result) → «Ещё раз» / «В меню».
+   Both games describe their drill as a sorted array of beats { t, action, glyph, win, ... }; this file owns the
+   clock, the ±window resolution, the HUD, the grade and the reward. The games own the 3D, the poses and the
+   reaction to a hit / a miss (09f_rope.js, 09g_mitts.js). The heavy bag (09_bag.js) shares only the reward.
+
+   Reward: PROF.xp = { pow, spd, chin, sta }; every 100 XP raises the matching PROF.stats by 1 (same cap of 5
+   as renderStats). One full reward per drill per real day; a repeat the same day pays 25% (anti-farming).
+   PROF is serialised whole by save() in 07, so xp / train survive a reload without any new save code. */
+if (!PROF.xp || typeof PROF.xp !== 'object') PROF.xp = {};
+for (const k of ['pow', 'spd', 'chin', 'sta']) PROF.xp[k] = Math.max(0, (PROF.xp[k] | 0) || 0);
+if (!PROF.train || typeof PROF.train !== 'object') PROF.train = {};
+if (!PROF.train.done || typeof PROF.train.done !== 'object') PROF.train.done = {};
+if (!PROF.train.best || typeof PROF.train.best !== 'object') PROF.train.best = {};
+if (typeof PROF.train.day !== 'string') PROF.train.day = '';
+
+const TRAIN_XP_MAX = 100, TRAIN_STAT_CAP = 5;
+const TRAIN_STAT = { pow: 'силе', spd: 'скорости', chin: 'челюсти', sta: 'дыхалке' };
+const TRAIN_XP_BASE = { S: 60, A: 45, B: 30, C: 18 };
+const TRAIN_DEF = {
+  rope: {
+    id: 'rope', title: 'Скакалка', dur: 35, stats: ['sta', 'spd'], window: 0.09, lead: 0.55,
+    rules: 'Прыгай в момент, когда скакалка проходит под ногами. Темп растёт с 100 до 150 ударов в минуту.',
+    keys: 'Пробел или тап по экрану — прыжок · ← → или левая/правая половина — бег на месте · двойной проворот — два быстрых тапа.',
+    hud: 'пробел / тап — прыжок · ← → — бег · два тапа — двойной проворот',
+    reset: ropeReset, hit: ropeHit, miss: ropeMiss, frame: ropeFrame, enter: ropeEnter, leave: ropeLeave, aim: null
+  },
+  mitts: {
+    id: 'mitts', title: 'Лапы', dur: 40, stats: ['spd', 'pow'], window: 0.12, lead: 0.5,
+    rules: 'Тренер называет комбинацию и подставляет лапы. Повтори удары в нужном порядке и вовремя.',
+    keys: 'U I J K N M — джеб, кросс, хуки, апперкоты · на телефоне — свайп по экрану, как в бою.',
+    hud: 'U I J K N M — удары · свайп на телефоне · бей по лапе в ритм',
+    reset: tmMittsReset, hit: tmMittsHit, miss: tmMittsMiss, frame: tmMittsFrame, enter: tmMittsEnter, leave: tmMittsLeave, aim: tmMittsAim
+  }
+};
+const TRAIN = {
+  on: false, game: null, def: null, phase: 'idle',   // 'rules' | 'count' | 'play' | 'result'
+  t: 0, i: 0, beats: [], window: 0.09, lead: 0.55, count: 3,
+  hits: 0, misses: 0, score: 0, combo: 0, bestCombo: 0,
+  fb: '', fbT: 0, res: null
+};
+
+/* local calendar day, so «one reward a day» does not depend on the browser locale */
+function trainDay() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+function trainDayRoll() { if (PROF.train.day !== trainDay()) { PROF.train.day = trainDay(); PROF.train.done = {}; } }
+function trainRepeatHint(id) { trainDayRoll(); return !!PROF.train.done[id]; }
+function trainGrade(acc) { return acc >= 0.94 ? 'S' : acc >= 0.80 ? 'A' : acc >= 0.60 ? 'B' : 'C'; }
+function trainBagGrade(score) { return score >= 900 ? 'S' : score >= 600 ? 'A' : score >= 350 ? 'B' : 'C'; }
+
+/* pay out the drill: add XP to each of its stats, turn every 100 XP into +1 (capped at 5), record the best
+   score and persist. Also used by bagEnd() in 09_bag.js (the bag has no beats, only a score). */
+function trainAward(id, grade, score) {
+  trainDayRoll();
+  const repeat = !!PROF.train.done[id];
+  const gain = Math.max(1, Math.round((TRAIN_XP_BASE[grade] || 18) * (repeat ? 0.25 : 1)));
+  PROF.train.done[id] = true;
+  const def = TRAIN_DEF[id] || { stats: ['pow'] }, ups = [];
+  for (const s of def.stats) {
+    let x = (PROF.xp[s] || 0) + gain;
+    while (x >= TRAIN_XP_MAX && (PROF.stats[s] || 0) < TRAIN_STAT_CAP) { x -= TRAIN_XP_MAX; PROF.stats[s] = (PROF.stats[s] || 0) + 1; ups.push(s); }
+    if ((PROF.stats[s] || 0) >= TRAIN_STAT_CAP) x = Math.min(x, TRAIN_XP_MAX - 1);   // nothing left to buy
+    PROF.xp[s] = x;
+  }
+  const rec = score > (PROF.train.best[id] || 0);
+  if (rec) PROF.train.best[id] = score;
+  save();
+  return { id, grade, gain, repeat, ups, score, best: PROF.train.best[id] || 0, rec };
+}
+function trainRewardLine(aw) {
+  const def = TRAIN_DEF[aw.id] || { stats: ['pow'] };
+  let t = '+' + aw.gain + ' к ' + def.stats.map(s => TRAIN_STAT[s]).join(' и ');
+  if (aw.ups.length) t += ' · ' + aw.ups.map(s => '+1 ' + (STATS.find(S => S.id === s) || { label: s }).label).join(', ');
+  if (aw.repeat) t += ' · повтор (25%)';
+  return t;
+}
+
+/* ── shell: entering, leaving, the three phases ── */
+function trainStart(id) {
+  const d = TRAIN_DEF[id]; if (!d || !P1 || !P2) return;
+  if (TRAIN.on) trainLeave();                     // «Ещё раз» from a previous drill: clean up first
+  const T = TRAIN;
+  T.on = true; T.game = id; T.def = d; T.phase = 'rules';
+  T.t = 0; T.i = 0; T.beats = []; T.window = d.window; T.lead = d.lead;
+  T.hits = T.misses = T.score = T.combo = T.bestCombo = 0; T.fb = ''; T.fbT = 0; T.res = null;
+  G.mode = 'train'; G.state = 'train'; G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0;
+  G.stareOn = false; G.stare = 0; G.rend = null; RP.hl = false;
+  BAG.on = false; if (BAG.g) BAG.g.visible = false;
+  setLocation('boxgym'); uiShow(null);
+  for (const s of ['hud', 'pad', 'vs', 'result', 'rec', 'bar-t', 'bar-b', 'hl']) show(s, false);
+  P1.stat = PROF.stats;
+  sfx.unlock(); camCut = true;
+  d.enter();
+  trainUI();
+}
+function trainLeave() {
+  const T = TRAIN; if (!T.on) return;
+  if (T.def && T.def.leave) T.def.leave();
+  T.on = false; T.phase = 'idle';
+  const root = $('train'); if (root) root.hidden = true;
+}
+function trainQuit() { if (!TRAIN.on) return; trainLeave(); toMenu(); }
+function trainCountdown() {
+  const T = TRAIN; if (!T.on || T.phase !== 'rules') return;
+  T.phase = 'count'; T.t = 0; T.count = 3; sfx.unlock(); sfx.ping(); trainUI(); trainHud();
+}
+function trainBeginPlay() {
+  const T = TRAIN, d = T.def;
+  T.phase = 'play'; T.t = 0; T.i = 0; T.beats = [];
+  T.hits = T.misses = T.score = T.combo = T.bestCombo = 0;
+  T.fb = ''; T.fbT = 0; T.res = null;
+  d.reset(T);                                   // the game fills T.beats, already sorted by t
+  trainUI();
+}
+function trainAgain() { const id = TRAIN.game; trainStart(id); trainCountdown(); }
+
+function trainTick(dt) {
+  const T = TRAIN; if (!T.on || dt <= 0) return;
+  if (T.phase === 'count') {
+    T.t += dt;
+    const n = 3 - Math.floor(T.t);
+    if (n !== T.count && n > 0) { T.count = n; sfx.ping(); }
+    trainHud();
+    if (T.t >= 3) { trainBeginPlay(); sfx.clap(); }
+    return;
+  }
+  if (T.phase !== 'play') return;              // rules / result are click-driven only
+  T.t += dt;
+  if (T.fbT > 0 && (T.fbT -= dt) <= 0) T.fb = '';
+  const w = (b) => b.win || T.window;
+  while (T.i < T.beats.length && T.t > T.beats[T.i].t + w(T.beats[T.i])) trainMiss(T.beats[T.i], null);
+  if (T.t >= T.def.dur) { trainFinish(); return; }
+  trainHud();
+}
+/* the single input funnel: real keys, pointer taps / swipes and the emulation all arrive here */
+function trainInput(action) {
+  const T = TRAIN; if (!T.on) return false;
+  if (T.phase === 'rules') { if (action === 'start' || action === 'ok' || action === 'jump') trainCountdown(); return true; }
+  if (T.phase === 'result') { if (action === 'again' || action === 'ok' || action === 'jump') trainAgain(); return true; }
+  if (T.phase !== 'play') return true;         // the countdown swallows input
+  const b = T.beats[T.i]; if (!b) return true;
+  const w = b.win || T.window, off = Math.abs(T.t - b.t);
+  if (off <= w && action === b.action) trainHit(b, off, w);
+  else trainMiss(b, action);                   // wrong punch / too early / too late: the combo resets
+  return true;
+}
+function trainHit(b, off, w) {
+  const T = TRAIN; T.i++; T.hits++; T.combo++; T.bestCombo = Math.max(T.bestCombo, T.combo);
+  const perfect = off <= w * 0.42;
+  T.score += (perfect ? 100 : 60) + Math.min(T.combo, 20) * 5;
+  T.fb = perfect ? 'Отлично!' : 'Хорошо'; T.fbT = 0.5;
+  if (T.def.hit) T.def.hit(b, perfect);
+  if (perfect) sfx.ping(); else sfx.clap();
+}
+function trainMiss(b, action) {
+  const T = TRAIN; T.i++; T.misses++; T.combo = 0;
+  T.fb = 'Мимо'; T.fbT = 0.5;
+  if (T.def.miss) T.def.miss(b, action);
+  sfx.whoosh(0.45);
+}
+function trainFinish() {
+  const T = TRAIN, total = T.hits + T.misses;
+  const acc = total ? T.hits / total : 0, grade = trainGrade(acc);
+  T.res = trainAward(T.game, grade, T.score);
+  T.res.acc = acc; T.res.hits = T.hits; T.res.misses = T.misses; T.res.bestCombo = T.bestCombo;
+  T.phase = 'result'; sfx.bell(2); trainUI();
+}
+
+/* ── the HUD: three readouts, a shrinking rhythm ring, the called combo, feedback, the countdown ── */
+function trainUI() {
+  const T = TRAIN, root = $('train'); if (!root) return;
+  root.hidden = false;
+  const p = T.phase, rules = p === 'rules', count = p === 'count', play = p === 'play', res = p === 'result';
+  $('tr-rules').hidden = !rules; $('tr-res').hidden = !res;
+  $('tr-top').hidden = !play; $('tr-mid').hidden = !play;
+  $('tr-bot').hidden = !play && !count; $('tr-count').hidden = !count;
+  $('tr-combo-hint').hidden = !(play && T.game === 'mitts');
+  if (rules) {
+    const d = T.def;
+    $('tr-r-title').textContent = d.title;
+    $('tr-r-h').textContent = d.rules;
+    $('tr-r-keys').textContent = d.keys;
+    $('tr-r-reward').textContent = 'Награда: ' + d.stats.map(s => (STATS.find(S => S.id === s) || { label: s }).label).join(' + ') +
+      ' · +1 за каждые 100 опыта' + (trainRepeatHint(d.id) ? ' · сегодня повтор: 25%' : '');
+  }
+  if (res && T.res) {
+    const r = T.res;
+    $('tr-res-title').textContent = T.def.title;
+    $('tr-grade').textContent = r.grade; $('tr-grade').className = 'tr-grade ' + r.grade.toLowerCase();
+    $('tr-res-score').innerHTML = `очки <b>${T.score}</b> · точность <b>${Math.round(r.acc * 100)}%</b> · попаданий <b>${T.hits}</b> · промахов <b>${T.misses}</b> · серия <b>×${T.bestCombo}</b>`;
+    $('tr-res-gain').textContent = trainRewardLine(r);
+    $('tr-res-best').textContent = (r.rec ? 'новый рекорд: ' : 'лучший результат: ') + r.best + ' очков';
+  }
+  trainHud();
+}
+function trainHud() {
+  const T = TRAIN; if (!T.on) return;
+  if (T.phase === 'count') { $('tr-count').textContent = String(Math.max(1, 3 - Math.floor(T.t))); return; }
+  if (T.phase !== 'play') return;
+  $('tr-score').textContent = String(T.score);
+  $('tr-combo').textContent = '×' + T.combo;
+  $('tr-time').textContent = String(Math.max(0, Math.ceil(T.def.dur - T.t)));
+  $('tr-hint').textContent = T.def.hud || '';
+  const b = T.beats[T.i], ring = $('tr-ring');
+  if (!b) ring.classList.remove('on');
+  else {
+    const until = b.t - T.t, k = clamp(until / T.lead, 0, 1);
+    $('tr-ring-i').style.transform = 'scale(' + (0.3 + 0.7 * k).toFixed(3) + ')';
+    ring.classList.toggle('hot', Math.abs(until) <= (b.win || T.window));
+    ring.classList.add('on');
+    $('tr-glyph').textContent = b.glyph || '⤴';
+  }
+  const ch = $('tr-combo-hint');
+  if (T.game === 'mitts' && b && b.combo) {
+    ch.innerHTML = b.combo.map((c, j) => `<i class="${j < b.seq ? 'on' : ''}">${c.label}</i>`).join('');
+    ch.hidden = false;
+  } else ch.hidden = true;
+  const fb = $('tr-fb'); fb.textContent = T.fb; fb.classList.toggle('on', !!T.fb);
+}
+
+/* ── the two hooks in frame() (11_arena_loop.js) ── */
+function trainAim() { return TRAIN.on && TRAIN.def && TRAIN.def.aim ? TRAIN.def.aim() : null; }
+function trainFrame(dt) { if (TRAIN.on && TRAIN.def && TRAIN.def.frame) TRAIN.def.frame(dt, TRAIN); }
+
+/* ── keyboard + pointer. trainKey is called from 12_ui.js before uiKey, so a training screen owns every key ── */
+function trainKey(e) {
+  const T = TRAIN; if (!T.on) return false;
+  if (e.repeat) return true;
+  e.preventDefault();
+  if (e.key === 'Escape') { trainQuit(); return true; }
+  if (T.phase === 'rules') { if (e.key === 'Enter' || e.key === ' ') trainCountdown(); return true; }
+  if (T.phase === 'result') { if (e.key === 'Enter' || e.key === ' ') trainAgain(); return true; }
+  if (T.phase !== 'play') return true;
+  if (T.game === 'rope') {
+    if (e.code === 'Space' || e.key === ' ') trainInput('jump');
+    else if (e.code === 'ArrowLeft' || e.code === 'KeyA') trainInput('left');
+    else if (e.code === 'ArrowRight' || e.code === 'KeyD') trainInput('right');
+  } else if (T.game === 'mitts') {
+    const k = ACT_KEYS[e.code]; if (k && k[0] === 'punch') trainInput(k[1]);
+  }
+  return true;
+}
+function trainPointerRope(e) {
+  const T = TRAIN, b = T.beats[T.i];
+  const run = b && (b.action === 'left' || b.action === 'right');
+  if (!run) { trainInput('jump'); return; }
+  if (stage.classList.contains('rot')) trainInput(e.clientY < window.innerHeight / 2 ? 'left' : 'right');
+  else trainInput(e.clientX < window.innerWidth / 2 ? 'left' : 'right');
+}
+function trainBoot() {
+  const on = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', fn); };
+  on('go-rope', () => trainStart('rope')); on('go-mitts', () => trainStart('mitts'));
+  on('tr-start', trainCountdown); on('tr-again', trainAgain);
+  on('tr-r-menu', trainQuit); on('tr-res-menu', trainQuit); on('tr-quit', trainQuit);
+  let g = null;
+  stage.addEventListener('pointerdown', e => {
+    const T = TRAIN; if (!T.on) return;
+    if (e.target.closest && e.target.closest('button, .tr-card')) return;
+    if (T.phase === 'rules') { trainCountdown(); return; }
+    if (T.phase === 'result') { trainAgain(); return; }
+    if (T.phase !== 'play') return;
+    g = { id: e.pointerId, x: e.clientX, y: e.clientY, fired: false };
+    if (T.game === 'rope') { trainPointerRope(e); g.fired = true; }
+  });
+  stage.addEventListener('pointermove', e => {
+    const T = TRAIN; if (!T.on || !g || e.pointerId !== g.id || g.fired || T.phase !== 'play' || T.game !== 'mitts') return;
+    let dx = e.clientX - g.x, dy = e.clientY - g.y;
+    if (stage.classList.contains('rot')) { const q = dx; dx = dy; dy = -q; }
+    if (Math.hypot(dx, dy) > 24) { const n = punchFromSwipe(dx, dy); if (n) trainInput(n); g.fired = true; }
+  });
+  stage.addEventListener('pointerup', e => {
+    const T = TRAIN;
+    if (T.on && g && e.pointerId === g.id && !g.fired && T.phase === 'play' && T.game === 'mitts') trainInput('jab');
+    g = null;
+  });
+}
+trainBoot();
+
+/* ── debug / emulation API ──
+   play(id, 'perfect'|'miss') runs a whole drill through trainTick + trainInput (the same funnels the keys use),
+   without waiting for the wall clock — used by tools/train_test.py and by the screenshot scenarios. */
+function trainPlay(id, mode) {
+  trainStart(id); trainBeginPlay();
+  const T = TRAIN, dt = 1 / 60; let guard = 0;
+  while (T.phase === 'play' && guard++ < 20000) {
+    const b = T.beats[T.i];
+    if (mode === 'perfect' && b && T.t + dt >= b.t) { T.t = b.t; trainInput(b.action); }
+    trainTick(dt);
+  }
+  return { grade: T.res && T.res.grade, hits: T.hits, misses: T.misses, score: T.score,
+    gain: T.res && T.res.gain, xp: { ...PROF.xp }, stats: { ...PROF.stats } };
+}
+window.__train = {
+  start: trainStart, countdown: trainCountdown, quit: trainQuit, again: trainAgain,
+  press: a => trainInput(a), play: trainPlay, boot: trainBoot,
+  state: () => ({ on: TRAIN.on, phase: TRAIN.phase, game: TRAIN.game, t: TRAIN.t, i: TRAIN.i,
+    beats: TRAIN.beats.length, hits: TRAIN.hits, misses: TRAIN.misses, score: TRAIN.score,
+    combo: TRAIN.combo, grade: TRAIN.res && TRAIN.res.grade, res: TRAIN.res,
+    next: TRAIN.beats[TRAIN.i] && { t: TRAIN.beats[TRAIN.i].t, action: TRAIN.beats[TRAIN.i].action } }),
+  prof: () => ({ xp: { ...PROF.xp }, stats: { ...PROF.stats }, train: JSON.parse(JSON.stringify(PROF.train)) }),
+  defs: TRAIN_DEF, award: trainAward, rewardLine: trainRewardLine
+};
+/* ───────── the jump-rope drill (issue 50, adapted from issue #31's 09c_rope.js) ─────────
+   A procedural rope + rig + chain physics for the training gym. The handles sit in the fists; the cord is a
+   verlet/PBD chain of 40 links pinned to the two handle tips. Unlike the old demo (a fixed 76 BPM spin) the
+   phase is now derived from TRAIN.beats: one revolution per jump, so the cord passes under the feet exactly at
+   the beat time, and the tempo ramps 100 → 150 BPM. A missed beat knocks the spin off (jrCatch): the cord goes
+   limp, snags a foot capsule, then spins up again. The shell (09e_train.js) owns scoring; this file owns the 3D. */
+const JRP = {
+  on: false, mode: 'spin',                      // 'spin' | 'catch'
+  phase: 3 * Math.PI / 2, subPhase: 3 * Math.PI / 2, omega: 8.0,
+  ropeLen: 2.7, N: 40, L0: 2.7 / 40,
+  drive: 0.16, lag: 0.55,                       // tension toward the hand-driven backbone; the tip trails the hands
+  cx: 0, cy: 0.92, cz: 0, w: 0.5, capR: 0.25, capLen: 0.79, D: 0.95, halfZ: 0.25,
+  jumpH: 0.135, jumpY: 0,                      // toe-hop height (m)
+  catchT: 0, needInit: true, initSpin: true, initPhase: 3 * Math.PI / 2,
+  E: [new V3(), new V3()], feet: [],
+  p: null, pp: null, vel: null,
+  mesh: null, geo: null, cordMat: null, h: [null, null],
+  twSave: null
+};
+const _jrA = new V3(), _jrB = new V3(), _jrX = new V3(), _jrY = new V3(), _jrZ = new V3();
+const _jrYdir = [new V3(), new V3()], _jrRef = new V3(0, 0, 1);
+
+/* ───────── model: two grips + a thin braided cord ───────── */
+function jrBuild() {
+  if (JRP.mesh) return;
+  const cordTex = canvasTex(64, 256, (g, w, h) => {
+    g.fillStyle = '#b71c27'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = 'rgba(255,225,220,0.30)'; g.lineWidth = 6;
+    for (let y = -h; y < h * 2; y += 34) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y + w); g.stroke(); }
+    g.strokeStyle = 'rgba(90,0,8,0.35)'; g.lineWidth = 5;
+    for (let y = -h; y < h * 2; y += 34) { g.beginPath(); g.moveTo(w, y); g.lineTo(0, y + w); g.stroke(); }
+  });
+  cordTex.wrapS = cordTex.wrapT = THREE.RepeatWrapping; cordTex.repeat.set(1, 9);
+  JRP.cordMat = new THREE.MeshStandardMaterial({ map: cordTex, roughness: 0.72, metalness: 0.02, side: THREE.DoubleSide });
+  const gripTex = canvasTex(128, 256, (g, w, h) => {
+    g.fillStyle = '#20232a'; g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 6) { g.fillStyle = `rgba(255,255,255,${0.03 + 0.05 * Math.abs(Math.sin(y * 0.7))})`; g.fillRect(0, y, w, 2); }
+    for (let x = 0; x < w; x += 9) { g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(x, 0, 3, h); }
+    g.fillStyle = '#c02a2f'; g.fillRect(0, 0, w, 8); g.fillRect(0, h - 8, w, 8);
+  });
+  const mGrip = new THREE.MeshStandardMaterial({ map: gripTex, roughness: 0.82, metalness: 0.06 });
+  const mMetal = new THREE.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.28, metalness: 0.92 });
+  const mRed = new THREE.MeshStandardMaterial({ color: 0xc4202a, roughness: 0.45, metalness: 0.15 });
+  const L = 0.15, parts = [], mats = [];
+  const add = (geo, mat) => { parts.push(geo); mats.push(mat); };
+  add(new THREE.CylinderGeometry(0.016, 0.0125, L, 16, 1).translate(0, L / 2, 0), mGrip);
+  for (const y of [0.028, 0.072, 0.116]) add(new THREE.TorusGeometry(0.0152, 0.0016, 6, 16).rotateX(Math.PI / 2).translate(0, y, 0), mGrip);
+  add(new THREE.CylinderGeometry(0.0165, 0.0165, 0.012, 16).translate(0, L - 0.006, 0), mRed);
+  add(new THREE.CylinderGeometry(0.009, 0.013, 0.02, 14).translate(0, -0.008, 0), mMetal);
+  add(new THREE.TorusGeometry(0.0075, 0.0024, 8, 16).rotateX(Math.PI / 2).translate(0, -0.02, 0), mMetal);
+  const handleGeo = mergeGeometries(parts, true);
+  for (let s = 0; s < 2; s++) {
+    const m = new THREE.Mesh(handleGeo, mats);
+    m.matrixAutoUpdate = false; m.frustumCulled = false; m.castShadow = true; m.visible = false;
+    scene.add(m); JRP.h[s] = m;
+  }
+  // (N+1) rings × 8 verts, world-space positions rewritten every frame; the mesh stays at identity
+  const RAD = 8, nPts = JRP.N + 1, count = nPts * RAD, geo = new THREE.BufferGeometry(); JRP.geo = geo;
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+  const uv = new Float32Array(count * 2);
+  for (let i = 0; i < nPts; i++) for (let j = 0; j < RAD; j++) { const k = (i * RAD + j) * 2; uv[k] = j / RAD; uv[k + 1] = i / JRP.N; }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  const idx = [];
+  for (let i = 0; i < JRP.N; i++) for (let j = 0; j < RAD; j++) {
+    const a = i * RAD + j, b = i * RAD + (j + 1) % RAD, c = (i + 1) * RAD + j, d = (i + 1) * RAD + (j + 1) % RAD;
+    idx.push(a, c, b, b, c, d);
+  }
+  geo.setIndex(idx);
+  const mesh = new THREE.Mesh(geo, JRP.cordMat); mesh.frustumCulled = false; mesh.castShadow = true; mesh.visible = false;
+  scene.add(mesh); JRP.mesh = mesh;
+  const len = nPts * 3; JRP.p = new Float32Array(len); JRP.pp = new Float32Array(len); JRP.vel = new Float32Array(len);
+}
+
+/* ───────── the taut backbone the hands drive (a hairpin in the world x-y plane) ───────── */
+function jrProfile() {
+  const S = JRP, A = S.E[0], B = S.E[1];
+  S.cx = (A.x + B.x) / 2; S.cy = (A.y + B.y) / 2; S.cz = (A.z + B.z) / 2;
+  S.w = A.distanceTo(B); S.halfZ = (B.z - A.z) / 2;
+  S.capR = S.w / 2; S.capLen = Math.PI * S.capR; S.D = (S.ropeLen - S.capLen) / 2;
+}
+function jrIdeal(i, ph, out) {
+  const S = JRP, ell = i * S.L0, D = S.D, capR = S.capR, capLen = S.capLen;
+  let rad, z;
+  if (ell <= D) { rad = ell; z = S.cz - S.halfZ; }
+  else if (ell <= D + capLen) { const th = (ell - D) / capR; rad = D + capR * Math.sin(th); z = S.cz - capR * Math.cos(th); }
+  else { rad = D - (ell - D - capLen); z = S.cz + S.halfZ; }
+  const a = ph - S.lag * rad / (D + capR);
+  return out.set(S.cx + Math.cos(a) * rad, S.cy + Math.sin(a) * rad, z);
+}
+function jrInitRope(phase, spin) {
+  const S = JRP, N = S.N, p = S.p, vel = S.vel, pp = S.pp, om = spin ? S.omega : 0;
+  for (let i = 0; i <= N; i++) {
+    jrIdeal(i, phase, _jrA);
+    const k = 3 * i, x = _jrA.x, y = _jrA.y;
+    p[k] = x; p[k + 1] = y; p[k + 2] = _jrA.z; pp[k] = x; pp[k + 1] = y; pp[k + 2] = _jrA.z;
+    vel[k] = -om * (y - S.cy); vel[k + 1] = om * (x - S.cx); vel[k + 2] = 0;
+  }
+}
+
+/* ───────── rig: hands to the hips, small wrist circles, a toe-hop, a stumble on a catch ───────── */
+function jrPose() {
+  const S = JRP, B = P1.bones, ph = S.phase, catchK = S.mode === 'catch' ? 1 : 0;
+  const r = 0.035 * (1 - 0.6 * catchK), dy = r * Math.sin(ph), dz = r * Math.cos(ph), droop = 0.05 * catchK;
+  for (let s = 0; s < 2; s++) {
+    const side = s === 0 ? 'L' : 'R', sx = s === 0 ? 0.26 : -0.26;
+    const t = _jrA.set(sx, 0.92 - droop + dy, 0.06 + dz);
+    P1.ik(B[`CC_Base_${side}_Upperarm`], B[`CC_Base_${side}_Forearm`], B[`CC_Base_${side}_Hand`], t);
+    P1.cc.updateMatrixWorld(true);
+  }
+  const bend = 0.02 + 0.035 * (1 - S.jumpY / S.jumpH);
+  P1.rot(B.CC_Base_L_Thigh, bend, 0, 0); P1.rot(B.CC_Base_R_Thigh, bend, 0, 0);
+  P1.rot(B.CC_Base_L_Calf, -1.4 * bend, 0, 0); P1.rot(B.CC_Base_R_Calf, -1.4 * bend, 0, 0);
+  if (catchK) P1.rot(B.CC_Base_Spine01, 0.14 * catchK, 0, 0);
+  P1.spreadTwist(); P1.cc.updateMatrixWorld(true);
+}
+function jrJumpY() {   // one hop per revolution, peaked at the under-feet pass (φ = 3π/2)
+  const S = JRP; if (S.mode === 'catch') return 0;
+  return S.jumpH * Math.pow(Math.max(0, Math.cos(S.phase - 3 * Math.PI / 2)), 1.2);
+}
+function jrHandles() {
+  const S = JRP, HB = P1.bones, ph = S.phase;
+  for (let s = 0; s < 2; s++) {
+    const side = s === 0 ? 'L' : 'R', sgn = s === 0 ? -1 : 1;
+    const hw = _jrB.setFromMatrixPosition(HB[`CC_Base_${side}_Hand`].matrixWorld);
+    const E = S.E[s].copy(hw); E.x += 0.01; E.y -= 0.025; E.z -= sgn * 0.02;
+    const Y = _jrYdir[s].set(0.5 + 0.16 * Math.cos(ph), -0.8, sgn * 0.1 + 0.16 * Math.sin(ph)).normalize();
+    _jrX.crossVectors(_jrRef, Y).normalize(); _jrZ.crossVectors(_jrX, Y).normalize();
+    const m = S.h[s]; m.matrix.makeBasis(_jrX, Y, _jrZ); m.matrix.setPosition(E);
+    m.matrixWorldNeedsUpdate = true; m.visible = true;
+  }
+}
+function jrFeet() {
+  const S = JRP, f = S.feet; f.length = 0;
+  for (const side of ['L', 'R']) {
+    const a = _jrB.setFromMatrixPosition(P1.bones[`CC_Base_${side}_Foot`].matrixWorld);
+    f.push({ c: new V3(a.x + 0.02, a.y - 0.02, a.z), r: 0.062 });
+    f.push({ c: new V3(a.x + 0.10, a.y - 0.045, a.z), r: 0.05 });
+  }
+}
+
+/* ───────── chain physics ───────── */
+function jrPinEnds() { const S = JRP, p = S.p, A = S.E[0], B = S.E[1], k = 3 * S.N; p[0] = A.x; p[1] = A.y; p[2] = A.z; p[k] = B.x; p[k + 1] = B.y; p[k + 2] = B.z; }
+function jrLink(i) {
+  const S = JRP, p = S.p, a = 3 * i, b = a + 3;
+  const dx = p[b] - p[a], dy = p[b + 1] - p[a + 1], dz = p[b + 2] - p[a + 2];
+  const d = Math.hypot(dx, dy, dz); if (d < 1e-9) return;
+  const wa = i === 0 ? 0 : 0.5, wb = i + 1 === S.N ? 0 : 0.5, w = wa + wb; if (w === 0) return;
+  const c = (d - S.L0) / d / w;
+  p[a] += dx * wa * c; p[a + 1] += dy * wa * c; p[a + 2] += dz * wa * c;
+  p[b] -= dx * wb * c; p[b + 1] -= dy * wb * c; p[b + 2] -= dz * wb * c;
+}
+function jrCollide() {
+  const S = JRP, p = S.p, N = S.N, floor = 0.004;
+  for (let i = 1; i < N; i++) {
+    const k = 3 * i;
+    if (p[k + 1] < floor) p[k + 1] = floor;
+    for (const f of S.feet) {
+      const dx = p[k] - f.c.x, dy = p[k + 1] - f.c.y, dz = p[k + 2] - f.c.z, d = Math.hypot(dx, dy, dz);
+      if (d < f.r && d > 1e-6) { const s = f.r / d; p[k] = f.c.x + dx * s; p[k + 1] = f.c.y + dy * s; p[k + 2] = f.c.z + dz * s; }
+    }
+  }
+}
+function jrStep(h) {
+  const S = JRP, N = S.N, p = S.p, pp = S.pp, vel = S.vel, catching = S.mode === 'catch';
+  const damp = 1 - (catching ? 3.2 : 0.6) * h, g = 9.81 * (catching ? 1.7 : 1);
+  for (let i = 1; i < N; i++) {
+    const k = 3 * i;
+    pp[k] = p[k]; pp[k + 1] = p[k + 1]; pp[k + 2] = p[k + 2];
+    let vx = vel[k] * damp, vy = (vel[k + 1] - g * h) * damp, vz = vel[k + 2] * damp;
+    const sp = Math.hypot(vx, vy, vz); if (sp > 24) { const f = 24 / sp; vx *= f; vy *= f; vz *= f; }
+    p[k] += vx * h; p[k + 1] += vy * h; p[k + 2] += vz * h;
+  }
+  jrPinEnds();
+  if (!catching) for (let i = 1; i < N; i++) {   // centrifugal tension toward the rotating backbone
+    jrIdeal(i, S.subPhase, _jrA);
+    const k = 3 * i, a = S.drive;
+    p[k] += (_jrA.x - p[k]) * a; p[k + 1] += (_jrA.y - p[k + 1]) * a; p[k + 2] += (_jrA.z - p[k + 2]) * a;
+  }
+  for (let it = 0; it < 6; it++) { if (it & 1) { for (let i = N - 1; i >= 0; i--) jrLink(i); } else { for (let i = 0; i < N; i++) jrLink(i); } jrPinEnds(); }
+  jrCollide(); jrPinEnds();
+  const inv = 1 / h;
+  for (let i = 1; i < N; i++) { const k = 3 * i; vel[k] = (p[k] - pp[k]) * inv; vel[k + 1] = (p[k + 1] - pp[k + 1]) * inv; vel[k + 2] = (p[k + 2] - pp[k + 2]) * inv; }
+}
+function jrRope(dt) {
+  const S = JRP;
+  if (S.needInit) { jrInitRope(S.initPhase, S.initSpin); S.needInit = false; }
+  const SUB = 6, h = dt / SUB;
+  for (let s = 0; s < SUB; s++) {
+    S.subPhase = S.phase - S.omega * dt + S.omega * dt * (s + 1) / SUB;
+    jrStep(h);
+  }
+}
+function jrTube() {
+  const S = JRP, N = S.N, p = S.p, RAD = 8, R = 0.0042;
+  const pos = S.geo.attributes.position.array, nor = S.geo.attributes.normal.array;
+  for (let i = 0; i <= N; i++) {
+    const k = 3 * i, ka = 3 * Math.max(0, i - 1), kb = 3 * Math.min(N, i + 1);
+    const tx = p[kb] - p[ka], ty = p[kb + 1] - p[ka + 1], tz = p[kb + 2] - p[ka + 2];
+    const tl = Math.hypot(tx, ty, tz) || 1; _jrA.set(tx / tl, ty / tl, tz / tl);
+    _jrX.crossVectors(_jrA, _jrRef); if (_jrX.lengthSq() < 1e-6) _jrX.crossVectors(_jrA, new V3(1, 0, 0)); _jrX.normalize();
+    _jrY.crossVectors(_jrX, _jrA).normalize();
+    for (let j = 0; j < RAD; j++) {
+      const a = 2 * Math.PI * j / RAD, c = Math.cos(a), s = Math.sin(a);
+      const nx = _jrX.x * c + _jrY.x * s, ny = _jrX.y * c + _jrY.y * s, nz = _jrX.z * c + _jrY.z * s, o = (i * RAD + j) * 3;
+      pos[o] = p[k] + nx * R; pos[o + 1] = p[k + 1] + ny * R; pos[o + 2] = p[k + 2] + nz * R;
+      nor[o] = nx; nor[o + 1] = ny; nor[o + 2] = nz;
+    }
+  }
+  S.geo.attributes.position.needsUpdate = true; S.geo.attributes.normal.needsUpdate = true;
+}
+function jrCatch() { const S = JRP; if (S.mode === 'catch') return; S.mode = 'catch'; S.catchT = 0; S.vel.fill(0); }
+
+/* ───────── the beat schedule: BPM 100 → 150, one jump per revolution ─────────
+   normal hops, a «double spin» (two beats 0.15 s apart) and a short run on the spot (alternating ←/→).
+   win = ±90 ms as specified; bpm / glyph are for the HUD and the rope phase. */
+function ropePickMode(n, u) {
+  const r = (n * 2654435761) % 100;
+  if (u > 0.30 && r < 14) return 'double';
+  if (u > 0.45 && r >= 14 && r < 34) return 'run';
+  return 'normal';
+}
+function ropeReset(T) {
+  const beats = T.beats, dur = T.def.dur;
+  let t = 1.1, n = 0;
+  while (t < dur - 0.7) {
+    const u = t / dur, bpm = 100 + 50 * u, len = 60 / bpm, mode = ropePickMode(n, u), win = T.def.window;
+    if (mode === 'double') {
+      beats.push({ t, action: 'jump', glyph: '⤴⤴', win, bpm });
+      beats.push({ t: t + Math.min(0.17, len * 0.45), action: 'jump', glyph: '⤴', win, bpm });
+      t += len * 1.15;
+    } else if (mode === 'run') {
+      for (let k = 0; k < 4 && t < dur - 0.7; k++) {
+        beats.push({ t, action: k % 2 ? 'right' : 'left', glyph: k % 2 ? '→' : '←', win, bpm });
+        t += len * 0.9;
+      }
+    } else {
+      beats.push({ t, action: 'jump', glyph: '⤴', win, bpm }); t += len;
+    }
+    n++;
+  }
+  const S = JRP; S.mode = 'spin'; S.catchT = 0; S.phase = 3 * Math.PI / 2;
+  S.needInit = true; S.initSpin = true; S.initPhase = S.phase;
+}
+function ropeHit(b, perfect) {
+  const S = JRP;
+  if (S.mode === 'catch') { S.mode = 'spin'; S.needInit = true; S.initSpin = true; S.initPhase = S.phase; }
+  S.jumpH = perfect ? 0.15 : 0.135;           // a perfect hop leaves the canvas a little higher
+}
+function ropeMiss(b, action) { jrCatch(); }
+
+/* ───────── per-frame driver (called by trainFrame, right before Fighter.simulate) ───────── */
+function ropeFrame(dt, T) {
+  const S = JRP; if (!S.on || dt <= 0) return;
+  if (S.mode === 'catch') {
+    S.catchT += dt;
+    if (S.catchT > 1.1) { S.mode = 'spin'; S.needInit = true; S.initSpin = true; S.initPhase = S.phase; }
+  } else if (T.phase === 'play' && T.beats.length) {
+    // 3π/2 (rope under the feet) exactly at each beat; one full revolution between neighbouring beats
+    const bs = T.beats; let j = 0;
+    for (let k = 0; k < bs.length; k++) { if (bs[k].t <= T.t) j = k; else break; }
+    const a = bs[j];
+    const span = j + 1 < bs.length ? Math.max(0.08, bs[j + 1].t - a.t) : Math.max(0.08, a.t - bs[Math.max(0, j - 1)].t);
+    // frac is not clamped: after the last call the cord keeps spinning at the final tempo until the bell
+    S.phase = 3 * Math.PI / 2 + 2 * Math.PI * Math.max(0, (T.t - a.t) / span);
+    S.omega = 2 * Math.PI / span;
+  } else { S.phase += 4.2 * dt; S.omega = 4.2; }   // idle spin on the rules / result cards
+
+  jrPose();
+  S.jumpY = jrJumpY();
+  P1.group.position.y = S.jumpY;
+  P1.group.updateMatrixWorld(true);
+  P1.headFrame.multiplyMatrices(P1.head.matrixWorld, HEAD.restInvT);
+  P1.headFrameInv.copy(P1.headFrame).invert();
+  P1.headNow.y += S.jumpY;
+  jrHandles(); jrFeet(); jrProfile();
+  jrRope(dt); jrTube();
+}
+
+/* ───────── enter / leave ───────── */
+function ropeEnter() {
+  jrBuild();
+  const S = JRP;
+  S.twSave = { ...(window.__tw || {}) };
+  window.__tw = window.__tw || {};
+  window.__tw.noPlant = true; window.__tw.noClear = true; window.__tw.noSep = true;  // feet follow the legs, no arm/body separation
+  BAG.on = false; showP2(false); if (BAG.g) BAG.g.visible = false;
+  P1.resetState(); P1.blocking = false; P1.blockW = 0; P1.dodge = null; P1.gest = null; P1.cur = null; P1.aimW = 0;
+  P1.place(0, Math.PI / 2, false);             // face +x → the rope's plane is x-y, seen from the default +z camera
+  P1.mark = P1.group.position.clone(); P1.adv = 0; P1.advV = 0; P1.hold = 0;
+  P1.group.position.y = 0; P1.group.updateMatrixWorld(true);
+  S.on = true; S.mode = 'spin'; S.catchT = 0; S.jumpY = 0; S.phase = 3 * Math.PI / 2;
+  S.needInit = true; S.initSpin = true; S.initPhase = S.phase;
+  S.mesh.visible = true;
+  jrPose(); jrHandles(); jrFeet(); jrProfile();   // seed the chain ends from the first posed frame
+}
+function ropeLeave() {
+  const S = JRP; if (!S.on) return;
+  S.on = false; S.mesh.visible = false; S.h[0].visible = S.h[1].visible = false;
+  if (S.twSave !== null) window.__tw = S.twSave;
+  P1.group.position.y = 0; P1.group.updateMatrixWorld(true);
+  P1.place(-D_SEP / 2, Math.PI / 2, false); P1.mark = P1.group.position.clone();
+}
+/* ───────── the focus-mitt drill (issue 50, adapted from issue #32's 09d_mitts.js) ─────────
+   A pair of procedural leather focus mitts worn on the trainer's (P2) hands. Geometry is built in the hand/mitt
+   frame (cm, +y = fingers, +z = the striking face) and carried by a rigid group: every frame the trainer's
+   forearms are posed with the game's two-bone IK and the mitts are seated on the wrist bones. A landed punch
+   (P1.knuckle vs. the pad bullseye) kicks a damped spring that recoils pad + forearm, ripples the leather in
+   the vertex shader and smacks. The shell (09e_train.js) calls a combo, the player answers with the real punch
+   keys / swipes: a correct beat fires startPunch() and the knuckle–pad contact does the rest. */
+const MITTS = { on: false, feed: 'jab', active: 'L', pending: null, parts: null, tex: null, t: 0 };
+const MITT = { a: 10.2, b: 12.6, cy: 5.0, zRim: 2.0, zFront: 7.2, zBackRim: -0.6, zBack: -1.4 };
+const MTAU = Math.PI * 2, _mto = new V3(), _mtd = new V3();
+const _mtA = new V3(), _mtB = new V3(), _mtN = new V3(), _mtW = new V3(), _mtKn = new V3(), _mtC = new V3();
+const _mtBack = new V3(), _mtTgt = new V3(), _mtAim = new V3(), _mtY = new V3(0, 1, 0), _mtX = new V3(1, 0, 0);
+const _mtQ = new Quat(), _mtQ2 = new Quat(), _mtS = new V3(0.01, 0.01, 0.01);
+
+/* rounded-rectangle outline of the pad in the x/y plane (superellipse) */
+function mittOutline(u, out) {
+  const t = u * MTAU, cs = Math.cos(t), sn = Math.sin(t), p = 0.58;
+  return out.set(MITT.a * Math.sign(cs) * Math.pow(Math.abs(cs), p), MITT.b * Math.sign(sn) * Math.pow(Math.abs(sn), p), 0);
+}
+const mittCup = (x, y) => 0.012 * x * x + 0.009 * (y - MITT.cy) * (y - MITT.cy);
+function mittFront(u, v, out) {
+  const o = mittOutline(u, _mto), x = o.x * v, y = MITT.cy + o.y * v, k = Math.pow(Math.max(0, 1 - v * v), 0.72);
+  return out.set(x, y, MITT.zRim + (MITT.zFront - MITT.zRim) * k - mittCup(x, y));
+}
+function mittBack(u, v, out) {
+  const o = mittOutline(u, _mto), x = o.x * v, y = MITT.cy + o.y * v, k = Math.pow(Math.max(0, 1 - v * v), 0.7);
+  return out.set(x, y, MITT.zBackRim - (MITT.zBackRim - MITT.zBack) * k - mittCup(x, y));
+}
+function mittWall(u, v, out) {
+  const o = mittOutline(u, _mto), x = o.x, y = MITT.cy + o.y;
+  return out.set(x, y, lerp(MITT.zRim, MITT.zBackRim, v) - mittCup(x, y));
+}
+
+/* ── canvas textures: a painted bullseye on the striking face / plain leather, pebbled normal, roughness ── */
+function mittTextures() {
+  if (MITTS.tex) return MITTS.tex;
+  let sd = 20261111; const R = () => { sd = (sd * 16807) % 2147483647; return (sd - 1) / 2147483646; };
+  const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  const tex = (c, srgb, rep) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.wrapS = t.wrapT = THREE.RepeatWrapping; if (rep) t.repeat.set(rep, rep); return t; };
+  const S = 512, fc = mk(S, S), g = fc.getContext('2d');
+  g.fillStyle = '#8a4a2e'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 11000; i++) { const x = R() * S, y = R() * S, r = 1 + R() * 2.8; g.fillStyle = R() < 0.5 ? `rgba(255,224,188,${0.03 + R() * 0.09})` : `rgba(30,12,6,${0.04 + R() * 0.13})`; g.beginPath(); g.ellipse(x, y, r, r * (0.6 + R() * 0.6), 0, 0, 7); g.fill(); }
+  const vg = g.createRadialGradient(S / 2, S / 2, S * 0.20, S / 2, S / 2, S * 0.72);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(24,10,4,0.55)'); g.fillStyle = vg; g.fillRect(0, 0, S, S);
+  g.save(); g.translate(S / 2, S / 2); g.scale(S / (2 * MITT.a), S / (2 * MITT.b));
+  g.beginPath();
+  for (let i = 0; i <= 160; i++) { const o = mittOutline(i / 160, _mto), x = o.x * 0.865, y = o.y * 0.865; if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+  g.closePath(); g.lineWidth = 0.14; g.strokeStyle = 'rgba(239,222,190,0.75)'; g.stroke();
+  for (const [r, col] of [[8.5, '#2b160e'], [7.6, '#efe1c6'], [5.7, '#b52c2f'], [4.0, '#efe1c6'], [2.4, '#b52c2f']]) { g.fillStyle = col; g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill(); }
+  g.restore();
+  const PS = 256, pc = mk(PS, PS), p = pc.getContext('2d');
+  p.fillStyle = '#57321f'; p.fillRect(0, 0, PS, PS);
+  for (let i = 0; i < 7000; i++) { const x = R() * PS, y = R() * PS, r = 1 + R() * 2.4; p.fillStyle = R() < 0.5 ? `rgba(230,190,150,${0.03 + R() * 0.08})` : `rgba(14,6,3,${0.05 + R() * 0.14})`; p.beginPath(); p.ellipse(x, y, r, r * (0.6 + R() * 0.5), 0, 0, 7); p.fill(); }
+  const NS = 256, hc = mk(NS, NS), h = hc.getContext('2d');
+  h.fillStyle = '#7f7f7f'; h.fillRect(0, 0, NS, NS);
+  for (let i = 0; i < 2600; i++) { const x = R() * NS, y = R() * NS, r = 2 + R() * 3.2; h.fillStyle = `rgba(255,255,255,${0.25 + R() * 0.35})`;
+    for (let ox = -NS; ox <= NS; ox += NS) for (let oy = -NS; oy <= NS; oy += NS) { h.beginPath(); h.ellipse(x + ox, y + oy, r, r * (0.6 + R() * 0.5), R() * 3, 0, 7); h.fill(); } }
+  const src = h.getImageData(0, 0, NS, NS).data, nc = mk(NS, NS), n = nc.getContext('2d'), im = n.createImageData(NS, NS);
+  const H = (x, y) => src[((((y + NS) % NS) * NS) + ((x + NS) % NS)) * 4] / 255;
+  for (let y = 0; y < NS; y++) for (let x = 0; x < NS; x++) {
+    const dx = (H(x - 1, y) - H(x + 1, y)) * 1.7, dy = (H(x, y - 1) - H(x, y + 1)) * 1.7, l = 1 / Math.hypot(dx, dy, 1), k = (y * NS + x) * 4;
+    im.data[k] = (dx * l * 0.5 + 0.5) * 255; im.data[k + 1] = (dy * l * 0.5 + 0.5) * 255; im.data[k + 2] = (l * 0.5 + 0.5) * 255; im.data[k + 3] = 255;
+  }
+  n.putImageData(im, 0, 0);
+  const rc = mk(NS, NS), r2 = rc.getContext('2d');
+  r2.fillStyle = '#c6c6c6'; r2.fillRect(0, 0, NS, NS);
+  for (let i = 0; i < 8000; i++) { const v = 165 + ((R() * 80) | 0); r2.fillStyle = `rgb(${v},${v},${v})`; r2.fillRect(R() * NS, R() * NS, 1 + R() * 2, 1 + R() * 2); }
+  return MITTS.tex = { face: tex(fc, true), plain: tex(pc, true, 2), nrm: tex(nc, false, 2), rgh: tex(rc, false, 2) };
+}
+/* a leather material whose vertices ripple for a few tenths of a second after a punch (uMVib decays in mittsTick) */
+function mittMat(U, opts) {
+  const T = MITTS.tex;
+  const m = new THREE.MeshPhysicalMaterial(Object.assign({
+    normalMap: T.nrm, normalScale: new THREE.Vector2(0.7, 0.7), roughnessMap: T.rgh, roughness: 0.95,
+    metalness: 0.0, clearcoat: 0.16, clearcoatRoughness: 0.55, sheen: 0.2,
+    sheenColor: new THREE.Color('#c98b60'), sheenRoughness: 0.7, envMapIntensity: 0.55, side: THREE.DoubleSide
+  }, opts));
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uMVib = U.vib; sh.uniforms.uMT = U.t;
+    sh.vertexShader = 'uniform float uMVib; uniform float uMT;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\n transformed += normal * (uMVib * 0.15 * sin(uMT * 74.0 + position.y * 52.0 + position.x * 31.0));');
+  };
+  m.customProgramCacheKey = () => 'mittVib';
+  return m;
+}
+function mittBuild(side) {
+  const T = mittTextures(), U = { vib: { value: 0 }, t: { value: 0 } };
+  const matFace = mittMat(U, { map: T.face }), matLeather = mittMat(U, { map: T.plain });
+  const matTrim = mittMat(U, { color: 0x2a1810, roughness: 0.8 });
+  const matStitch = new THREE.MeshStandardMaterial({ color: 0xefe1c6, roughness: 0.9, side: THREE.DoubleSide });
+  const matBuckle = new THREE.MeshStandardMaterial({ color: 0xb9b2a4, metalness: 0.75, roughness: 0.35 });
+  const c = new V3(0, MITT.cy, 1);
+  const front = gridGeo(mittFront, 96, 30, { c, ku: 1, kv: 1 });
+  { const uv = front.attributes.uv, pos = front.attributes.position;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.5 + pos.getX(i) / (2 * MITT.a), 0.5 + (pos.getY(i) - MITT.cy) / (2 * MITT.b)); }
+  const wall = gridGeo(mittWall, 96, 4, { c, ku: 5, kv: 1 });
+  const back = gridGeo(mittBack, 96, 14, { c, ku: 4, kv: 3 });
+  const pocket = gridGeo((u, v, o) => { const d = sphDir(u, v, _mtd); return o.set(d.x * 8.0, MITT.cy - 2 + d.y * 10.5, -2.2 + d.z * 3.0); },
+    40, 24, { c: new V3(0, MITT.cy - 2, -2.2), ku: 3, kv: 2 });
+  const strap = gridGeo((u, v, o) => { const t = u * MTAU; return o.set(5.1 * Math.cos(t), -7.0 + 4.4 * v, -1.6 + 4.5 * Math.sin(t)); },
+    40, 3, { c: new V3(0, -4.8, -1.6), ku: 4, kv: 1 });
+  const buckle = new THREE.BoxGeometry(2.7, 2.3, 0.55).translate(0, -4.8, -6.35);
+  const loop = [];
+  for (let i = 0; i < 96; i++) { const o = mittOutline(i / 96, _mto), x = o.x, y = MITT.cy + o.y; loop.push(new V3(x, y, 0.7 - mittCup(x, y))); }
+  const welt = pipeGeo(loop, 1.0, true);
+  const g = new THREE.Group(); g.matrixAutoUpdate = false; g.frustumCulled = false;
+  const add = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; g.add(m); return m; };
+  add(front, matFace); add(wall, matLeather); add(back, matLeather); add(pocket, matLeather);
+  add(strap, matTrim); add(buckle, matBuckle); add(welt, matTrim);
+  const N = 56, dashGeo = new THREE.CylinderGeometry(0.13, 0.13, 1, 5, 1);
+  const stitches = new THREE.InstancedMesh(dashGeo, matStitch, N);
+  stitches.frustumCulled = false; stitches.matrixAutoUpdate = false;
+  for (let i = 0; i < N; i++) {
+    const u = (i + 0.5) / N, a = mittFront(u, 0.90, _mtA), b = mittFront(u + 0.004, 0.90, _mtB);
+    const dir = _mtB.sub(a).normalize(), pos = a.add(_mtN.set(0, 0, 0.25));
+    const q = new Quat().setFromUnitVectors(_mtY, dir);
+    stitches.setMatrixAt(i, new M4().compose(pos, q, new V3(1, 0.62, 1)));
+  }
+  stitches.instanceMatrix.needsUpdate = true; g.add(stitches);
+  P2.group.add(g);
+  const B = P2.bones, s = side;
+  return { side: s, g, U,
+    upper: B[`CC_Base_${s}_Upperarm`], fore: B[`CC_Base_${s}_Forearm`], hand: B[`CC_Base_${s}_Hand`],
+    cur: new V3(), tgt: new V3(), q: new Quat(), yaw: 0, tgtYaw: 0,
+    x: 0, v: 0, vib: 0 };
+}
+
+/* feeds. Wrist targets are world metres (P2 stands at x = +0.575; −x is toward P1), converted to his model frame */
+const MITT_FEEDS = {
+  jab:   { active: 'L', L: [0.40, 1.58, -0.12], R: [0.56, 1.28, 0.22], yL: -0.42, yR: -0.22 },
+  cross: { active: 'R', L: [0.56, 1.28, -0.22], R: [0.40, 1.58, 0.12], yL: -0.22, yR: -0.42 },
+  hook:  { active: 'L', both: true, L: [0.42, 1.50, -0.24], R: [0.56, 1.28, 0.22], yL: -0.95, yR: -0.22 },
+  hookR: { active: 'R', both: true, L: [0.56, 1.28, -0.22], R: [0.42, 1.50, 0.24], yL: -0.22, yR: -0.95 }
+};
+function mittsHold(kind) {
+  if (!MITTS.parts) return;
+  const F = MITT_FEEDS[kind] || MITT_FEEDS.jab; kind = MITT_FEEDS[kind] ? kind : 'jab';
+  MITTS.feed = kind; MITTS.active = F.active;
+  P2.group.updateMatrixWorld(true);
+  for (const s of ['L', 'R']) {
+    const P = MITTS.parts[s], w = new V3(F[s][0], F[s][1], F[s][2]);
+    P.tgt.copy(P2.group.worldToLocal(w)); P.tgtYaw = F['y' + s] || 0;
+  }
+}
+function mittsStrike(side, out) { return out.set(0, MITT.cy, MITT.zFront).applyMatrix4(MITTS.parts[side].g.matrixWorld); }
+/* where P1's fist is aimed during a pending punch: the bullseye, or wide of it on a wrong punch */
+function mittsAim() {
+  if (!MITTS.on || !MITTS.pending || MITTS.pending.done || !P1.cur) return null;
+  const pk = MITTS.pending, p = mittsStrike(pk.side, _mtAim);
+  if (!pk.armed) { p.z += pk.side === 'L' ? -0.34 : 0.34; p.y += 0.07; }
+  return p;
+}
+/* pose the trainer, seat the mitts on his wrists, run the recoil springs, test the knuckle–pad contact */
+function mittsTick(dt) {
+  if (!MITTS.on || !MITTS.parts) return;
+  MITTS.t += dt; P2.group.updateMatrixWorld(true);
+  const smooth = 1 - Math.exp(-dt * 9), k = 320, damp = 15;
+  for (const s of ['L', 'R']) {
+    const P = MITTS.parts[s];
+    P.cur.lerp(P.tgt, smooth); P.yaw += (P.tgtYaw - P.yaw) * smooth;
+    P.v += (-k * P.x - damp * P.v) * dt; P.x += P.v * dt;
+    if (Math.abs(P.x) < 1e-5 && Math.abs(P.v) < 1e-4) { P.x = 0; P.v = 0; }
+    P.vib *= Math.exp(-dt * 10);
+    P.q.setFromAxisAngle(_mtY, P.yaw).multiply(_mtQ2.setFromAxisAngle(_mtX, -clamp(P.x * 2.2, 0, 0.28)));
+    _mtBack.set(0, 0, -1).applyQuaternion(P.q);
+    _mtTgt.copy(P.cur).addScaledVector(_mtBack, P.x);
+    P2.ik(P.upper, P.fore, P.hand, _mtTgt);
+    P2.cc.updateMatrixWorld(true);
+    const wrist = P2.mpos(P.hand, _mtW);
+    P.g.matrix.compose(wrist, P.q, _mtS);
+    P.g.matrixWorldNeedsUpdate = true; P.g.updateMatrixWorld(true);
+    P.U.vib.value = P.vib; P.U.t.value = MITTS.t;
+  }
+  const pk = MITTS.pending;
+  if (pk) {
+    if (!pk.done && P1.cur && pk.armed) {
+      const kn = P1.knuckle(_mtKn), c = mittsStrike(pk.side, _mtC);
+      if (kn.distanceTo(c) < 0.16) {
+        pk.done = true;
+        const P = MITTS.parts[pk.side];
+        P.v += 0.45 + 1.45 * pk.power; P.vib = 0.55 + 0.45 * pk.power;
+        sfx.mitt(pk.power);
+      }
+    }
+    if (!P1.cur) { pk.done = true; MITTS.pending = null; }
+  }
+}
+
+/* ── the drill: combos grow longer, the gap and the hit window shrink (tuning: 0.62→0.40 s, 160→90 ms) ── */
+const TM_LABEL = { jab: '1', cross: '2', hookL: '3', hookR: '4', upperL: 'АП', upperR: 'АП' };
+const TM_PAD = {
+  jab: { feed: 'jab', side: 'L' }, cross: { feed: 'cross', side: 'R' },
+  hookL: { feed: 'hook', side: 'L' }, hookR: { feed: 'hookR', side: 'R' },
+  upperL: { feed: 'jab', side: 'L' }, upperR: { feed: 'cross', side: 'R' }
+};
+const TM_COMBOS = [
+  ['jab', 'cross'],                       // 1-2
+  ['jab', 'cross', 'hookL'],              // 1-2-3
+  ['jab', 'jab', 'cross'],                // 1-1-2
+  ['jab', 'cross', 'hookR'],              // 1-2-хук
+  ['jab', 'upperL', 'hookL'],             // джеб-апперкот-хук
+  ['jab', 'cross', 'hookL', 'upperR']     // late in the drill: four punches
+];
+function tmMittsReset(T) {
+  const beats = T.beats, dur = T.def.dur;
+  let t = 1.4, ci = 0;
+  while (t < dur - 0.9) {
+    const u = t / dur, maxLen = u < 0.30 ? 2 : u < 0.65 ? 3 : 4;
+    const pool = TM_COMBOS.filter(c => c.length <= maxLen), combo = pool[(ci * 7 + 3) % pool.length];
+    const step = lerp(0.62, 0.40, u), win = lerp(0.16, 0.09, u);
+    const shown = combo.map(punch => ({ label: TM_LABEL[punch] || punch, punch }));
+    for (let j = 0; j < combo.length && t < dur - 0.9; j++) {
+      beats.push({ t, action: combo[j], glyph: TM_LABEL[combo[j]], win, combo: shown, seq: j, feed: (TM_PAD[combo[j]] || TM_PAD.jab).feed });
+      t += step;
+    }
+    t += lerp(0.55, 0.30, u);   // a breath to read the next call
+    ci++;
+  }
+}
+function tmMittsHitPunch(name, power, armed) {
+  const P = TM_PAD[name] || TM_PAD.jab;
+  mittsHold(P.feed);
+  P1.startPunch(name);
+  P1.resolved = true;   // the trainer is not an opponent: no damage / knockdown / whiff resolution from this swing
+  P1.wide = 0; if (P1.aimJit) P1.aimJit.set(0, 0, 0);
+  MITTS.pending = { side: P.side, power: clamp(power, 0, 1), armed: !!armed, done: false };
+}
+function tmMittsHit(b, perfect) { tmMittsHitPunch(b.action, perfect ? 0.95 : 0.6, true); }
+function tmMittsMiss(b, action) { if (action && TM_PAD[action]) tmMittsHitPunch(action, 0.5, false); }  // a wrong punch sails past the pad
+function tmMittsFrame(dt, T) { mittsTick(dt); }
+function tmMittsAim() { return mittsAim(); }
+
+/* ── enter / leave ── */
+function tmMittsEnter() {
+  if (!MITTS.parts) MITTS.parts = { L: mittBuild('L'), R: mittBuild('R') };
+  MITTS.on = true; MITTS.pending = null; MITTS.t = 0;
+  BAG.on = false; if (BAG.g) BAG.g.visible = false;
+  P1.resetState(); P2.resetState();
+  P1.place(-D_SEP / 2, Math.PI / 2, false); P2.place(D_SEP / 2, -Math.PI / 2, true);
+  for (const F of [P1, P2]) { F.mark = F.group.position.clone(); F.adv = 0; F.advV = 0; F.latV = 0; F.group.updateMatrixWorld(true); }
+  showP2(true);   // re-applies his normal outfit, then the wraps / gloves / gum shield / hand skin come off
+  const G2 = P2.gear;
+  P2.wrapMesh.visible = false; for (const t of P2.tails) t.mesh.visible = false;
+  G2.guard.visible = false;
+  if (G2.gloves) { for (const gl of G2.gloves) gl.g.visible = false; G2.hg.visible = false; }
+  if (G2.mma) { G2.mma.visible = false; for (const pd of G2.mmaPads) pd.m.visible = false; }
+  P2.flesh.u.uGlv.value = 1;   // the hand inside a mitt is not drawn (the skin shader's glove mode)
+  for (const s of ['L', 'R']) { const P = MITTS.parts[s]; P.g.visible = true; P.x = 0; P.v = 0; P.vib = 0; P.U.vib.value = 0; }
+  mittsHold('jab');
+  for (const s of ['L', 'R']) { const P = MITTS.parts[s]; P.cur.copy(P.tgt); P.yaw = P.tgtYaw; }
+  mittsTick(0);   // seat the pads immediately, so the very first frame already shows the trainer in position
+  sfx.unlock(); camCut = true;
+}
+function tmMittsLeave() {
+  if (!MITTS.on) return;
+  MITTS.on = false; MITTS.pending = null;
+  if (MITTS.parts) for (const s of ['L', 'R']) MITTS.parts[s].g.visible = false;
+  P2.flesh.u.uGlv.value = 0;   // toMenu() → showP2(true) puts the ordinary hand gear back
+}
 /* ───────── camera ───────── */
 const camP = new V3(1.2, 1.4, 3), camL = new V3(0, 1, 0), _cp = new V3(), _cl = new V3(); let camCut = true, camClock = 0;
 const FLY_R = 6.3, FLY_H = 2.25;   // m: where the intro fly-round starts — behind the back row of the crowd, over its heads (under the parking's ceiling)

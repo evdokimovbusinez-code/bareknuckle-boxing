@@ -412,6 +412,47 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 #stage.short .tut-chip{font-size:11px;padding:2px 8px}
 #stage.short .tut-foot{gap:8px;margin-top:3px}
 #stage.short .tut-btns .btn{font-size:11px;padding:3px 9px}
+/* issue 50: training mini-games — a full-screen HUD with the shrinking rhythm ring and the rules / result cards */
+.tr{position:absolute;inset:0;z-index:5;pointer-events:none;color:#f1e3c2;font-family:var(--body)}
+.tr button{pointer-events:auto}
+.tr-top{position:absolute;top:calc(var(--pt) + 10px);left:0;right:0;display:flex;justify-content:center;gap:clamp(14px,4vmin,48px);text-align:center}
+.tr-stat small{display:block;font:600 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.tr-stat b{display:block;font-family:var(--display);font-weight:900;font-size:clamp(20px,4.6vmin,36px);line-height:1;color:var(--gold);text-shadow:0 2px 0 rgba(0,0,0,.6)}
+.tr-mid{position:absolute;inset:0}
+.tr-ring{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:clamp(70px,13vmin,130px);height:clamp(70px,13vmin,130px);border:2px solid rgba(226,177,74,.5);border-radius:50%;display:grid;place-items:center;opacity:0;transition:opacity .15s}
+.tr-ring.on{opacity:1}
+.tr-ring.hot{border-color:#fff;box-shadow:0 0 26px rgba(226,177,74,.85),inset 0 0 18px rgba(226,177,74,.4)}
+.tr-ring i{position:absolute;inset:8%;border:2px dashed rgba(226,177,74,.65);border-radius:50%}
+.tr-ring span{position:relative;font-family:var(--display);font-weight:900;font-size:clamp(22px,4.6vmin,40px);color:#fff;text-shadow:0 0 14px rgba(0,0,0,.9)}
+.tr-fb{position:absolute;left:0;right:0;top:64%;text-align:center;font-family:var(--display);font-weight:900;text-transform:uppercase;font-size:clamp(18px,4vmin,34px);color:var(--gold);opacity:0;transition:opacity .18s;text-shadow:0 3px 0 rgba(0,0,0,.6)}
+.tr-fb.on{opacity:1}
+.tr-combo{position:absolute;top:calc(var(--pt) + 68px);left:50%;transform:translateX(-50%);display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.tr-combo i{font-style:normal;font:700 clamp(13px,2.6vmin,20px) var(--poster);letter-spacing:.06em;border:1px solid rgba(255,255,255,.22);background:rgba(10,12,17,.72);border-radius:5px;padding:3px 12px;color:#cfc8ba}
+.tr-combo i.on{border-color:var(--gold);color:#0a0c11;background:var(--gold);box-shadow:0 0 16px rgba(226,177,74,.6)}
+.tr-count{position:absolute;left:0;right:0;top:38%;text-align:center;font-family:var(--display);font-weight:900;font-size:min(24vw,170px);line-height:1;color:#fff;text-shadow:0 6px 0 rgba(0,0,0,.6),0 0 44px rgba(255,255,255,.3)}
+.tr-bot{position:absolute;left:0;right:0;bottom:calc(var(--pb) + 10px);display:flex;justify-content:center;align-items:center;gap:14px;flex-wrap:wrap}
+.tr-bot span{font:500 clamp(11px,2vmin,14px) var(--mono);color:var(--muted);letter-spacing:.04em;text-align:center}
+.tr-bot .btn{font-size:clamp(11px,2vmin,14px);padding:5px 12px}
+.tr-card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,88%);box-sizing:border-box;text-align:center;pointer-events:none;
+  background:linear-gradient(180deg,rgba(27,29,34,.96),rgba(12,13,17,.97));border:1px solid rgba(226,177,74,.5);border-top:3px solid var(--gold);border-radius:10px;
+  padding:clamp(16px,3.4vmin,28px) clamp(18px,4vmin,30px);box-shadow:0 22px 64px -14px rgba(0,0,0,.92)}
+.tr-card h2{font-family:var(--display);font-weight:800;font-size:clamp(16px,3vmin,23px);line-height:1.25;text-transform:none;margin:8px 0 10px;color:#fff}
+.tr-card p{font-size:clamp(12px,2.2vmin,15px);line-height:1.45;color:#d8d2c6;margin:0 0 12px}
+.tr-card .eyebrow{display:block;margin-bottom:4px}
+.tr-rew{font:600 clamp(11px,2.2vmin,14px) var(--mono);color:var(--gold);letter-spacing:.03em;margin:0 0 14px}
+.tr-grade{font-family:var(--display);font-weight:900;font-size:clamp(72px,16vmin,150px);line-height:.9;color:var(--gold);text-shadow:0 5px 0 rgba(0,0,0,.6),0 0 50px rgba(226,177,74,.5)}
+.tr-grade.a{color:#8fd49a;text-shadow:0 5px 0 rgba(0,0,0,.6),0 0 50px rgba(143,212,154,.5)}
+.tr-grade.b{color:#8ab6e8}.tr-grade.c{color:#cfc8ba}
+.tr-res{font:500 clamp(12px,2.4vmin,15px) var(--mono);line-height:1.7;color:#d8d2c6;margin:8px 0}
+.tr-res b{color:var(--gold)}
+.tr-res .gain{display:block;color:var(--gold);font-size:clamp(14px,2.8vmin,19px);margin:6px 0}
+.tr-card .modal-b{margin-top:6px}
+#stage.short .tr-card{width:min(520px,92%);padding:10px 16px}
+#stage.short .tr-grade{font-size:clamp(44px,12vmin,80px)}
+#stage.short .tr-card h2{font-size:clamp(13px,2.6vmin,18px);margin:4px 0 6px}
+#stage.short .tr-card p{font-size:12px;margin:0 0 8px}
+#stage.short .tr-top{top:2px}
+#stage.short .tr-combo{top:40px}
 </style>
 
 <div id="stage">
@@ -483,8 +524,10 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       </nav>
       <nav class="mnav" id="nav-train" hidden>
         <button id="go-bag"><i>01</i><b>Груша</b><small id="bag-lbl"></small></button>
-        <button id="go-spar"><i>02</i><b>Спарринг</b><small>шлем и перчатки · зал</small></button>
-        <button id="go-tutorial"><i>03</i><b>Обучение</b><small>управление · 1 мин</small></button>
+        <button id="go-rope"><i>02</i><b>Скакалка</b><small>ритм · дыхалка + скорость</small></button>
+        <button id="go-mitts"><i>03</i><b>Лапы</b><small>комбо · скорость + сила</small></button>
+        <button id="go-spar"><i>04</i><b>Спарринг</b><small>шлем и перчатки · зал</small></button>
+        <button id="go-tutorial"><i>05</i><b>Обучение</b><small>управление · 1 мин</small></button>
         <button id="train-back"><i>←</i><b>Назад</b></button>
       </nav>
       <div class="mfoot"><div class="ladder" id="ladder"></div><div class="rec-line" id="rec-line"></div></div>
