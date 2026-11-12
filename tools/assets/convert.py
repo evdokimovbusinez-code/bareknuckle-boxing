@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Rebuild the compressed GLB asset pack from the original .fbx.txt / .jpg sources.
 
-    python3 tools/assets/convert.py        (or:  bash tools/assets/pack.sh)
+    python3 tools/assets/convert.py
 
 Blender is used as a Python module (bpy) to re-encode the 13 JPG textures as WebP.
 No glTF mesh/morph-target conversion is done: the game rebuilds the boxer from the
