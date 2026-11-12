@@ -7,7 +7,7 @@ TOOLS = ["Read", "Edit", "MultiEdit", "Write", "Glob", "Grep", "LS", "TodoWrite"
          "Bash(bash tools/check.sh)", "Bash(bash tools/shot.sh:*)", "Bash(python3 src/assemble.py)", "Bash(node --check:*)",
          "Bash(grep:*)", "Bash(sed -n:*)", "Bash(wc:*)", "Bash(ls:*)", "Bash(head:*)", "Bash(tail:*)", "Bash(diff:*)", "Bash(git diff:*)", "Bash(git status:*)", "Bash(git log:*)",
          "Bash(python3 tools/assets/:*)", "Bash(node tools/assets/:*)", "Bash(npx gltf-transform:*)", "Bash(du:*)", "Bash(md5sum:*)",
-         "Bash(python3 tools/audio/:*)", "Bash(ffmpeg:*)", "Bash(ffprobe:*)"]
+         "Bash(python3 tools/audio/:*)", "Bash(ffmpeg:*)", "Bash(ffprobe:*)", "Bash(python3 tools/test/:*)", "Bash(node tools/test/:*)"]
 
 async def main():
     prompt = open(sys.argv[1]).read()
