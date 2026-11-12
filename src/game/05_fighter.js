@@ -167,6 +167,8 @@ class Fighter {
     this.gu = null; this.wobble = 0; this.kdCount = 0; this.cutLook = false; this.doomed = null; this.liver = null; this.wind = 0; this.adv = 0; this.advV = 0; this.knock = 0; this.dmgMul = 1; if (this.mark) { this.group.position.copy(this.mark); this.slide = null; }
     this.dodge = null; this.stunUntil = 0; this.counterUntil = 0; this.ko = false; this.frozen = false; this.rag.stop(); this.aimW = 0; this.bodyShot = false; this.blocking = false; this.blockW = 0; this.daze = 0; this.wantBody = false;
     this.guardDown = 0; this.brkT0 = -9;   // a broken guard: down until guardDown, hands flung apart from brkT0 (issue 41)
+    // issue 44 — reaction state: the series counter, the deferred trunk impulse, the body-shot fold / deflate
+    this.rxN = 0; this.rxLast = -9; this.rxFollow = null; this.deflateT = -9; this.foldPt = null; this.foldSide = 0; this.rxLog = null;
     for (const k of PN) { this.w[k] = 0; for (const a of this.inst[k]) { a.stop(); this.wA.set(a, 0); } this.act[k] = this.inst[k][0]; }
     for (const s of Object.values(this.sp)) s.zero();
     this.u.uDmg.value = 0; this.dmgShow = 0; if (this.flesh) this.flesh.reset(); if (this.face) this.face.reset(); this.simReset = true; for (const j of this.jigs) j.init = false;
@@ -446,22 +448,85 @@ class Fighter {
   }
   startDodge(type) { this.dodge = { type, t: 0 }; this.stamina = Math.max(0, this.stamina - 4); this.staT = G.t + 0.3; }
   knuckle(v) { return v.setFromMatrixPosition(this.bones[`CC_Base_${this.aimArm}_Mid1`].matrixWorld); }
-  takeHit(dirWorld, power, name, contact, body, blocked) {
-    const g = this.group, hp = contact;
-    this.face.hit(body ? power * 0.4 : power, !body && (PUNCH[name].type === 'hook' || PUNCH[name].type === 'upper'), hp);
+  takeHit(dirWorld, power, name, contact, body, blocked, rx) {
+    const g = this.group, hp = contact, P = PUNCH[name], type = P.type, s = this.sp;
+
+    /* A shot that landed on the guard keeps the block reaction from 1.2 verbatim (do not touch it here). */
+    if (blocked) {
+      this.face.hit(body ? power * 0.4 : power, !body && (type === 'hook' || type === 'upper'), hp);
+      const dm = _v1.copy(hp).add(dirWorld); g.worldToLocal(dm); dm.sub(g.worldToLocal(_v2.copy(hp)));
+      const cm = g.worldToLocal(contact.clone()), speed = (body ? 0.8 : 1.1) + 1.6 * Math.min(power, 1.3);
+      if (!body) {
+        const dl = contact.distanceTo(_v3.setFromMatrixPosition(this.bones.CC_Base_L_Hand.matrixWorld)), dr = contact.distanceTo(_v3.setFromMatrixPosition(this.bones.CC_Base_R_Hand.matrixWorld));
+        this.rag.blockArm = dl < dr ? 'farmL' : 'farmR';
+        this.rag.hit(dm.clone().normalize().multiplyScalar(2.2 + 2.4 * Math.min(power / 0.35, 1.3)), cm, 'block', power / 0.35);
+      } else this.rag.hit(dm.clone().normalize().multiplyScalar(speed), cm, 'body', power);
+      const k = (0.55 + power) * 0.45, kt = 0.25;
+      if (body) { s.sp.v += 1.0 * (0.6 + power); s.hz.v -= 0.15; }
+      s.hp.v += (dm.z * 6.0 - dm.y * 5.0) * k; s.hr.v -= dm.x * 6.5 * k; s.hy.v += dm.x * 7.5 * k;
+      s.sp.v += (dm.z * 2.4 - dm.y * 1.2) * k * kt; s.sr.v -= dm.x * 2.2 * k * kt; s.hz.v += dm.z * 1.5 * k * kt;
+      if (this.cur && !this.resolved) this.cur = null;
+      this.stunUntil = G.t + (name === 'jab' ? 0.14 : 0.27) * (1 + this.daze);
+      return;
+    }
+
+    /* ── clean hit (issue 44): where it landed, how hard, and how many in a row all shape the recoil ── */
+    const mult = rx ? rx.mult : 1, heavy = !!(rx && rx.heavy), combo = rx ? rx.combo : 1;
+    const rawP = rx ? rx.power : power;
+    const eff = power * mult;                             // the series compounds a clean shot
+    const light = !body && !heavy && rawP < REACT.light;  // a feeler jab: only a nod + a blink
+
+    // face: a power-scaled pain grimace + blink; the 4th+ of a series unfocuses the gaze and buckles the legs («поплыл»)
+    this.face.hit((body ? eff * 0.4 : eff) * (light ? 0.45 : 1), !body && (type === 'hook' || type === 'upper'), hp);
+    if (combo >= REACT.dazeAt) {
+      this.daze = Math.min(1, Math.max(this.daze, 0.5 + 0.08 * (combo - REACT.dazeAt)));
+      this.wobble = Math.max(this.wobble, 0.6 + 0.1 * (combo - REACT.dazeAt));
+    }
+
+    // the punch direction in this man's own frame: z = away from the opponent (back), x = across, y = up
     const dm = _v1.copy(hp).add(dirWorld); g.worldToLocal(dm); dm.sub(g.worldToLocal(_v2.copy(hp)));
-    // the upper body takes the real impulse at the contact point (muscles let go there and pull back)
-    const cm = g.worldToLocal(contact.clone()), speed = (body ? 0.8 : 1.1) + 1.6 * Math.min(power, 1.3);
-    if (blocked && !body) {   // into the guard: the forearm takes it and is driven back into the face; the head still rocks behind it
-      const dl = contact.distanceTo(_v3.setFromMatrixPosition(this.bones.CC_Base_L_Hand.matrixWorld)), dr = contact.distanceTo(_v3.setFromMatrixPosition(this.bones.CC_Base_R_Hand.matrixWorld));
-      this.rag.blockArm = dl < dr ? 'farmL' : 'farmR';
-      this.rag.hit(dm.clone().normalize().multiplyScalar(2.2 + 2.4 * Math.min(power / 0.35, 1.3)), cm, 'block', power / 0.35);
-    } else
-    this.rag.hit(dm.clone().normalize().multiplyScalar(speed), cm, body ? 'body' : 'head', power);
-    const k = (0.55 + power) * 0.45, s = this.sp, kt = 0.25;
-    if (body) { s.sp.v += 1.0 * (0.6 + power); s.hz.v -= 0.15; }
-    s.hp.v += (dm.z * 6.0 - dm.y * 5.0) * k; s.hr.v -= dm.x * 6.5 * k; s.hy.v += dm.x * 7.5 * k;
-    s.sp.v += (dm.z * 2.4 - dm.y * 1.2) * k * kt; s.sr.v -= dm.x * 2.2 * k * kt; s.hz.v += dm.z * 1.5 * k * kt;
+    const cm = g.worldToLocal(contact.clone());
+    const k = (0.55 + eff) * 0.45;
+
+    // standing ragdoll: the struck part goes soft, the muscles pull it back (a series leaves them softer for longer)
+    if (!light) {
+      const speed = (body ? 0.8 : 1.1) + 1.6 * Math.min(eff, 1.3);
+      this.rag.hit(dm.clone().normalize().multiplyScalar(speed), cm, body ? 'body' : 'head', eff, rx);
+    }
+
+    // pose springs — the head flies in the punch's direction: a straight snaps it back, a hook twists it to the side,
+    // an uppercut lifts the chin. Before stage 1.4 these coefficients were the same for every punch (all 1.0).
+    const back = type === 'straight' || type === 'over' ? 1 : 0.55;
+    const side = type === 'hook' ? 1.5 : 0.55;
+    const up   = type === 'upper' ? 1.55 : 1;
+    const amp  = light ? 0.32 : 1;                       // a feeler jab only nods
+    const dHP = (dm.z * 6.0 * back - dm.y * 5.0 * up) * k * amp;   // head pitch (back / chin up)
+    const dHR = (-dm.x * 6.5 + dm.z * 1.0 * (side - 1)) * k * amp; // head roll (side)
+    const dHY = ( dm.x * 7.5 * side) * k * amp;                     // head yaw (twist)
+    s.hp.v += dHP; s.hr.v += dHR; s.hy.v += dHY;
+    // head shots: the trunk catches up a beat later — this delay is what reads as whiplash instead of a rigid shove
+    if (!light && !body) this.rxFollow = { t: G.t + REACT.follow, dm: dm.clone(), eff };
+
+    if (body) {
+      s.sp.v += 1.0 * (0.6 + eff); s.hz.v -= 0.15;      // fold at the waist, hips tuck
+      this.deflateT = G.t + REACT.deflate;              // winded: hands drop, a short hunch, ~0.5 s
+      this.foldSide = rx ? (rx.rib | 0) : 0;
+      this.foldPt = cm.clone();                         // struck ribs (model space) for the elbow tuck
+      if (typeof sfx !== 'undefined' && sfx.exhale) sfx.exhale(eff);   // short forced breath out
+    }
+
+    // debug log (issue 44): type, force, series multiplier, head departure angle, trunk shift, step.
+    // bodyDeg is THIS hit's trunk kick, not the instantaneous s.sp.v: for a head shot the trunk is kicked by
+    // rxFollow ~65 ms later, so reading the spring here would wrongly report 0. wB = 1/ω of the trunk spring (k≈90).
+    const wH = 1 / 12.7, wB = 1 / 9.5, kt = 0.25;
+    const dSP = body ? 1.0 * (0.6 + eff) : light ? 0 : (dm.z * 2.4 - dm.y * 1.2) * k * kt;
+    this.rxLog = {
+      kind: name, type, body: !!body, blocked: false, heavy, light, power: +rawP.toFixed(2),
+      mult: +mult.toFixed(2), combo, eff: +eff.toFixed(2),
+      headDeg: +(Math.hypot(dHP, dHY, dHR) * wH * 57.3).toFixed(1),
+      bodyDeg: +(Math.abs(dSP) * wB * 57.3).toFixed(1),
+      step: +(this.knock || 0).toFixed(2),
+    };
     if (this.cur && !this.resolved) this.cur = null;
     this.stunUntil = G.t + (name === 'jab' ? 0.14 : 0.27) * (1 + this.daze);
   }
@@ -573,6 +638,13 @@ class Fighter {
     }
   }
   tick(dt) {
+    // the trunk catches the head's impulse ~65 ms later (issue 44): a whiplash, not a rigid shove. Timed on G.t
+    // so hitstop freezes the delay too and the debug ticker steps it deterministically.
+    if (this.rxFollow && G.t >= this.rxFollow.t) {
+      const q = this.rxFollow, dm = q.dm, k = (0.55 + q.eff) * 0.45, kt = 0.25, s = this.sp;
+      this.rxFollow = null;
+      s.sp.v += (dm.z * 2.4 - dm.y * 1.2) * k * kt; s.sr.v -= dm.x * 2.2 * k * kt; s.hz.v += dm.z * 1.5 * k * kt;
+    }
     if (G.t > this.staT) this.stamina = Math.min(100, this.stamina + 26 * dt * (1 + 0.08 * SK(this, 'sta')));
     // holding the guard costs a little breath; keep the regen paused while it is up so the drain is net (issue 41)
     if (G.state === 'fight' && this.blockW > 0.55 && !this.cur && !(this.guardDown > G.t)) {
@@ -602,6 +674,9 @@ class Fighter {
     const rc = clamp(this.sp.bk.x, 0, BLK.recoilMax);   // how far the last shot drove the gloves back
     const sag = blkSag(this), sagDrop = Math.min(1, sag * 1.9);   // the gloves are down at the chin by ~10 % stamina
     const shell = this.shellT > G.t;
+    // a body shot leaves him winded for ~0.5 s: a quick 60 ms attack, then a linear fade (issue 44)
+    const dT = this.deflateT || 0;
+    const defl = clamp(Math.min((G.t - (dT - REACT.deflate)) / 0.06, (dT - G.t) / REACT.deflate), 0, 1);
     const guardTgt = (this.blocking || shell) && !this.cur && !broken ? 1 : 0;
     this.blockW += (guardTgt - this.blockW) * Math.min(1, dt * BLK.onRate);
     const guardW = Math.max(this.blockW, fly);   // the hands still get posed while they are being flung apart
@@ -613,7 +688,7 @@ class Fighter {
     if (this.wobble > 0) this.wobble = Math.max(0, this.wobble - dt);
     const wb = sstep(0, 0.6, this.wobble), dip = wb * (0.55 + 0.45 * Math.sin(G.t * 6.3 + this.ph)) * (0.7 + 0.3 * Math.sin(G.t * 2.9));
     const dz = Math.max(this.daze, wb), tt = G.t, sw = dz * Math.sin(tt * 1.9 + this.ph) + 1.8 * wb * Math.sin(tt * 2.6 + this.ph), sw2 = dz * Math.sin(tt * 1.3 + this.ph * 2);
-    duck = Math.max(duck, 0.42 * dip, this.wind > G.t ? 0.55 : 0, this.liver ? 0.4 : 0, shell ? 0.32 : 0);   // covering up: chin down, elbows in, hunched behind the gloves
+    duck = Math.max(duck, 0.42 * dip, this.wind > G.t ? 0.55 : 0, this.liver ? 0.4 : 0, shell ? 0.32 : 0, 0.16 * defl);   // covering up: chin down, elbows in, hunched behind the gloves; a body shot folds him at the waist
     const s = this.sp; let live = duck + lean + Math.abs(slip) + guardW + dz;   // s.bk (the recoil) also feeds live below
     for (const k in s) { const q = s[k]; if (dt > 0) { const n = dt > 0.02 ? 2 : 1; for (let i = 0; i < n; i++) q.step(dt / n); } live += Math.abs(q.x) + Math.abs(q.v) * 0.01; }
     const B = this.bones;
@@ -642,7 +717,7 @@ class Fighter {
        vertical forearms cover it with the elbows tucked onto the ribs. It used to cross both gloves low over the mouth
        (±0.065, −0.075 from the head bone) with the elbows flared out. The target is still built off the head bone, so a
        duck / slip / step carries the guard with it. */
-    const tiredSag = clamp((35 - this.stamina) / 35, 0, 1) * (this.cur ? 0 : 1);
+    const tiredSag = Math.min(1, clamp((35 - this.stamina) / 35, 0, 1) * (this.cur ? 0 : 1) + 0.7 * defl);   // winded by a body shot: the hands come down as if the tank were empty
     const stareDown = G.state === 'intro' ? G.stare || 0 : 0;   // the stare-down: the hands drop from the face (09b_cine.js)
     const gx = BT.x ?? BLK.guardX, gy = BT.y ?? BLK.guardY, gz = BT.z ?? BLK.guardZ;
     if (guardW > 0.02 || dz > 0.02 || tiredSag > 0.02 || stareDown > 0.02) for (const S of ['L', 'R']) {
@@ -651,6 +726,7 @@ class Fighter {
       const H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), hc = this.group.worldToLocal(this.head.getWorldPosition(_v3));   // the guard follows the head where it is now (ducked / slipped), not where it stands upright
       const g = _v4.set(side * gx, gy, gz).add(hc);
       g.y -= 0.115 * sagDrop;                       // an empty tank: the gloves slide down from the eyes to the chin
+      g.y -= 0.06 * defl;                          // a body shot drops them another 6 cm even with a full guard up
       g.z -= 0.35 * rc; g.y -= 0.65 * rc;          // a shot drives them 4…10 cm back / down onto the face, on a spring
       g.x += side * 0.27 * fly; g.y -= 0.17 * fly; g.z -= 0.05 * fly;   // broken: flung out to the sides
       hand.lerp(g, guardW).add(_v5.set(0, (-0.2 * dz - 0.11 * tiredSag - 0.34 * stareDown) * (1 - guardW), 0.03 * dz - 0.03 * tiredSag - 0.06 * stareDown));   // dazed or out of breath: the hands come down
@@ -662,6 +738,18 @@ class Fighter {
       // ikPole only moved the arm, so refresh the matrices before measuring the hand bone's directions
       this.cc.updateMatrixWorld(true);
       this.guardHand(S, H, Fn, hc, guardW);
+    }
+    /* A clean body shot tucks the near elbow onto the struck ribs for ~0.5 s (issue 44). The hand is pulled toward
+       the contact point in the man's own frame, with the elbow hinted down/in so it folds rather than reaching. */
+    if (defl > 0.02 && !this.cur && this.foldPt) {
+      const S = this.foldSide === 0 ? 'L' : 'R', side = S === 'L' ? 1 : -1;
+      const H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3);
+      const tgt = _v4.copy(this.foldPt).add(_v5.set(side * 0.10, -0.06, 0.10));
+      hand.lerp(tgt, 0.6 * defl);
+      const A = B[`CC_Base_${S}_Upperarm`], Fn = B[`CC_Base_${S}_Forearm`];
+      this.mpos(A, _bkP); _bkP.x -= side * 0.12; _bkP.y -= 0.24; _bkP.z += 0.10;
+      this.ikPole(A, Fn, H, hand, _bkP);
+      this.cc.updateMatrixWorld(true);
     }
     if (this.aimW > 0.02 && this.aimTarget) {
       const S = this.aimArm, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), kn = this.mpos(B[`CC_Base_${S}_Mid1`], _po4);
