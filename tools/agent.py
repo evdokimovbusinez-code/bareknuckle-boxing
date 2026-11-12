@@ -12,7 +12,7 @@ async def main():
     prompt = open(sys.argv[1]).read()
     eff = os.environ.get("BOT_EFFORT") or None   # reasoning effort only for Claude models
     opts = ClaudeAgentOptions(model=os.environ.get("BOT_MODEL", "z-ai/glm-5.3-flash"), effort=eff,
-                              max_budget_usd=float(os.environ.get("BOT_BUDGET", "8")), max_turns=int(os.environ.get("BOT_TURNS", "100")), max_buffer_size=64 * 1024 * 1024, allowed_tools=TOOLS, permission_mode="acceptEdits",
+                              max_budget_usd=float(os.environ.get("BOT_BUDGET", "8")), max_turns=int(os.environ.get("BOT_TURNS", "150")), max_buffer_size=64 * 1024 * 1024, allowed_tools=TOOLS, permission_mode="acceptEdits",
                               setting_sources=["project"], system_prompt={"type": "preset", "preset": "claude_code"})
     out = {"is_error": True, "result": "no result", "cost": 0, "turns": 0}
     async def run():
