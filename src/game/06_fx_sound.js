@@ -197,6 +197,13 @@ const sfx = (() => {
       { const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 0.9; f.frequency.value = body ? 1700 : 2600; env(g, t, 0.002, 0.035, 0.22 + 0.2 * p); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // skin slap
       const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'lowpass'; f.frequency.setValueAtTime(1400 + 900 * p, t); f.frequency.exponentialRampToValueAtTime(180, t + 0.12); env(g, t, 0.004, 0.13, 0.5 + 0.4 * p); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.2);
       const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16); env(g2, t, 0.004, 0.18, 0.5 + 0.4 * p); o.connect(g2).connect(master); o.start(t); o.stop(t + 0.25); },
+    /* A fist landing on gloves / forearms (issue 41): a dry, dull leather "pock" — darker and much shorter than thud
+       (no bright 2.6 kHz skin slap, no body ring), two low-passed bursts and a short low knock. p = raw force 0.2…1.6,
+       loud > 1 on a broken guard. */
+    block(p, loud = 1) { const a = ac; if (!a) return; const t = a.currentTime, out = bus, k = clamp(p, 0.2, 1.6), L = clamp(loud, 1, 2);
+      { const n = a.createBufferSource(), f = filt('lowpass', 780 + 420 * k, 0.9), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.018 + 0.012 * k, (0.22 + 0.26 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // muffled slap of leather on leather
+      { const n = a.createBufferSource(), f = filt('lowpass', 380, 0.8), g = a.createGain(); n.buffer = noise; env(g, t, 0.002, 0.03 + 0.02 * k, (0.16 + 0.2 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.09); }   // the dull knock behind it
+      const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(112 + 26 * k, t); o.frequency.exponentialRampToValueAtTime(52, t + 0.07); env(g2, t, 0.002, 0.06, (0.2 + 0.18 * k) * L); o.connect(g2).connect(out); o.start(t); o.stop(t + 0.09); },
     /* the heavy bag: a deep thump of 40 kg of filling (sine dropping from ~95 Hz + a low-passed burst), the slap of knuckles on
        leather on top; p = power 0.2 … 1.6 */
     bag(p) { const a = ac; if (!a) return; const t = a.currentTime, master = bus, k = clamp(p, 0.2, 1.6);

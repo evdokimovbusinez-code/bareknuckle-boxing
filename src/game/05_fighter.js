@@ -6,8 +6,39 @@ const _pf1 = new V3(), _pf2 = new V3(), _pf3 = new V3(), _pf4 = new V3(), _pfq =
 // a skipped frame (GFX.simSkip = 2) carries the free hair points rigidly with the head instead of leaving them behind:
 // left where they were, they trailed every quick head move by a frame and then jumped — the hair looked like it ran at half rate
 const _hcM = new M4(), _hcI = new M4(), _hcV = new V3();
+// scratch for the pole-aware guard IK (kept apart from ik()'s own scratch so neither can clobber the other)
+const _bkA = new V3(), _bkB = new V3(), _bkC = new V3(), _bkD = new V3(), _bkE = new V3(), _bkF = new V3(), _bkG = new V3(), _bkP = new V3();
+const _bkQ1 = new Quat(), _bkQ2 = new Quat();
+// orienting the fist on the wrist in the high guard (issue 41): measured hand basis → target basis → one delta quaternion.
+// The hand is turned by its bone DIRECTIONS (finger, thumb side, palm), never by guessing the bone's local axes.
+const _ghHp = new V3(), _ghEp = new V3(), _ghM = new V3(), _ghI = new V3(), _ghPk = new V3();
+const _ghY = new V3(), _ghT = new V3(), _ghZ = new V3(), _ghX = new V3();
+const _ghYt = new V3(), _ghZt = new V3(), _ghXt = new V3(), _ghTo = new V3();
+const _ghMc = new M4(), _ghMt = new M4(), _ghQd = new Quat(), _ghQc = new Quat(), _ghQn = new Quat();
+// extra knuckle curl (the fight clips leave the fingers half open): one delta quaternion per hand, shared by its four fingers
+const _clQ = new Quat(), _clQc = new Quat(), _clQn = new Quat();
 function simCarry(S, M) { for (const A of [S.p, S.o]) for (let k = 0; k < A.length; k += 3) { _hcV.fromArray(A, k).applyMatrix4(M).toArray(A, k); } }
 function simPin(S) { const p = S.p, t = S.t, inv = S.inv; for (let i = 0, n = inv.length; i < n; i++) if (inv[i] === 0) { const k = 3 * i; p[k] = t[k]; p[k + 1] = t[k + 1]; p[k + 2] = t[k + 2]; } }
+/* ── the high block (issue 41) ──────────────────────────────────────────────────────────────────────────────
+   One place for the numbers the stance (pose, here) and the hit resolution (resolveHit, 07_state_replay_hits.js)
+   both need. Stamina is 0…100, distances are metres, times seconds. */
+const BLK = {
+  sagSta: 20,        // below this the gloves sag from the eyes to the chin and up to ×2 damage leaks through
+  breakSta: 35,      // below this a power shot or a hook breaks the guard
+  downT: 0.6,        // the guard is unavailable this long after a break — the next punch lands clean
+  flyT: 0.4,         // the hands are flung apart for this long
+  recoilMax: 0.10,   // the gloves give 4…10 cm back onto the face, on a spring
+  holdDrain: 1.5,    // stamina / s just for holding the guard up
+  onRate: 30,        // guard rises / drops in ~0.1 s (was dt * 16, ≈0.25 s — a visible jerk)
+  guardX: 0.078,     // glove offset from the head bone: half-width (was 0.088 — a finger's width tighter, eyes show in the gap)
+  guardY: -0.04,     // the WRIST sits below the eye line (was +0.018, on the crown): the fist now ends at cheek/temple level
+  guardZ: 0.20,      // out in front of the face (was 0.135 = the fingers folded back onto the hair): ~6-8 cm of air
+  poleIn: 0.05, poleDown: 0.32, poleFwd: -0.08,  // elbow hint: in, down to the ribs, BEHIND the wrist (was +0.10 = forearm leant back into the face)
+  chinLift: 0.20,    // rad: the head/neck nod back up in the guard so the eyes look at the opponent over the gloves (was ~23° down)
+  palmIn: 0.5,       // how much of the palm's turn is toward the centre line (a little toward each other) vs straight back at the face
+  clench: 0.78,      // rad: extra curl at the knuckles — the fight clips leave the fingers half open (a hook), fold them into a fist
+};
+const blkSag = F => clamp((BLK.sagSta - F.stamina) / BLK.sagSta, 0, 1);   // 0 at 20 % stamina, 1 at empty
 class Fighter {
   constructor(isPlayer) {
     this.isPlayer = isPlayer;
@@ -31,6 +62,15 @@ class Fighter {
     this.rb = RJ.map(n => B['CC_Base_' + n]);
     this.allBones = []; this.cc.traverse(o => { if (o.isBone) this.allBones.push(o); });
     this.bindQ = new Map(this.allBones.map(b => [b, b.quaternion.clone()]));
+    // palm-normal sign per hand, once, from the bind pose (where the palms look down = palm normal has −y). guardHand()
+    // rebuilds the palm normal from measured bone directions as sign · (finger × thumb-side) — no guessing local axes.
+    this.palmSign = {};
+    for (const S of ['L', 'R']) {
+      const H = B[`CC_Base_${S}_Hand`], M = B[`CC_Base_${S}_Mid1`], I = B[`CC_Base_${S}_Index1`], Pk = B[`CC_Base_${S}_Pinky1`];
+      const fw = new V3().setFromMatrixPosition(M.matrixWorld).sub(new V3().setFromMatrixPosition(H.matrixWorld));
+      const lat = new V3().setFromMatrixPosition(I.matrixWorld).sub(new V3().setFromMatrixPosition(Pk.matrixWorld));
+      this.palmSign[S] = fw.cross(lat).y > 0 ? -1 : 1;
+    }
     // forearm twist rig: the hand's roll about the forearm is spread over the CC twist bones (no candy-wrapper wrist)
     this.twist = ['L', 'R'].map(S => { const fa = B[`CC_Base_${S}_Forearm`], h = B[`CC_Base_${S}_Hand`], ax = h.position.clone().normalize();
       // Twist02 hangs under Twist01: each gets its share of the roll, expressed in its own parent chain (0.3 + 0.35 = 0.65 at the wrist end)
@@ -113,7 +153,8 @@ class Fighter {
     this.inst = {}; this.wA = new Map(); T.clips2 = T.clips2 || {};
     for (const k of PN) { const cl2 = T.clips2[k] || (T.clips2[k] = T.clips[k].clone()); this.inst[k] = [T.clips[k], cl2].map(c => { const a = this.mixer.clipAction(c); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; this.wA.set(a, 0); return a; }); this.act[k] = this.inst[k][0]; this.w[k] = 0; }
 
-    this.sp = { hp: new Spring(170, 7), hy: new Spring(150, 8), hr: new Spring(170, 7), sp: new Spring(90, 8), sr: new Spring(90, 8), hz: new Spring(120, 13) };
+    // bk: the guard recoil — a stiff, well-damped spring that carries the gloves back after a shot lands on them (issue 41)
+    this.sp = { hp: new Spring(170, 7), hy: new Spring(150, 8), hr: new Spring(170, 7), sp: new Spring(90, 8), sr: new Spring(90, 8), hz: new Spring(120, 13), bk: new Spring(900, 34) };
     this.jp = Array.from({ length: 17 }, () => new V3()); this.jo = Array.from({ length: 17 }, () => new V3()); this.jdt = 1 / 60;
     this.headNow = new V3(0, 1.6, 0); this.headNeutral = new V3(0, 1.6, 0); this.aimV = new V3(); this.aimTarget = null; this.aimW = 0; this.aimArm = 'L';
     this.rag = new Ragdoll(this); this.face = new Face(this); this.ph = rr() * 6; this.speed = 1.5; this.simReset = true; this.rootZ = 1;
@@ -125,6 +166,7 @@ class Fighter {
     if (this.wrapU) this.wrapU.uWB.value.set(0, 0);
     this.gu = null; this.wobble = 0; this.kdCount = 0; this.cutLook = false; this.doomed = null; this.liver = null; this.wind = 0; this.adv = 0; this.advV = 0; this.knock = 0; this.dmgMul = 1; if (this.mark) { this.group.position.copy(this.mark); this.slide = null; }
     this.dodge = null; this.stunUntil = 0; this.counterUntil = 0; this.ko = false; this.frozen = false; this.rag.stop(); this.aimW = 0; this.bodyShot = false; this.blocking = false; this.blockW = 0; this.daze = 0; this.wantBody = false;
+    this.guardDown = 0; this.brkT0 = -9;   // a broken guard: down until guardDown, hands flung apart from brkT0 (issue 41)
     for (const k of PN) { this.w[k] = 0; for (const a of this.inst[k]) { a.stop(); this.wA.set(a, 0); } this.act[k] = this.inst[k][0]; }
     for (const s of Object.values(this.sp)) s.zero();
     this.u.uDmg.value = 0; this.dmgShow = 0; if (this.flesh) this.flesh.reset(); if (this.face) this.face.reset(); this.simReset = true; for (const j of this.jigs) j.init = false;
@@ -467,8 +509,76 @@ class Fighter {
     this.setMQuat(A, Ag.premultiply(base));
     this.setMQuat(Bn, Bg.premultiply(r1).premultiply(base));
   }
+  /* Two-bone IK with an elbow pole (the high guard, issue 41). ik() takes its bend plane from the arm's current
+     pose: lifting the hands just makes that plane steeper, so the elbows flare out to the sides. Here the elbow is
+     put at the point of the usual two-bone circle nearest to `pole` (model space, near the ribs), which tucks it in
+     and leaves the forearm vertical under the glove. All scratch is local to this method. */
+  ikPole(A, Bn, Cn, t, pole) {
+    const a = this.mpos(A, _bkA), b = this.mpos(Bn, _bkB), c = this.mpos(Cn, _bkC);
+    const lab = a.distanceTo(b), lcb = b.distanceTo(c);
+    const dir = _bkD.subVectors(t, a), lat = clamp(dir.length(), 0.05, lab + lcb - 0.004);
+    dir.normalize();
+    const tEff = _bkE.copy(a).addScaledVector(dir, lat);       // the hand can only reach the clamped distance
+    const d = (lab * lab - lcb * lcb + lat * lat) / (2 * lat), h = Math.sqrt(Math.max(0, lab * lab - d * d));
+    const ap = _bkF.subVectors(pole, a); ap.addScaledVector(dir, -ap.dot(dir));
+    if (ap.lengthSq() < 1e-8) ap.set(0, -1, 0).addScaledVector(dir, dir.y);
+    ap.normalize();
+    const elbow = _bkG.copy(a).addScaledVector(dir, d).addScaledVector(ap, h);
+    const u0 = _bkB.subVectors(b, a).normalize(), u1 = _bkF.subVectors(elbow, a).normalize();
+    const qA = _bkQ1.setFromUnitVectors(u0, u1);
+    this.setMQuat(A, this.mquat(A, _bkQ2).premultiply(qA));
+    const c1 = _bkD.subVectors(c, a).applyQuaternion(qA).add(a);   // the hand rode along with the upper arm
+    const v0 = _bkB.subVectors(c1, elbow).normalize(), v1 = _bkF.subVectors(tEff, elbow).normalize();
+    const qB = _bkQ1.setFromUnitVectors(v0, v1);
+    this.setMQuat(Bn, this.mquat(Bn, _bkQ2).premultiply(qB));
+  }
+  /* The idle clip keeps the wrist bent, so once ikPole() stands the forearm up the curled fist just folds back onto the
+     forehead — "grabbing the head". Straighten it: rotate CC_Base_{S}_Hand so the fingers run on along the forearm
+     (elbow→wrist, knuckles up-forward) and the palm looks back at the face. The rotation comes from bone DIRECTIONS
+     measured in model space — finger = Mid1−Hand, thumb side = Index1−Pinky1, palm = their cross product with a
+     per-hand sign fixed once in the bind pose — never from the bone's local axes. Blended in by the guard weight. */
+  guardHand(S, H, Fn, hc, w) {
+    const B = this.bones, M = B[`CC_Base_${S}_Mid1`], I = B[`CC_Base_${S}_Index1`], Pk = B[`CC_Base_${S}_Pinky1`];
+    const BT = window.__blkTune || {};
+    const Hp = this.mpos(H, _ghHp), Ep = this.mpos(Fn, _ghEp);
+    this.mpos(M, _ghM); this.mpos(I, _ghI); this.mpos(Pk, _ghPk);
+    // current frame: finger axis Y, palm-outward normal Z, and X = Y × Z to keep the basis right-handed
+    const Y = _ghY.subVectors(_ghM, Hp).normalize();                              // where the fingers point now
+    const T = _ghT.subVectors(_ghI, _ghPk); T.addScaledVector(Y, -T.dot(Y)).normalize();   // thumb side, ⊥ to the fingers
+    const Z = _ghZ.crossVectors(Y, T).multiplyScalar(this.palmSign[S]);          // palm outward normal
+    const X = _ghX.crossVectors(Y, Z);
+    // target frame: fingers run on along the forearm, the palm looks back toward the face (slightly toward the centre line)
+    const Yt = _ghYt.subVectors(Hp, Ep).normalize();                             // elbow → wrist
+    _ghTo.subVectors(hc, Hp); _ghTo.x *= BT.palmIn ?? BLK.palmIn;               // toward the head centre, only a little inward
+    const Zt = _ghZt.copy(_ghTo).addScaledVector(Yt, -_ghTo.dot(Yt));           // ⊥ to the finger axis
+    if (Zt.lengthSq() < 1e-8) { Zt.set(0, 0, -1); Zt.addScaledVector(Yt, -Zt.dot(Yt)); }
+    Zt.normalize();
+    const Xt = _ghXt.crossVectors(Yt, Zt);
+    // one delta rotation from the measured frame to the target frame, applied to the hand bone's model quaternion
+    _ghMc.makeBasis(X, Y, Z).transpose(); _ghMt.makeBasis(Xt, Yt, Zt);
+    _ghQd.setFromRotationMatrix(_ghMt.multiply(_ghMc));
+    const qc = this.mquat(H, _ghQc); _ghQn.copy(_ghQd).multiply(qc);
+    qc.slerp(_ghQn, w); this.setMQuat(H, qc);
+    // The clips keep the fingers half-curled: a hook, not a fist. Fold the first phalanges further about the hand's
+    // transverse axis (Xt = fingers × palm) so the fingertips tuck into the palm and only the knuckles show. Applied
+    // in model space to the base phalanx, so it carries that finger's whole chain; blended in by the guard weight.
+    const k = (window.__blkTune || {}).clench ?? BLK.clench;
+    if (k > 0) {
+      _clQ.setFromAxisAngle(_ghXt, k);
+      for (const f of ['Index', 'Mid', 'Ring', 'Pinky']) {
+        const b = B[`CC_Base_${S}_${f}1`], q = this.mquat(b, _clQc);
+        _clQn.copy(_clQ).multiply(q);
+        q.slerp(_clQn, w); this.setMQuat(b, q);
+      }
+    }
+  }
   tick(dt) {
     if (G.t > this.staT) this.stamina = Math.min(100, this.stamina + 26 * dt * (1 + 0.08 * SK(this, 'sta')));
+    // holding the guard costs a little breath; keep the regen paused while it is up so the drain is net (issue 41)
+    if (G.state === 'fight' && this.blockW > 0.55 && !this.cur && !(this.guardDown > G.t)) {
+      this.stamina = Math.max(0, this.stamina - BLK.holdDrain * dt);
+      if (this.staT < G.t + 0.1) this.staT = G.t + 0.1;
+    }
     if (this.cur) {
       const P = PUNCH[this.cur], t = this.act[this.cur].time, sc = (this.tsBase || 1) * (t < P.impact ? (this.tsWind || 1) : FOLLOW_K); this.act[this.cur].setEffectiveTimeScale(sc); this.aImpactIn = (P.impact - t) / Math.max(0.3, sc);
       // the punch lands when the knuckles actually touch the face (or ribs); if they never do, it is decided at the end of the window
@@ -485,39 +595,73 @@ class Fighter {
   pose(dt) {
     let duck = 0, lean = 0, slip = 0;
     if (this.dodge) { const d = this.dodge; d.t += dt; const a = sstep(0, 0.09, d.t) * (1 - sstep(0.36, 0.6, d.t)); if (d.type === 'duck') duck = a; else if (d.type === 'lean') lean = a; else slip = a * (d.type === 'slipL' ? 1 : -1); if (d.t > 0.6) this.dodge = null; }
-    const shell = this.shellT > G.t; this.blockW += (((this.blocking || shell) && !this.cur ? 1 : 0) - this.blockW) * Math.min(1, dt * 16);
+    // guard state (issue 41): a break locks it out for BLK.downT; the hands are flung apart for the first BLK.flyT of that.
+    // The button may still be held — the target is 0 until the lockout ends, then the guard rises again on its own.
+    const broken = (this.guardDown || 0) > G.t, bt = G.t - (this.brkT0 ?? -9);
+    const fly = broken ? sstep(0, 0.06, bt) * (1 - sstep(BLK.flyT - 0.14, BLK.flyT, bt)) : 0;
+    const rc = clamp(this.sp.bk.x, 0, BLK.recoilMax);   // how far the last shot drove the gloves back
+    const sag = blkSag(this), sagDrop = Math.min(1, sag * 1.9);   // the gloves are down at the chin by ~10 % stamina
+    const shell = this.shellT > G.t;
+    const guardTgt = (this.blocking || shell) && !this.cur && !broken ? 1 : 0;
+    this.blockW += (guardTgt - this.blockW) * Math.min(1, dt * BLK.onRate);
+    const guardW = Math.max(this.blockW, fly);   // the hands still get posed while they are being flung apart
+    const BT = window.__blkTune || {};
+    // in the guard the head/neck nod back up: the idle clip plus the hunched trunk used to leave the eyes ~23° down,
+    // buried behind the gloves — halve that so the fighter looks at the opponent over the fists (issue 41 review)
+    const chin = BLK.chinLift * (BT.chin ?? 1) * this.blockW;
     // "his legs went": rubber legs — the knees dip and give, the hips swim sideways (cerebellar ataxia after a hard shot)
     if (this.wobble > 0) this.wobble = Math.max(0, this.wobble - dt);
     const wb = sstep(0, 0.6, this.wobble), dip = wb * (0.55 + 0.45 * Math.sin(G.t * 6.3 + this.ph)) * (0.7 + 0.3 * Math.sin(G.t * 2.9));
     const dz = Math.max(this.daze, wb), tt = G.t, sw = dz * Math.sin(tt * 1.9 + this.ph) + 1.8 * wb * Math.sin(tt * 2.6 + this.ph), sw2 = dz * Math.sin(tt * 1.3 + this.ph * 2);
     duck = Math.max(duck, 0.42 * dip, this.wind > G.t ? 0.55 : 0, this.liver ? 0.4 : 0, shell ? 0.32 : 0);   // covering up: chin down, elbows in, hunched behind the gloves
-    const s = this.sp; let live = duck + lean + Math.abs(slip) + this.blockW + dz;
+    const s = this.sp; let live = duck + lean + Math.abs(slip) + guardW + dz;   // s.bk (the recoil) also feeds live below
     for (const k in s) { const q = s[k]; if (dt > 0) { const n = dt > 0.02 ? 2 : 1; for (let i = 0; i < n; i++) q.step(dt / n); } live += Math.abs(q.x) + Math.abs(q.v) * 0.01; }
     const B = this.bones;
     if (live > 1e-4) {
       const fL = B.CC_Base_L_Foot, fR = B.CC_Base_R_Foot;
       const tL = this.mpos(fL, _po1), tR = this.mpos(fR, _po2), qL = this.mquat(fL, _poq1), qR = this.mquat(fR, _poq2);
       this.setHip(_v1.copy(this.hipModel).add(_v2.set(0.09 * slip + 0.03 * sw, -0.26 * duck - 0.04 * lean - 0.05 * Math.abs(slip) - 0.06 * this.blockW - 0.07 * dz + 0.015 * sw2, -0.11 * duck - 0.13 * lean + clamp(s.hz.x, -0.12, 0.12))));
-      this.rot(B.CC_Base_Waist, 0.22 * duck - 0.20 * lean + 0.06 * this.blockW + 0.4 * s.sp.x + 0.07 * sw2, 0, 0.4 * s.sr.x - 0.2 * slip - 0.12 * sw);
-      this.rot(B.CC_Base_Spine01, 0.16 * duck - 0.18 * lean + 0.08 * this.blockW, 0, -0.14 * slip);
-      this.rot(B.CC_Base_Spine02, 0.10 * duck - 0.14 * lean + 0.6 * s.sp.x, 0, 0.6 * s.sr.x - 0.1 * slip - 0.06 * sw);
-      this.rot(B.CC_Base_NeckTwist01, -0.25 * duck + 0.2 * lean + 0.45 * s.hp.x, 0.4 * s.hy.x, 0.45 * s.hr.x);
+      // a shot on the guard rocks the trunk back behind the gloves (the recoil spring), on top of the standing reactions
+      this.rot(B.CC_Base_Waist, 0.22 * duck - 0.20 * lean + 0.06 * this.blockW + 0.4 * s.sp.x + 0.07 * sw2 - 0.5 * rc, 0, 0.4 * s.sr.x - 0.2 * slip - 0.12 * sw);
+      this.rot(B.CC_Base_Spine01, 0.16 * duck - 0.18 * lean + 0.08 * this.blockW - 0.7 * rc, 0, -0.14 * slip);
+      this.rot(B.CC_Base_Spine02, 0.10 * duck - 0.14 * lean + 0.6 * s.sp.x - 0.9 * rc, 0, 0.6 * s.sr.x - 0.1 * slip - 0.06 * sw);
+      this.rot(B.CC_Base_NeckTwist01, -0.25 * duck + 0.2 * lean + 0.45 * s.hp.x - 0.3 * rc - 0.6 * chin, 0.4 * s.hy.x, 0.45 * s.hr.x);
       // shaking it off: a hard one landed, half a second later the head shakes (5–6 Hz, three swings) — "I'm fine"
       const sk = G.t - (this.shakeT ?? -9), shake = sk > 0.35 && sk < 1.0 ? 0.16 * Math.sin((sk - 0.35) * 34) * (1 - (sk - 0.35) / 0.65) : 0;
-      this.rot(this.head, s.hp.x + 0.12 * dz, s.hy.x + shake, s.hr.x + 0.15 * sw);
+      // the chin tucks a little in the high guard and nods back on the recoil — with the guard lift above, the eyes stay on the opponent
+      this.rot(this.head, s.hp.x + 0.12 * dz + 0.03 * this.blockW - 0.6 * rc - 0.4 * chin, s.hy.x + shake, s.hr.x + 0.15 * sw);
+      // shoulders come up round the tucked chin — a symmetric, mirrored lift of the shoulder girdle
+      if (this.blockW > 0.02) for (const S of ['L', 'R']) {
+        const cl = B[`CC_Base_${S}_Clavicle`]; if (cl) this.rot(cl, 0, 0, (S === 'L' ? 1 : -1) * 0.055 * this.blockW);
+      }
       this.cc.updateMatrixWorld(true);
       this.ik(B.CC_Base_L_Thigh, B.CC_Base_L_Calf, fL, tL); this.setMQuat(fL, qL);
       this.ik(B.CC_Base_R_Thigh, B.CC_Base_R_Calf, fR, tR); this.setMQuat(fR, qR);
     }
-    // guard: block pulls both fists to the face; a dazed fighter's hands sag
+    /* High guard (issue 41): symmetric gloves at the temples at eye height, a little in front of the face; the nearly
+       vertical forearms cover it with the elbows tucked onto the ribs. It used to cross both gloves low over the mouth
+       (±0.065, −0.075 from the head bone) with the elbows flared out. The target is still built off the head bone, so a
+       duck / slip / step carries the guard with it. */
     const tiredSag = clamp((35 - this.stamina) / 35, 0, 1) * (this.cur ? 0 : 1);
     const stareDown = G.state === 'intro' ? G.stare || 0 : 0;   // the stare-down: the hands drop from the face (09b_cine.js)
-    if (this.blockW > 0.02 || dz > 0.02 || tiredSag > 0.02 || stareDown > 0.02) for (const S of ['L', 'R']) {
+    const gx = BT.x ?? BLK.guardX, gy = BT.y ?? BLK.guardY, gz = BT.z ?? BLK.guardZ;
+    if (guardW > 0.02 || dz > 0.02 || tiredSag > 0.02 || stareDown > 0.02) for (const S of ['L', 'R']) {
       if (this.aimW > 0.05 && this.aimArm === S) continue;
+      const side = S === 'L' ? 1 : -1;
       const H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), hc = this.group.worldToLocal(this.head.getWorldPosition(_v3));   // the guard follows the head where it is now (ducked / slipped), not where it stands upright
-      const g = _v4.set(S === 'L' ? 0.065 : -0.065, -0.075, 0.135).add(hc);
-      hand.lerp(g, this.blockW).add(_v5.set(0, (-0.2 * dz - 0.11 * tiredSag - 0.34 * stareDown) * (1 - this.blockW), 0.03 * dz - 0.03 * tiredSag - 0.06 * stareDown));   // dazed or out of breath: the hands come down
-      this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, hand);
+      const g = _v4.set(side * gx, gy, gz).add(hc);
+      g.y -= 0.115 * sagDrop;                       // an empty tank: the gloves slide down from the eyes to the chin
+      g.z -= 0.35 * rc; g.y -= 0.65 * rc;          // a shot drives them 4…10 cm back / down onto the face, on a spring
+      g.x += side * 0.27 * fly; g.y -= 0.17 * fly; g.z -= 0.05 * fly;   // broken: flung out to the sides
+      hand.lerp(g, guardW).add(_v5.set(0, (-0.2 * dz - 0.11 * tiredSag - 0.34 * stareDown) * (1 - guardW), 0.03 * dz - 0.03 * tiredSag - 0.06 * stareDown));   // dazed or out of breath: the hands come down
+      const A = B[`CC_Base_${S}_Upperarm`], Fn = B[`CC_Base_${S}_Forearm`];
+      // elbow hint: down at the ribs, a little in and forward of the shoulder; the forearm ends up vertical
+      this.mpos(A, _bkP); _bkP.x -= side * (BT.in ?? BLK.poleIn); _bkP.y -= (BT.down ?? BLK.poleDown); _bkP.z += (BT.fwd ?? BLK.poleFwd);
+      this.ikPole(A, Fn, H, hand, _bkP);
+      // the fist is a straight continuation of the forearm, palm to the face (not folded back onto the hair):
+      // ikPole only moved the arm, so refresh the matrices before measuring the hand bone's directions
+      this.cc.updateMatrixWorld(true);
+      this.guardHand(S, H, Fn, hc, guardW);
     }
     if (this.aimW > 0.02 && this.aimTarget) {
       const S = this.aimArm, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), kn = this.mpos(B[`CC_Base_${S}_Mid1`], _po4);

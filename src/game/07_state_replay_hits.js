@@ -107,7 +107,8 @@ function stepReplay(dtReal) {
     if (e.wear) { wearEvent(e); continue; }   // a hat flies off / glasses break again (04e_wardrobe.js)
     const F = e.who ? P2 : P1; FX.spawn(e.pos, e.dir, e.power); if (e.dent) F.flesh.dent(...e.dent); if (e.mist) FX.mist(e.pos, e.dir, e.power, e.mist);
     if (e.spray) F.flesh.spray(e.spray.map(i => F.flesh.wounds[i]).filter(Boolean), e.dir, e.power, F);
-    sfx.thud(e.power * 0.7); G.shake = Math.max(G.shake, 0.01 + 0.02 * e.power); EVT.emit('hit', { pos: e.pos, power: e.power, replay: true }); }
+    if (e.blocked) sfx.block(clamp(e.power * 2, 0.3, 1.4)); else sfx.thud(e.power * 0.7);
+    G.shake = Math.max(G.shake, 0.01 + 0.02 * e.power); EVT.emit('hit', { pos: e.pos, power: e.power, replay: true }); }
   if (RP.tau >= s.to) nextSeg();
   return sdt;
 }
@@ -201,8 +202,22 @@ function resolveHit(att, name, contact) {
   const caught = def.cur && !def.resolved && !(def.blockW > 0.55); if (caught) dmg *= 1.25;
   if (att.adv > 0.04) dmg *= 1.08;   // stepping in behind it
   dmg *= att.punchK ?? 1; if (evading) dmg *= 1.35; if (body) dmg *= 0.8;
-  const blocked = def.blockW > 0.55 && (!def.cur || def.dodge);
-  if (blocked) { dmg *= body ? 0.6 : P.type === 'upper' ? 0.55 : 0.18; def.stamina = Math.max(0, def.stamina - 7); }
+  const stamBefore = def.stamina;
+  const guardBroken = (def.guardDown || 0) > G.t;   // the next punch after a break gets through clean (issue 41)
+  const blocked = def.blockW > 0.55 && (!def.cur || def.dodge) && !guardBroken;
+  // The raw force of the shot before the guard eats it: it drives the recoil, the breath it costs, the nod and the break.
+  // `power` below is computed from the reduced damage, so without this every block would read as the same light jab.
+  const bforce = clamp(P.dmg / 18 * (att.punchK ?? 1) * (att.dmgMul || 1) * (counter ? 1.5 : 1), 0.25, 1.6);
+  const isPow = !!att.heavy, isHook = P.type === 'hook';
+  const breakIt = blocked && def.stamina < BLK.breakSta && (isPow || isHook);
+  const sag = blocked ? blkSag(def) : 0;   // < 20 % stamina: gloves at the chin, up to ×2 damage leaks through
+  if (blocked) {
+    dmg *= (body ? 0.6 : P.type === 'upper' ? 0.55 : 0.18) * (1 + sag);   // was a flat ×0.18 / ×0.55 / ×0.6
+    def.stamina = Math.max(0, def.stamina - clamp(1.5 + 6.5 * bforce, 3, 12));   // was a flat 7, now ∝ the shot, 3…12
+    def.sp.bk.v += (0.5 + bforce) * 1.9;   // gloves spring back onto the face; the head / trunk follow in pose()
+    if (isPow) def.knock = (def.knock || 0) + 0.7 * bforce;   // a power shot takes a short step back
+    if (breakIt) { def.guardDown = G.t + BLK.downT; def.brkT0 = G.t; def.blockW = 0; }
+  }
   dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (G.mode === 'spar' ? 0.6 : 1);   // 16 oz and a helmet
   if (window.__dmgLog) window.__dmgLog.push([def === P1 ? 1 : 2, +dmg.toFixed(1), name, counter ? 'C' : '', caught ? 'K' : '', blocked ? 'B' : '', evading ? 'E' : '', +G.t.toFixed(1)]);
   if (att.fs) { if (blocked) att.fs.blk++; else { att.fs.land++; if (P.type !== 'straight' || name === 'cross') att.fs.pow++; if (att.sig && sigOf(name) === att.sig) att.fs.sig++; } att.fs.dmg += dmg; }
@@ -214,10 +229,15 @@ function resolveHit(att, name, contact) {
   dir.normalize();
   const power = clamp(dmg / (18 * ((window.__tw || {}).dmgK ?? DMG_K)), 0.2, 1.6), blood = !blocked && (def.hp < 62 || dmg >= 14);
   if (!blocked) { const was = def.daze; def.daze = Math.min(1, def.daze + power * 0.13 + (def.hp < 30 ? 0.1 : 0)); if (was < 0.55 && def.daze >= 0.55) popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'поплыл', 'crit'); }
-  if (blocked) popup(pos, 'блок', 'dodge');
+  if (breakIt) popup(_v4.copy(pos).add(_v5.set(0, 0.18, 0)), 'блок пробит', 'crit');
+  else if (blocked) popup(pos, 'блок', 'dodge');
   // direction: how the knuckles were travelling at contact
   { const kn = att.knuckle(_v4); if (att.kOld) { _v3.copy(kn).sub(att.kOld); if (_v3.lengthSq() > 1e-6) dir.lerp(_v3.normalize(), 0.6).normalize(); } }
   if (body) { def.stamina = Math.max(0, def.stamina - 18); popup(pos, 'по корпусу', 'dodge'); }
+  // debug hook (issue 41): one row per punch that lands on a guard
+  if (blocked && window.__blk && window.__blk.log) window.__blk.log.push({
+    kind: name, pow: !!isPow, dmg: +dmg.toFixed(2),
+    stamBefore: +stamBefore.toFixed(1), stamAfter: +def.stamina.toFixed(1), broken: !!breakIt });
   def.lastContact = pos.clone();
   if (caught) {   // his own punch: knocked off line if it was early, landing weakened if it was nearly there
     const dp = PUNCH[def.cur], td = def.act[def.cur].time;
@@ -237,7 +257,7 @@ function resolveHit(att, name, contact) {
       else if (power > 0.9) AI.backT = G.t + 0.5 + rr() * 0.4;
     } else if (def.hitLog.length >= 3) def.shellT = G.t + 0.45;
   }
-  const ev = { t: G.t, pos, dir, power, who: def === P1 ? 0 : 1 };
+  const ev = { t: G.t, pos, dir, power, who: def === P1 ? 0 : 1, blocked };
   if (!blocked && !body) wearHit(def, pos, dir, power);   // hats fly off, glasses crack (04e_wardrobe.js)
   if (!blocked) {
     const fr = def.flesh.onHit(pos, dir, power, name, body, def); ev.dent = fr.dent; ev.pos = pos = fr.skin;
@@ -261,7 +281,9 @@ function resolveHit(att, name, contact) {
   // and light shots, a short freeze on a clean heavy one, a breath of slow motion only on the really big ones
   if (!blocked && power > 0.55) G.hitstop = Math.min(0.04, 0.012 + 0.03 * (power - 0.55));
   if (!blocked && power > 1.05 && G.slowT <= 0.02) { G.slow = 0.6; G.slowT = 0.06; }
-  G.shake = Math.max(G.shake, 0.012 + 0.03 * power); sfx.thud(power, body); EVT.emit('hit', { pos, power, blocked });
+  G.shake = Math.max(G.shake, 0.012 + 0.03 * power + (breakIt ? 0.02 : 0));
+  if (blocked) sfx.block(bforce, breakIt ? 1.8 : 1); else sfx.thud(power, body);   // dull/short on gloves, louder on a break
+  EVT.emit('hit', { pos, power, blocked });
   popup(pos, String(Math.round(dmg)), counter ? 'crit' : 'hit');
   // feel it: the screen edge flushes red when you are hit, the phone kicks on what you land and harder on what you take
   if (def === P1 && !blocked) { const h = $('hurt'); if (h) { h.style.setProperty('--k', power); h.classList.remove('on'); void h.offsetWidth; h.classList.add('on'); } }
@@ -349,4 +371,33 @@ function knockout(att, def, dir, power, name, fwd, forced) {
   msg('Нокаут', 'ko'); setTimeout(() => sfx.bell(3), 500); EVT.emit('ko', { pos: def.headNow });
   $('pad').hidden = true; Q.length = 0;
 }
+
+/* ── debug hook for the block work (issue 41) ───────────────────────────────────────────────────────────────
+   guard(true) raises P1's guard at once and keeps the AI quiet; throwAt(kind, pow) has P2 throw that punch into it.
+   __tick / __step then advance the swing. Every punch that lands on a guard is appended to __blk.log as
+   { kind, pow, dmg, stamBefore, stamAfter, broken } (written in resolveHit above). Set P1.stamina before a throw
+   to look at the sag / the break — throwAt never resets the defender's state. */
+window.__blk = {
+  log: [],
+  quiet() {
+    G.state = 'fight'; G.introT = 9; G.stareT = 0;
+    if (typeof AI !== 'undefined' && AI) { AI.t = 99; AI.blockUntil = 0; AI.backT = 0; AI.lat = 0; }
+    if (P2 && !P2._blkQuiet) { P2._blkQuiet = true; P2.startDodge = () => {}; }
+    if (P2) { P2.blocking = false; P2.blockW = 0; }
+  },
+  guard(on) {
+    if (!P1 || !P2) return;
+    if (G.state === 'menu' || G.state === 'result') startFight(true);
+    this.quiet();
+    P1.blocking = !!on; P1.blockW = on ? 1 : 0; P1.guardDown = 0; P1.brkT0 = -9;
+    return { blocking: P1.blocking, blockW: P1.blockW };
+  },
+  throwAt(kind, pow) {
+    const name = PUNCH[kind] ? kind : 'jab';
+    if (G.state === 'menu' || G.state === 'result') startFight(true);
+    this.quiet();
+    P2.cancelPunch(); P2.powerNext = !!pow; P2.wantBody = false; P2.startPunch(name);
+    return name;
+  },
+};
 
