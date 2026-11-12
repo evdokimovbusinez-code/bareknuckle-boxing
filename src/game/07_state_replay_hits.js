@@ -2,6 +2,19 @@
 /* damage per landed punch is scaled so a fight lasts: ~25–35 clean head shots to empty a full bar, so cuts and swelling
    have time to show (BKFC bouts that end inside the distance mostly end in rounds 1–3, not in the first ten seconds) */
 const DMG_K = 0.18;
+/* issue 44 — hit reactions: read the place, the force and the series off the recoil (metres / seconds).
+   Before this stage every clean shot drove the same springs at the same instant: no series, no per-punch direction,
+   no light/heavy split, head and trunk together. These are the tuned values the reactions now use. */
+const REACT = {
+  gap: 1.0,        // s: a clean hit within this of the last one keeps the combo alive (else the series resets)
+  step: 0.3,       // reaction multiplier added per extra consecutive hit → ×1.0 / ×1.3 / ×1.6
+  max: 1.6,        // cap of the series multiplier
+  dazeAt: 4,       // 4th+ consecutive clean hit: «поплыл» — legs buckle, gaze unfocused
+  follow: 0.065,   // s: the trunk takes the impulse this long AFTER the head (head leads, body catches up)
+  light: 0.55,     // power at/below which a non-power shot is just a nod + a blink (a feeler jab)
+  deflate: 0.5,    // s: a body shot leaves him winded, hands down, elbow tucked this long
+  backStep: 0.14,  // extra knock-back per hit from the 2nd one on (he starts retreating)
+};
 const DIFFS = { easy: { label: 'Лёгкий', dodge: 0.18, read: 0.5, gap: 1.9, speed: 1.0, toAI: 1.25, toMe: 0.75 }, normal: { label: 'Норм', dodge: 0.4, read: 0.7, gap: 1.35, speed: 1.15, toAI: 1, toMe: 1 }, hard: { label: 'Жёсткий', dodge: 0.6, read: 0.86, gap: 0.95, speed: 1.3, toAI: 0.9, toMe: 1.15 } };
 const G = { state: 'load', t: 0, real: 0, hitstop: 0, slow: 1, slowT: 0, shake: 0, koT: 0, introT: 0, winner: null, loser: null, wins: 0, losses: 0, diff: 'normal', fallSnd: false };
 let P1, P2, VW = 1, VH = 1, inp = null;
@@ -228,6 +241,15 @@ function resolveHit(att, name, contact) {
   else if (P.type === 'over') dir.set(fwd, -0.45, 0);
   dir.normalize();
   const power = clamp(dmg / (18 * ((window.__tw || {}).dmgK ?? DMG_K)), 0.2, 1.6), blood = !blocked && (def.hp < 62 || dmg >= 14);
+  // ── issue 44: the series + the reaction descriptor handed to takeHit ──
+  // A clean hit inside REACT.gap of the last one compounds (×1.0 → ×1.3 → ×1.6); a block keeps its own 1.2 recoil.
+  let combo = 0, mult = 1;
+  if (!blocked) {
+    if (G.t - (def.rxLast ?? -9) <= REACT.gap) def.rxN = (def.rxN || 0) + 1; else def.rxN = 1;
+    def.rxLast = G.t; combo = def.rxN;
+    mult = Math.min(1 + REACT.step * (combo - 1), REACT.max);
+  }
+  const rx = { mult, combo, heavy: !!isPow, power, rib: att.ribIdx | 0 };
   if (!blocked) { const was = def.daze; def.daze = Math.min(1, def.daze + power * 0.13 + (def.hp < 30 ? 0.1 : 0)); if (was < 0.55 && def.daze >= 0.55) popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'поплыл', 'crit'); }
   if (breakIt) popup(_v4.copy(pos).add(_v5.set(0, 0.18, 0)), 'блок пробит', 'crit');
   else if (blocked) popup(pos, 'блок', 'dodge');
@@ -245,8 +267,9 @@ function resolveHit(att, name, contact) {
     else def.dmgMul = 0.55;
   }
   if (G.t - (att.lastLand || -9) < 0.2 || G.t - (def.lastLand || -9) < 0.2) { if (!G.tradeT || G.t - G.tradeT > 1) { G.tradeT = G.t; popup(_v4.lerpVectors(att.headNow, def.headNow, 0.5).add(_v5.set(0, 0.3, 0)), 'размен!', 'crit'); G.slow = 0.3; G.slowT = 0.35; } }
-  att.lastLand = G.t; def.knock = (def.knock || 0) + (blocked ? 0.25 : 1) * power * (body ? 0.6 : 1);
-  def.takeHit(dir, blocked ? power * 0.35 : power, name, pos, body, blocked);
+  // the step back grows with the series (a clean shot is scaled by `mult`); from the 2nd hit on he also starts retreating
+  att.lastLand = G.t; def.knock = (def.knock || 0) + (blocked ? 0.25 : mult) * power * (body ? 0.6 : 1) + (combo >= 2 ? REACT.backStep * (combo - 1) : 0);
+  def.takeHit(dir, blocked ? power * 0.35 : power, name, pos, body, blocked, rx);
   // how a man reacts depends on what hit him: a single hard one → a step back and a head shake; three landing inside ~1.5 s →
   // he stops punching, covers up and gets out of the corner of it (sideways, back)
   if (!blocked) {
@@ -400,6 +423,60 @@ window.__blk = {
     this.quiet();
     P2.cancelPunch(); P2.powerNext = !!pow; P2.wantBody = false; P2.startPunch(name);
     return name;
+  },
+};
+
+/* ── debug hook for the hit reactions (issue 44) ───────────────────────────────────────────────────────────
+   hit('hookL', { body: true, pow: true }) has P1 land that punch clean on P2 and returns the row P2.rxLog:
+   { kind, type, body, heavy, power, mult, combo, eff, headDeg, bodyDeg, step }. __tick / __step then advance
+   the springs to the peak of the recoil. series(n, kind, opts) lands n clean hits 0.2 s apart (inside REACT.gap)
+   and returns all n rows — watch ×1.0 → ×1.3 → ×1.6 and «поплыл» from the 4th one on.
+   The hits are resolved straight through resolveHit (a real swing takes too long to fit a 4-hit series), with
+   the knockdown / knockout of stage 1.5 disabled and a synthetic contact point. Same path for the player and the AI. */
+window.__react = {
+  log: [],
+  quiet() {
+    G.state = 'fight'; G.introT = 9; G.stareT = 0; G.stare = 0; G.paused = false;
+    G.hitstop = 0; G.slow = 1; G.slowT = 0; G.shake = 0; G.tradeT = 0;
+    window.__noKD = true;                       // stage 1.5: no knockdown / knockout while probing reactions
+    if (typeof AI !== 'undefined' && AI) { AI.t = 99; AI.blockUntil = 0; AI.backT = 0; AI.lat = 0; AI.latT = 0; }
+    if (P2 && !P2._rxQuiet) { P2._rxQuiet = true; P2.startDodge = () => {}; }
+    if (P2) { P2.blocking = false; P2.blockW = 0; P2.guardDown = 0; P2.dodge = null; P2.cur = null; P2.ko = false; P2.rag.stop(); }
+    Q.length = 0;
+  },
+  _hit(kind, opts, reset) {
+    const o = opts || {}, name = PUNCH[kind] ? kind : 'jab';
+    if (!P1 || !P2 || !P1.other) return null;
+    if (G.state !== 'fight') startFight(true);
+    this.quiet();
+    if (window.__tick) window.__tick(6, 1 / 60);   // seat the bones, headNow and the rib colliders first
+    this.quiet();
+    if (reset !== false) {
+      P2.rxN = 0; P2.rxLast = -9; P2.rxFollow = null; P2.deflateT = -9; P2.foldPt = null;
+      P2.daze = 0; P2.wobble = 0; P2.shellT = 0; P2.wind = 0; P2.liver = null; P2.hitLog = []; P2.knock = 0;
+      for (const k in P2.sp) P2.sp[k].zero();
+      P2.rag.stop(); P2.rxLog = null;
+    }
+    P2.hp = 100; P2.hpCap = 100; P2.stamina = 100;
+    P1.heavy = !!o.pow; P1.punchK = o.pow ? 1.45 : 1; P1.dmgMul = 1; P1.sig = null; P1.adv = 0;
+    P1.counterUntil = 0; P1.cur = null; P1.resolved = false; P1.kOld = null; P1.lastLand = -9; P1.whiff = false;
+    P1.bodyShot = !!o.body; P1.wantBody = false; P1.ribIdx = 0;
+    const pos = o.body ? P2.ribs[0].w.clone() : P2.headNow.clone();
+    resolveHit(P1, name, pos);
+    G.hitstop = 0; G.slow = 1; G.slowT = 0;
+    const L = P2.rxLog ? { ...P2.rxLog } : null;
+    if (L) this.log.push(L);
+    return L;
+  },
+  hit(kind, opts) { return this._hit(kind, opts, true); },
+  series(n, kind, opts) {
+    const out = [], N = Math.max(1, n | 0 || 1), name = kind || 'cross', o = opts || {};
+    for (let i = 0; i < N; i++) {
+      const r = this._hit(name, o, i === 0);
+      if (r) out.push(r);
+      if (window.__tick) window.__tick(12, 1 / 60);   // 0.2 s between hits — well inside REACT.gap (1 s)
+    }
+    return out;
   },
 };
 

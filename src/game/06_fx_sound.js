@@ -204,6 +204,14 @@ const sfx = (() => {
       { const n = a.createBufferSource(), f = filt('lowpass', 780 + 420 * k, 0.9), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.018 + 0.012 * k, (0.22 + 0.26 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // muffled slap of leather on leather
       { const n = a.createBufferSource(), f = filt('lowpass', 380, 0.8), g = a.createGain(); n.buffer = noise; env(g, t, 0.002, 0.03 + 0.02 * k, (0.16 + 0.2 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.09); }   // the dull knock behind it
       const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(112 + 26 * k, t); o.frequency.exponentialRampToValueAtTime(52, t + 0.07); env(g2, t, 0.002, 0.06, (0.2 + 0.18 * k) * L); o.connect(g2).connect(out); o.start(t); o.stop(t + 0.09); },
+    /* A clean body shot forces the air out of him (issue 44): a short breath — noise through a bandpass falling
+       900 → 320 Hz, straight to master (no room echo: close to the mic), plus a faint chest thump. p = effective power. */
+    exhale(p) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.2, 1.6);
+      const n = a.createBufferSource(), f = filt('bandpass', 900, 0.7), g = a.createGain(); n.buffer = noise;
+      f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(320, t + 0.2);
+      env(g, t, 0.012, 0.22, 0.13 + 0.12 * k); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.3);
+      const o = a.createOscillator(), g2 = a.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.18);
+      env(g2, t, 0.01, 0.18, 0.06 + 0.05 * k); o.connect(g2).connect(master); o.start(t); o.stop(t + 0.25); },
     /* the heavy bag: a deep thump of 40 kg of filling (sine dropping from ~95 Hz + a low-passed burst), the slap of knuckles on
        leather on top; p = power 0.2 … 1.6 */
     bag(p) { const a = ac; if (!a) return; const t = a.currentTime, master = bus, k = clamp(p, 0.2, 1.6);
