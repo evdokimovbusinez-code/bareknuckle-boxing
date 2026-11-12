@@ -1,7 +1,7 @@
 /* ───────── AI ───────── */
 /* opponent styles, after how bare-knuckle bouts actually go: short range, lots of hooks and overhands, fighters who stand and trade,
    counter-punchers who make you miss and make you pay, and pressure fighters who walk you to the ropes with combinations and body shots */
-const ROUND_LEN = 120, ROUNDS = 5, BREAK_LEN = 7;
+const ROUND_LEN = 120, BREAK_LEN = 7; let ROUNDS = 5;   // issue 49: a P2P match is 3 rounds (was a const = 5)
 const STYLES = {
   brawler: { label: 'рубака', gap: 0.72, w: { jab: 2, cross: 3, hookL: 3.5, hookR: 3.2, upperL: 1, upperR: 1.4, over: 2.4 }, dodge: 0.55, block: 0.5, combo: 0.55, trade: 0.55, feint: 0.03, body: 0.15, adv: 0.05, counter: 0.15 },
   counter: { label: 'контрпанчер', gap: 1.35, w: { jab: 4, cross: 3.5, hookL: 2.5, hookR: 1.2, upperL: 1.4, upperR: 1.8, over: 0.6 }, dodge: 1.35, block: 0.9, combo: 0.3, trade: 0.12, feint: 0.16, body: 0.12, adv: -0.06, counter: 0.6 },
@@ -10,6 +10,7 @@ const STYLES = {
 const AI = { lat: 0, latT: 0, backT: 0, t: 1.2, combo: 0, seen: -1, dodgeAt: 0, dodgeType: 'duck', blockUntil: 0, feintAt: 0, style: STYLES.brawler };
 function ai(dt) {
   if (window.__tutOn) return;   // (issue 45) the sparring partner stands and waits (his slow block-step punches come from tutTick)
+  if (NET.host) return netHostAI(dt);   // issue 49: P2 is the guest's man, not the AI
   if (BAG.on) { AI.t = 9; return; }
   const me = P2, pl = P1, D = DIFFS[G.diff], S = AI.style;
   if (me.doomed || me.liver || me.wind > G.t) return;
@@ -59,6 +60,7 @@ function ai(dt) {
   }
 }
 function aiFollow() {   // he doesn't let a falling man go: one or two more on the way down
+  if (NET.host) return;   // issue 49: the guest drives P2 himself
   if (!followOK(P2) || !P2.canAct() || (AI.fol = (AI.fol || 0)) >= 2 || G.t < (AI.folT || 0)) return;
   AI.fol++; AI.folT = G.t + 0.25 + rr() * 0.2; P2.wantBody = false; P2.powerNext = true; P2.startPunch(rr() < 0.5 ? 'hookL' : rr() < 0.6 ? 'cross' : 'over');
 }
@@ -74,6 +76,7 @@ function playerInput() {
 /* ───────── flow ───────── */
 function show(id, on) { $(id).hidden = !on; }
 function toMenu() {
+  if (NET.role) netClose();   // issue 49: leaving the match tears the P2P connection down
   if (window.__tutOn) tutEnd();   // (issue 45) leaving through the pause «Сдаться / Выйти» also closes the lesson
   socFlush(); socLeave();   // the frame of the last post; a challenge's place and level go back (15_social.js)
   if (G.mode === 'career') G.diff = G.userDiff; BAG.on = false; showP2(true); BAG.g.visible = false; updateMenu(); for (const F of [P1, P2]) F.sparGear(false);

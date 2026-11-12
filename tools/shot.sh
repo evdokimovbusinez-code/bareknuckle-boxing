@@ -4,6 +4,7 @@
 #   bash tools/shot.sh /tmp/shots/fight.jpg fight 6
 #   bash tools/shot.sh /tmp/shots/x.jpg js "document.getElementById('go').click(); __tick(400, 1/60);"
 #   bash tools/shot.sh /tmp/shots/t.jpg tut   # issue 45: run tools/tut_test.py (all steps, desktop keys + touch PointerEvents)
+#   bash tools/shot.sh /tmp/shots/mp.jpg mp   # issue 49: run tools/test/mp_test.py (two pages, real PeerJS P2P)
 # then look at the JPG with the Read tool.  Takes 1-4 minutes (software rendering).
 set -e
 cd "$(dirname "$0")/.."
@@ -16,4 +17,6 @@ if [ "${2:-}" = "tut" ]; then exec python3 tools/tut_test.py; fi
 # one server per checkout (worktrees run side by side): the port comes from this directory's path
 PORT=${SHOT_PORT:-$((8700 + $(pwd | cksum | cut -d' ' -f1) % 200))}
 curl -sf -o /dev/null http://localhost:$PORT/gtest.html || { (python3 -m http.server $PORT >/dev/null 2>&1 &); sleep 1; }
+# issue 49: two pages in one browser, real PeerJS — tools/test/mp_test.py starts its own http.server
+if [ "${2:-}" = "mp" ]; then exec python3 tools/test/mp_test.py "$1"; fi
 SHOT_PORT=$PORT timeout 600 python3 tools/shot.py "$@"

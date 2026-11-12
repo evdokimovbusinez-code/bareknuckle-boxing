@@ -363,6 +363,25 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 @media (hover:none){.db small,.pb small,.keys{display:none}}
 @media (prefers-reduced-motion:reduce){.msg.show,.popn,.rt,.hp.hit,.counter{animation-duration:.01s}}
 
+/* ── issue 49: «Бой с другом» — room screen, ping badge, disconnect banner ── */
+.net-st{font:500 12px var(--mono);letter-spacing:.06em;color:var(--muted);line-height:1.5}
+.net-st b{color:var(--gold)}
+.net-home{display:flex;flex-direction:column;gap:10px}
+.net-home .btn{width:100%}
+.net-code{font:700 clamp(30px,7vmin,52px) var(--mono);letter-spacing:.22em;color:var(--gold);text-align:center;padding:10px 0;border:1px dashed rgba(226,177,74,.5);border-radius:4px;background:rgba(226,177,74,.06);-webkit-user-select:text;user-select:text}
+.net-link{font:500 11px var(--mono);letter-spacing:.02em;color:var(--muted);word-break:break-all;line-height:1.5;padding:7px 9px;border:1px solid rgba(255,255,255,.14);border-radius:2px;background:rgba(0,0,0,.3);-webkit-user-select:text;user-select:text;min-height:14px}
+.net-acts{display:flex;gap:8px}.net-acts .btn{flex:1}
+.net-wait{font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--gold);text-align:center;padding-top:6px}
+.net-wait::before{content:'';display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--gold);animation:locpulse 1s ease-in-out infinite;vertical-align:middle}
+.net-ping{pointer-events:none;display:block;margin:4px auto 0;font:500 10px var(--mono);letter-spacing:.06em;color:#8fd49a;white-space:nowrap}
+.net-ping.bad{color:var(--gold)}
+.net-ping[hidden]{display:none}
+.net-drop{position:absolute;left:50%;top:calc(var(--pt,8px) + 78px);transform:translateX(-50%);z-index:12;min-width:min(420px,86%);box-sizing:border-box;text-align:center;
+  background:rgba(13,16,23,.95);border:1px solid rgba(255,59,78,.7);border-top:3px solid var(--neon);border-radius:8px;padding:12px 18px;box-shadow:0 14px 44px -12px rgba(0,0,0,.9)}
+.net-drop b{display:block;font-family:var(--display);font-weight:900;font-size:clamp(18px,4vmin,28px);text-transform:uppercase;letter-spacing:.03em}
+.net-drop small{display:block;margin-top:4px;font:500 11px var(--mono);letter-spacing:.06em;color:var(--muted)}
+.net-drop[hidden]{display:none}
+
 /* ── issue 45: the beginner's tutorial — first-visit offer, top hint bar, final card ── */
 .modal{position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:rgba(5,6,9,.72);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .modal-c{width:min(430px,86%);box-sizing:border-box;text-align:center;background:linear-gradient(180deg,#1b1d22,#0c0d11);border:1px solid rgba(226,177,74,.5);border-top:3px solid var(--gold);border-radius:10px;padding:clamp(16px,3.4vmin,26px) clamp(18px,4vmin,28px);box-shadow:0 22px 64px -14px rgba(0,0,0,.92);animation:pop2 .4s cubic-bezier(.2,1.6,.4,1)}
@@ -409,7 +428,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="st"><i id="s1"></i></div>
       <div class="counter" id="cnt" hidden>КОНТРУДАР ×1.5</div>
     </div>
-    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><button class="pz" id="pause-btn" aria-label="Пауза"></button><button class="fs" id="fs-btn" aria-label="На весь экран" title="На весь экран" hidden>⛶</button></div>
+    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><span class="net-ping" id="net-ping" hidden></span><button class="pz" id="pause-btn" aria-label="Пауза"></button><button class="fs" id="fs-btn" aria-label="На весь экран" title="На весь экран" hidden>⛶</button></div>
     <div class="side r">
       <div class="nm"><b id="n2">Соперник</b><span id="w2">побед 0</span><span id="st2" style="opacity:.7"></span></div>
       <div class="hp" id="hpb2"><i class="ghost" id="g2"></i><i class="fill" id="h2"></i></div>
@@ -419,6 +438,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 
   <div class="pops" id="pops"></div>
   <div class="msg" id="msg"></div>
+  <!-- issue 49: «Соперник отключился» — ten seconds to reconnect, then a win to the man left standing -->
+  <div class="net-drop" id="net-drop" hidden><b>Соперник отключился</b><small id="net-drop-t">Ждём восстановления… 10 с</small></div>
   <div class="kdbar" id="kdbar" hidden><div class="kdbar-t"><span id="kdtxt">ВСТАВАЙ · ЖМИ УДАРЫ</span><span id="kdn"></span></div><div class="kdbar-r"><i id="kdfill"></i></div></div>
 
   <!-- the card of a career opponent before the fight (fightCard): name and nickname, style · place · level, his legend -->
@@ -458,6 +479,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
         <button id="go-shop"><i>05</i><b>Магазин</b><small id="shop-lbl"></small></button>
         <button id="go-social"><i>06</i><b>Соцсети</b><small id="soc-lbl"></small></button>
         <button id="go-set"><i>07</i><b>Настройки</b></button>
+        <button id="go-net"><i>08</i><b>Бой с другом</b><small>по ссылке · P2P</small></button>
       </nav>
       <nav class="mnav" id="nav-train" hidden>
         <button id="go-bag"><i>01</i><b>Груша</b><small id="bag-lbl"></small></button>
@@ -479,6 +501,30 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
         <div class="fld"><span>соперник</span><div class="sw" id="o-diff"></div></div>
       </div>
       <div class="pfoot"><button class="btn" id="quick-back">Назад</button><button class="btn pri" id="go">В бой</button></div>
+    </div>
+  </div>
+
+  <!-- issue 49: «Бой с другом» — create a room / join by code, share the link, P2P over PeerJS -->
+  <div class="ui scr" id="net" hidden>
+    <div class="panel wide">
+      <div class="ptitle"><small>мультиплеер · P2P</small>Бой с другом</div>
+      <div class="pbody">
+        <div class="net-st" id="net-st">Бой 1 на 1 по ссылке. Хост считает бой, гость видит его со своей стороны. Без регистрации и своих серверов.</div>
+        <div class="net-home" id="net-home">
+          <button class="btn pri" id="net-create">Создать комнату</button>
+          <div class="fld"><span>или войти по коду</span>
+            <input class="inp" id="net-code-in" maxlength="6" placeholder="КОД" autocomplete="off" spellcheck="false">
+            <button class="btn" id="net-join">Войти по коду</button>
+          </div>
+        </div>
+        <div id="net-room" hidden>
+          <div class="fld"><span>код комнаты</span><div class="net-code" id="net-code">------</div></div>
+          <div class="fld"><span>ссылка другу</span><div class="net-link" id="net-link"></div></div>
+          <div class="net-acts"><button class="btn" id="net-copy">Копировать</button><button class="btn" id="net-share">Поделиться</button></div>
+          <div class="net-wait" id="net-wait">Ждём соперника…</div>
+        </div>
+      </div>
+      <div class="pfoot"><button class="btn" id="net-back">Назад</button></div>
     </div>
   </div>
 

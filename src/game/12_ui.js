@@ -51,6 +51,7 @@ const press = (type, n, el) => {
   let body = false, pow = false;
   if (type === 'punch') { const m = punchMod(); body = m.body; pow = m.pow; ctlLog(n, body, pow); }
   if (type === 'dodge') { Q.length = 0; tutAct('dodge', n); }   // (issue 45) the tutorial reads dodges here too
+  if (NET.guest) { netSendPress(type, n, body, pow); blip(el); return; }   // issue 49: the guest's press goes to the host, not into Q
   if (Q.length < 2) Q.push({ type, name: n, at: G.real, body, pow });
   blip(el);
 };
@@ -98,14 +99,14 @@ const punchFromSwipe = (dx, dy) => {
     });
   }
 }
-const setBlock = v => { if (P1) P1.blocking = v && G.state === 'fight'; const b = $('block-btn'); b && b.classList.toggle('on', !!v); };
+const setBlock = v => { if (NET.guest) netBlock(v); if (P1) P1.blocking = v && G.state === 'fight'; const b = $('block-btn'); b && b.classList.toggle('on', !!v); };
 // block: hold the button (or space)
 { const bb = $('block-btn'); bb.addEventListener('pointerdown', e => { e.preventDefault(); try { bb.setPointerCapture(e.pointerId); } catch (_) {} setBlock(true); });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) bb.addEventListener(ev, () => setBlock(false)); }
 /* movement: the floating left stick (or arrows / Q E) walks — x along the fight line, y circles him; a quick flick and
    release is a dodge: back = lean away, down = duck, up = slip (to the side his punch isn't coming from) */
 const MV = { kx: 0, ky: 0, sx: 0, sy: 0 };
-const setMove = () => { if (!P1) return; const x = MV.kx || MV.sx, y = MV.ky || MV.sy; P1.moveDir = Math.abs(x) > 0.25 ? Math.sign(x) * Math.min(1, Math.abs(x) * 1.25) : 0; P1.moveLat = Math.abs(y) > 0.25 ? Math.sign(y) * Math.min(1, Math.abs(y) * 1.25) : 0; };
+const setMove = () => { if (NET.guest) netMove(); if (!P1) return; const x = MV.kx || MV.sx, y = MV.ky || MV.sy; P1.moveDir = Math.abs(x) > 0.25 ? Math.sign(x) * Math.min(1, Math.abs(x) * 1.25) : 0; P1.moveLat = Math.abs(y) > 0.25 ? Math.sign(y) * Math.min(1, Math.abs(y) * 1.25) : 0; };
 /* the stick has no fixed home: it appears where the left thumb lands (left half, below the HUD) and fades back to a
    faint hint at rest. Its radius matches the CSS size; on a rotated portrait stage the touch is mapped into the
    local frame exactly as camera layout rotates it. pointer-events:none on the stick lets the document see the touch. */
@@ -195,7 +196,7 @@ window.addEventListener('keydown', e => {
   if (MV_KEYS[e.code]) { if (live || e.code.startsWith('Key')) e.preventDefault(); if (!e.repeat) { HELD.add(e.code); mvKeys(); } return; }
   if (e.repeat) return; const k = ACT_KEYS[e.code];
   if (k) { e.preventDefault(); press(k[0], k[1]); }
-  else if ((e.key === 'Enter' || e.key === ' ') && G.state === 'result' && document.activeElement === document.body) startFight();
+  else if ((e.key === 'Enter' || e.key === ' ') && G.state === 'result' && document.activeElement === document.body) (NET.role ? netRematch() : startFight());
 });
 stage.addEventListener('pointerdown', e => { if (!(e.target.closest && e.target.closest('button')) && introSkip()) e.preventDefault(); });   // a tap skips the card / the fly-round
 // mouse punches anywhere on the ring (not on menus / buttons)
@@ -206,7 +207,7 @@ stage.addEventListener('pointerdown', e => {
   e.preventDefault(); press('punch', n);
 });
 stage.addEventListener('contextmenu', e => { if (G.state !== 'menu') e.preventDefault(); });
-$('r-again').addEventListener('click', startFight);
+$('r-again').addEventListener('click', () => NET.role ? netRematch() : startFight());
 $('r-menu').addEventListener('click', toMenu);
 $('r-replay').addEventListener('click', startReplay);
 $('skip').addEventListener('click', endReplay);
@@ -220,5 +221,6 @@ buildTemplates().then(() => {
   /*DBG*/
   $('loading').hidden = true;
   tutBoot();   // (issue 45) the first-visit offer; wired after the debug block so window.__manual is set in the debug build
+  netBoot();   // issue 49: the «Бой с другом» screen and the ?room= link
   requestAnimationFrame(t => { last = t; frame(t); });
 }).catch(e => { console.error(e); ldText.textContent = 'Не удалось загрузить бойцов. Обнови страницу.'; ldText.className = 'err'; });
