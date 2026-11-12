@@ -213,3 +213,94 @@ window.__colFit = (F, step = 3) => {
   res.ALL = '>1cm ' + (all.filter(x => x > 0.01).length / all.length * 100).toFixed(1) + '% >2cm ' + (all.filter(x => x > 0.02).length / all.length * 100).toFixed(1) + '% >4cm ' + (all.filter(x => x > 0.04).length / all.length * 100).toFixed(1) + '%';
   return res;
 };
+
+/* ── issue 42: somersault-on-a-punch reproducer ──────────────────────────────────────────────
+   window.__flip.run(n): sets up n fights, gives P1 a strong finishing punch (uppercuts, power hooks,
+   counter crosses, low-HP knockouts), steps the sim with __tick and measures, at every 120 Hz
+   ragdoll substep, how far P2's pelvis/chest leaned from the upright rest pose and their angular
+   speed. Tilt is the angle of the body's OWN up-axis from its upright direction — i.e. pitch/roll,
+   exactly the issue's «по тангажу или крену»: 0° upright, 90° horizontal, 180° upside-down. A twist
+   about the body's own axis does not count (that is not a somersault).
+   A "flip" (сальто) = tilt > 120° while genuinely airborne (pelvis & chest > 0.4 m AND pelvis |vy| > 0.8,
+   i.e. falling/launched, not a settled fold), or body spin > 12 rad/s.
+   Reports a per-punch table plus the flip count and the peak tilts / angular speeds. Debug: o.wMax
+   overrides every body's wMax (to replay the old uncapped physics): run(40, { wMax: 30 }). */
+window.__flip = {
+  out: [],
+  SC: [   // the reported offenders first; power is what resolveHit hands to knockout() (clamped 0.2…1.6)
+    { name: 'upperR', power: 1.5, note: 'апперкот' },
+    { name: 'upperL', power: 1.5, note: 'апперкот' },
+    { name: 'hookR', power: 1.5, note: 'силовой хук' },
+    { name: 'hookL', power: 1.5, note: 'силовой хук' },
+    { name: 'cross', power: 1.6, note: 'кросс в контратаке ×1.5' },
+    { name: 'over', power: 1.45, note: 'силовой оверхенд' },
+    { name: 'cross', power: 1.35, note: 'малое HP → нокаут' },
+    { name: 'jab', power: 1.25, note: 'малое HP → нокаут' },
+  ],
+  run(n = 40, o = {}) {
+    const g = window.__g, { P1, P2, G, PUNCH, THREE } = g, V3 = THREE.Vector3;
+    const D2R = Math.PI / 180, secs = o.secs || 3, frames = Math.round(secs * 60), out = [];
+    const origRand = Math.random, u1 = new V3(), u2 = new V3();
+    const tw = window.__tw || (window.__tw = {}), oldWM = tw.wMax;
+    if (o.wMax !== undefined) tw.wMax = o.wMax;
+    delete window.__fall; delete window.__koVar;   // clear debug overrides left by other tools
+    for (let i = 0; i < n; i++) {
+      const sc = this.SC[i % this.SC.length];
+      let s = (o.seed0 || 4242) + i * 7919;
+      Math.random = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };  // deterministic where the game reads Math.random directly
+      g.startFight(); G.state = 'fight'; G.introT = 9; G.stareT = 0; g.AI.t = 99; P2.startDodge = () => {};
+      window.__tick(5 + (Math.random() * 30 | 0), 1 / 60); g.AI.t = 99;
+      const P = PUNCH[sc.name], att = P1, def = P2, fwd = Math.sign(def.group.position.x - att.group.position.x);
+      const dir = new V3(fwd, 0.15, 0);
+      if (P.type === 'hook') dir.set(P.arm === 'L' ? -1 : 1, 0.1, 0.35).transformDirection(att.group.matrixWorld);
+      else if (P.type === 'upper') dir.set(fwd * 0.4, 1, 0);
+      else if (P.type === 'over') dir.set(fwd, -0.45, 0);
+      dir.normalize();
+      def.lastContact = def.headNow.clone().add(new V3(-fwd * 0.09, (Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.08));
+      def.hp = 0;
+      const power = clamp(sc.power + (Math.random() - 0.5) * 0.2, 0.3, 1.6);
+      g.knockout(att, def, dir, power, sc.name, fwd);
+      // clean KO sim: full speed, no freeze, no replay cut (koT pushed far away), no follow-up shots
+      G.slow = 1; G.slowT = 0; G.hitstop = 0; G.koT = 1e9;
+      const R = def.rag, by = R.by, qb = { pelvis: by.pelvis.qBind, chest: by.chest.qBind };
+      const pr = R.prof || {}, st = { n: i, kind: sc.name, note: sc.note, power: +power.toFixed(2), ko: true,
+        rag: (R.world ? R.world.constructor.name : '-') + '/' + R.mode,
+        fall: R.fall, prof: [pr.stiff && 'stiff', pr.frozen && 'frozen', pr.seizure && 'seiz', pr.fence && 'fence'].filter(Boolean).join('+') || '-',
+        maxTilt: 0, maxTiltAir: 0, maxW: 0, flip: false, nan: false };
+      const origProject = R.project;
+      const sample = () => {
+        for (const key of ['pelvis', 'chest']) {
+          const b = by[key].body, q = b.quaternion, r = qb[key];
+          // lean of the body's up-axis from its upright bind direction: pitch / roll only (twist ignored)
+          u1.set(0, 1, 0).applyQuaternion(r);
+          u2.set(0, 1, 0).applyQuaternion(q);
+          const tilt = Math.acos(Math.max(-1, Math.min(1, u1.dot(u2)))) / D2R;
+          const w = Math.hypot(b.angularVelocity.x, b.angularVelocity.y, b.angularVelocity.z);
+          if (!isFinite(tilt) || !isFinite(w)) { st.nan = true; continue; }
+          if (tilt > st.maxTilt) st.maxTilt = tilt;
+          if (w > st.maxW) st.maxW = w;
+          // "in the air" = both segments elevated AND the pelvis actually in free fall / launched (|vy| > 0.8).
+          // Height alone is not enough: a man crumpled face-down with his hips up is on the canvas (vy≈0) yet his
+          // up-axis can read >120° — that is a fold, not a somersault. Only a real airborne tumble has speed here.
+          const air = by.pelvis.body.position.y > 0.4 && by.chest.body.position.y > 0.4 && Math.abs(by.pelvis.body.velocity.y) > 0.8;
+          if (air && tilt > st.maxTiltAir) st.maxTiltAir = tilt;
+        }
+      };
+      R.project = function () { sample(); if (origProject) origProject.call(this); };
+      for (let f = 0; f < frames; f++) window.__tick(1, 1 / 60);
+      delete R.project;
+      st.maxTilt = +st.maxTilt.toFixed(1); st.maxTiltAir = +st.maxTiltAir.toFixed(1); st.maxW = +st.maxW.toFixed(2);
+      st.flip = st.nan || st.maxTiltAir > 120 || st.maxW > 12;
+      out.push(st);
+    }
+    Math.random = origRand;
+    if (o.wMax !== undefined) tw.wMax = oldWM;
+    window.__flip.out = out;
+    const flips = out.filter(r => r.flip), mx = k => Math.max(...out.map(r => r[k]));
+    const L = [`FLIP run(${n}): сальто ${flips.length}/${n} | maxTilt ${mx('maxTilt').toFixed(1)}°  maxTiltAir ${mx('maxTiltAir').toFixed(1)}°  maxW ${mx('maxW').toFixed(2)} rad/s  NaN ${out.filter(r => r.nan).length}`,
+      'kind      note                      pow   rag          maxTilt  air     maxW    flip'];
+    for (const r of out) L.push(r.kind.padEnd(9) + r.note.padEnd(25) + String(r.power).padEnd(6) + r.rag.padEnd(13) +
+      String(r.maxTilt).padEnd(9) + String(r.maxTiltAir).padEnd(8) + String(r.maxW).padEnd(8) + (r.flip ? 'FLIP' : '-'));
+    return L.join('\n');
+  },
+};

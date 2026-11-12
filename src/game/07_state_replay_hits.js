@@ -356,7 +356,9 @@ function knockout(att, def, dir, power, name, fwd, forced) {
   // keep the fall in the side-on plane: mostly away from the attacker, a little toward/away from camera
   // momentum check: a punch (~5–9 kg effective mass at 8–10 m/s) can give the 5 kg head several m/s, but the whole 80 kg body well under 1 m/s.
   // The fall itself comes from the legs giving way under the body's own lean; the punch only tips it and whips the head.
-  const T = PUNCH[name].type, imp = dir.clone().multiplyScalar(1.5 + 0.9 * power); imp.y = T === 'upper' ? 0.9 : Math.max(-0.6, Math.min(imp.y, 0.3));
+  // issue 42: was 0.9 for an uppercut — that much vertical impulse on the head/contact lever whipped the whole
+  // body up and over into a backflip. 0.45 still snaps the head up under the chin; the fall stays a sag, not a toss.
+  const T = PUNCH[name].type, imp = dir.clone().multiplyScalar(1.5 + 0.9 * power); imp.y = T === 'upper' ? 0.45 : Math.max(-0.6, Math.min(imp.y, 0.3));
   const along = imp.x * fwd, minAlong = T === 'hook' ? 0.3 + 0.4 * power : T === 'over' ? 0 : 0.9 + 0.6 * power; if (along < minAlong) imp.x += fwd * (minAlong - along);
   // how the body goes down (from KO footage): straight shots to an upright fighter tip him back; hooks and overhands, landing on a man
   // who is coming forward, usually fold him forward or onto his side; any of them can simply drop him where he stands

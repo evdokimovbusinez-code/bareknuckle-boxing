@@ -1959,6 +1959,25 @@ const RAG_CHILD = { Hip: 'Waist', Waist: 'Spine02', Spine02: 'NeckTwist01', Neck
 // which captured joint (Fighter.jp index) gives a body its launch velocity
 const RAG_VEL = { pelvis: [0, 1], waist: [0, 1, 16], chest: [16], neck: [4], head: [15], uarmL: [2], farmL: [6], uarmR: [3], farmR: [8], thighL: [0], shinL: [9], footL: [10], thighR: [1], shinR: [12], footR: [13] };
 const RAG_GAIN = { t0: 3.2, t1: 5, lim: 26, tz: 1.0, lz: 0.55 };
+/* issue 42 — a punch must not send the man into a somersault. A hit can snap the light head, but the heavy
+   trunk (pelvis / waist / chest / neck / head) must never spin like a propeller: cap its angular speed.
+   Light end segments (feet, forearm+hand) may still flail; upper arms / thighs / shins get an intermediate cap.
+   Applied to XBody.wMax (XWorld.step) and to the cannon-es debug path through capSpin(). Debug override: __tw.wMax. */
+const W_SPIN = { foot: 20, farm: 26, limb: 12, trunk: 8 };   // rad/s
+function wCap(key) {
+  if (key.startsWith('foot')) return W_SPIN.foot;
+  if (key.startsWith('farm')) return W_SPIN.farm;
+  if (key === 'pelvis' || key === 'waist' || key === 'chest' || key === 'neck' || key === 'head') return W_SPIN.trunk;
+  return W_SPIN.limb;
+}
+// cannon-es debug worlds have no wMax hook: clamp the trunk's angular velocity directly (called every 120 Hz substep)
+function capSpin(defs) {
+  for (const d of defs) {
+    const b = d.body; if (!b || !b.angularVelocity || b.mass === 0) continue;
+    const w = b.angularVelocity, m = wCap(d.key), L = Math.hypot(w.x, w.y, w.z);
+    if (L > m) { const s = m / L; w.x *= s; w.y *= s; w.z *= s; }
+  }
+}
 class Ragdoll {
   constructor(F) {
     this.F = F; this.on = false; this.hitOn = false; this.tone = 1;
@@ -2101,7 +2120,7 @@ class Ragdoll {
       for (const [p, r] of sph) { com.addScaledVector(p, r * r * r); ws += r * r * r; } com.multiplyScalar(1 / ws);
       const qi = q.clone().invert();
       const b = d.body = new XBody(d.mass, sph.map(([p, r]) => [p.clone().sub(com).applyQuaternion(qi), r]), com, q);
-      { const wm = (window.__tw || {}).wMax; b.wMax = wm === 0 ? 0 : d.key.startsWith('foot') ? (wm || 20) : d.key.startsWith('farm') ? (wm || 20) * 1.3 : (wm || 20) * 1.5; }   // nothing in a falling body spins like a propeller
+      { const wm = (window.__tw || {}).wMax; b.wMax = wm === 0 ? 0 : (wm || wCap(d.key)); }   // issue 42: trunk ≤ 8 rad/s — nothing in a falling body spins like a propeller
       d.off = org.clone().sub(com).applyQuaternion(qi); d.prev.copy(com);
       const vi = RAG_VEL[d.key], vv = new V3(); for (const j of vi) vv.add(_v1.copy(F.jp[j]).sub(F.jo[j]));
       vv.multiplyScalar(idt / vi.length); const vm = vv.clone().transformDirection(inv).multiplyScalar(vv.length()).clampLength(0, d.leg ? 1.2 : 3);
@@ -2141,7 +2160,9 @@ class Ragdoll {
       const kick = { neck: 0.8, chest: 0.5, uarmL: 0.4, uarmR: 0.4, waist: 0.3, farmL: 0.35, farmR: 0.35, pelvis: 0.12 }[d.key] || 0;
       const bv = d.body.velocity;
       const kk = kick * (d.key === 'neck' ? Math.max(trunk, 0.6) : trunk);
-      if (kk) { bv.x += imp.x * kk; bv.y += imp.y * kk; bv.z += imp.z * kk; }
+      // issue 42: only the head (below) gets the upward part of the punch. Feeding imp.y to the whole trunk launched
+      // the 80 kg body off its feet and gave it the airtime to rotate into a backflip. Horizontal impulse still tips him over.
+      if (kk) { bv.x += imp.x * kk; bv.z += imp.z * kk; }
       if (d.key === 'head') {   // the head takes the blow at the contact point: it is shoved and spun
         const b = d.body, c = contactWorld ? contactWorld.clone().applyMatrix4(inv) : new V3(b.position.x, b.position.y, b.position.z);
         const hk = fall === 'fwd' ? 0.25 : 1.1 * Math.max(trunk, 0.45), hi = fall === 'fwd' ? 0.5 : 0.9 * Math.max(trunk, 0.6);   // folding falls: the head spins on the neck more than it is thrown
@@ -2194,7 +2215,7 @@ class Ragdoll {
       const sph = d.fit.map(([lo, r]) => [lo.clone().applyQuaternion(q).add(org), r]), com = new V3(); let ws = 0;
       for (const [p, r] of sph) { com.addScaledVector(p, r * r * r); ws += r * r * r; } com.multiplyScalar(1 / ws);
       const qi = q.clone().invert(), b = d.body = new XBody(d.mass, sph.map(([p, r]) => [p.clone().sub(com).applyQuaternion(qi), r]), com, q);
-      b.wMax = d.key.startsWith('foot') ? 20 : d.key.startsWith('farm') ? 26 : 30;
+      b.wMax = wCap(d.key);   // issue 42: same trunk-spin cap on standing hits (belt and braces; they also have the RAG_MAXDEV leash)
       d.off = org.clone().sub(com).applyQuaternion(qi); d.kin = !d.p || d.leg; d.inLim = 0; d.str = d.str ?? 1;
       if (d.kin) { b.invMass = 0; b.invIb.set(0, 0, 0, 0, 0, 0, 0, 0, 0); b.updateIw(); }
       d.kA = { p: com.clone(), q: q.clone() }; d.kB = { p: com.clone(), q: q.clone() };
@@ -2267,7 +2288,7 @@ class Ragdoll {
         const h = 1 / 120, a = Math.PI * q.t / q.T, b = Math.PI * Math.min(q.t + h, q.T) / q.T, k = (Math.cos(a) - Math.cos(b)) / 2 / h;   // exact share of the half-sine over this substep
         q.b.applyForce(_cf1.set(q.J.x * k, q.J.y * k, q.J.z * k), _cf2.set(q.r.x, q.r.y, q.r.z)); q.t += h;
       }
-      this.world.step(1 / 120); this.acc -= 1 / 120;
+      this.world.step(1 / 120); capSpin(defs); this.acc -= 1 / 120;
       for (const d of defs) {   // hard leash to the animated pose
         if (!d.p) continue; const b = d.body, mx = RAG_MAXDEV[d.key] || 0.3; _qb.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
         const dot = Math.abs(_qb.dot(d.qa)), ang = 2 * Math.acos(Math.min(1, dot));
@@ -2368,7 +2389,7 @@ class Ragdoll {
     this.placeObstacle();
     if (this.world instanceof XWorld) { const TW = window.__tw || {}; this.world.step(Math.min(dt, 1 / 20), () => { if (!TW.noMus) this.muscles(); }); return; }
     this.acc = Math.min(this.acc + dt, 8 / 120);
-    while (this.acc >= 1 / 120) { this.muscles(); this.world.step(1 / 120); this.project(); this.acc -= 1 / 120; }
+    while (this.acc >= 1 / 120) { this.muscles(); this.world.step(1 / 120); capSpin(this.defs); this.project(); this.acc -= 1 / 120; }
   }
   /* the effort of getting up, as forces: roll the chest face-down, turn toward the opponent, push chest and hips off the canvas.
      (A conscious man does this with his arms and legs against the floor; the joint targets put the hands and knees under him,
@@ -6791,7 +6812,9 @@ function knockout(att, def, dir, power, name, fwd, forced) {
   // keep the fall in the side-on plane: mostly away from the attacker, a little toward/away from camera
   // momentum check: a punch (~5–9 kg effective mass at 8–10 m/s) can give the 5 kg head several m/s, but the whole 80 kg body well under 1 m/s.
   // The fall itself comes from the legs giving way under the body's own lean; the punch only tips it and whips the head.
-  const T = PUNCH[name].type, imp = dir.clone().multiplyScalar(1.5 + 0.9 * power); imp.y = T === 'upper' ? 0.9 : Math.max(-0.6, Math.min(imp.y, 0.3));
+  // issue 42: was 0.9 for an uppercut — that much vertical impulse on the head/contact lever whipped the whole
+  // body up and over into a backflip. 0.45 still snaps the head up under the chin; the fall stays a sag, not a toss.
+  const T = PUNCH[name].type, imp = dir.clone().multiplyScalar(1.5 + 0.9 * power); imp.y = T === 'upper' ? 0.45 : Math.max(-0.6, Math.min(imp.y, 0.3));
   const along = imp.x * fwd, minAlong = T === 'hook' ? 0.3 + 0.4 * power : T === 'over' ? 0 : 0.9 + 0.6 * power; if (along < minAlong) imp.x += fwd * (minAlong - along);
   // how the body goes down (from KO footage): straight shots to an upright fighter tip him back; hooks and overhands, landing on a man
   // who is coming forward, usually fold him forward or onto his side; any of them can simply drop him where he stands
