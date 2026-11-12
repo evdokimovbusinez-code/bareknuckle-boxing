@@ -343,6 +343,35 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 #stage.short .sw button:not(.txt){width:24px;height:24px}
 @media (hover:none){.db small,.pb small,.keys{display:none}}
 @media (prefers-reduced-motion:reduce){.msg.show,.popn,.rt,.hp.hit,.counter{animation-duration:.01s}}
+
+/* ── issue 45: the beginner's tutorial — first-visit offer, top hint bar, final card ── */
+.modal{position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:rgba(5,6,9,.72);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.modal-c{width:min(430px,86%);box-sizing:border-box;text-align:center;background:linear-gradient(180deg,#1b1d22,#0c0d11);border:1px solid rgba(226,177,74,.5);border-top:3px solid var(--gold);border-radius:10px;padding:clamp(16px,3.4vmin,26px) clamp(18px,4vmin,28px);box-shadow:0 22px 64px -14px rgba(0,0,0,.92);animation:pop2 .4s cubic-bezier(.2,1.6,.4,1)}
+.modal-c h2{font-family:var(--display);font-weight:900;font-size:clamp(26px,6vmin,42px);line-height:1;text-transform:uppercase;margin:6px 0 10px}
+.modal-c p{font-size:clamp(12px,2.4vmin,15px);line-height:1.4;color:#d8d2c6;margin:0 0 18px}
+.modal-b{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.tut{position:absolute;left:50%;top:calc(var(--pt) + 8px);transform:translateX(-50%);z-index:6;width:min(680px,92%);box-sizing:border-box;text-align:center;
+  background:linear-gradient(180deg,rgba(13,16,23,.95),rgba(13,16,23,.84));border:1px solid var(--line);border-top:3px solid var(--gold);border-radius:8px;
+  padding:clamp(8px,1.8vmin,12px) 18px clamp(10px,2vmin,14px);box-shadow:0 12px 40px -10px rgba(0,0,0,.85);transition:border-top-color .2s}
+.tut.done{border-top-color:#8fd49a}
+.tut-n{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.tut-h{font-family:var(--display);font-weight:900;font-size:clamp(20px,4.4vmin,34px);line-height:1.05;text-transform:uppercase;letter-spacing:.02em;margin:2px 0 6px}
+.tut-how{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.tut-chip{font-size:clamp(11px,2.3vmin,14px);border:1px solid rgba(255,255,255,.16);border-radius:5px;padding:3px 10px;background:rgba(255,255,255,.04);color:var(--muted);white-space:nowrap}
+.tut-chip.prim{border-color:rgba(226,177,74,.65);background:rgba(226,177,74,.12);color:var(--text)}
+.tut-chip b{color:var(--gold);font-family:var(--mono);font-weight:600}
+.tut-p{font:500 12px var(--mono);letter-spacing:.06em;color:var(--muted);margin-top:7px}
+.tut-p b{color:var(--text)}
+.tut-btns{display:flex;gap:8px;justify-content:center;margin-top:8px}
+.tut-btns .btn{font-size:clamp(11px,2.1vmin,13px);padding:5px 12px}
+.tut-ok{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.4);font-size:clamp(56px,14vmin,120px);font-weight:900;color:#8fd49a;text-shadow:0 0 30px rgba(143,212,154,.85);pointer-events:none;opacity:0}
+.tut-ok.on{animation:tutok .7s ease-out}
+@keyframes tutok{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}60%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.06)}}
+#stage.short .tut{padding:6px 12px 8px;width:min(620px,94%)}
+#stage.short .tut-h{font-size:clamp(17px,3.8vmin,24px);margin:1px 0 4px}
+#stage.short .tut-chip{font-size:11px;padding:2px 8px}
+#stage.short .tut-p{margin-top:5px}
+#stage.short .tut-btns{margin-top:5px}
 </style>
 
 <div id="stage">
@@ -411,6 +440,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <nav class="mnav" id="nav-train" hidden>
         <button id="go-bag"><i>01</i><b>Груша</b><small id="bag-lbl"></small></button>
         <button id="go-spar"><i>02</i><b>Спарринг</b><small>шлем и перчатки · зал</small></button>
+        <button id="go-tutorial"><i>03</i><b>Обучение</b><small>управление · 1 мин</small></button>
         <button id="train-back"><i>←</i><b>Назад</b></button>
       </nav>
       <div class="mfoot"><div class="ladder" id="ladder"></div><div class="rec-line" id="rec-line"></div></div>
@@ -539,6 +569,30 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <nav class="mnav c"><button id="p-resume"><b>Продолжить</b></button><button id="p-set"><b>Настройки</b></button><button id="p-quit"><b id="p-quit-l">Сдаться</b><small>выход в меню</small></button></nav>
     </div>
   </div>
+
+  <!-- issue 45: the first-visit offer, the lesson's top hint bar and the final card -->
+  <div class="modal" id="tut-ask" hidden><div class="modal-c">
+    <div class="eyebrow">первый раз здесь?</div>
+    <h2>Пройти обучение?</h2>
+    <p>Покажем управление: удары, свайпы на телефоне, блок и уклоны. Около минуты, в зале со спарринг-партнёром.</p>
+    <div class="modal-b"><button class="btn pri" id="tut-yes">Да</button><button class="btn" id="tut-no">Пропустить</button></div>
+  </div></div>
+
+  <div class="tut" id="tut" hidden>
+    <div class="tut-n" id="tut-n"></div>
+    <div class="tut-h" id="tut-h"></div>
+    <div class="tut-how"><span class="tut-chip" id="tut-k"></span><span class="tut-chip" id="tut-g"></span></div>
+    <div class="tut-p" id="tut-p"></div>
+    <div class="tut-ok" id="tut-ok">✓</div>
+    <div class="tut-btns"><button class="btn sm" id="tut-skip">Пропустить шаг</button><button class="btn sm" id="tut-exit">Выйти ✕</button></div>
+  </div>
+
+  <div class="modal" id="tut-end" hidden><div class="modal-c">
+    <div class="eyebrow">шаг 11 · обучение</div>
+    <h2>Готово!</h2>
+    <p>Ты знаешь все удары, блок и уклоны. Пора в ринг.</p>
+    <div class="modal-b"><button class="btn pri" id="tut-go">Быстрый бой</button><button class="btn" id="tut-menu">В меню</button></div>
+  </div></div>
 
   <div class="loading" id="loading"><div class="box"><span id="ld-text">Загружаю бойцов…</span><div class="bar"><span id="ld-bar"></span></div></div></div>
 </div>

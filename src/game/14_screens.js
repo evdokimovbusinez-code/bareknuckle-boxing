@@ -30,6 +30,12 @@ function uiBack() {
 }
 /* keys of the screens; true = the key is taken (12_ui.js then leaves it alone). Esc: back / pause / skip the replay / leave the result */
 function uiKey(e) {
+  if (window.__tutAsk) {   // (issue 45) the first-visit offer is modal: Enter = Да, Esc = Пропустить
+    e.preventDefault();
+    if (e.key === 'Escape') tutDecline();
+    else if (e.key === 'Enter' || e.key === ' ') tutAccept();
+    return true;
+  }
   const t = e.target, txt = t && t.tagName === 'INPUT' && t.type !== 'range';
   if (txt) { if (e.key === 'Escape' || e.key === 'Enter') t.blur(); return true; }
   if (e.key === 'Escape') {
@@ -166,6 +172,7 @@ function buildMenu() {
   on('go-quick', () => { buildQuick(); uiShow('quick', 'go'); });
   on('go', startQuick); on('quick-back', uiBack);
   on('go-train', () => uiShow('train')); on('train-back', uiBack); on('go-bag', startBag); on('go-spar', startSpar);
+  on('go-tutorial', tutStart);   // (issue 45) «Обучение» in the Тренировка menu
   on('go-fighter', () => { buildCreator(); uiShow('creator'); setCat(UI.cat); });
   buildShop(); on('go-shop', () => uiShow('shop', 'sh-buy')); on('shop-back', uiBack); on('sh-face', () => setView(VIEW_FACE)); on('sh-full', () => setView(VIEW_FULL));
   on('sh-buy', shopBuy);

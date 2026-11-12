@@ -187,6 +187,7 @@ function followHit(att, name, contact) {
   popup(fr.skin.clone().add(_v4.set(0, 0.15, 0)), 'добил', 'crit');
 }
 function resolveHit(att, name, contact) {
+  if (window.__tutOn) return;   // (issue 45) the tutorial: nobody takes damage, no cuts / knockdown / KO
   const def = att.other; if (def.ko || G.state !== 'fight') { if (followOK(att)) followHit(att, name, contact); return; }
   if (BAG.on) { if (att === P1) bagHit(att, name, contact); return; }
   const P = PUNCH[name], d = def.dodge, evading = !!d && d.t > 0.05 && d.t < 0.44, body = att.bodyShot;

@@ -15,7 +15,7 @@ function swatches(id, list, get, set, txt, noLook) {
 /* one circular punch zone: a short swipe from the touch point picks the punch, the way a right stick does in Undisputed.
    window.__ctl is the control log for the issue-40 check: the last ten punches as the queue saw them ({ name, body, pow }). */
 window.__ctl = { last: [] };
-const ctlLog = (name, body, pow) => { const L = window.__ctl.last; L.push({ name, body, pow }); if (L.length > 10) L.shift(); };
+const ctlLog = (name, body, pow) => { const L = window.__ctl.last; L.push({ name, body, pow }); if (L.length > 10) L.shift(); tutAct('punch', name, body, pow); };   // (issue 45) the tutorial reads punches here, the same place the control log is written
 /* hints: the first three bouts are "learning" — the zone captions are bright and the desktop bar is always up; after that
    the captions dim and the bar only comes back after 8 s of no input. The settings switch turns every hint off. The
    bout count lives in its own localStorage key (not the save), read through try/catch so a blocked storage can't break input. */
@@ -50,7 +50,7 @@ const press = (type, n, el) => {
   if (G.state !== 'fight' && !(type === 'punch' && followOK(P1))) return;
   let body = false, pow = false;
   if (type === 'punch') { const m = punchMod(); body = m.body; pow = m.pow; ctlLog(n, body, pow); }
-  if (type === 'dodge') Q.length = 0;
+  if (type === 'dodge') { Q.length = 0; tutAct('dodge', n); }   // (issue 45) the tutorial reads dodges here too
   if (Q.length < 2) Q.push({ type, name: n, at: G.real, body, pow });
   blip(el);
 };
@@ -219,5 +219,6 @@ buildTemplates().then(() => {
   P1.applyLook(LOOK); buildMenu(); toMenu();
   /*DBG*/
   $('loading').hidden = true;
+  tutBoot();   // (issue 45) the first-visit offer; wired after /*DBG*/ so window.__manual is set in the debug build
   requestAnimationFrame(t => { last = t; frame(t); });
 }).catch(e => { console.error(e); ldText.textContent = 'Не удалось загрузить бойцов. Обнови страницу.'; ldText.className = 'err'; });
