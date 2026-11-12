@@ -86,9 +86,11 @@ const FX = (() => {
 
 /* ───────── sound (synthesised) ───────── */
 const sfx = (() => {
-  let ac = null, noise = null, master = null, crowdG = null;   // master: everything goes through one gain — the volume of the settings screen (OPT.vol)
+  let ac = null, noise = null, master = null, top = null, crowdG = null;   // top = OPT.vol (everything), master = OPT.sfxVol (the game sounds); music goes straight to top
   let bus = null, conv = null, wet = null, amb = null, ambId = null, wantId = null; const IR = {}, BUF = {};   // bus: the punches, sent on to master and through the echo of the place (conv → wet)
-  const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } master = ac.createGain(); master.gain.value = OPT.vol; master.connect(ac.destination);
+  const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+    top = ac.createGain(); top.gain.value = OPT.vol; top.connect(ac.destination);
+    master = ac.createGain(); master.gain.value = OPT.sfxVol; master.connect(top);
     bus = ac.createGain(); conv = ac.createConvolver(); conv.normalize = false; wet = ac.createGain(); wet.gain.value = 0; bus.connect(master); bus.connect(conv).connect(wet).connect(master); const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; noise = b; } if (ac.state === 'suspended') ac.resume(); return ac; };
   const env = (g, t, a, d, peak) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
   /* ── the place: the echo of its walls and its ambience ──
@@ -181,7 +183,10 @@ const sfx = (() => {
     // the horn out of the tunnel before the train shows
     trainHorn() { const a = ac; if (!a) return; const t = a.currentTime + 0.3; for (const fq of [311, 370]) { const o = a.createOscillator(), f = filt('lowpass', 1100), g = a.createGain(); o.type = 'sawtooth'; o.frequency.value = fq; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.035, t + 0.06); g.gain.setValueAtTime(0.035, t + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9); o.connect(f).connect(g).connect(conv); o.start(t); o.stop(t + 1); } },
     unlock() { ctx(); if (ac && wantId) this.place(wantId); },
-    vol(v) { if (master) master.gain.value = v; },
+    vol(v) { if (top) top.gain.value = v; },                 // the master slider in settings
+    sfxVol(v) { if (master) master.gain.value = v; },        // the effects slider: leaves the music alone
+    // live nodes for the recorded-sound layer (06b_audio.js); all null until unlock()
+    _nodes() { return { ac, bus, master, top, conv, wet, noise, SPACE, IR, gain, filt, env, impulse }; },
     /* the location changed (setLocation): its echo for the punches and its ambience (cross-faded). Before the first sound of the
        game there is no audio context yet — the place is remembered and set by unlock() */
     place(id) { wantId = id; const a = ac; if (!a || id === ambId) return; ambId = id; const t = a.currentTime, S = SPACE[id] || SPACE.gym;

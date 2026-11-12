@@ -6,3 +6,5 @@ __pycache__/
 .claude-result.json
 node_modules
 .claude/
+# issue #48: 13 MB of intermediate WAVs are rebuilt by fetch.py + build.py, not kept in git
+assets/audio/src/

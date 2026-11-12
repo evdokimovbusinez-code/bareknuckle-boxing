@@ -1,0 +1,822 @@
+{
+ "sources": [
+  {
+   "id": "punches",
+   "title": "Punch",
+   "author": "qubodup",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/punch",
+   "files": [
+    "qubodupPunch.7z"
+   ]
+  },
+  {
+   "id": "hits",
+   "title": "37 hits/punches",
+   "author": "Independent.nu (ljudbank)",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/37-hitspunches",
+   "files": [
+    "independent_nu_ljudbank-hits_and_punches.7z"
+   ]
+  },
+  {
+   "id": "kenney",
+   "title": "Impact Sounds",
+   "author": "Kenney",
+   "license": "CC0",
+   "page": "https://kenney.nl/assets/impact-sounds",
+   "files": [
+    "Impact Sounds (Kenney CC0 pack)"
+   ]
+  },
+  {
+   "id": "blocks",
+   "title": "10 Impact/Shield Blocks",
+   "author": "StarNinjas",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/10-impactshield-blocks",
+   "files": [
+    "impact_-_starninjas.zip"
+   ]
+  },
+  {
+   "id": "falls",
+   "title": "12 wet towel hitting/falling/punching floor sounds",
+   "author": "qubodup",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/12-wet-towel-hittingfallingpunching-floor-sounds",
+   "files": [
+    "wet_towel_on_floor.7z"
+   ]
+  },
+  {
+   "id": "swishes",
+   "title": "Swishes Sound Pack",
+   "author": "artisticdude",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/swishes-sound-pack",
+   "files": [
+    "swishes.zip"
+   ]
+  },
+  {
+   "id": "whoosh",
+   "title": "Air whoosh",
+   "author": "pyranostudios",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/air-whoosh",
+   "files": [
+    "whoosh2_0.wav"
+   ]
+  },
+  {
+   "id": "bells",
+   "title": "Bell dings/chimes",
+   "author": "PWL",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/bell-dingschimes",
+   "files": [
+    "bell_ding1.wav",
+    "bell_ding2.wav",
+    "bell_ding3.wav",
+    "bell_ding4.wav"
+   ]
+  },
+  {
+   "id": "grunts",
+   "title": "grunts of male death and pain",
+   "author": "thebardofblasphemy",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/grunts-male-death-and-pain",
+   "files": [
+    "death pain grunts.wav"
+   ]
+  },
+  {
+   "id": "crowd",
+   "title": "Crowd Shouting/Speaking Ambience",
+   "author": "StarNinjas",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/crowd-shoutingspeaking-ambience",
+   "files": [
+    "crowd_shouting_0.ogg"
+   ]
+  },
+  {
+   "id": "ooo",
+   "title": "OoOoOoOoOoOoOo",
+   "author": "Nocturnal_Vanguard",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/oooooooooooooo",
+   "files": [
+    "oooooooooo.ogg"
+   ]
+  },
+  {
+   "id": "applause",
+   "title": "Applause in a large hall or church",
+   "author": "eXpl0it3r",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/applause-in-a-large-hall-or-church",
+   "files": [
+    "applause-clapping-church-crowd-immersive.wav"
+   ]
+  },
+  {
+   "id": "park",
+   "title": "Park ambiences",
+   "author": "Thimras",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/park-ambiences",
+   "files": [
+    "park_ambience_birds.wav"
+   ]
+  },
+  {
+   "id": "dungeon",
+   "title": "Loopable Dungeon Ambience",
+   "author": "JaggedStone",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/loopable-dungeon-ambience",
+   "files": [
+    "dungeon_ambient_1_0.ogg"
+   ]
+  },
+  {
+   "id": "windamb",
+   "title": "windy ambient noise",
+   "author": "Some Weirdo",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/windy-ambient-noise",
+   "files": [
+    "windy_ambiance_0.ogg"
+   ]
+  },
+  {
+   "id": "electricrock",
+   "title": "Electric Rock",
+   "author": "Pro Sensory",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/electric-rock",
+   "files": [
+    "rock4_0.mp3"
+   ]
+  },
+  {
+   "id": "cleanrock",
+   "title": "Clean Rock",
+   "author": "Pro Sensory",
+   "license": "CC0",
+   "page": "https://opengameart.org/node/174329",
+   "files": [
+    "clean_rock_0.mp3"
+   ]
+  },
+  {
+   "id": "rockloop",
+   "title": "rocky musicloop",
+   "author": "johndekale",
+   "license": "CC0",
+   "page": "https://opengameart.org/content/rocky-musicloop",
+   "files": [
+    "loop.7z"
+   ]
+  }
+ ],
+ "clips": {
+  "faceLight": [
+   {
+    "file": "clips/faceLight_00.wav",
+    "src": "punches",
+    "original": "qubodupPunch/qubodupPunch01.ogg",
+    "ss": 0.0,
+    "dur": 0.4542,
+    "loop": false
+   },
+   {
+    "file": "clips/faceLight_01.wav",
+    "src": "punches",
+    "original": "qubodupPunch/qubodupPunch02.ogg",
+    "ss": 0.0,
+    "dur": 0.4391,
+    "loop": false
+   },
+   {
+    "file": "clips/faceLight_02.wav",
+    "src": "punches",
+    "original": "qubodupPunch/qubodupPunch03.ogg",
+    "ss": 0.0,
+    "dur": 0.447,
+    "loop": false
+   },
+   {
+    "file": "clips/faceLight_03.wav",
+    "src": "punches",
+    "original": "qubodupPunch/qubodupPunch04.ogg",
+    "ss": 0.0,
+    "dur": 0.4442,
+    "loop": false
+   },
+   {
+    "file": "clips/faceLight_04.wav",
+    "src": "punches",
+    "original": "qubodupPunch/qubodupPunch05.ogg",
+    "ss": 0.0,
+    "dur": 0.4593,
+    "loop": false
+   },
+   {
+    "file": "clips/faceLight_05.wav",
+    "src": "kenney",
+    "original": "Audio/impactPunch_medium_000.ogg",
+    "ss": 0.0,
+    "dur": 0.2772,
+    "loop": false
+   }
+  ],
+  "faceHeavy": [
+   {
+    "file": "clips/faceHeavy_00.wav",
+    "src": "kenney",
+    "original": "Audio/impactPunch_heavy_000.ogg",
+    "ss": 0.0,
+    "dur": 0.4476,
+    "loop": false
+   },
+   {
+    "file": "clips/faceHeavy_01.wav",
+    "src": "kenney",
+    "original": "Audio/impactPunch_heavy_001.ogg",
+    "ss": 0.0,
+    "dur": 0.3788,
+    "loop": false
+   },
+   {
+    "file": "clips/faceHeavy_02.wav",
+    "src": "kenney",
+    "original": "Audio/impactPunch_heavy_002.ogg",
+    "ss": 0.0,
+    "dur": 0.3566,
+    "loop": false
+   },
+   {
+    "file": "clips/faceHeavy_03.wav",
+    "src": "kenney",
+    "original": "Audio/impactPunch_heavy_003.ogg",
+    "ss": 0.0,
+    "dur": 0.3411,
+    "loop": false
+   },
+   {
+    "file": "clips/faceHeavy_04.wav",
+    "src": "kenney",
+    "original": "Audio/impactPunch_heavy_004.ogg",
+    "ss": 0.0,
+    "dur": 0.3793,
+    "loop": false
+   },
+   {
+    "file": "clips/faceHeavy_05.wav",
+    "src": "hits",
+    "original": "hits/hit01.mp3.flac",
+    "ss": 0.1156,
+    "dur": 0.6112,
+    "loop": false
+   }
+  ],
+  "body": [
+   {
+    "file": "clips/body_00.wav",
+    "src": "kenney",
+    "original": "Audio/impactSoft_heavy_000.ogg",
+    "ss": 0.0,
+    "dur": 0.5022,
+    "loop": false
+   },
+   {
+    "file": "clips/body_01.wav",
+    "src": "kenney",
+    "original": "Audio/impactSoft_heavy_001.ogg",
+    "ss": 0.0,
+    "dur": 0.5498,
+    "loop": false
+   },
+   {
+    "file": "clips/body_02.wav",
+    "src": "kenney",
+    "original": "Audio/impactSoft_heavy_002.ogg",
+    "ss": 0.0,
+    "dur": 0.5248,
+    "loop": false
+   },
+   {
+    "file": "clips/body_03.wav",
+    "src": "kenney",
+    "original": "Audio/impactSoft_heavy_003.ogg",
+    "ss": 0.0,
+    "dur": 0.5413,
+    "loop": false
+   },
+   {
+    "file": "clips/body_04.wav",
+    "src": "kenney",
+    "original": "Audio/impactSoft_heavy_004.ogg",
+    "ss": 0.0,
+    "dur": 0.4981,
+    "loop": false
+   },
+   {
+    "file": "clips/body_05.wav",
+    "src": "hits",
+    "original": "hits/hit02.mp3.flac",
+    "ss": 0.1147,
+    "dur": 0.7292,
+    "loop": false
+   }
+  ],
+  "block": [
+   {
+    "file": "clips/block_00.wav",
+    "src": "blocks",
+    "original": "impact.1.ogg",
+    "ss": 0.0891,
+    "dur": 0.7236,
+    "loop": false
+   },
+   {
+    "file": "clips/block_01.wav",
+    "src": "blocks",
+    "original": "impact.2.ogg",
+    "ss": 0.0947,
+    "dur": 0.403,
+    "loop": false
+   },
+   {
+    "file": "clips/block_02.wav",
+    "src": "blocks",
+    "original": "impact.3.ogg",
+    "ss": 0.13,
+    "dur": 0.5462,
+    "loop": false
+   },
+   {
+    "file": "clips/block_03.wav",
+    "src": "blocks",
+    "original": "impact.4.ogg",
+    "ss": 0.3192,
+    "dur": 0.8621,
+    "loop": false
+   },
+   {
+    "file": "clips/block_04.wav",
+    "src": "blocks",
+    "original": "impact.5.ogg",
+    "ss": 0.2738,
+    "dur": 0.6987,
+    "loop": false
+   },
+   {
+    "file": "clips/block_05.wav",
+    "src": "blocks",
+    "original": "impact.6.ogg",
+    "ss": 0.2482,
+    "dur": 0.4702,
+    "loop": false
+   }
+  ],
+  "whoosh": [
+   {
+    "file": "clips/whoosh_00.wav",
+    "src": "swishes",
+    "original": "swishes/swish-1.wav",
+    "ss": 0.0,
+    "dur": 0.126,
+    "loop": false
+   },
+   {
+    "file": "clips/whoosh_01.wav",
+    "src": "swishes",
+    "original": "swishes/swish-2.wav",
+    "ss": 0.0,
+    "dur": 0.0958,
+    "loop": false
+   },
+   {
+    "file": "clips/whoosh_02.wav",
+    "src": "swishes",
+    "original": "swishes/swish-4.wav",
+    "ss": 0.0,
+    "dur": 0.1458,
+    "loop": false
+   },
+   {
+    "file": "clips/whoosh_03.wav",
+    "src": "swishes",
+    "original": "swishes/swish-7.wav",
+    "ss": 0.0,
+    "dur": 0.1875,
+    "loop": false
+   },
+   {
+    "file": "clips/whoosh_04.wav",
+    "src": "swishes",
+    "original": "swishes/swish-9.wav",
+    "ss": 0.0,
+    "dur": 0.1969,
+    "loop": false
+   },
+   {
+    "file": "clips/whoosh_05.wav",
+    "src": "whoosh",
+    "original": "whoosh.wav",
+    "ss": 0.0,
+    "dur": 1.4,
+    "loop": false
+   }
+  ],
+  "fall": [
+   {
+    "file": "clips/fall_00.wav",
+    "src": "falls",
+    "original": "wet_towel_on_floor/wet_towel_on_floor-01.flac",
+    "ss": 0.0,
+    "dur": 0.4756,
+    "loop": false
+   },
+   {
+    "file": "clips/fall_01.wav",
+    "src": "falls",
+    "original": "wet_towel_on_floor/wet_towel_on_floor-02.flac",
+    "ss": 0.0,
+    "dur": 0.5125,
+    "loop": false
+   },
+   {
+    "file": "clips/fall_02.wav",
+    "src": "falls",
+    "original": "wet_towel_on_floor/wet_towel_on_floor-03.flac",
+    "ss": 0.0,
+    "dur": 0.4815,
+    "loop": false
+   },
+   {
+    "file": "clips/fall_03.wav",
+    "src": "falls",
+    "original": "wet_towel_on_floor/wet_towel_on_floor-04.flac",
+    "ss": 0.0,
+    "dur": 0.4699,
+    "loop": false
+   },
+   {
+    "file": "clips/fall_04.wav",
+    "src": "falls",
+    "original": "wet_towel_on_floor/wet_towel_on_floor-05.flac",
+    "ss": 0.0,
+    "dur": 0.4,
+    "loop": false
+   },
+   {
+    "file": "clips/fall_05.wav",
+    "src": "falls",
+    "original": "wet_towel_on_floor/wet_towel_on_floor-06.flac",
+    "ss": 0.0,
+    "dur": 0.5536,
+    "loop": false
+   }
+  ],
+  "bell": [
+   {
+    "file": "clips/bell_00.wav",
+    "src": "bells",
+    "original": "bell_ding1.wav",
+    "ss": 0.0,
+    "dur": 0.832,
+    "loop": false
+   },
+   {
+    "file": "clips/bell_01.wav",
+    "src": "bells",
+    "original": "bell_ding2.wav",
+    "ss": 0.0604,
+    "dur": 1.2502,
+    "loop": false
+   },
+   {
+    "file": "clips/bell_02.wav",
+    "src": "bells",
+    "original": "bell_ding3.wav",
+    "ss": 0.0,
+    "dur": 1.4,
+    "loop": false
+   },
+   {
+    "file": "clips/bell_03.wav",
+    "src": "bells",
+    "original": "bell_ding4.wav",
+    "ss": 0.0,
+    "dur": 1.2136,
+    "loop": false
+   },
+   {
+    "file": "clips/bell_04.wav",
+    "src": "kenney",
+    "original": "Audio/impactBell_heavy_000.ogg",
+    "ss": 0.0,
+    "dur": 1.1018,
+    "loop": false
+   },
+   {
+    "file": "clips/bell_05.wav",
+    "src": "kenney",
+    "original": "Audio/impactBell_heavy_001.ogg",
+    "ss": 0.0,
+    "dur": 1.3144,
+    "loop": false
+   }
+  ],
+  "count": [
+   {
+    "file": "clips/count_00.wav",
+    "src": "kenney",
+    "original": "Audio/impactWood_light_000.ogg",
+    "ss": 0.0,
+    "dur": 0.1318,
+    "loop": false
+   },
+   {
+    "file": "clips/count_01.wav",
+    "src": "kenney",
+    "original": "Audio/impactWood_light_001.ogg",
+    "ss": 0.0,
+    "dur": 0.1303,
+    "loop": false
+   },
+   {
+    "file": "clips/count_02.wav",
+    "src": "kenney",
+    "original": "Audio/impactWood_light_002.ogg",
+    "ss": 0.0,
+    "dur": 0.1463,
+    "loop": false
+   },
+   {
+    "file": "clips/count_03.wav",
+    "src": "kenney",
+    "original": "Audio/impactWood_light_003.ogg",
+    "ss": 0.0,
+    "dur": 0.1317,
+    "loop": false
+   },
+   {
+    "file": "clips/count_04.wav",
+    "src": "kenney",
+    "original": "Audio/impactGeneric_light_000.ogg",
+    "ss": 0.0,
+    "dur": 0.1358,
+    "loop": false
+   },
+   {
+    "file": "clips/count_05.wav",
+    "src": "kenney",
+    "original": "Audio/impactGeneric_light_001.ogg",
+    "ss": 0.0,
+    "dur": 0.1146,
+    "loop": false
+   }
+  ],
+  "clink": [
+   {
+    "file": "clips/clink_00.wav",
+    "src": "kenney",
+    "original": "Audio/impactMetal_light_000.ogg",
+    "ss": 0.0,
+    "dur": 0.243,
+    "loop": false
+   },
+   {
+    "file": "clips/clink_01.wav",
+    "src": "kenney",
+    "original": "Audio/impactMetal_light_001.ogg",
+    "ss": 0.0,
+    "dur": 0.1989,
+    "loop": false
+   },
+   {
+    "file": "clips/clink_02.wav",
+    "src": "kenney",
+    "original": "Audio/impactMetal_light_002.ogg",
+    "ss": 0.0,
+    "dur": 0.1851,
+    "loop": false
+   },
+   {
+    "file": "clips/clink_03.wav",
+    "src": "kenney",
+    "original": "Audio/impactMetal_light_003.ogg",
+    "ss": 0.0,
+    "dur": 0.3121,
+    "loop": false
+   },
+   {
+    "file": "clips/clink_04.wav",
+    "src": "kenney",
+    "original": "Audio/impactMetal_light_004.ogg",
+    "ss": 0.0,
+    "dur": 0.1748,
+    "loop": false
+   },
+   {
+    "file": "clips/clink_05.wav",
+    "src": "kenney",
+    "original": "Audio/impactTin_medium_000.ogg",
+    "ss": 0.0,
+    "dur": 0.1558,
+    "loop": false
+   }
+  ],
+  "exhale": [
+   {
+    "file": "clips/exhale_00.wav",
+    "src": "grunts",
+    "original": "grunts.wav",
+    "ss": 3.9378,
+    "dur": 1.4,
+    "loop": false
+   },
+   {
+    "file": "clips/exhale_01.wav",
+    "src": "grunts",
+    "original": "grunts.wav",
+    "ss": 9.9789,
+    "dur": 1.4,
+    "loop": false
+   },
+   {
+    "file": "clips/exhale_02.wav",
+    "src": "grunts",
+    "original": "grunts.wav",
+    "ss": 14.4361,
+    "dur": 1.4,
+    "loop": false
+   },
+   {
+    "file": "clips/exhale_03.wav",
+    "src": "grunts",
+    "original": "grunts.wav",
+    "ss": 20.3191,
+    "dur": 1.4,
+    "loop": false
+   },
+   {
+    "file": "clips/exhale_04.wav",
+    "src": "grunts",
+    "original": "grunts.wav",
+    "ss": 23.8551,
+    "dur": 1.4,
+    "loop": false
+   },
+   {
+    "file": "clips/exhale_05.wav",
+    "src": "grunts",
+    "original": "grunts.wav",
+    "ss": 47.3537,
+    "dur": 1.4,
+    "loop": false
+   }
+  ],
+  "wave": [
+   {
+    "file": "clips/wave_00.wav",
+    "src": "ooo",
+    "original": "ooo.ogg",
+    "ss": 0.0866,
+    "dur": 0.5921,
+    "loop": false
+   },
+   {
+    "file": "clips/wave_01.wav",
+    "src": "ooo",
+    "original": "ooo.ogg",
+    "ss": 0.6786,
+    "dur": 0.5921,
+    "loop": false
+   },
+   {
+    "file": "clips/wave_02.wav",
+    "src": "ooo",
+    "original": "ooo.ogg",
+    "ss": 1.2707,
+    "dur": 0.5921,
+    "loop": false
+   }
+  ],
+  "applause": [
+   {
+    "file": "clips/applause_00.wav",
+    "src": "applause",
+    "original": "applause.wav",
+    "ss": 0.0,
+    "dur": 1.4,
+    "loop": false
+   },
+   {
+    "file": "clips/applause_01.wav",
+    "src": "applause",
+    "original": "applause.wav",
+    "ss": 12.7693,
+    "dur": 1.4,
+    "loop": false
+   },
+   {
+    "file": "clips/applause_02.wav",
+    "src": "applause",
+    "original": "applause.wav",
+    "ss": 25.5385,
+    "dur": 1.4,
+    "loop": false
+   }
+  ],
+  "roar": [
+   {
+    "file": "clips/roar_00.wav",
+    "src": "crowd",
+    "original": "crowd.ogg",
+    "ss": 0.0,
+    "dur": 1.4,
+    "loop": false
+   },
+   {
+    "file": "clips/roar_01.wav",
+    "src": "crowd",
+    "original": "crowd.ogg",
+    "ss": 9.128,
+    "dur": 1.4,
+    "loop": false
+   },
+   {
+    "file": "clips/roar_02.wav",
+    "src": "crowd",
+    "original": "crowd.ogg",
+    "ss": 18.256,
+    "dur": 1.4,
+    "loop": false
+   }
+  ],
+  "crowd": [
+   {
+    "file": "amb/crowd_00.wav",
+    "src": "crowd",
+    "original": "crowd.ogg",
+    "ss": 0.0,
+    "dur": 9.0,
+    "loop": true
+   }
+  ],
+  "ambGym": [
+   {
+    "file": "amb/ambGym_00.wav",
+    "src": "crowd",
+    "original": "crowd.ogg",
+    "ss": 0.0,
+    "dur": 9.0,
+    "loop": true
+   }
+  ],
+  "ambOutdoor": [
+   {
+    "file": "amb/ambOutdoor_00.wav",
+    "src": "park",
+    "original": "park_birds.wav",
+    "ss": 0.0,
+    "dur": 9.0,
+    "loop": true
+   }
+  ],
+  "ambWind": [
+   {
+    "file": "amb/ambWind_00.wav",
+    "src": "windamb",
+    "original": "windamb.ogg",
+    "ss": 0.0,
+    "dur": 9.0,
+    "loop": true
+   }
+  ],
+  "ambIndoor": [
+   {
+    "file": "amb/ambIndoor_00.wav",
+    "src": "dungeon",
+    "original": "dungeon.ogg",
+    "ss": 0.0,
+    "dur": 9.0,
+    "loop": true
+   }
+  ]
+ },
+ "music": [
+  "rock1",
+  "rock2",
+  "rock3"
+ ]
+}
