@@ -9,6 +9,7 @@ const STYLES = {
 };
 const AI = { lat: 0, latT: 0, backT: 0, t: 1.2, combo: 0, seen: -1, dodgeAt: 0, dodgeType: 'duck', blockUntil: 0, feintAt: 0, style: STYLES.brawler };
 function ai(dt) {
+  if (window.__tutOn) return;   // (issue 45) the sparring partner stands and waits (his slow block-step punches come from tutTick)
   if (BAG.on) { AI.t = 9; return; }
   const me = P2, pl = P1, D = DIFFS[G.diff], S = AI.style;
   if (me.doomed || me.liver || me.wind > G.t) return;
@@ -73,6 +74,7 @@ function playerInput() {
 /* ───────── flow ───────── */
 function show(id, on) { $(id).hidden = !on; }
 function toMenu() {
+  if (window.__tutOn) tutEnd();   // (issue 45) leaving through the pause «Сдаться / Выйти» also closes the lesson
   socFlush(); socLeave();   // the frame of the last post; a challenge's place and level go back (15_social.js)
   if (G.mode === 'career') G.diff = G.userDiff; BAG.on = false; showP2(true); BAG.g.visible = false; updateMenu(); for (const F of [P1, P2]) F.sparGear(false);
   G.state = 'menu'; G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0; wearReset();
