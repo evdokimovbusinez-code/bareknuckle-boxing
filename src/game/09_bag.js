@@ -42,6 +42,7 @@ function updateMenu() {
   renderStats();
   const el = $('ladder'); if (el) el.innerHTML = LADDER.map((L, i) => `<i class="${i < G.career ? 'done' : i === G.career ? 'next' : ''}">${L.nm}${L.champ ? ' ★' : ''}</i>`).join('');
   const c = $('car-lbl'); if (c) c.textContent = G.career >= LADDER.length ? 'ты чемпион — пройти заново' : `бой ${G.career + 1}/${LADDER.length} · ${LADDER[G.career].nm} · ${careerPlace()}`;
+  const s = $('story-lbl'); if (s) s.textContent = storyMenuLbl();   // issue 51: «История» replaced «Карьера» in the menu
   const f = $('fighter-lbl'); f.textContent = PROF.pts > 0 ? `свободных очков: ${PROF.pts}` : 'внешность · стиль'; f.classList.toggle('pt', PROF.pts > 0);
   $('who').innerHTML = `${esc(PROF.name || 'Боец')}${PROF.nick ? ` «${esc(PROF.nick)}»` : ''}<small>побед ${G.wins} · поражений ${G.losses}${PROF.champ ? ' · чемпион ×' + PROF.champ : ''} · ${cash(PROF.cash)}</small>`;
   const sh = $('shop-lbl'); if (sh) sh.textContent = cash(PROF.cash);
@@ -65,28 +66,29 @@ function startCareer() {
 function startSpar() { if (G.mode === 'career') { G.diff = G.userDiff; rollOpponent(); } G.mode = 'spar'; startFight(true); }
 function startQuick() { if (G.mode === 'career') { G.diff = G.userDiff; rollOpponent(); } G.mode = 'quick'; startFight(true); }
 function startFight(fromMode) {
-  if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); }
+  if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); if (G.mode === 'story') return storyAgain(); }
   hintFightStart(); window.goFull && window.goFull();   // touch: full screen + landscape (12_ui.js)   // control hints: the first three bouts are the learning ones (12_ui.js)
   for (const F of [P1, P2]) F.sparGear(G.mode === 'spar' || (G.mode === 'net' && NET.cfg.spar));   // a P2P host may pick «Спарринг» (18_net.js)
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
-  if (G.mode !== 'career' && G.mode !== 'net') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }
+  if (G.mode !== 'career' && G.mode !== 'net' && G.mode !== 'story') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }   // a story bout dresses P2 with the chapter's fixed look (19_story.js)
   CROWD.fill = G.mode === 'career' ? LADDER[Math.min(G.career, LADDER.length - 1)].crowd ?? 1 : 1;   // the semi-final in the warehouse: a half-empty hall; the title fight: everybody came
   setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'boxgym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the training gym (13e_loc_boxgym.js); a career fight is where the ladder says
   G.paused = false; UI.from = null; uiShow(null);
   BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; payShow(null); }
   sfx.unlock(); socStart();   // the hype cools down (15_social.js)
-  P1.stat = PROF.stats; P1.sig = PROF.sig; P2.stat = lvlStats(G.mode === 'career' ? Math.min(5, Math.floor(G.career * 0.7)) : ({ easy: 0, normal: 1, hard: 2 })[G.diff] || 0); P2.sig = SIGS[(rr() * SIGS.length) | 0].id;
+  P1.stat = PROF.stats; P1.sig = PROF.sig; P2.stat = lvlStats(G.mode === 'career' ? Math.min(5, Math.floor(G.career * 0.7)) : G.mode === 'story' ? (storyCh().fight.lvl ?? 0) : ({ easy: 0, normal: 1, hard: 2 })[G.diff] || 0); P2.sig = SIGS[(rr() * SIGS.length) | 0].id;
   $('n1').textContent = myName();
-  P1.resetState(); P2.resetState(); P2.speed = DIFFS[G.diff].speed * (1 + 0.035 * SK(P2, 'spd')); P1.speed = 1.5 * (1 + 0.035 * SK(P1, 'spd'));
+  P1.resetState(); P2.resetState(); P2.speed = DIFFS[G.diff].speed * (1 + 0.035 * SK(P2, 'spd')) * (G.mode === 'story' ? storyCh().fight.speed ?? 1 : 1); P1.speed = 1.5 * (1 + 0.035 * SK(P1, 'spd'));
   FX.clearAir(); REC.frames.length = 0; REC.events.length = 0; wearReset(); Q.length = 0; AI.blockUntil = 0; AI.t = 1.0 + rr(); AI.combo = 0; AI.dodgeAt = 0;
   /* the intro runs on G.introT: [−card − fly, −fly) the opponent's card (career), [−fly, 0) the camera flies round the place and
      its crowd (street locations), [0, 1.25) «Готовься», then the referee's clap (the bell in the gym) starts the round */
-  { const street = !LOC.ring && G.mode !== 'bag' && G.mode !== 'spar';
+  { const street = !LOC.ring && G.mode !== 'bag' && G.mode !== 'spar' && !LOC.noFly;   // noFly (the bar, #51): from outside a tight room would read as a dollhouse
     G.flyT = street ? INTRO_FLY : 0; G.cardT = G.mode === 'career' ? INTRO_CARD : 0; G.flyA = INTRO_ARC[LOC.id] ?? -2.1; }
   G.stareT = G.mode !== 'bag' && OPT.cine ? STARE_LEN : 0; G.stare = 0; G.stareOn = false; G.rend = null; RP.hl = false; P1.pant = P2.pant = 0; hlReset(); show('hl', false);   // the stare-down (09b_cine.js): after the card / the fly-round, before «Готовься»
   G.state = 'intro'; G.introT = -(G.flyT + G.cardT); G.introMsg = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; AI.lat = 0; AI.latT = 0;
-  // BKFC: five two-minute rounds; between rounds the corner works on him (stamina, the cuts, ice on the eye); no knockout → the judges
-  G.round = 1; G.roundT = ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0]; G.cutWarn = false;
+  // BKFC: five two-minute rounds; between rounds the corner works on him (stamina, the cuts, ice on the eye); no knockout → the judges.
+  // A story bout has no rounds — one fall to the knockout, the clock is out of reach (issue 51).
+  G.round = 1; G.roundT = G.mode === 'story' ? STORY_TIME : ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0]; G.cutWarn = false;
   show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', !G.cardT); show('pad', false);
   $('diffl').textContent = DIFFS[G.diff].label.toUpperCase(); $('w1').textContent = 'побед ' + G.wins; $('w2').textContent = 'побед ' + G.losses;
   if (G.cardT) fightCard(); else show('vs', false);
@@ -170,6 +172,7 @@ function cutCheck() {
 }
 function stateTick(dtReal) {
   if (window.__tutOn) tutTick(dtReal);   // (issue 45) the lesson's own clock, fresh stamina and step checks
+  if (G.mode === 'story') storyTick(dtReal);   // issue 51: the drunk sway and the chapter's live checks (19_story.js)
   hlTick();
   if (G.state === 'intro') introTick(dtReal);
   else if (G.state === 'rend') rendTick(dtReal);

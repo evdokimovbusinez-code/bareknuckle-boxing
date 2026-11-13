@@ -384,6 +384,36 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .net-drop small{display:block;margin-top:4px;font:500 11px var(--mono);letter-spacing:.06em;color:var(--muted)}
 .net-drop[hidden]{display:none}
 
+/* ── issue 51: «История» — the chapter timeline screen, the dialog plate and the «Титр» card ── */
+.strail{display:flex;flex-direction:column}
+.stc{position:relative;display:flex;align-items:center;gap:10px;padding:10px 2px 10px 26px;margin-left:8px;border-left:2px solid rgba(255,255,255,.14)}
+.stc:last-child{border-left-color:transparent}
+.stc .dot{position:absolute;left:-8px;top:50%;width:14px;height:14px;margin-top:-7px;box-sizing:border-box;border-radius:50%;border:2px solid rgba(255,255,255,.3);background:#0c0d11}
+.stc.done .dot{border-color:var(--gold);background:var(--gold)}
+.stc.done .dot::after{content:'✓';position:absolute;inset:0;display:grid;place-items:center;font:700 9px var(--body);color:#0a0c11}
+.stc.cur .dot{border-color:var(--neon);background:var(--neon);box-shadow:0 0 10px rgba(255,59,78,.8)}
+.stc.lock{opacity:.55}
+.stc-b{flex:1;min-width:0}
+.stc b{display:block;font-family:var(--poster);font-weight:700;font-size:clamp(15px,3vmin,20px);letter-spacing:.04em;text-transform:uppercase;line-height:1.1}
+.stc small{display:block;font-size:11px;color:var(--muted);line-height:1.35;margin-top:3px}
+.stc .btn{flex:none}
+.stc-lock{flex:none;font:500 10.5px var(--mono);letter-spacing:.08em;color:var(--muted);padding:3px 8px;border:1px solid rgba(255,255,255,.14);border-radius:2px;text-transform:uppercase}
+.pfoot .btn small{display:block;font:400 9.5px var(--mono);letter-spacing:.04em;text-transform:none;color:var(--muted);margin-top:2px}
+.dlg{position:absolute;left:0;right:0;bottom:calc(var(--pb) + 3vmin);z-index:5;display:flex;justify-content:center;padding:0 var(--pr) 0 var(--pl);pointer-events:none}
+.dlg-box{pointer-events:auto;cursor:pointer;width:min(780px,96%);box-sizing:border-box;background:linear-gradient(180deg,rgba(13,16,23,.95),rgba(8,9,13,.9));border:1px solid rgba(226,177,74,.42);border-left:4px solid var(--neon);border-radius:3px;padding:clamp(9px,1.9vmin,14px) clamp(12px,2.4vmin,18px);box-shadow:0 18px 48px -16px rgba(0,0,0,.92);animation:dlgIn .22s ease-out}
+@keyframes dlgIn{from{opacity:0;transform:translateY(10px)}}
+.dlg-k{font:500 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.dlg-n{margin-top:4px;font-family:var(--poster);font-weight:700;font-size:clamp(16px,3.2vmin,22px);letter-spacing:.05em;text-transform:uppercase;color:#fff}
+.dlg-t{margin-top:5px;font-size:clamp(13px,2.3vmin,16.5px);line-height:1.45;color:#e9e2d2;min-height:2.7em}
+.dlg-opts{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.dlg-opts .btn{text-align:left;max-width:100%;white-space:normal;text-transform:none;letter-spacing:.02em;font-family:var(--body);font-weight:500;font-size:clamp(12.5px,2.2vmin,15px)}
+.dlg-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:7px;font:500 10.5px var(--mono);letter-spacing:.08em;color:var(--muted)}
+.dlg-skip{border:0;background:none;color:var(--gold);font:600 11px var(--mono);letter-spacing:.06em;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.dlg-card{position:absolute;inset:0;z-index:5;display:grid;place-items:center;background:rgba(5,6,9,.78);cursor:pointer;pointer-events:auto;animation:mFade .3s both}
+.dlg-card b{font-family:var(--display);font-weight:900;font-size:clamp(34px,9vmin,84px);line-height:.95;letter-spacing:.04em;text-transform:uppercase;text-align:center;color:#f1e3c2;text-shadow:0 4px 0 rgba(0,0,0,.6),0 0 40px rgba(226,177,74,.35);padding:0 var(--pr)}
+#stage.short .dlg{bottom:calc(var(--pb) + 1vmin)}
+#stage.short .dlg-t{min-height:0}
+
 /* ── issue 45: the beginner's tutorial — first-visit offer, top hint bar, final card ── */
 .modal{position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:rgba(5,6,9,.72);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .modal-c{width:min(430px,86%);box-sizing:border-box;text-align:center;background:linear-gradient(180deg,#1b1d22,#0c0d11);border:1px solid rgba(226,177,74,.5);border-top:3px solid var(--gold);border-radius:10px;padding:clamp(16px,3.4vmin,26px) clamp(18px,4vmin,28px);box-shadow:0 22px 64px -14px rgba(0,0,0,.92);animation:pop2 .4s cubic-bezier(.2,1.6,.4,1)}
@@ -447,6 +477,16 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <!-- the card of a career opponent before the fight (fightCard): name and nickname, style · place · level, his legend -->
   <div class="vs" id="vs" hidden><div class="vs-b"><div class="vs-k" id="vs-k"></div><div class="vs-n" id="vs-n"></div><div class="vs-m" id="vs-m"></div><div class="vs-l" id="vs-l"></div><div class="vs-h" id="vs-h"></div></div></div>
 
+  <!-- dialog of a story scene (19_story.js): a plate with the name and the line; tap / Enter — «далее», Esc / «Пропустить» — the whole scene; «Титр» is a full-screen card -->
+  <div class="dlg-card" id="dlg-card" hidden><b id="dlg-card-t"></b></div>
+  <div class="dlg" id="dlg" hidden><div class="dlg-box">
+    <div class="dlg-k" id="dlg-k"></div>
+    <div class="dlg-n" id="dlg-n"></div>
+    <div class="dlg-t" id="dlg-t"></div>
+    <div class="dlg-opts" id="dlg-opts"></div>
+    <div class="dlg-h"><span id="dlg-hint"></span><button type="button" class="dlg-skip" id="dlg-skip">Пропустить</button></div>
+  </div></div>
+
   <div class="pad" id="pad" hidden>
     <div class="stick" id="stick" aria-label="Стик: ходить; быстрый рывок = уклон"><i class="knob"></i><span class="sl">ходьба · рывок = уклон</span></div>
     <div class="punches">
@@ -474,7 +514,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="mm-l">
       <div class="logo"><div class="eyebrow">подпольные бои · голые кулаки</div><h1><span>Нокаут</span><b>ринг</b></h1></div>
       <nav class="mnav" id="nav-main">
-        <button id="go-car"><i>01</i><b>Карьера</b><small id="car-lbl"></small></button>
+        <button id="go-story"><i>01</i><b>История</b><small id="story-lbl"></small></button>
         <button id="go-quick"><i>02</i><b>Быстрый бой</b><small>место и соперник</small></button>
         <button id="go-train"><i>03</i><b>Тренировка</b><small>груша · спарринг</small></button>
         <button id="go-fighter"><i>04</i><b>Боец</b><small id="fighter-lbl"></small></button>
@@ -610,6 +650,15 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="sw" id="so-tabs"></div>
       <div class="pbody so-list" id="so-list"></div>
       <div class="pfoot"><button class="btn" id="so-back">Назад</button></div>
+    </div>
+  </div>
+
+  <!-- story (issue #51): chapters as a vertical timeline — passed / next (Играть) / locked; the old ladder lives under «Лестница» -->
+  <div class="ui scr" id="story" hidden>
+    <div class="panel wide">
+      <div class="ptitle"><small>путь со дна</small>История</div>
+      <div class="pbody"><div class="strail" id="st-list"></div></div>
+      <div class="pfoot"><button class="btn" id="go-ladder">Лестница<small id="car-lbl"></small></button><button class="btn pri" id="st-back">Назад</button></div>
     </div>
   </div>
 

@@ -384,6 +384,36 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .net-drop small{display:block;margin-top:4px;font:500 11px var(--mono);letter-spacing:.06em;color:var(--muted)}
 .net-drop[hidden]{display:none}
 
+/* ── issue 51: «История» — the chapter timeline screen, the dialog plate and the «Титр» card ── */
+.strail{display:flex;flex-direction:column}
+.stc{position:relative;display:flex;align-items:center;gap:10px;padding:10px 2px 10px 26px;margin-left:8px;border-left:2px solid rgba(255,255,255,.14)}
+.stc:last-child{border-left-color:transparent}
+.stc .dot{position:absolute;left:-8px;top:50%;width:14px;height:14px;margin-top:-7px;box-sizing:border-box;border-radius:50%;border:2px solid rgba(255,255,255,.3);background:#0c0d11}
+.stc.done .dot{border-color:var(--gold);background:var(--gold)}
+.stc.done .dot::after{content:'✓';position:absolute;inset:0;display:grid;place-items:center;font:700 9px var(--body);color:#0a0c11}
+.stc.cur .dot{border-color:var(--neon);background:var(--neon);box-shadow:0 0 10px rgba(255,59,78,.8)}
+.stc.lock{opacity:.55}
+.stc-b{flex:1;min-width:0}
+.stc b{display:block;font-family:var(--poster);font-weight:700;font-size:clamp(15px,3vmin,20px);letter-spacing:.04em;text-transform:uppercase;line-height:1.1}
+.stc small{display:block;font-size:11px;color:var(--muted);line-height:1.35;margin-top:3px}
+.stc .btn{flex:none}
+.stc-lock{flex:none;font:500 10.5px var(--mono);letter-spacing:.08em;color:var(--muted);padding:3px 8px;border:1px solid rgba(255,255,255,.14);border-radius:2px;text-transform:uppercase}
+.pfoot .btn small{display:block;font:400 9.5px var(--mono);letter-spacing:.04em;text-transform:none;color:var(--muted);margin-top:2px}
+.dlg{position:absolute;left:0;right:0;bottom:calc(var(--pb) + 3vmin);z-index:5;display:flex;justify-content:center;padding:0 var(--pr) 0 var(--pl);pointer-events:none}
+.dlg-box{pointer-events:auto;cursor:pointer;width:min(780px,96%);box-sizing:border-box;background:linear-gradient(180deg,rgba(13,16,23,.95),rgba(8,9,13,.9));border:1px solid rgba(226,177,74,.42);border-left:4px solid var(--neon);border-radius:3px;padding:clamp(9px,1.9vmin,14px) clamp(12px,2.4vmin,18px);box-shadow:0 18px 48px -16px rgba(0,0,0,.92);animation:dlgIn .22s ease-out}
+@keyframes dlgIn{from{opacity:0;transform:translateY(10px)}}
+.dlg-k{font:500 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.dlg-n{margin-top:4px;font-family:var(--poster);font-weight:700;font-size:clamp(16px,3.2vmin,22px);letter-spacing:.05em;text-transform:uppercase;color:#fff}
+.dlg-t{margin-top:5px;font-size:clamp(13px,2.3vmin,16.5px);line-height:1.45;color:#e9e2d2;min-height:2.7em}
+.dlg-opts{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.dlg-opts .btn{text-align:left;max-width:100%;white-space:normal;text-transform:none;letter-spacing:.02em;font-family:var(--body);font-weight:500;font-size:clamp(12.5px,2.2vmin,15px)}
+.dlg-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:7px;font:500 10.5px var(--mono);letter-spacing:.08em;color:var(--muted)}
+.dlg-skip{border:0;background:none;color:var(--gold);font:600 11px var(--mono);letter-spacing:.06em;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.dlg-card{position:absolute;inset:0;z-index:5;display:grid;place-items:center;background:rgba(5,6,9,.78);cursor:pointer;pointer-events:auto;animation:mFade .3s both}
+.dlg-card b{font-family:var(--display);font-weight:900;font-size:clamp(34px,9vmin,84px);line-height:.95;letter-spacing:.04em;text-transform:uppercase;text-align:center;color:#f1e3c2;text-shadow:0 4px 0 rgba(0,0,0,.6),0 0 40px rgba(226,177,74,.35);padding:0 var(--pr)}
+#stage.short .dlg{bottom:calc(var(--pb) + 1vmin)}
+#stage.short .dlg-t{min-height:0}
+
 /* ── issue 45: the beginner's tutorial — first-visit offer, top hint bar, final card ── */
 .modal{position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:rgba(5,6,9,.72);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .modal-c{width:min(430px,86%);box-sizing:border-box;text-align:center;background:linear-gradient(180deg,#1b1d22,#0c0d11);border:1px solid rgba(226,177,74,.5);border-top:3px solid var(--gold);border-radius:10px;padding:clamp(16px,3.4vmin,26px) clamp(18px,4vmin,28px);box-shadow:0 22px 64px -14px rgba(0,0,0,.92);animation:pop2 .4s cubic-bezier(.2,1.6,.4,1)}
@@ -447,6 +477,16 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <!-- the card of a career opponent before the fight (fightCard): name and nickname, style · place · level, his legend -->
   <div class="vs" id="vs" hidden><div class="vs-b"><div class="vs-k" id="vs-k"></div><div class="vs-n" id="vs-n"></div><div class="vs-m" id="vs-m"></div><div class="vs-l" id="vs-l"></div><div class="vs-h" id="vs-h"></div></div></div>
 
+  <!-- dialog of a story scene (19_story.js): a plate with the name and the line; tap / Enter — «далее», Esc / «Пропустить» — the whole scene; «Титр» is a full-screen card -->
+  <div class="dlg-card" id="dlg-card" hidden><b id="dlg-card-t"></b></div>
+  <div class="dlg" id="dlg" hidden><div class="dlg-box">
+    <div class="dlg-k" id="dlg-k"></div>
+    <div class="dlg-n" id="dlg-n"></div>
+    <div class="dlg-t" id="dlg-t"></div>
+    <div class="dlg-opts" id="dlg-opts"></div>
+    <div class="dlg-h"><span id="dlg-hint"></span><button type="button" class="dlg-skip" id="dlg-skip">Пропустить</button></div>
+  </div></div>
+
   <div class="pad" id="pad" hidden>
     <div class="stick" id="stick" aria-label="Стик: ходить; быстрый рывок = уклон"><i class="knob"></i><span class="sl">ходьба · рывок = уклон</span></div>
     <div class="punches">
@@ -474,7 +514,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="mm-l">
       <div class="logo"><div class="eyebrow">подпольные бои · голые кулаки</div><h1><span>Нокаут</span><b>ринг</b></h1></div>
       <nav class="mnav" id="nav-main">
-        <button id="go-car"><i>01</i><b>Карьера</b><small id="car-lbl"></small></button>
+        <button id="go-story"><i>01</i><b>История</b><small id="story-lbl"></small></button>
         <button id="go-quick"><i>02</i><b>Быстрый бой</b><small>место и соперник</small></button>
         <button id="go-train"><i>03</i><b>Тренировка</b><small>груша · спарринг</small></button>
         <button id="go-fighter"><i>04</i><b>Боец</b><small id="fighter-lbl"></small></button>
@@ -610,6 +650,15 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="sw" id="so-tabs"></div>
       <div class="pbody so-list" id="so-list"></div>
       <div class="pfoot"><button class="btn" id="so-back">Назад</button></div>
+    </div>
+  </div>
+
+  <!-- story (issue #51): chapters as a vertical timeline — passed / next (Играть) / locked; the old ladder lives under «Лестница» -->
+  <div class="ui scr" id="story" hidden>
+    <div class="panel wide">
+      <div class="ptitle"><small>путь со дна</small>История</div>
+      <div class="pbody"><div class="strail" id="st-list"></div></div>
+      <div class="pfoot"><button class="btn" id="go-ladder">Лестница<small id="car-lbl"></small></button><button class="btn pri" id="st-back">Назад</button></div>
     </div>
   </div>
 
@@ -6810,6 +6859,7 @@ const sfx = (() => {
     tires: { len: 0.2, lp: 2400, wet: 0.03 },
     parking: { len: 2.2, lp: 1700, wet: 0.6, amb: 0.3, taps: [[0.04, 0.5], [0.075, 0.4], [0.13, 0.3]] },
     warehouse: { len: 2.8, lp: 3200, wet: 0.55, amb: 0.5, taps: [[0.055, 0.5], [0.12, 0.4], [0.2, 0.3], [0.31, 0.2]] },
+    bar: { len: 0.85, lp: 2600, wet: 0.34, amb: 0.5, taps: [[0.026, 0.55], [0.058, 0.38], [0.115, 0.22]] },   // a low tight room: the slap is back on you almost at once
     metro: { len: 2.6, lp: 2900, wet: 0.5, amb: 0.4, taps: [[0.035, 0.5], [0.07, 0.4], [0.16, 0.3], [0.26, 0.2]] } };   // a long stone hall: the slap comes back off the track walls, then from the ends
   const AMB_LVL = 1;
   const impulse = S => { const sr = ac.sampleRate, n = (sr * S.len) | 0, b = ac.createBuffer(2, n, sr), k = 1 - Math.exp(-2 * Math.PI * S.lp / sr);
@@ -6859,6 +6909,17 @@ const sfx = (() => {
           for (let i = 0; i < n && i0 + i < d.length; i++) { const x = i / sr; d[i0 + i] += a * Math.sin(2 * Math.PI * (f0 * x + 9000 * x * x)) * Math.exp(-x / 0.014) * Math.min(1, x / 0.001); }   // a plink: the pitch runs up
           t += Math.random() < 0.25 ? 0.13 + 0.1 * Math.random() : 0.5 + 1.6 * Math.random(); } }));
       const n = loop(b), g = gain(0.1); n.connect(g).connect(out); L.push(n);
+    },
+    // the bar (issue 51): the murmur of the regulars, the fridge hum under the counter, a glass clinking somewhere on the bar
+    bar(out, L) {
+      const [m, mg] = band(L, out, 'bandpass', 430, 1.7, 0.05); wander(L, mg.gain, 0.05, 0.0007, 3); wander(L, m.frequency, 170, 0.0004, 1.2);   // voices, no words
+      const [, lo] = band(L, out, 'lowpass', 110, 0.7, 0.22); wander(L, lo.gain, 0.05, 0.0003, 1);
+      for (const [fq, lvl] of [[100, 0.014], [200, 0.005]]) { const o = ac.createOscillator(), g = gain(lvl); o.frequency.value = fq; o.connect(g).connect(out); L.push(o); }   // the compressor
+      const b = BUF.glass || (BUF.glass = render(8, (d, sr) => {   // taps of glasses: 15 ms pings, metal-bright, sparse
+        let t = 0.4; while (t < 7.5) { const f0 = 1600 + 1800 * Math.random(), a = 0.1 + 0.25 * Math.random(), i0 = (t * sr) | 0, n = (0.05 * sr) | 0;
+          for (let i = 0; i < n && i0 + i < d.length; i++) { const x = i / sr; d[i0 + i] += a * Math.sin(2 * Math.PI * (f0 * x)) * Math.exp(-x / 0.008) * Math.min(1, x / 0.0005); }
+          t += 0.7 + 1.9 * Math.random(); } }));
+      const n = loop(b, 0.93), g2 = gain(0.12); n.connect(g2).connect(out); L.push(n);
     },
     // the metro station at night: the ventilation shafts breathe, the escalators grind far away, a transformer hums
     metro(out, L) {
@@ -7283,14 +7344,17 @@ function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | '
   if (draw) { const p = payOut(false, true, how, stage, before); p.soc = socFight(false, true, how, stage); payShow(p); save(); return; }
   if (win) G.wins++; else G.losses++;
   let t = '', pts = 0;
-  if (G.mode === 'career') {
+  if (G.mode === 'story') { const ch = storyCh();   // issue 51: a story chapter — clear it, the purse is in purse(), the outro comes after the replay
+    if (win) { storyClear(); pts = ch.pts ?? 2; t = `глава «${ch.title}» пройдена`; }
+    else t = `глава «${ch.title}» не пройдена — попробуй ещё`;
+  } else if (G.mode === 'career') {
     if (win) { G.career = Math.min(LADDER.length, G.career + 1); pts = 2; if (G.career >= LADDER.length) { PROF.champ++; pts += 3; t = 'ЧЕМПИОН! Пояс твой'; } else t = `карьера ${G.career}/${LADDER.length} · следующий: ${LADDER[G.career].nm} — ${careerPlace()}`; }
     else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути — ${careerPlace()}`;
   } else if (win) pts = 1;
   if (pts) { PROF.pts += pts; t += (t ? ' · ' : '') + `+${pts} ${pts === 1 ? 'очко' : 'очка'} бойцу`; }
   { const p = payOut(win, false, how, stage, before); p.soc = socFight(win, false, how, stage); payShow(p); }   // the purse (07b_economy.js) and the followers (15_social.js) onto the result screen
   save(); const c = $('r-car'); if (c) c.textContent = t;
-  const a = $('r-again'); if (a) a.textContent = G.mode === 'career' && win && G.career < LADDER.length ? 'Следующий бой' : G.mode === 'career' && !win ? 'Ещё раз' : 'Реванш';
+  const a = $('r-again'); if (a) a.textContent = G.mode === 'story' ? (win ? 'Дальше' : 'Ещё раз') : G.mode === 'career' && win && G.career < LADDER.length ? 'Следующий бой' : G.mode === 'career' && !win ? 'Ещё раз' : 'Реванш';
 }
 const D_SEP = 1.15;
 
@@ -7362,7 +7426,7 @@ function endReplay() {
   G.state = 'result'; $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true;
   const win = G.winner === P1; $('r-title').textContent = win ? 'Победа' : 'Нокаут'; $('r-title').className = 'rt ' + (win ? 'win' : 'lose');
   $('r-sub').textContent = `${win ? 'соперник на полу' : 'ты на полу'} · счёт ${G.wins} : ${G.losses}`;
-  $('result').hidden = false;
+  if (!storyOut(win)) $('result').hidden = false;   // issue 51: a story bout plays its outro dialog first, the result screen after it
 }
 
 /* ───────── hits ───────── */
@@ -7820,6 +7884,11 @@ wearSanitize();
 /* the purse: lines [label, roubles]; `how` = 'dec' | 'ko' | 'tko'; stage = the career step of this fight (before the win is counted) */
 function purse(win, draw, how, stage) {
   if (G.mode === 'spar') return { lines: [], total: 0, note: 'Спарринг — без оплаты' };
+  if (G.mode === 'story') { const R = (storyCh() || {}).reward || {}, lines = [];   // issue 51: the chapter's own purse (money under the bar counter)
+    if (win) { lines.push(['Победа', R.win || 500]); if ((how === 'ko' || how === 'tko') && R.ko) lines.push(['Нокаут', R.ko]); }
+    const sp = socSponsorLine(win); if (sp) lines.push(sp);
+    return { lines, total: lines.reduce((s, l) => s + l[1], 0), note: win ? '' : 'Никаких денег — ты проиграл' };
+  }
   if (G.mode !== 'career' && G.mode !== 'quick') return { lines: [], total: 0 };
   const car = G.mode === 'career', T = car ? PAY.career : PAY.quick, k = car ? 1 + T.step * stage : PAY_DIFF[G.diff] || 1, r10 = v => Math.round(v * k / 10) * 10, lines = [];
   lines.push(['Участие', r10(T.part)]);
@@ -7987,6 +8056,7 @@ function updateMenu() {
   renderStats();
   const el = $('ladder'); if (el) el.innerHTML = LADDER.map((L, i) => `<i class="${i < G.career ? 'done' : i === G.career ? 'next' : ''}">${L.nm}${L.champ ? ' ★' : ''}</i>`).join('');
   const c = $('car-lbl'); if (c) c.textContent = G.career >= LADDER.length ? 'ты чемпион — пройти заново' : `бой ${G.career + 1}/${LADDER.length} · ${LADDER[G.career].nm} · ${careerPlace()}`;
+  const s = $('story-lbl'); if (s) s.textContent = storyMenuLbl();   // issue 51: «История» replaced «Карьера» in the menu
   const f = $('fighter-lbl'); f.textContent = PROF.pts > 0 ? `свободных очков: ${PROF.pts}` : 'внешность · стиль'; f.classList.toggle('pt', PROF.pts > 0);
   $('who').innerHTML = `${esc(PROF.name || 'Боец')}${PROF.nick ? ` «${esc(PROF.nick)}»` : ''}<small>побед ${G.wins} · поражений ${G.losses}${PROF.champ ? ' · чемпион ×' + PROF.champ : ''} · ${cash(PROF.cash)}</small>`;
   const sh = $('shop-lbl'); if (sh) sh.textContent = cash(PROF.cash);
@@ -8010,28 +8080,29 @@ function startCareer() {
 function startSpar() { if (G.mode === 'career') { G.diff = G.userDiff; rollOpponent(); } G.mode = 'spar'; startFight(true); }
 function startQuick() { if (G.mode === 'career') { G.diff = G.userDiff; rollOpponent(); } G.mode = 'quick'; startFight(true); }
 function startFight(fromMode) {
-  if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); }
+  if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); if (G.mode === 'story') return storyAgain(); }
   hintFightStart(); window.goFull && window.goFull();   // touch: full screen + landscape (12_ui.js)   // control hints: the first three bouts are the learning ones (12_ui.js)
   for (const F of [P1, P2]) F.sparGear(G.mode === 'spar' || (G.mode === 'net' && NET.cfg.spar));   // a P2P host may pick «Спарринг» (18_net.js)
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
-  if (G.mode !== 'career' && G.mode !== 'net') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }
+  if (G.mode !== 'career' && G.mode !== 'net' && G.mode !== 'story') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }   // a story bout dresses P2 with the chapter's fixed look (19_story.js)
   CROWD.fill = G.mode === 'career' ? LADDER[Math.min(G.career, LADDER.length - 1)].crowd ?? 1 : 1;   // the semi-final in the warehouse: a half-empty hall; the title fight: everybody came
   setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'boxgym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the training gym (13e_loc_boxgym.js); a career fight is where the ladder says
   G.paused = false; UI.from = null; uiShow(null);
   BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; payShow(null); }
   sfx.unlock(); socStart();   // the hype cools down (15_social.js)
-  P1.stat = PROF.stats; P1.sig = PROF.sig; P2.stat = lvlStats(G.mode === 'career' ? Math.min(5, Math.floor(G.career * 0.7)) : ({ easy: 0, normal: 1, hard: 2 })[G.diff] || 0); P2.sig = SIGS[(rr() * SIGS.length) | 0].id;
+  P1.stat = PROF.stats; P1.sig = PROF.sig; P2.stat = lvlStats(G.mode === 'career' ? Math.min(5, Math.floor(G.career * 0.7)) : G.mode === 'story' ? (storyCh().fight.lvl ?? 0) : ({ easy: 0, normal: 1, hard: 2 })[G.diff] || 0); P2.sig = SIGS[(rr() * SIGS.length) | 0].id;
   $('n1').textContent = myName();
-  P1.resetState(); P2.resetState(); P2.speed = DIFFS[G.diff].speed * (1 + 0.035 * SK(P2, 'spd')); P1.speed = 1.5 * (1 + 0.035 * SK(P1, 'spd'));
+  P1.resetState(); P2.resetState(); P2.speed = DIFFS[G.diff].speed * (1 + 0.035 * SK(P2, 'spd')) * (G.mode === 'story' ? storyCh().fight.speed ?? 1 : 1); P1.speed = 1.5 * (1 + 0.035 * SK(P1, 'spd'));
   FX.clearAir(); REC.frames.length = 0; REC.events.length = 0; wearReset(); Q.length = 0; AI.blockUntil = 0; AI.t = 1.0 + rr(); AI.combo = 0; AI.dodgeAt = 0;
   /* the intro runs on G.introT: [−card − fly, −fly) the opponent's card (career), [−fly, 0) the camera flies round the place and
      its crowd (street locations), [0, 1.25) «Готовься», then the referee's clap (the bell in the gym) starts the round */
-  { const street = !LOC.ring && G.mode !== 'bag' && G.mode !== 'spar';
+  { const street = !LOC.ring && G.mode !== 'bag' && G.mode !== 'spar' && !LOC.noFly;   // noFly (the bar, #51): from outside a tight room would read as a dollhouse
     G.flyT = street ? INTRO_FLY : 0; G.cardT = G.mode === 'career' ? INTRO_CARD : 0; G.flyA = INTRO_ARC[LOC.id] ?? -2.1; }
   G.stareT = G.mode !== 'bag' && OPT.cine ? STARE_LEN : 0; G.stare = 0; G.stareOn = false; G.rend = null; RP.hl = false; P1.pant = P2.pant = 0; hlReset(); show('hl', false);   // the stare-down (09b_cine.js): after the card / the fly-round, before «Готовься»
   G.state = 'intro'; G.introT = -(G.flyT + G.cardT); G.introMsg = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0; AI.lat = 0; AI.latT = 0;
-  // BKFC: five two-minute rounds; between rounds the corner works on him (stamina, the cuts, ice on the eye); no knockout → the judges
-  G.round = 1; G.roundT = ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0]; G.cutWarn = false;
+  // BKFC: five two-minute rounds; between rounds the corner works on him (stamina, the cuts, ice on the eye); no knockout → the judges.
+  // A story bout has no rounds — one fall to the knockout, the clock is out of reach (issue 51).
+  G.round = 1; G.roundT = G.mode === 'story' ? STORY_TIME : ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0]; G.cutWarn = false;
   show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', !G.cardT); show('pad', false);
   $('diffl').textContent = DIFFS[G.diff].label.toUpperCase(); $('w1').textContent = 'побед ' + G.wins; $('w2').textContent = 'побед ' + G.losses;
   if (G.cardT) fightCard(); else show('vs', false);
@@ -8115,6 +8186,7 @@ function cutCheck() {
 }
 function stateTick(dtReal) {
   if (window.__tutOn) tutTick(dtReal);   // (issue 45) the lesson's own clock, fresh stamina and step checks
+  if (G.mode === 'story') storyTick(dtReal);   // issue 51: the drunk sway and the chapter's live checks (19_story.js)
   hlTick();
   if (G.state === 'intro') introTick(dtReal);
   else if (G.state === 'rend') rendTick(dtReal);
@@ -8838,6 +8910,7 @@ function camUpdate(dt) {
   if (G.state === 'menu') { menuCam(dt, _cp, _cl); k = 1e3; }   // already eased inside menuCam (orbit about P1, 14_screens.js): taken as is
   else if (G.state === 'replay' && RP.segs[RP.seg].hlc) { k = hlCam(RP.segs[RP.seg]); if (RP.cut) { camCut = true; RP.cut = false; } }   // the highlights of a round (09b_cine.js)
   else if (G.state === 'rend') k = rendCam();   // the close-up of the faces at the end of a round
+  else if (G.state === 'talk') k = talkCam();   // a story dialog: the face of whoever speaks (19_story.js, issue 51)
   else if (G.state === 'replay') {
     const s = RP.segs[RP.seg], h = G.loser.headNow, side = Math.sign(G.loser.group.position.x) || 1;
     const p = clamp((RP.tau - s.from) / Math.max(0.01, s.to - s.from), 0, 1), c = G.loser.jp[0], w = G.winner.headNow;
@@ -8899,7 +8972,9 @@ function hudUpdate(dt) {
   const ME = NET.guest && NET.started ? P2 : P1, OP = ME === P1 ? P2 : P1;
   hudBar(0, ME.hp / 100); hudBar(1, ME.hp / 100); hudBar(2, OP.hp / 100); hudBar(3, OP.hp / 100); hudBar(4, ME.stamina / 100); hudBar(5, OP.stamina / 100);
   $('cnt').hidden = !(G.state === 'fight' && ME.counterUntil > G.t);
-  if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), txt = `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`; if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
+  if (G.round) { const t = Math.max(0, Math.ceil(G.roundT));   // issue 51: a story bout has no rounds — the pill says «ДО НОКАУТА»
+    const txt = G.mode === 'story' ? 'ДО НОКАУТА' : `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`;
+    if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
   const k = Math.min(1, dt * 3); P1.u.uDmg.value += (clamp(1 - P1.hp / 100, 0, 1) - P1.u.uDmg.value) * k; P2.u.uDmg.value += (clamp(1 - P2.hp / 100, 0, 1) - P2.u.uDmg.value) * k;
   // (issue 46) the get-up bar during the referee's count: how close the man is to beating it (mashing punches adds)
   const kb = $('kdbar');
@@ -9282,6 +9357,7 @@ window.addEventListener('blur', () => { HELD.clear(); mvKeys(); setBlock(false);
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (!e.repeat && introSkip()) { e.preventDefault(); return; }   // the card before a fight / the fly-round: any key skips
+  if (!e.repeat && storyTalkKey(e)) { e.preventDefault(); return; }   // issue 51: a story dialog — Enter / Space is «далее», Esc skips it
   if (uiKey(e)) return;   // menu screens / pause: arrows, Enter, Esc
   const live = G.state === 'fight' || G.state === 'ko' || G.state === 'kd';
   if (e.code === 'Space' && G.state === 'fight') { e.preventDefault(); if (!e.repeat) { setBlock(true); kbLit('kb-blk', true); } return; }
@@ -11426,6 +11502,184 @@ LOCS.metro = {
   },
 };
 const _mtM = new M4();
+/* ───────── location «Бар» (story, issue #51 ch. 1): a tight bar hall at night ─────────
+   A long low room: a wooden floor sticky with spilled beer, a counter with a bar-back of bottles and a mirror along the −z wall,
+   a pink neon «ХМЕЛЬ» over it, four stools, round tables with chairs against the side walls, a dartboard, a fridge by the exit
+   door with a glowing «ВЫХОД» above it, two warm pendant lamps over the fighting floor. The regulars form a rectangle around the
+   circle; the soft wall (invisible, `wall`) keeps a knocked-out man short of the stools.
+   Layout (ARENA frame, floor centre = origin, the default camera looks from +z): room |x| ≤ BAR_HX, |z| ≤ BAR_HZ, height BAR_HH;
+   the fighting bound is a circle r 2.5, the wall faces are at ±BAR_W — everything (counter at −4.1…−4.6, stools at −3.5, side
+   tables at |x| ≈ 4.5) stands behind that line. Whatever gets between the camera and the fighters is hidden in sync(): the whole
+   bar side as one group (like the parking hides its cars), the side props per mesh.
+   No intro fly-round (`noFly`): from outside the room would read as a dollhouse — the story dialogue and the stare-down take its
+   place (19_story.js). */
+const BAR_HX = 6, BAR_HZ = 5, BAR_HH = 3.4, BAR_W = 3.1;   // half-sides of the room; BAR_W — the inner face of the soft wall
+LOCS.bar = {
+  id: 'bar', label: 'Бар', desc: 'Тесный бар: стойка, табуреты, тёплый свет', lockLbl: '🔒 откроется в главе «Бар»', bound: { kind: 'circle', r: 2.5 }, ring: false, noFly: true,
+  // the ragdoll stops at the invisible line in front of the stools: a hard-ish spring of a counter edge, little give
+  wall: { kind: 'rect', hx: BAR_W, hz: BAR_W, k: 2.0e4, mu: 0.7, h: 1.85, d: 0.3, give: 0.1, damp: 20, top() { return this.h; } },
+  // warm: the pendants are the key, neon pink rim from the bar, a cold sliver by the exit
+  light: { bg: '#0a0705', fog: ['#0a0705', 4.5, 15], exposure: 1.02, hemi: ['#6b5236', '#170f08', 0.5], key: ['#ffc084', 40], rim: ['#ff9058', 1.4], rim2: ['#82a0ff', 0.8], fill: ['#ffdcb0', 0.28] },
+  build() {
+    const R = locRng(2051), g = new THREE.Group(), PI = Math.PI, lite = lowEnd || GFX.level === 'low';
+    const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
+    const speck = (c, w, h, n, a) => { for (let i = 0; i < n; i++) { c.fillStyle = `rgba(${R() < 0.5 ? '0,0,0' : '255,255,255'},${R() * a})`; c.fillRect(R() * w, R() * h, 1 + R() * 2, 1 + R() * 2); } };
+    const font = px => `900 ${px}px "Big Shoulders Display", Impact, "Arial Black", sans-serif`;
+    const tb = (col, w, h, d, x, y, z, ry = 0) => geoTint(geoBox(w, h, d, x, y, z, ry), col);
+    const tcyl = (col, r0, r1, hgt, x, y, z, seg = 8) => geoTint(new THREE.CylinderGeometry(r1, r0, hgt, seg).translate(x, y + hgt / 2, z), col);
+    const flat = (w, d, x, z, y, ry = 0) => new THREE.PlaneGeometry(w, d).rotateX(-PI / 2).rotateY(ry).translate(x, y, z);
+    const noAO = o => { CROWD.blobs.push(o); return o; };
+    const near = this.near = [];
+    const propMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.12, envMapIntensity: 0.4 });
+    const glowTex = canvasTex(128, 128, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.12, 'rgba(255,255,255,.6)'); gr.addColorStop(0.4, 'rgba(255,255,255,.14)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
+    const glow = (p, s, col) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); sp.position.copy(p); sp.scale.set(s, s, 1); g.add(noAO(sp)); };
+
+    /* floor: a 1.5 m plank tile of dark varnished wood, scuffed; over the middle — non-repeating spills, beer rings and footpaths */
+    const woodTex = rep(canvasTex(lite ? 512 : 1024, lite ? 512 : 1024, (c, w, h) => {
+      const pw = w / 4;
+      for (let i = 0; i < 4; i++) { c.fillStyle = `hsl(${22 + R() * 12},${30 + R() * 16}%,${16 + R() * 9}%)`; c.fillRect(i * pw, 0, pw, h);
+        c.strokeStyle = 'rgba(8,6,4,.6)'; c.lineWidth = 2; c.strokeRect(i * pw, 0, pw, h);
+        for (let k = 0; k < 40; k++) { c.strokeStyle = `rgba(${R() < 0.5 ? '20,14,10' : '90,66,42'},${0.06 + R() * 0.12})`; c.lineWidth = 1 + R() * 2; c.beginPath(); let x = i * pw + 4, y = R() * h; c.moveTo(x, y); for (let m = 0; m < 8; m++) { x += pw / 8; y += (R() - 0.5) * 14; c.lineTo(x, y); } c.stroke(); }
+        for (let k = 0; k < 900; k++) { c.fillStyle = `rgba(${R() < 0.6 ? '10,8,6' : '130,105,75'},${R() * 0.1})`; c.fillRect(i * pw + R() * pw, R() * h, 1 + R() * 2, 1); } }
+      c.fillStyle = 'rgba(200,190,170,.05)'; c.fillRect(0, 0, w, h);   // a film of varnish
+    }));
+    const floor = staticMesh(geoUvMul(new THREE.PlaneGeometry(2 * BAR_HX, 2 * BAR_HZ).rotateX(-PI / 2), BAR_HX / 0.75, BAR_HZ / 0.75), new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.55, envMapIntensity: 0.5 }));
+    floor.receiveShadow = true; g.add(floor);
+    const spillTex = canvasTex(lite ? 512 : 1024, lite ? 512 : 1024, (c, w, h) => {
+      const s = w / 11; c.setTransform(s, 0, 0, s, w / 2, h / 2);   // metres, x right, z down
+      for (let i = 0; i < 9; i++) { const x = (R() * 2 - 1) * 3.1, y = (R() * 2 - 1) * 2.5, r = 0.12 + R() * 0.3;   // rings left by glasses
+        c.strokeStyle = `rgba(60,40,20,${0.25 + R() * 0.3})`; c.lineWidth = 0.02 + R() * 0.015; c.beginPath(); c.arc(x, y, r, 0, 7); c.stroke();
+        c.fillStyle = `rgba(50,34,18,${0.05 + R() * 0.08})`; c.beginPath(); c.arc(x, y, r * 0.9, 0, 7); c.fill(); }
+      for (let i = 0; i < 5; i++) { const x = (R() * 2 - 1) * 3.4, y = (R() * 2 - 1) * 2.8, r = 0.3 + R() * 0.6, gr = c.createRadialGradient(x, y, 0, x, y, r);   // spilled pools
+        gr.addColorStop(0, `rgba(40,26,12,${0.2 + R() * 0.15})`); gr.addColorStop(1, 'rgba(40,26,12,0)'); c.fillStyle = gr; c.beginPath(); c.ellipse(x, y, r, r * (0.6 + R() * 0.4), R() * 3, 0, 7); c.fill(); }
+      let fx = 4.6, fy = -4.4, fa = Math.atan2(0 - fy, 0 - fx);   // the path from the door: smeared prints
+      c.fillStyle = 'rgba(30,20,10,.22)';
+      for (let k = 0; k < 14; k++) { fx += Math.cos(fa) * 0.55; fy += Math.sin(fa) * 0.55; fa += (R() - 0.5) * 0.4;
+        c.save(); c.translate(fx + (k % 2 ? 0.12 : -0.12), fy); c.rotate(fa + PI / 2); c.beginPath(); c.ellipse(0, 0, 0.06, 0.14, 0, 0, 7); c.fill(); c.restore(); }
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalCompositeOperation = 'destination-out';   // worn through in places
+      for (let i = 0; i < w * 3; i++) { c.fillStyle = `rgba(0,0,0,${0.2 + R() * 0.5})`; c.fillRect(R() * w, R() * h, 1 + R() * 4, 1 + R() * 2); }
+    });
+    const spill = staticMesh(flat(11, 11, 0, 0, 0.0013), new THREE.MeshStandardMaterial({ map: spillTex, transparent: true, roughness: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    spill.receiveShadow = true; spill.renderOrder = -3; g.add(spill);
+
+    /* walls: painted plaster above, a dark wood wainscot below; one tiled texture; single-sided like the parking */
+    const wallTex = rep(canvasTex(512, 512, (c, w, h) => {
+      c.fillStyle = '#37402f'; c.fillRect(0, 0, w, h * 0.7); c.fillStyle = '#241a12'; c.fillRect(0, h * 0.7, w, h * 0.3);
+      c.fillStyle = '#1a120c'; c.fillRect(0, h * 0.685, w, h * 0.02);
+      for (let k = 0; k < 6; k++) { c.strokeStyle = 'rgba(10,8,6,.5)'; c.lineWidth = 3; c.beginPath(); c.moveTo(k * w / 6 + 8, h * 0.71); c.lineTo(k * w / 6 + 8, h * 0.97); c.stroke(); }
+      speck(c, w, h, 16000, 0.1);
+      for (let i = 0; i < 20; i++) { const x = R() * w, y = R() * h * 0.66, l = 30 + R() * 150, gr = c.createLinearGradient(0, y, 0, y + l); gr.addColorStop(0, `rgba(12,10,8,${0.05 + R() * 0.1})`); gr.addColorStop(1, 'rgba(12,10,8,0)'); c.fillStyle = gr; c.fillRect(x, y, 2 + R() * 10, l); }
+      const gr = c.createLinearGradient(0, h * 0.5, 0, h * 0.72); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.4)'); c.fillStyle = gr; c.fillRect(0, h * 0.5, w, h * 0.24);   // smoke-darkened above the wainscot
+    }));
+    const wallG = (len, ry, x, z) => geoUvMul(new THREE.PlaneGeometry(len, BAR_HH), len / 5, 1).rotateY(ry).translate(x, BAR_HH / 2, z);
+    g.add(staticMesh(geoMerge([wallG(2 * BAR_HX, 0, 0, -BAR_HZ), wallG(2 * BAR_HX, PI, 0, BAR_HZ), wallG(2 * BAR_HZ, PI / 2, -BAR_HX, 0), wallG(2 * BAR_HZ, -PI / 2, BAR_HX, 0)]),
+      new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9, envMapIntensity: 0.2 })));
+
+    /* the bar side: counter, bar-back with shelves, bottles, mirror, neon, stools — one group, hidden as a whole when in the way */
+    const bar = this.bar = new THREE.Group(); g.add(bar); near.push({ m: bar, p: new V3(0, 1, -BAR_HZ + 0.8), r: 3.4 });
+    { const gs = [];
+      gs.push(tb('#2a1d13', 6.6, 1.02, 0.52, 0, 0.53, -4.15));                       // counter body
+      gs.push(tb('#4a3320', 6.8, 0.06, 0.62, 0, 1.07, -4.13));                       // the top, a hair overhanging
+      gs.push(tb('#20150e', 6.4, 0.14, 0.06, 0, 0.07, -3.92));                       // kick recess
+      gs.push(tcyl('#b9963f', 0.026, 0.026, 0.3, -2.6, 0.15, -3.86, 6), tcyl('#b9963f', 0.026, 0.026, 0.3, 2.6, 0.15, -3.86, 6));
+      gs.push(geoTint(new THREE.CylinderGeometry(0.022, 0.022, 5.2, 6).rotateZ(PI / 2).translate(0, 0.3, -3.86), '#c8a44c'));   // brass foot rail
+      for (const sx of [-3.3, 3.3]) gs.push(tb('#241812', 0.14, 1.12, 0.6, sx, 0.56, -4.15));   // end caps
+      // bar-back: two shelves and a mirror between them
+      gs.push(tb('#1c120c', 2.9, 0.05, 0.3, -2.15, 1.55, -4.62), tb('#1c120c', 2.9, 0.05, 0.3, 2.15, 1.55, -4.62));
+      gs.push(tb('#1c120c', 2.9, 0.05, 0.3, -2.15, 2.06, -4.62), tb('#1c120c', 2.9, 0.05, 0.3, 2.15, 2.06, -4.62));
+      gs.push(tb('#160f0a', 6.4, 1.5, 0.12, 0, 1.6, -4.86));                         // the back panel
+      gs.push(geoTint(new THREE.BoxGeometry(2.5, 1.4, 0.04).translate(0, 1.75, -4.78), '#38332e'));   // mirror frame
+      bar.add(staticMesh(geoMerge(gs), propMat));
+      const mir = staticMesh(new THREE.PlaneGeometry(2.42, 1.32).translate(0, 1.75, -4.74), new THREE.MeshStandardMaterial({ color: '#14110d', roughness: 0.06, metalness: 0.9, envMapIntensity: 1.4 }));
+      bar.add(mir);
+      // bottles on the shelves: one InstancedMesh, every bottle its own colour and height
+      const B = [], pal = ['#7a3f12', '#2e4d24', '#514020', '#141618', '#61685e', '#42252b'];
+      for (const [x0, x1] of [[-3.5, -0.9], [0.9, 3.5]]) for (const y of [1.58, 2.09]) for (let x = x0; x < x1; x += 0.13 + R() * 0.06) { if (R() < 0.12) continue; B.push([x + (R() - 0.5) * 0.02, y, 0.15 + R() * 0.12, pal[(R() * pal.length) | 0]]); }
+      const bm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.027, 0.031, 1, 6).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ roughness: 0.25, envMapIntensity: 1 }), B.length), m4 = new M4(), col = new THREE.Color();
+      B.forEach(([x, y, hh, c], i) => { m4.makeScale(1, hh, 1); m4.setPosition(x, y, -4.62); bm.setMatrixAt(i, m4); bm.setColorAt(i, col.set(c)); });
+      bm.matrixAutoUpdate = false; bar.add(bm);
+      // stools, on the far side of the soft wall line
+      const st = [];
+      for (const x of [-2.1, -0.7, 0.7, 2.1]) {
+        st.push(tcyl('#b9963f', 0.032, 0.032, 0.68, x, 0.04, -3.5, 6), geoTint(new THREE.CylinderGeometry(0.19, 0.185, 0.075, 12).translate(x, 0.74, -3.5), '#5a2b26'),
+          geoTint(new THREE.TorusGeometry(0.15, 0.012, 5, 14).rotateX(PI / 2).translate(x, 0.22, -3.5), '#8a7248')); }
+      bar.add(staticMesh(geoMerge(st), propMat));
+      // what stands on the counter: two glasses, a bottle, an ashtray, a spill
+      const cp = [];
+      cp.push(tcyl('#8a8f94', 0.034, 0.03, 0.13, -1.25, 1.1, -4.05, 8), tcyl('#8a8f94', 0.034, 0.03, 0.11, -1.12, 1.1, -4.12, 8));
+      cp.push(tcyl('#31401f', 0.028, 0.028, 0.24, -1.7, 1.1, -4.2, 6), tcyl('#0e0d0c', 0.06, 0.055, 0.03, 0.9, 1.1, -4.1, 10));
+      bar.add(staticMesh(geoMerge(cp), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.2, metalness: 0.1, envMapIntensity: 0.9, transparent: true, opacity: 0.85 })));
+      // the neon over the mirror
+      const neonTex = canvasTex(512, 160, (c, w, h) => { c.clearRect(0, 0, w, h); c.font = font(120); c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.shadowColor = '#ff2f62'; c.shadowBlur = 42; c.fillStyle = '#ff86a2'; for (let k = 0; k < 3; k++) c.fillText('ХМЕЛЬ', w / 2, h / 2 + 4); c.shadowBlur = 0; c.fillStyle = '#ffd9e2'; c.fillText('ХМЕЛЬ', w / 2, h / 2 + 4); });
+      bar.add(staticMesh(new THREE.PlaneGeometry(1.5, 0.47).translate(0, 2.72, -4.72), new THREE.MeshBasicMaterial({ map: neonTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, color: new THREE.Color(1.6, 1.6, 1.6) })));
+      const nl = new THREE.PointLight('#ff3b6e', 5, 5.5, 1.8); nl.position.set(0, 2.5, -4.2); bar.add(nl);
+      const bl = new THREE.PointLight('#ffd9a0', 7, 6.5, 1.8); bl.position.set(0, 2.25, -3.5); bar.add(bl);
+    }
+
+    /* side props: two tables with chairs on the +x wall, a dartboard and a fridge on the −x wall, the exit door with «ВЫХОД» */
+    const table = (x, z, ry) => { const gs = [geoTint(new THREE.CylinderGeometry(0.44, 0.44, 0.05, 14).rotateY(ry).translate(x, 0.75, z), '#38251a'), tcyl('#1f1e1d', 0.05, 0.07, 0.74, x, 0, z, 8), geoTint(new THREE.CylinderGeometry(0.22, 0.24, 0.03, 12).translate(x, 0.015, z), '#242220')];
+      for (const [lx, lz, a] of [[0.62, 0.2, 0.4], [0.55, -0.5, -0.7]]) { const cx = x + Math.cos(ry + a) * lx + 0.1, cz = z + Math.sin(ry + a) * lx;
+        gs.push(tb('#4a3a26', 0.34, 0.045, 0.34, cx, 0.45, cz, a), tb('#4a3a26', 0.34, 0.42, 0.045, cx - Math.sin(a) * 0.16, 0.66, cz + Math.cos(a) * 0.16, a));
+        for (const [sx, sz] of [[-0.14, -0.14], [0.14, -0.14], [-0.14, 0.14], [0.14, 0.14]]) gs.push(tb('#282622', 0.035, 0.44, 0.035, cx + sx, 0.22, cz + sz)); }
+      const m = staticMesh(geoMerge(gs), propMat); m.receiveShadow = true; g.add(m); near.push({ m, p: new V3(x, 0.9, z), r: 1.05 }); };
+    table(4.6, -1.3, 0.2); table(4.55, 1.7, -0.35);
+    { const gs = [];
+      // a fridge by the −x wall, and the door of the place with a glowing exit sign on the −z wall
+      gs.push(tb('#c9c6bb', 0.66, 1.66, 0.62, -5.35, 0.83, 2.7), tb('#1c120c', 0.02, 1.3, 0.5, -5.0, 0.95, 2.86), tcyl('#8b8880', 0.014, 0.014, 0.2, -5.0, 1.15, 2.66, 5));
+      gs.push(tb('#2a2018', 0.9, 0.5, 0.5, -5.4, 0.25, -2.9));                                   // a keg out of service
+      // dartboard on the −x wall
+      const dTex = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#1b1410'; c.beginPath(); c.arc(w / 2, h / 2, w / 2, 0, 7); c.fill();
+        for (const [r, col] of [[0.9, '#0e0b08'], [0.7, '#5a1a14'], [0.52, '#0e0b08'], [0.34, '#5a1a14'], [0.16, '#2f5d2a'], [0.08, '#8a1010']]) { c.fillStyle = col; c.beginPath(); c.arc(w / 2, h / 2, w / 2 * r, 0, 7); c.fill(); }
+        c.strokeStyle = '#8a7248'; c.lineWidth = 1.5; for (let k = 0; k < 20; k++) { const a = k * PI / 10; c.beginPath(); c.moveTo(w / 2, h / 2); c.lineTo(w / 2 + Math.cos(a) * w * 0.45, h / 2 + Math.sin(a) * w * 0.45); c.stroke(); } });
+      gs.push(geoTint(new THREE.CircleGeometry(0.23, 18).rotateY(PI / 2).translate(-5.94, 1.7, 0.6), '#1b1410'));
+      g.add(staticMesh(geoMerge(gs), propMat));
+      g.add(staticMesh(new THREE.PlaneGeometry(0.44, 0.44).rotateY(PI / 2).translate(-5.93, 1.7, 0.6), new THREE.MeshStandardMaterial({ map: dTex, roughness: 0.85 })));
+      const doorGs = [tb('#232622', 1.05, 2.18, 0.1, 4.8, 1.09, -4.9), tb('#31352f', 0.9, 2.04, 0.06, 4.8, 1.06, -4.83), tcyl('#9aa0a5', 0.02, 0.02, 0.16, 4.42, 1.15, -4.76, 5)];
+      g.add(staticMesh(geoMerge(doorGs), propMat));
+      const exitTex = canvasTex(256, 96, (c, w, h) => { c.fillStyle = '#0b9a50'; c.fillRect(0, 0, w, h); c.strokeStyle = '#e9fff2'; c.lineWidth = 4; c.strokeRect(5, 5, w - 10, h - 10); c.fillStyle = '#f2fff7'; c.font = 'bold 54px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('ВЫХОД', w / 2, h / 2 + 3); });
+      g.add(staticMesh(new THREE.PlaneGeometry(0.6, 0.22).rotateY(PI).translate(4.8, 2.42, -4.96), new THREE.MeshBasicMaterial({ map: exitTex, color: new THREE.Color(1.4, 1.4, 1.4) })));
+      const ex = new THREE.PointLight('#28d878', 2.4, 3.5, 2); ex.position.set(4.8, 2.3, -4.6); g.add(ex);
+      // two posters: the beer of the place, and a card of somebody's fight night
+      const poster = lines => canvasTex(256, 344, (c, w, h) => { c.fillStyle = lines.bg; c.fillRect(0, 0, w, h);
+        c.fillStyle = 'rgba(0,0,0,.35)'; for (let i = 0; i < 60; i++) c.fillRect(R() * w, R() * h, 2 + R() * 24, 2 + R() * 10);
+        c.fillStyle = lines.ink; c.font = font(lines.big); c.textAlign = 'center'; lines.t.forEach((s, i) => { if (i === 0) c.fillText(s, w / 2, 110); else { c.font = `700 ${lines.sm}px "Oswald", Arial, sans-serif`; c.fillText(s, w / 2, 150 + i * 46); } }); });
+      const pTex = [poster({ bg: '#6d1c1f', ink: '#f1e3c2', big: 64, sm: 26, t: ['ЖИТО', 'живое светлое', '0,5 — 120 ₽', 'на разлив'] }),
+        poster({ bg: '#141822', ink: '#ffd98a', big: 54, sm: 24, t: ['БОЙ', 'пятница · 21:00', 'задний зал', 'вход свободный'] })];
+      for (const [t, ry, x, z] of [[pTex[0], -PI / 2, BAR_HX - 0.02, -2.4], [pTex[1], PI, 3.35, -BAR_HZ + 0.02]])
+        g.add(staticMesh(new THREE.PlaneGeometry(0.62, 0.84).rotateY(ry).translate(x, 1.75, z), new THREE.MeshStandardMaterial({ map: t, roughness: 0.92, emissiveMap: t, emissive: '#ffffff', emissiveIntensity: 0.05 })));
+    }
+
+    /* ceiling, beams, and two pendant lamps over the floor — the ceiling and the rig go away for the top-down replay shot */
+    const ceil = this.ceil = new THREE.Group(); g.add(ceil);
+    { const gs = [];
+      for (const z of [-2.6, 0.6]) gs.push(tb('#181008', 2 * BAR_HX, 0.14, 0.16, 0, BAR_HH - 0.12, z));
+      ceil.add(staticMesh(geoMerge(gs), propMat));
+      const shades = [], bulbs = [];
+      for (const [x, z, y] of [[-1.15, -0.5, 2.55], [1.2, 0.75, 2.62]]) {
+        shades.push(geoTint(new THREE.CylinderGeometry(0.055, 0.24, 0.19, 16, 1, true).translate(x, y + 0.1, z), '#27322c'), geoTint(new THREE.CylinderGeometry(0.006, 0.006, BAR_HH - y - 0.22, 4).translate(x, (BAR_HH + y + 0.2) / 2, z), '#0c0c0d'));
+        bulbs.push(new THREE.SphereGeometry(0.05, 8, 6).translate(x, y - 0.02, z), new THREE.CircleGeometry(0.22, 14).rotateX(PI / 2).translate(x, y + 0.02, z));
+        const sp = new THREE.SpotLight('#ffbe7e', 22, 7.5, 1.0, 0.9, 1.5); sp.position.set(x, y, z); sp.target.position.set(x, 0, z); ceil.add(sp, sp.target);
+        glow(new V3(x, y - 0.02, z), 1.1, new THREE.Color(2.2, 1.3, 0.5)); }
+      ceil.add(staticMesh(geoMerge(shades), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide })));
+      ceil.add(staticMesh(geoMerge(bulbs), new THREE.MeshBasicMaterial({ color: new THREE.Color(3.0, 2.2, 1.3), fog: false })));
+      ceil.add(staticMesh(new THREE.PlaneGeometry(2 * BAR_HX, 2 * BAR_HZ).rotateX(PI / 2).translate(0, BAR_HH, 0), new THREE.MeshStandardMaterial({ color: '#0c0806', roughness: 1, envMapIntensity: 0.05 })));
+    }
+
+    /* the regulars: three rows against the invisible line, the front ones half on their haunches (some on the stools' side) */
+    this.crowd = makeCrowd({ shape: 'rect', w: 2 * BAR_W, h: 2 * BAR_W, r: 0.55, rows: 3, look: 'street', seed: 73, max: 104, squat: 0.2 });
+    g.add(this.crowd.group);
+    return g;
+  },
+  // per frame, after the camera: hide the bar side and the tables once they get between the lens and the fighters
+  sync() {
+    const M = ARENA.matrixWorld, cam = camera.position;
+    const dx = camL.x - cam.x, dz = camL.z - cam.z, len = Math.hypot(dx, dz) || 1, ux = dx / len, uz = dz / len, tH = Math.tan(camera.fov * Math.PI / 360) * camera.aspect * 1.1;
+    for (const o of this.near) { _lp.copy(o.p).applyMatrix4(M); const px = _lp.x - cam.x, pz = _lp.z - cam.z, s = px * ux + pz * uz; o.m.visible = !(s > -o.r && s < len - 0.5 && Math.abs(px * uz - pz * ux) - o.r < Math.max(s, 0) * tH + 0.3); }
+    this.ceil.visible = cam.y < 2.4;
+  },
+};
 /* ───────── crowd: the people around the fighting floor (any location can use it) ─────────
    makeCrowd({ shape: 'circle' | 'rect', r | w, h, rows, density, look, squat }) → { group, update(dt), cheer(power, pos, hold, kind), wall, count }.
    One figure (≈1200 triangles with every accessory, welded to ≈1000 vertices) drawn as ONE InstancedMesh, plus one InstancedMesh of soft blobs on the
@@ -11943,7 +12197,7 @@ EVT.on((type, e) => {
    All of them except the pause (and the settings opened from it) live in G.state === 'menu'; the pause sets G.paused, frame() then
    runs with dt = 0. The menu camera (menuCam) orbits P1: the creator turns it by dragging, the other screens just frame him. */
 const UI = { scr: null, from: null, cat: 'name', spar: false, mouth: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };   // mouth: the gum-shield close-up of the creator (he bares his teeth: Face.update)
-const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', credits: 'credits', pause: 'pause', net: 'net' };   // net: issue 49 «Бой с другом»
+const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', story: 'story', settings: 'settings', credits: 'credits', pause: 'pause', net: 'net' };   // net: issue 49 «Бой с другом»; story: issue 51 «История»
 const VIEW_MOUTH = { yaw: 1.38, zoom: 0 }, _mouthP = new V3(), VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
 const VIEW_BACK = { yaw: -2.3, zoom: 0.55 };   // his back (the back tattoo)
 const myName = () => PROF.nick || PROF.name || 'Ты';
@@ -11951,13 +12205,14 @@ function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [..
 function uiShow(scr, focusId) {
   if (UI.scr === 'shop' && scr !== 'shop') shopLeave();   // a try-on that was not bought comes off (14b_shop.js)
   UI.scr = scr; const on = scr ? UI_IDS[scr] : null;
-  for (const id of ['menu', 'quick', 'creator', 'shop', 'social', 'settings', 'credits', 'pause', 'net']) $(id).hidden = id !== on;
+  for (const id of ['menu', 'quick', 'creator', 'shop', 'social', 'story', 'settings', 'credits', 'pause', 'net']) $(id).hidden = id !== on;
   if (on === 'menu') { $('nav-main').hidden = scr !== 'main'; $('nav-train').hidden = scr !== 'train'; }
   if (scr === 'settings') { const p = UI.from === 'pause'; $('settings').classList.toggle('dim', p); $('reset-row').hidden = p; buildSettings(); setTab('opt'); }
   if (scr === 'credits') buildCredits();
   if (scr === 'pause') $('p-quit-l').textContent = BAG.on ? 'Выйти' : 'Сдаться';
   if (scr === 'shop') shopEnter();
   if (scr === 'social') socEnter();
+  if (scr === 'story') buildStory();   // issue 51: the chapter timeline (19_story.js)
   if (scr !== 'creator') UI.mouth = false;
   if (scr !== 'creator' && UI.spar) { UI.spar = false; if (G.state === 'menu') P1.sparGear(false); }   // the glove preview of the creator
   const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur();
@@ -11967,7 +12222,7 @@ function uiBack() {
   if (UI.scr === 'credits') return uiShow('settings', 'set-credits');
   if (UI.scr === 'settings' && UI.from === 'pause') return uiShow('pause', 'p-set');
   if (UI.scr === 'main' || G.state !== 'menu') return;
-  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', social: 'go-social', settings: 'go-set', net: 'go-net' }[UI.scr];
+  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', social: 'go-social', story: 'go-story', settings: 'go-set', net: 'go-net' }[UI.scr];
   updateMenu(); uiShow('main', back);
 }
 /* keys of the screens; true = the key is taken (12_ui.js then leaves it alone). Esc: back / pause / skip the replay / leave the result */
@@ -12008,7 +12263,7 @@ function menuCam(dt, cp, cl) {
   if (UI.scr === 'creator' || UI.scr === 'shop') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1;
     if (UI.mouth && UI.scr === 'creator') { const m = _mouthP.set(0, -0.08, 0.075).applyMatrix4(P1.gear.guard.matrix); T.d = 0.13 / th; T.tx = m.x; T.ty = m.y; T.tz = m.z; T.h = 0.012; } }   // the gum shield, close
   else if (UI.scr === 'quick') { T.yaw = 0.2; T.d = dFull * 1.18; T.ty = 1.02; T.sh = 0.4; T.h = 0.32; }
-  else { T.yaw = 0.52 + 0.05 * Math.sin(camClock * 0.4); T.d = dFull * 0.84; T.ty = 1.05; T.sh = UI.scr === 'settings' || UI.scr === 'social' ? 0.5 : 0.38; T.h = 0.12; }
+  else { T.yaw = 0.52 + 0.05 * Math.sin(camClock * 0.4); T.d = dFull * 0.84; T.ty = 1.05; T.sh = UI.scr === 'settings' || UI.scr === 'social' || UI.scr === 'story' ? 0.5 : 0.38; T.h = 0.12; }
   const M = MCAM, a = camCut || !M.init ? 1 : 1 - Math.exp(-dt * (UI.drag ? 16 : 4.2)); M.init = true;
   for (const k in T) M[k] += (T[k] - M[k]) * a;
   const s = M.sh * M.d * th * asp, c = Math.cos(M.yaw), sn = Math.sin(M.yaw);
@@ -12110,7 +12365,7 @@ function resetAsk(sure) {   // wiping the progress takes a second, explicit pres
   const no = btn('отмена', '', () => resetAsk(false).focus()); btn('да, стереть всё', 'warn', () => { resetProgress(); resetAsk(false).focus(); }); return no;
 }
 function resetProgress() {   // record, career, belt, points and stats; the name and the look stay (minus wraps that are locked again)
-  G.wins = G.losses = G.career = G.bagBest = 0; Object.assign(PROF, { sig: null, pts: 1, champ: 0, cash: 0, own: {} }); socReset(); for (const k in PROF.stats) PROF.stats[k] = 0;
+  G.wins = G.losses = G.career = G.bagBest = 0; Object.assign(PROF, { sig: null, pts: 1, champ: 0, cash: 0, own: {}, story: { done: 0, mig: 1, pick: {} } }); socReset(); for (const k in PROF.stats) PROF.stats[k] = 0;   // story progress resets too (mig: 1 — no career gift on reload)
   wearSanitize(); const w = WRAPS_LOOKS.find(x => x.id === (LOOK.wraps || 'white')); if (w && w.need > 0) LOOK.wraps = 'white'; P1.applyLook(LOOK);   // bought and career clothes go away with the money
   save(); buildCreator(); updateMenu(); msg('Прогресс сброшен', 'tip');
 }
@@ -12121,7 +12376,7 @@ function buildQuick() {
   const box = $('o-loc'); box.textContent = '';
   if (!locOpen(G.loc)) G.loc = 'gym';
   for (const L of Object.values(LOCS)) { if (L.train) continue;   // the training gym is not a place for fights; a place can wait for followers (LOC_FANS, 15_social.js)
-    const open = locOpen(L.id), b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${open ? L.desc || '' : '🔒 от ' + numF(LOC_FANS[L.id]) + ' подписчиков'}</small>`; b.setAttribute('aria-pressed', String(G.loc === L.id)); b.disabled = !open;
+    const open = locOpen(L.id), b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${open ? L.desc || '' : L.lockLbl || '🔒 от ' + numF(LOC_FANS[L.id]) + ' подписчиков'}</small>`; b.setAttribute('aria-pressed', String(G.loc === L.id)); b.disabled = !open;   // lockLbl: a non-follower gate (LOC_LOCK, the story bar — #51)
     // #47: hover prebuilds the place while the player is still reading the list; a cold click first paints the
     // «Готовим площадку…» pill, then builds on the next macrotask so the frozen frame is never silent.
     if (open) b.addEventListener('pointerenter', () => locPrefetchOne(L.id));
@@ -12138,7 +12393,10 @@ function buildQuick() {
 function buildMenu() {
   buildCreator(); buildSettings(); buildQuick(); applyOpt(); setCat(UI.cat);
   const on = (id, fn) => $(id).addEventListener('click', fn);
-  on('go-car', () => { if (G.career >= LADDER.length) G.career = 0; startCareer(); });
+  // issue 51: «КАРЬЕРА» became «ИСТОРИЯ»; the old ladder lives under «Лестница» on the story screen
+  on('go-story', () => uiShow('story', 'st-play'));
+  on('st-back', uiBack);
+  on('go-ladder', () => { if (G.career >= LADDER.length) G.career = 0; startCareer(); });
   on('go-quick', () => { buildQuick(); uiShow('quick', 'go'); });
   on('go', startQuick); on('quick-back', uiBack);
   on('go-train', () => uiShow('train')); on('train-back', uiBack); on('go-bag', startBag); on('go-spar', startSpar);
@@ -12244,6 +12502,7 @@ window.__shop = { PROF, LOOK, ITEMS, SHOP, cash, itemOwned, purse, open: shopOpe
 const SOC = { feed: [], tab: 'feed', cand: null, want: null, pend: null, cv: null, sp: {} };
 const SOC_KEY = 'ko-feed', SOC_FEED_MAX = 14, SOC_HIST = 24, SOC_W = 480, SOC_DM_MAX = 3;
 const LOC_FANS = { parking: 500, warehouse: 1500 };   // followers needed for a place in the quick fight (the career opens its places by itself)
+const LOC_LOCK = {};   // non-follower gates of a place: id → () => true when open (the story sets its own, 19_story.js)
 const numF = n => String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ' ');
 const SPONSORS = [
   { id: 'fox', name: 'ЛИСИЙ ХВОСТ', what: 'энергетик', need: 300, pay: 60, fights: 5, c: '#e8742a', ink: '#1b120a', mark: 'tri' },
@@ -12252,7 +12511,7 @@ const SPONSORS = [
   { id: 'brick', name: 'ГРАНИТ-ДОМ', what: 'стройматериалы', need: 4500, pay: 400, fights: 6, c: '#b8352f', ink: '#f6eee4', mark: 'ring' }];
 const spById = id => SPONSORS.find(s => s.id === id);
 const socOn = () => (G.mode === 'career' || G.mode === 'quick') && !BAG.on;
-const locOpen = id => PROF.soc.fans >= (LOC_FANS[id] || 0);
+const locOpen = id => PROF.soc.fans >= (LOC_FANS[id] || 0) && !(LOC_LOCK[id] && !LOC_LOCK[id]());
 const hypeTier = h => h < 15 ? 'тишина' : h < 40 ? 'теплеет' : h < 70 ? 'горячо' : 'вирусный';
 
 function socInit() {   // a fresh save, or the first start with the feature: the fame of the wins already won
@@ -13233,4 +13492,234 @@ function netClose() {
   if (had) netHome();
   setTimeout(() => { NET.closing = false; }, 0);
 }
+/* ───────── story: «История» instead of the career ladder (issue #51, part 1: the frame + chapter «Бар») ─────────
+   The rise from the bottom, Punch-Club style. STORY.chapters is a flat list; a chapter is one flow:
+     intro dialog  →  one fight (no rounds, to the knockout)  →  outro dialog  →  the purse (payOut/purse) and the followers (socFight).
+   CHAPTER FORMAT (parts 2–3 only add data here and a fight rule where needed):
+     { id, title, sub,                       // sub: one line in the «История» list
+       todo: true,                           // a chapter not implemented yet: the list shows «скоро», it is not playable
+       intro: [line, …], outro: [line, …], outroLose: [line, …],
+       fight: { loc, nm, st, diff, lvl, speed, drunk, look },   // place, the name on the HUD, STYLES key, level, P2 stat level (0-5),
+                                                                 // P2 speed ×, the drunk sway, his fixed look (04d_street clothes, like LADDER)
+       reward: { win, ko } }                 // ₽ lines of the purse (07b_economy.js); a win also gives pts fighter points
+   LINE FORMAT: { who: 'p' | 'o' | 'n' | 'a name', text, card, opt: [{ t, r, a }] }
+     who — who speaks: 'p' the hero (camera closes on his face), 'o' the opponent (camera on his), 'n' or a name — off screen (wide shot);
+     card — a title plate instead of the dialog box («Три года спустя»): any tap / Enter moves on;
+     opt — 1–2 answers; only the text and PROF.story.pick change (attitude `a` for later parts).
+   State: dialogs run while G.state === 'talk' (camUpdate → talkCam); the fighters just stand, the crowd murmurs.
+   Progress: PROF.story = { done: cleared chapters, mig, pick: { chapterId: choice } } — it lives in the 'ko-ring' save.
+   Entry: the menu item «ИСТОРИЯ» (14_screens.js) → the screen #story (buildStory) → «Играть». The old ladder stays under «Лестница».
+   Debug: __story.play(0) · __story.skip() · __story.next() · __story.ko(true) · __story.end() */
+const STORY = { chapters: [
+  { id: 'bar', title: 'Бар', sub: 'Ночь. Ты задержался на один бокал после смены.',
+    intro: [
+      { card: 'Бар' },
+      { who: 'p', text: 'Последняя смена на неделе. Задержался на один бокал — и, как назло, в баре уже кто-то был.' },
+      { who: 'o', text: 'Э, малой. Ты мне подножку поставил, когда заходил. Или как это у вас называется?' },
+      { who: 'p', text: 'На ногах ты держишься плохо. Извинись — или держись за стойку.', opt: [
+        { t: 'Извини. Садись, допивай и остывай.', r: 'Пёс молча кивает и тянет табурет. Кажется, он именно этого и ждал. Но за его спиной уже собрались завсегдатаи — им скучно.', a: 1 },
+        { t: 'Иди домой, дед. Тут не твоё время.', r: 'Пёс усмехается и ставит стакан на стойку. Домой он сегодня точно не пойдёт.', a: -1 } ] },
+      { who: 'n', text: 'Бармен не вмешался. Он просто вытер стакан и стал ждать, когда начнётся.' },
+      { who: 'o', text: 'Давай, чемпион. Развлеки старика. Кто упал — тот и прав.' } ],
+    fight: { loc: 'bar', nm: 'Пёс', st: 'drunk', diff: 'easy', lvl: 0, speed: 0.88, drunk: true,
+      look: { skin: 'tan', hair: 'bald', beard: 'stubble', top: 'tank', bottom: 'sweatG', shoes: 'sneakB', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'black', tats: [] } },
+    outro: [
+      { who: 'n', text: 'В зале стало тише обычного. Даже холодильник за стойкой будто перестал гудеть.' },
+      { who: 'o', text: 'Не по голове… Вставай. Садись. С тебя следующий, но без фанатизма.' },
+      { who: 'n', text: 'Уже на улице догнала сирена. Мутный вечер: в баре дрались, а запись в журнал ляжет на тебя.' } ],
+    outroLose: [
+      { who: 'n', text: 'Очнулся ты у стойки. Перед тобой стоит полный бокал — кто-то умеет ухаживать за проигравшими.' },
+      { who: 'o', text: 'Лежи, чемпион. Лежать тебе пока полезнее, чем драться.' } ],
+    reward: { win: 700, ko: 300 }, pts: 2 },
+  { id: 'patrol', title: 'Патруль', sub: 'На шум приезжает полиция. Дубинка бьёт далеко и сильно.', todo: true },
+  { id: 'prison', title: 'Тюрьма', sub: 'Три года. Двор, этап, сокскамерники, смотрящий.', todo: true },
+  { id: 'under', title: 'Подполье', sub: 'На выходе — организатор подпольных боёв и первые деньги.', todo: true },
+  { id: 'circle', title: 'Железный круг', sub: 'Своя лига. Путь к поясу.', todo: true },
+] };
+
+/* the drunk: heavy loops and overhands from far, almost no defence, long pauses between swings — «размашистый, медленный» */
+STYLES.drunk = { label: 'пьяный', gap: 1.65, w: { jab: 1, cross: 1.3, hookL: 3.4, hookR: 3.1, upperL: 0.5, upperR: 0.8, over: 4.2 }, dodge: 0.16, block: 0.25, combo: 0.3, trade: 0.6, feint: 0, body: 0.12, adv: 0.02, counter: 0.08 };
+/* the bar joins the quick-fight list only after chapter 1 (15_social.js checks LOC_LOCK in locOpen) */
+LOC_LOCK.bar = () => storyDone() >= 1;
+/* old saves: whoever climbed the ladder has walked this road already — chapter 1 counts as cleared, plus a gift */
+if (!PROF.story) PROF.story = { done: 0, mig: 0, pick: {} };
+else { PROF.story.done = PROF.story.done | 0; PROF.story.pick = PROF.story.pick || {}; }
+if (!PROF.story.mig) { PROF.story.mig = 1; if (G.career > 0 || PROF.champ > 0) { PROF.story.done = Math.max(PROF.story.done, 1); PROF.cash += 1000; save(); } }
+
+const storyCh = (i = G.story) => STORY.chapters[i];
+const storyDone = () => Math.max(0, PROF.story.done | 0);
+const storyPlayable = i => !!STORY.chapters[i] && !STORY.chapters[i].todo && i <= storyDone();
+const STORY_TIME = 3600;   // s: a story bout has no rounds — the clock is only there so endRound() can never catch it
+function storyClear(i = G.story) { PROF.story.done = Math.max(storyDone(), i + 1); save(); }
+function storyPick(lineId, k) { PROF.story.pick[storyCh().id + (lineId ? '#' + lineId : '')] = k; save(); }
+function storyMenuLbl() {
+  const d = storyDone(), ch = STORY.chapters[d];
+  if (!ch) return `пройдено глав: ${d}`;
+  if (d === 0) return `глава 1 · ${ch.title}`;
+  return ch.todo ? `дальше: «${ch.title}» — скоро` : `дальше: глава ${d + 1} · ${ch.title}`;
+}
+
+/* ── the dialog: one plate over the scene, G.state 'talk' ── */
+const DLG = { lines: [], i: 0, after: null, active: false, reply: false, kicker: '', who: 'n', camWho: null };
+function storyTalk(lines, after) {
+  DLG.lines = lines || []; DLG.i = 0; DLG.after = after || null; DLG.reply = false;
+  if (!DLG.lines.length) { const A = DLG.after; DLG.after = null; A && A(); return; }
+  G.state = 'talk'; DLG.active = true; DLG.camWho = null;
+  show('hud', false); show('pad', false); show('vs', false); show('result', false); show('rec', false);
+  $('dlg').hidden = true; $('dlg-card').hidden = true;
+  dlgDraw();
+}
+function dlgCur() { return DLG.lines[DLG.i] || null; }
+function dlgName(L) {
+  if (L.who === 'p') return myName();
+  if (L.who === 'o') { const ch = storyCh(); return ch ? ch.fight.nm : 'Соперник'; }
+  if (L.who && L.who !== 'n') return L.who;   // a named off-screen voice: its own name
+  return '';
+}
+function dlgDraw() {
+  const L = dlgCur(); if (!L) return dlgDone();
+  DLG.reply = false; DLG.who = L.who || 'n';
+  const cut = DLG.camWho !== DLG.who || !!L.card; DLG.camWho = L.card ? 'card' : DLG.who; if (cut) camCut = true;
+  const card = !!L.card, box = $('dlg'), pl = $('dlg-card');
+  box.hidden = card; pl.hidden = !card;
+  if (card) { $('dlg-card-t').textContent = L.card; return; }
+  $('dlg-k').textContent = DLG.kicker;
+  const nm = dlgName(L), ne = $('dlg-n'); ne.hidden = !nm; ne.textContent = nm;
+  $('dlg-t').textContent = L.text || '';
+  const op = $('dlg-opts'); op.textContent = '';
+  for (const o of L.opt || []) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm'; b.textContent = o.t;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); dlgChoose(o); });
+    b.addEventListener('click', e => { e.stopPropagation(); if (!DLG.reply) dlgChoose(o); });
+    op.appendChild(b); }
+  $('dlg-hint').textContent = (L.opt && !DLG.reply) ? 'выбери ответ' : 'далее — тап или Enter';
+}
+function dlgChoose(o) {
+  if (DLG.reply) return;
+  DLG.reply = true; storyPick(DLG.i, (dlgCur().opt || []).indexOf(o));
+  $('dlg-t').textContent = o.r || ''; $('dlg-opts').textContent = ''; $('dlg-hint').textContent = 'далее — тап или Enter';
+}
+function dlgNext() {
+  if (!DLG.active) return;
+  const L = dlgCur(); if (L && L.opt && !DLG.reply) return;   // an answer must be picked first
+  DLG.i++; if (DLG.i >= DLG.lines.length) return dlgDone();
+  dlgDraw();
+}
+function dlgDone() {
+  DLG.active = false; DLG.lines = []; DLG.i = 0; $('dlg').hidden = true; $('dlg-card').hidden = true;
+  const A = DLG.after; DLG.after = null; A && A();
+}
+/* Enter / Space / a tap — the next card; Esc — skip the whole dialog (12_ui.js routes it here first) */
+function storyTalkKey(e) {
+  if (!DLG.active) return false;
+  if (e.key === 'Escape') { dlgDone(); return true; }
+  if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space') { dlgNext(); return true; }
+  return false;
+}
+/* the camera of a dialog line: close on the speaker's face (stareCam-style), a wide shot for off-screen voices */
+function talkCam() {
+  if (DLG.who === 'p' || DLG.who === 'o') {
+    const F = DLG.who === 'p' ? P1 : P2, h = F.headNow, f = Math.sign(F.other.headNow.x - h.x) || 1;
+    _cp.set(h.x + f * 0.16, h.y - 0.05, 0.52); _cl.set(h.x + f * 0.1, h.y - 0.08, 0); return 7;
+  }
+  const mx = (P1.headNow.x + P2.headNow.x) * 0.5;
+  _cp.set(mx, 1.16, 3.1); _cl.set(mx, 0.94, 0); return 2.6;
+}
+{ const box = $('dlg'), card = $('dlg-card');
+  for (const el of [box, card]) el.addEventListener('pointerdown', e => { if (e.target.closest && e.target.closest('button') && !e.target.closest('.dlg-skip')) return; e.preventDefault(); dlgNext(); });
+  $('dlg-skip').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); dlgDone(); }); }
+
+/* ── the chapter flow ── */
+function storyPlay(i) {
+  const ch = STORY.chapters[i];
+  if (!ch || !storyPlayable(i)) return false;
+  G.mode = 'story'; G.story = i; G.storyOut = false;
+  if (!G.storyHome || G.state === 'menu') G.storyHome = G.loc;   // the place the menu was showing; toMenu puts it back (a rematch from the result keeps it)
+  G.prev = { diff: G.userDiff, loc: G.storyHome };       // toMenu → socLeave() restores the level and the place
+  G.loc = ch.fight.loc; G.diff = ch.fight.diff || 'easy';
+  UI.from = null; uiShow(null); show('result', false); show('rec', false);
+  DLG.kicker = `глава ${i + 1} · ${ch.title}`;
+  const go = () => {
+    setLocation(ch.fight.loc);
+    showP2(true); P2.applyLook({ ...ch.fight.look, street: true });
+    AI.style = STYLES[ch.fight.st] || STYLES.brawler; $('n2').textContent = ch.fight.nm;
+    const sl = $('st2'); if (sl) sl.textContent = AI.style.label;
+    P1.resetState(); P2.resetState(); sfx.unlock();
+    storyTalk(ch.intro, storyFightGo);
+  };
+  const cold = !LOCS[ch.fight.loc] || !LOCS[ch.fight.loc].group;
+  if (cold) { locBusy(true); setTimeout(() => { try { go(); } finally { locBusy(false); } }, 0); } else go();
+  return true;
+}
+function storyFightGo() {
+  startFight(true);
+  if (LOC.noFly) msg(LOC.label, 'place');   // the bar gets no fly-round — the dialogue already showed the place
+}
+/* the end of the bout: the story intercepts endReplay() with its outro; the result screen comes after the dialog */
+function storyOut(win) {
+  if (G.mode !== 'story') return false;
+  const ch = storyCh(); if (!ch) return false;
+  if (G.storyOut) return false;
+  G.storyOut = true;
+  const lines = win ? ch.outro : ch.outroLose;
+  storyTalk(lines, () => { G.state = 'result'; camCut = true; show('result', true); });
+  return true;
+}
+/* «Реванш / Дальше» on the result screen (r-again routes here through startFight's dispatch) */
+function storyAgain() {
+  const i = G.story;
+  if (storyDone() > i) {                       // the chapter is cleared: on to the next, or back to the «История» screen
+    if (storyPlayable(i + 1)) return storyPlay(i + 1);
+    toMenu(); return uiShow('story', 'st-back');
+  }
+  storyPlay(i);                                // a loss: the same chapter again, from its dialog
+}
+/* the drunk: he never fully stops swaying, and now and then one leg gives out (Fighter's wobble drives the pose) */
+function storyTick(dt) {
+  const ch = storyCh(); if (!ch || !ch.fight.drunk) return;
+  const F = P2; if (!F || F.ko || (F.rag && F.rag.on) || F.gu) return;
+  if (G.state !== 'fight' && G.state !== 'talk' && G.state !== 'intro' && G.state !== 'break') return;
+  F.drunkT = (F.drunkT || 0) + dt;
+  F.wobble = Math.max(F.wobble, 0.3 + 0.16 * Math.sin(F.drunkT * 1.6 + (F.ph || 0)));
+  if (F.drunkT > (F.drunkNext || 4)) { F.drunkNext = F.drunkT + 3 + rr() * 4.5; if (G.state === 'fight') F.wobble = Math.max(F.wobble, 0.9 + rr() * 0.5); }
+}
+
+/* ── the «История» screen: a vertical timeline of the chapters ── */
+function buildStory() {
+  const box = $('st-list'); if (!box) return;
+  box.textContent = '';
+  STORY.chapters.forEach((ch, i) => {
+    const done = i < storyDone(), cur = storyPlayable(i) && !done, lock = !done && !cur;
+    const row = document.createElement('div'); row.className = 'stc ' + (done ? 'done' : cur ? 'cur' : 'lock');
+    row.innerHTML = `<i class="dot"></i><div class="stc-b"><b>${i + 1}. ${esc(ch.title)}</b><small>${esc(ch.sub || '')}</small></div>`;
+    if (done || cur) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm' + (cur ? ' pri' : ''); b.textContent = done ? 'Ещё раз' : 'Играть';
+      if (cur) b.id = 'st-play'; b.onclick = () => storyPlay(i); row.appendChild(b); }
+    else { const s = document.createElement('span'); s.className = 'stc-lock'; s.textContent = ch.todo ? 'скоро' : '🔒'; row.appendChild(s); }
+    box.appendChild(row);
+  });
+}
+/* debug / screenshot hook: play a chapter, drive the dialog, finish the bout without the long cinematic */
+window.__story = {
+  STORY, DLG,
+  get done() { return storyDone(); },
+  play(i = storyDone()) { return storyPlay(i) ? G.state : 'locked'; },
+  next(n = 1) { for (let k = 0; k < n && DLG.active; k++) { const L = dlgCur(); if (L && L.opt && !DLG.reply) dlgChoose(L.opt[0]); dlgNext(); } return DLG.active ? DLG.i + '/' + DLG.lines.length : 'done'; },
+  skip() { if (DLG.active) dlgDone(); return G.state + ':' + G.mode; },
+  begin(i) { if (storyPlay(i ?? storyDone())) { while (DLG.active && G.state === 'talk') { const L = dlgCur(); if (L.opt && !DLG.reply) dlgChoose(L.opt[0]); dlgNext(); } } return G.state; },
+  ko(win = true) {
+    if (G.state === 'talk' || G.state === 'intro') return 'not fighting yet: ' + G.state;
+    if (G.state !== 'fight') return 'not fighting: ' + G.state;
+    const att = win ? P1 : P2, def = win ? P2 : P1;
+    def.lastContact = def.headNow.clone(); window.__fall = 'back';
+    knockout(att, def, new V3(1, 0.2, 0).normalize(), 1.3, 'cross', 1, true, false);
+    delete window.__fall;
+    if (window.__tick) __tick(95, 1 / 60);   // let the fall itself get into the replay buffer, then cut it short
+    this.end(); return G.state;
+  },
+  end() {   // skip the rest of the KO cinematic: replay only the very last frames, then endReplay → outro/result
+    if (G.state === 'ko') { G.koTitle = true; startReplay(); }
+    if (G.state === 'replay' && REC.frames.length > 3) { const t1 = REC.frames[REC.frames.length - 1].t;
+      RP.segs = [{ from: Math.max(REC.frames[0].t, t1 - 0.06), to: t1, rate: 14, cam: 'wide' }]; RP.seg = -1; nextSeg(); }
+    return G.state;
+  },
+};
 </script>

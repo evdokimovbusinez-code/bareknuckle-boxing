@@ -70,14 +70,17 @@ function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | '
   if (draw) { const p = payOut(false, true, how, stage, before); p.soc = socFight(false, true, how, stage); payShow(p); save(); return; }
   if (win) G.wins++; else G.losses++;
   let t = '', pts = 0;
-  if (G.mode === 'career') {
+  if (G.mode === 'story') { const ch = storyCh();   // issue 51: a story chapter — clear it, the purse is in purse(), the outro comes after the replay
+    if (win) { storyClear(); pts = ch.pts ?? 2; t = `глава «${ch.title}» пройдена`; }
+    else t = `глава «${ch.title}» не пройдена — попробуй ещё`;
+  } else if (G.mode === 'career') {
     if (win) { G.career = Math.min(LADDER.length, G.career + 1); pts = 2; if (G.career >= LADDER.length) { PROF.champ++; pts += 3; t = 'ЧЕМПИОН! Пояс твой'; } else t = `карьера ${G.career}/${LADDER.length} · следующий: ${LADDER[G.career].nm} — ${careerPlace()}`; }
     else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути — ${careerPlace()}`;
   } else if (win) pts = 1;
   if (pts) { PROF.pts += pts; t += (t ? ' · ' : '') + `+${pts} ${pts === 1 ? 'очко' : 'очка'} бойцу`; }
   { const p = payOut(win, false, how, stage, before); p.soc = socFight(win, false, how, stage); payShow(p); }   // the purse (07b_economy.js) and the followers (15_social.js) onto the result screen
   save(); const c = $('r-car'); if (c) c.textContent = t;
-  const a = $('r-again'); if (a) a.textContent = G.mode === 'career' && win && G.career < LADDER.length ? 'Следующий бой' : G.mode === 'career' && !win ? 'Ещё раз' : 'Реванш';
+  const a = $('r-again'); if (a) a.textContent = G.mode === 'story' ? (win ? 'Дальше' : 'Ещё раз') : G.mode === 'career' && win && G.career < LADDER.length ? 'Следующий бой' : G.mode === 'career' && !win ? 'Ещё раз' : 'Реванш';
 }
 const D_SEP = 1.15;
 
@@ -149,7 +152,7 @@ function endReplay() {
   G.state = 'result'; $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true;
   const win = G.winner === P1; $('r-title').textContent = win ? 'Победа' : 'Нокаут'; $('r-title').className = 'rt ' + (win ? 'win' : 'lose');
   $('r-sub').textContent = `${win ? 'соперник на полу' : 'ты на полу'} · счёт ${G.wins} : ${G.losses}`;
-  $('result').hidden = false;
+  if (!storyOut(win)) $('result').hidden = false;   // issue 51: a story bout plays its outro dialog first, the result screen after it
 }
 
 /* ───────── hits ───────── */
