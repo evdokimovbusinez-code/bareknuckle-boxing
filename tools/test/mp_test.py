@@ -86,8 +86,10 @@ async def run():
         await wait(B, "__mp.stat().started && __mp.stat().conn && __mp.stat().recv >= 2", 60)
         print('  оба подключены:', await A.evaluate('__mp.stat()'), await B.evaluate('__mp.stat()'))
 
-        for _ in range(3):
-            await step()          # intro → fight
+        for _ in range(30):       # intro → fight (a street place adds the camera fly-round)
+            await step()
+            if await A.evaluate("__g.G.state === 'fight'") and await B.evaluate("__g.G.state === 'fight'"):
+                break
         await wait(A, "__g.G.state === 'fight'", 20)
         await wait(B, "__g.G.state === 'fight'", 20)
         cf = "JSON.stringify([__g.G.loc, __g.P1.gear.spar, __g.P2.gear.spar, __mp.cfg().len, __mp.cfg().rounds])"
