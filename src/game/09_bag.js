@@ -160,10 +160,10 @@ function decision() {
 // a cut over the eye that keeps running into it: the referee calls time for the doctor; if it can't be controlled, the fight is stopped
 function cutCheck() {
   for (const F of [P1, P2]) for (const w of F.flesh.wounds) {
-    if (w.kind !== 'cut' || w.sev < 0.85) continue;
+    if (w.kind !== 'cut' || w.sev < 0.85 || pvp('blood')) continue;   // «Кровавая бойня»: no doctor
     const near = Math.min(w.p.distanceTo(F.flesh.u.uEyeL.value), w.p.distanceTo(F.flesh.u.uEyeR.value)) / F.flesh.U; if (near > 0.045) continue;
     if (!F.cutLook) { F.cutLook = true; msg('Врач смотрит рассечение'); G.state = 'break'; G.breakT = 3.5; G.doc = true; corner(F, 0.35); return; }
-    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; fightOver(A === P1, false, 'tko'); $('pad').hidden = true;
+    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; fightOver(A === P1, false, 'tko'); $('pad').hidden = true; if (NET.role) return netResult();   // P2P: the shared result (the guest was left hanging)
       $('r-title').textContent = A === P1 ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (A === P1 ? 'win' : 'lose');
       $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false; msg('Стоп! Рассечение', 'ko'); return; }
   }

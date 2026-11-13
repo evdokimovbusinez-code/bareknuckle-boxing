@@ -244,7 +244,7 @@ function resolveHit(att, name, contact) {
     if (isPow) def.knock = (def.knock || 0) + 0.7 * bforce;   // a power shot takes a short step back
     if (breakIt) { def.guardDown = G.t + BLK.downT; def.brkT0 = G.t; def.blockW = 0; }
   }
-  dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (G.mode === 'spar' ? 0.6 : 1);   // 16 oz and a helmet
+  dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (sparOn() ? 0.6 : 1) * (pvp('glass') ? 2.2 : pvp('blood') ? 1.25 : 1);   // 16 oz and a helmet; P2P modes (00a_net_state.js)
   if (window.__dmgLog) window.__dmgLog.push([def === P1 ? 1 : 2, +dmg.toFixed(1), name, counter ? 'C' : '', caught ? 'K' : '', blocked ? 'B' : '', evading ? 'E' : '', +G.t.toFixed(1)]);
   if (att.fs) { if (blocked) att.fs.blk++; else { att.fs.land++; if (P.type !== 'straight' || name === 'cross') att.fs.pow++; if (att.sig && sigOf(name) === att.sig) att.fs.sig++; } att.fs.dmg += dmg; }
   def.hp = Math.max(0, def.hp - dmg); def.hpCap = Math.max(def.hp, def.hpCap - dmg * (blocked ? 0.15 : 0.4)); def.hitT = G.t; if (G.rd) G.rd[att === P1 ? 0 : 1] += blocked ? dmg * 0.3 : dmg;
@@ -253,7 +253,7 @@ function resolveHit(att, name, contact) {
   else if (P.type === 'upper') dir.set(fwd * 0.4, 1, 0);
   else if (P.type === 'over') dir.set(fwd, -0.45, 0);
   dir.normalize();
-  const power = clamp(dmg / (18 * ((window.__tw || {}).dmgK ?? DMG_K)), 0.2, 1.6), blood = !blocked && (def.hp < 62 || dmg >= 14);
+  const power = clamp(dmg / (18 * ((window.__tw || {}).dmgK ?? DMG_K)), 0.2, 1.6), blood = !blocked && (def.hp < 62 || dmg >= 14 || pvp('blood'));
   // ── issue 44: the series + the reaction descriptor handed to takeHit ──
   // A clean hit inside REACT.gap of the last one compounds (×1.0 → ×1.3 → ×1.6); a block keeps its own 1.2 recoil.
   let combo = 0, mult = 1;
@@ -362,6 +362,7 @@ function kdProgress(K) {
 }
 /* knockdown: down but conscious — a knee taken, or a flash fall. The referee counts (BKFC: 10 s to stand; the other man to a neutral spot) */
 function knockdown(att, def, dir, power, name, fwd, sev, kind, bodyArg) {
+  if (pvp('kd1')) return knockout(att, def, dir, power, name, fwd, true, bodyArg);   // P2P «Первый нокдаун»: the first fall ends it
   if (att.fs) att.fs.kd++;
   G.state = 'kd'; def.kdCount = (def.kdCount || 0) + 1; if (G.rkd) G.rkd[def === P1 ? 0 : 1]++;
   const body = !!bodyArg || kind === 'liver';

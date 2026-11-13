@@ -315,7 +315,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .so-sp .so-logo{width:120px;height:36px;image-rendering:auto}.so-sp.lock{opacity:.62}.so-lock{font:500 10.5px var(--mono);letter-spacing:.06em;color:var(--muted)}.so-lock.on{color:#8fd49a}
 .dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
 .views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
-#net-room,#net-home{flex-shrink:0}#net-cfg{display:flex;flex-direction:column;gap:8px;margin-top:6px}#net-cfg[hidden]{display:none}
+#net-room,#net-home,#net-stance-f{flex-shrink:0}.net-tip{display:block;margin-top:4px;font:400 11px var(--mono);color:#a9a9a9}#net-cfg{display:flex;flex-direction:column;gap:8px;margin-top:6px}#net-cfg[hidden]{display:none}
 #net-cfg .locs{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}#net-cfg .locs small{display:none}#net-cfg .locs button{padding:7px 10px}
 .locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .locs button{display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid rgba(255,255,255,.16);border-radius:2px;background:rgba(255,255,255,.04);padding:clamp(7px,1.6vmin,11px) 12px;transition:border-color .15s,background .15s}
@@ -512,6 +512,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="ptitle"><small>мультиплеер · P2P</small>Бой с другом</div>
       <div class="pbody">
         <div class="net-st" id="net-st">Бой 1 на 1 по ссылке. Хост считает бой, гость видит его со своей стороны. Без регистрации и своих серверов.</div>
+        <div class="fld" id="net-stance-f"><span>твоя стойка</span><div class="sw" id="net-stance"></div></div>
         <div class="net-home" id="net-home">
           <button class="btn pri" id="net-create">Создать комнату</button>
           <div class="fld"><span>или войти по коду</span>
@@ -529,6 +530,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
             <div class="fld"><span>раунды</span><div class="sw" id="net-rounds"></div></div>
             <div class="fld"><span>время раунда</span><div class="sw" id="net-len"></div></div>
             <div class="fld"><span>правила</span><div class="sw" id="net-rules"></div></div>
+            <div class="fld"><span>режим · только PvP</span><div class="sw" id="net-mode"></div><small class="net-tip" id="net-mode-tip"></small></div>
           </div>
         </div>
       </div>
@@ -2132,7 +2134,7 @@ const NET = {
   role: null, host: false, guest: false, started: false, closing: false,
   peer: null, conn: null, loading: null, code: '', link: '', nm: '',
   saved: null, over: null,
-  cfg: { loc: 'gym', rounds: 3, len: 120, spar: false },   // the host's match settings (room screen), sent in hello
+  cfg: { loc: 'gym', rounds: 3, len: 120, spar: false, mode: 'std' },   // the host's match settings (room screen), sent in hello
   rate: 1 / 30, buf: 0.10, acc: 0, pingAcc: 0, ping: 0, silent: 0, silenceMax: 1.5,
   snaps: [], evs: [], pops: [], playT: 0, first: true,
   mv: { x: 0, y: 0, b: false }, blk: false, q: [], iq: [], evI: 0, pop: [],
@@ -2153,6 +2155,18 @@ const NET_ERR = {
   'network': 'Нет связи с сервером PeerJS.', 'server-error': 'Сервер PeerJS недоступен.',
   'socket-error': 'Соединение с сервером прервано.', 'webrtc': 'Не удалось пробить P2P-соединение (строгий NAT).',
 };
+
+/* P2P-only match modes (the host picks one in the room, 18_net.js); every check goes through these two */
+const NET_MODES = [
+  { id: 'std', label: 'Обычный', tip: 'Как в быстром бою' },
+  { id: 'blood', label: 'Кровавая бойня', tip: 'Рассечения на каждом шагу, всё в крови, врач бой не останавливает, урон ×1.25' },
+  { id: 'kd1', label: 'Первый нокдаун', tip: 'Кто первым упал — тот проиграл' },
+  { id: 'glass', label: 'Стеклянные челюсти', tip: 'Урон ×2.2: пара чистых — и спать' },
+  { id: 'iron', label: 'Железные лёгкие', tip: 'Выносливость не кончается: рубка без остановки' },
+  { id: 'ko', label: 'До нокаута', tip: 'Раунды без конца, судей нет — только нокаут' },
+];
+function pvp(m) { return G.mode === 'net' && NET.cfg.mode === m; }
+function sparOn() { return G.mode === 'spar' || (G.mode === 'net' && NET.cfg.spar); }   // 16 oz gloves + headgear: less damage, no cuts
 /* ───────── ragdoll: rigid bodies (cannon-es) with soft joint limits and muscle tone toward the neutral body posture ─────────
    Every joint has three anatomical axes taken from the bind pose: flex (child swings forward; for the knee "+" is hyperextension),
    side (left limbs: "+" = adduction toward the midline) and twist (about the bone). Inside the limits a weak tone pulls toward the
@@ -3194,7 +3208,7 @@ class Flesh {
       const d = at.p.distanceTo(lips.p) / this.U;
       if (d < 0.045) {
         this.lipBleed = Math.min(1, this.lipBleed + 0.25 * w);
-        if (!this.wounds.some(x => x.kind === 'lip') && rr() < 0.2 + 0.4 * (1 - F.hp / 100) * w) {
+        if (!this.wounds.some(x => x.kind === 'lip') && rr() < (0.2 + 0.4 * (1 - F.hp / 100) * w) * (pvp('blood') ? 2.5 : 1)) {
           const side = rr() < 0.5 ? -1 : 1;
           const c = this.snap(T.headV, lips.p.clone().addScaledVector(this.lat, side * 0.012 * this.U).addScaledVector(this.up, -0.004 * this.U)); c.n.copy(this.fwdB);
           const x = this.wound('lip', c, 0.3 + 0.35 * w, this.lat.clone(), 0.008); if (x) { res.spray.push(x); res.lip = true; }
@@ -3205,16 +3219,16 @@ class Flesh {
     if (l.z > 0 && l.y > -0.035) {
       const near = this.wounds.find(x => x.kind === 'cut' && x.p.distanceTo(at.p) < 0.02 * this.U);
       if (near) { near.sev = Math.min(1, near.sev + 0.25 * w); near.L *= 0.5; res.spray.push(near); }
-      else if (rr() < 0.05 + 0.25 * hurt * w + (P.type === 'hook' || P.type === 'over' ? 0.08 : 0)) {
+      else if (rr() < (0.05 + 0.25 * hurt * w + (P.type === 'hook' || P.type === 'over' ? 0.08 : 0)) * (pvp('blood') ? 3.5 : 1)) {   // «Кровавая бойня»: cuts ×3.5
         const tan = _f1.crossVectors(at.n, this.up).normalize().clone();
-        const c = G.mode === 'spar' ? null : this.wound('cut', at, 0.35 + 0.4 * rr() * w, tan, 0.012 + 0.012 * rr()); if (c) { res.spray.push(c); res.cut = true; }   // the headgear's padding: no cuts in sparring
+        const c = sparOn() ? null : this.wound('cut', at, 0.35 + 0.4 * rr() * w, tan, 0.012 + 0.012 * rr()); if (c) { res.spray.push(c); res.cut = true; }   // the headgear's padding: no cuts in sparring
       }
     }
     // the nose: straights and overhands to the middle of the face
     if (l.z > 0 && l.y < 0.01 && l.y > -0.09 && Math.abs(l.x) < 0.06 && P.type !== 'upper') {
       const nose = this.wounds.filter(x => x.kind === 'nose');
       if (nose.length) { for (const x of nose) { x.sev = Math.min(1, x.sev + 0.2 * w); res.spray.push(x); } }
-      else if (rr() < 0.15 + 0.6 * hurt * w) { for (const ns of this.nose.nostrils) { const x = this.wound('nose', ns, 0.25 + 0.3 * w); if (x) res.spray.push(x); } res.nose = true; }
+      else if (rr() < (0.15 + 0.6 * hurt * w) * (pvp('blood') ? 2.5 : 1)) { for (const ns of this.nose.nostrils) { const x = this.wound('nose', ns, 0.25 + 0.3 * w); if (x) res.spray.push(x); } res.nose = true; }
       if (nose.length && nose[0].sev > 0.7 && w > 0.9 && this.u.uNB.value.w === 0 && rr() < 0.5) {   // the nose breaks: it sits crooked from now on
         const t = this.nose.tip, side = _f1.crossVectors(db, this.up).normalize(); this.u.uNB.value.set(t.x, t.y, t.z, 1); this.u.uNBD.value.set(side.x, side.y, side.z, 0); res.broke = true;
       }
@@ -5780,9 +5794,11 @@ class Fighter {
     this.u.uDmg.value = 0; this.dmgShow = 0; if (this.flesh) this.flesh.reset(); if (this.face) this.face.reset(); this.simReset = true; for (const j of this.jigs) j.init = false;
   }
   place(x, rotY, mirror) {
-    const g = this.group; g.position.set(x, 0, 0); g.rotation.y = rotY; if (mirror) g.scale.x = -1;
+    const g = this.group; g.position.set(x, 0, 0); g.rotation.y = rotY; this.mir0 = !!mirror; this.stanceSet(false);
     g.updateMatrixWorld(true); this.simReset = true;
   }
+  // a southpaw is his own mirror image: the whole group flips in x on top of the side's own mirror (P2 is placed mirrored)
+  stanceSet(upd = true) { const g = this.group, s = (this.mir0 ? -1 : 1) * (((this.gear && this.gear.look) || {}).stance === 'south' ? -1 : 1); if (g.scale.x !== s) { g.scale.x = s; this.simReset = true; } if (upd) g.updateMatrixWorld(true); }
   attach(name, worldRest) { const b = this.bones[name]; const a = { b, local: b.worldToLocal(worldRest.clone()), w: new V3() }; this.ATT.push(a); return a; }
   bpos(name, v) { return v.setFromMatrixPosition(this.bones[name].matrixWorld); }
   mpos(bone, v) { v.setFromMatrixPosition(bone.matrixWorld); return this.group.worldToLocal(v); }
@@ -5955,7 +5971,7 @@ class Fighter {
     hairApply(this, L);   // cut, hair colour, beard (04g_hair.js); handGear, called from dress below, decides what of it shows (hairVis)
     skinApply(this, L); tatApply(this, L);   // skin tone, tattoos (04h_skin_tattoo.js)
     if (this.wmat) this.wmat.color.set((WRAPS_LOOKS.find(x => x.id === L.wraps) || WRAPS_LOOKS[0]).c);
-    this.dress(L);
+    this.dress(L); this.stanceSet();
   }
   dress(L) {
     const G2 = this.gear, U = this.flesh.u.uGear.value, W = wearDress(this, L), bt = W.bottom, tp = W.top, sh = W.shoes;   // 04e_wardrobe.js: the meshes of what he wears (model + colour from the registry)
@@ -7328,7 +7344,7 @@ function resolveHit(att, name, contact) {
     if (isPow) def.knock = (def.knock || 0) + 0.7 * bforce;   // a power shot takes a short step back
     if (breakIt) { def.guardDown = G.t + BLK.downT; def.brkT0 = G.t; def.blockW = 0; }
   }
-  dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (G.mode === 'spar' ? 0.6 : 1);   // 16 oz and a helmet
+  dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (sparOn() ? 0.6 : 1) * (pvp('glass') ? 2.2 : pvp('blood') ? 1.25 : 1);   // 16 oz and a helmet; P2P modes (00a_net_state.js)
   if (window.__dmgLog) window.__dmgLog.push([def === P1 ? 1 : 2, +dmg.toFixed(1), name, counter ? 'C' : '', caught ? 'K' : '', blocked ? 'B' : '', evading ? 'E' : '', +G.t.toFixed(1)]);
   if (att.fs) { if (blocked) att.fs.blk++; else { att.fs.land++; if (P.type !== 'straight' || name === 'cross') att.fs.pow++; if (att.sig && sigOf(name) === att.sig) att.fs.sig++; } att.fs.dmg += dmg; }
   def.hp = Math.max(0, def.hp - dmg); def.hpCap = Math.max(def.hp, def.hpCap - dmg * (blocked ? 0.15 : 0.4)); def.hitT = G.t; if (G.rd) G.rd[att === P1 ? 0 : 1] += blocked ? dmg * 0.3 : dmg;
@@ -7337,7 +7353,7 @@ function resolveHit(att, name, contact) {
   else if (P.type === 'upper') dir.set(fwd * 0.4, 1, 0);
   else if (P.type === 'over') dir.set(fwd, -0.45, 0);
   dir.normalize();
-  const power = clamp(dmg / (18 * ((window.__tw || {}).dmgK ?? DMG_K)), 0.2, 1.6), blood = !blocked && (def.hp < 62 || dmg >= 14);
+  const power = clamp(dmg / (18 * ((window.__tw || {}).dmgK ?? DMG_K)), 0.2, 1.6), blood = !blocked && (def.hp < 62 || dmg >= 14 || pvp('blood'));
   // ── issue 44: the series + the reaction descriptor handed to takeHit ──
   // A clean hit inside REACT.gap of the last one compounds (×1.0 → ×1.3 → ×1.6); a block keeps its own 1.2 recoil.
   let combo = 0, mult = 1;
@@ -7446,6 +7462,7 @@ function kdProgress(K) {
 }
 /* knockdown: down but conscious — a knee taken, or a flash fall. The referee counts (BKFC: 10 s to stand; the other man to a neutral spot) */
 function knockdown(att, def, dir, power, name, fwd, sev, kind, bodyArg) {
+  if (pvp('kd1')) return knockout(att, def, dir, power, name, fwd, true, bodyArg);   // P2P «Первый нокдаун»: the first fall ends it
   if (att.fs) att.fs.kd++;
   G.state = 'kd'; def.kdCount = (def.kdCount || 0) + 1; if (G.rkd) G.rkd[def === P1 ? 0 : 1]++;
   const body = !!bodyArg || kind === 'liver';
@@ -7966,10 +7983,10 @@ function decision() {
 // a cut over the eye that keeps running into it: the referee calls time for the doctor; if it can't be controlled, the fight is stopped
 function cutCheck() {
   for (const F of [P1, P2]) for (const w of F.flesh.wounds) {
-    if (w.kind !== 'cut' || w.sev < 0.85) continue;
+    if (w.kind !== 'cut' || w.sev < 0.85 || pvp('blood')) continue;   // «Кровавая бойня»: no doctor
     const near = Math.min(w.p.distanceTo(F.flesh.u.uEyeL.value), w.p.distanceTo(F.flesh.u.uEyeR.value)) / F.flesh.U; if (near > 0.045) continue;
     if (!F.cutLook) { F.cutLook = true; msg('Врач смотрит рассечение'); G.state = 'break'; G.breakT = 3.5; G.doc = true; corner(F, 0.35); return; }
-    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; fightOver(A === P1, false, 'tko'); $('pad').hidden = true;
+    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; fightOver(A === P1, false, 'tko'); $('pad').hidden = true; if (NET.role) return netResult();   // P2P: the shared result (the guest was left hanging)
       $('r-title').textContent = A === P1 ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (A === P1 ? 'win' : 'lose');
       $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false; msg('Стоп! Рассечение', 'ko'); return; }
   }
@@ -12635,6 +12652,7 @@ function netBoot() {
   };
 }
 function netHome() {
+  netStanceUI();
   show('net-room', false); show('net-home', true); NET.roomShown = false;
   $('net-code-in').value = '';
   $('net-st').textContent = 'Бой 1 на 1 по ссылке. Хост считает бой, гость видит его со своей стороны. Без регистрации и своих серверов.';
@@ -12652,6 +12670,11 @@ function netRoomUI(code) {
   show('net-cfg', NET.host); if (NET.host) netCfgUI();
 }
 /* the host's match settings: place, rounds, round length, rules (bare knuckle / sparring gloves + headgear); the guest gets them in hello */
+function netRounds(C) { return C.mode === 'ko' ? 99 : C.rounds; }   // «До нокаута»: no judges, the rounds just keep coming
+/* your own stance (kept in LOOK, so it goes over in hello and stays for the creator / quick fights) */
+function netStanceUI() {
+  swatches('net-stance', [{ id: 'orth', label: 'Правша' }, { id: 'south', label: 'Левша' }], () => LOOK.stance === 'south' ? 'south' : 'orth', v => { LOOK.stance = v; try { save(); } catch (e) {} P1.applyLook(LOOK); }, true, true);
+}
 function netCfgUI() {
   const C = NET.cfg, box = $('net-loc'); box.textContent = '';
   if (!LOCS[C.loc] || !locOpen(C.loc)) C.loc = 'gym';
@@ -12664,11 +12687,13 @@ function netCfgUI() {
   swatches('net-rounds', [1, 3, 5].map(n => ({ id: n, label: String(n) })), () => C.rounds, v => { C.rounds = v; }, true, true);
   swatches('net-len', [[60, '1 мин'], [120, '2 мин'], [180, '3 мин']].map(([id, label]) => ({ id, label })), () => C.len, v => { C.len = v; }, true, true);
   swatches('net-rules', [{ id: false, label: 'Голые кулаки' }, { id: true, label: 'Спарринг: перчатки и шлем' }], () => C.spar, v => { C.spar = v; }, true, true);
+  const tip = () => { const M = NET_MODES.find(x => x.id === C.mode) || NET_MODES[0]; $('net-mode-tip').textContent = M.tip; $('net-rounds').parentElement.style.opacity = C.mode === 'ko' ? 0.4 : ''; };
+  swatches('net-mode', NET_MODES.map(M => ({ id: M.id, label: M.label })), () => C.mode, v => { C.mode = v; tip(); }, true, true); tip();
 }
 function netCfgApply(C) {   // both sides, before the bout is set up
   if (!C) return;
-  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar };
-  ROUNDS = NET.cfg.rounds; ROUND_LEN = NET.cfg.len;
+  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar, mode: NET_MODES.some(M => M.id === C.mode) ? C.mode : 'std' };
+  ROUNDS = netRounds(NET.cfg); ROUND_LEN = NET.cfg.len;
   if (G.loc !== NET.cfg.loc) { G.loc = NET.cfg.loc; try { setLocation(G.loc); } catch (e) { console.error(e); } }
   for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
 }
@@ -12761,7 +12786,7 @@ function netBeginMatch() {
   NET.saved = { loc: G.loc, cine: OPT.cine, rounds: ROUNDS, len: ROUND_LEN, diff: G.diff, mode: G.mode };
   G.mode = 'net'; G.diff = 'normal'; OPT.cine = false;
   const C = NET.host ? NET.cfg : { loc: 'gym', rounds: 3, len: 120, spar: false };   // the guest's real settings come with the host's hello
-  ROUNDS = C.rounds; ROUND_LEN = C.len; G.loc = C.loc;
+  ROUNDS = netRounds(C); ROUND_LEN = C.len; G.loc = C.loc;
   try { setLocation(G.loc); } catch (e) {}
   uiShow(null); show('net-drop', false); $('net-ping').hidden = false; $('net-ping').textContent = '… мс';
   camCut = true;
@@ -12832,6 +12857,7 @@ function netInput(m) {
   if (m.q) for (const p of m.q) if (NET.q.length < 6) NET.q.push({ t: p.t, n: p.n, body: !!p.body, pow: !!p.pow, at: G.real });
 }
 function netHostAI(dt) {   // called from ai(dt) instead of the AI (08_ai_flow.js)
+  if (pvp('iron')) { P1.stamina = Math.max(P1.stamina, 100); P2.stamina = Math.max(P2.stamina, 100); }   // «Железные лёгкие»
   const me = P2, m = NET.mv;
   me.moveDir = m.x; me.moveLat = -m.y;   // mirrored camera: the guest's right is toward the opponent, up circles the other way
   me.blocking = !!m.b && G.state === 'fight';

@@ -65,6 +65,7 @@ function netBoot() {
   };
 }
 function netHome() {
+  netStanceUI();
   show('net-room', false); show('net-home', true); NET.roomShown = false;
   $('net-code-in').value = '';
   $('net-st').textContent = 'Бой 1 на 1 по ссылке. Хост считает бой, гость видит его со своей стороны. Без регистрации и своих серверов.';
@@ -82,6 +83,11 @@ function netRoomUI(code) {
   show('net-cfg', NET.host); if (NET.host) netCfgUI();
 }
 /* the host's match settings: place, rounds, round length, rules (bare knuckle / sparring gloves + headgear); the guest gets them in hello */
+function netRounds(C) { return C.mode === 'ko' ? 99 : C.rounds; }   // «До нокаута»: no judges, the rounds just keep coming
+/* your own stance (kept in LOOK, so it goes over in hello and stays for the creator / quick fights) */
+function netStanceUI() {
+  swatches('net-stance', [{ id: 'orth', label: 'Правша' }, { id: 'south', label: 'Левша' }], () => LOOK.stance === 'south' ? 'south' : 'orth', v => { LOOK.stance = v; try { save(); } catch (e) {} P1.applyLook(LOOK); }, true, true);
+}
 function netCfgUI() {
   const C = NET.cfg, box = $('net-loc'); box.textContent = '';
   if (!LOCS[C.loc] || !locOpen(C.loc)) C.loc = 'gym';
@@ -94,11 +100,13 @@ function netCfgUI() {
   swatches('net-rounds', [1, 3, 5].map(n => ({ id: n, label: String(n) })), () => C.rounds, v => { C.rounds = v; }, true, true);
   swatches('net-len', [[60, '1 мин'], [120, '2 мин'], [180, '3 мин']].map(([id, label]) => ({ id, label })), () => C.len, v => { C.len = v; }, true, true);
   swatches('net-rules', [{ id: false, label: 'Голые кулаки' }, { id: true, label: 'Спарринг: перчатки и шлем' }], () => C.spar, v => { C.spar = v; }, true, true);
+  const tip = () => { const M = NET_MODES.find(x => x.id === C.mode) || NET_MODES[0]; $('net-mode-tip').textContent = M.tip; $('net-rounds').parentElement.style.opacity = C.mode === 'ko' ? 0.4 : ''; };
+  swatches('net-mode', NET_MODES.map(M => ({ id: M.id, label: M.label })), () => C.mode, v => { C.mode = v; tip(); }, true, true); tip();
 }
 function netCfgApply(C) {   // both sides, before the bout is set up
   if (!C) return;
-  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar };
-  ROUNDS = NET.cfg.rounds; ROUND_LEN = NET.cfg.len;
+  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar, mode: NET_MODES.some(M => M.id === C.mode) ? C.mode : 'std' };
+  ROUNDS = netRounds(NET.cfg); ROUND_LEN = NET.cfg.len;
   if (G.loc !== NET.cfg.loc) { G.loc = NET.cfg.loc; try { setLocation(G.loc); } catch (e) { console.error(e); } }
   for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
 }
@@ -191,7 +199,7 @@ function netBeginMatch() {
   NET.saved = { loc: G.loc, cine: OPT.cine, rounds: ROUNDS, len: ROUND_LEN, diff: G.diff, mode: G.mode };
   G.mode = 'net'; G.diff = 'normal'; OPT.cine = false;
   const C = NET.host ? NET.cfg : { loc: 'gym', rounds: 3, len: 120, spar: false };   // the guest's real settings come with the host's hello
-  ROUNDS = C.rounds; ROUND_LEN = C.len; G.loc = C.loc;
+  ROUNDS = netRounds(C); ROUND_LEN = C.len; G.loc = C.loc;
   try { setLocation(G.loc); } catch (e) {}
   uiShow(null); show('net-drop', false); $('net-ping').hidden = false; $('net-ping').textContent = '… мс';
   camCut = true;
@@ -262,6 +270,7 @@ function netInput(m) {
   if (m.q) for (const p of m.q) if (NET.q.length < 6) NET.q.push({ t: p.t, n: p.n, body: !!p.body, pow: !!p.pow, at: G.real });
 }
 function netHostAI(dt) {   // called from ai(dt) instead of the AI (08_ai_flow.js)
+  if (pvp('iron')) { P1.stamina = Math.max(P1.stamina, 100); P2.stamina = Math.max(P2.stamina, 100); }   // «Железные лёгкие»
   const me = P2, m = NET.mv;
   me.moveDir = m.x; me.moveLat = -m.y;   // mirrored camera: the guest's right is toward the opponent, up circles the other way
   me.blocking = !!m.b && G.state === 'fight';

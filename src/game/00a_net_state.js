@@ -6,7 +6,7 @@ const NET = {
   role: null, host: false, guest: false, started: false, closing: false,
   peer: null, conn: null, loading: null, code: '', link: '', nm: '',
   saved: null, over: null,
-  cfg: { loc: 'gym', rounds: 3, len: 120, spar: false },   // the host's match settings (room screen), sent in hello
+  cfg: { loc: 'gym', rounds: 3, len: 120, spar: false, mode: 'std' },   // the host's match settings (room screen), sent in hello
   rate: 1 / 30, buf: 0.10, acc: 0, pingAcc: 0, ping: 0, silent: 0, silenceMax: 1.5,
   snaps: [], evs: [], pops: [], playT: 0, first: true,
   mv: { x: 0, y: 0, b: false }, blk: false, q: [], iq: [], evI: 0, pop: [],
@@ -27,3 +27,15 @@ const NET_ERR = {
   'network': 'Нет связи с сервером PeerJS.', 'server-error': 'Сервер PeerJS недоступен.',
   'socket-error': 'Соединение с сервером прервано.', 'webrtc': 'Не удалось пробить P2P-соединение (строгий NAT).',
 };
+
+/* P2P-only match modes (the host picks one in the room, 18_net.js); every check goes through these two */
+const NET_MODES = [
+  { id: 'std', label: 'Обычный', tip: 'Как в быстром бою' },
+  { id: 'blood', label: 'Кровавая бойня', tip: 'Рассечения на каждом шагу, всё в крови, врач бой не останавливает, урон ×1.25' },
+  { id: 'kd1', label: 'Первый нокдаун', tip: 'Кто первым упал — тот проиграл' },
+  { id: 'glass', label: 'Стеклянные челюсти', tip: 'Урон ×2.2: пара чистых — и спать' },
+  { id: 'iron', label: 'Железные лёгкие', tip: 'Выносливость не кончается: рубка без остановки' },
+  { id: 'ko', label: 'До нокаута', tip: 'Раунды без конца, судей нет — только нокаут' },
+];
+function pvp(m) { return G.mode === 'net' && NET.cfg.mode === m; }
+function sparOn() { return G.mode === 'spar' || (G.mode === 'net' && NET.cfg.spar); }   // 16 oz gloves + headgear: less damage, no cuts

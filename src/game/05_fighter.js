@@ -174,9 +174,11 @@ class Fighter {
     this.u.uDmg.value = 0; this.dmgShow = 0; if (this.flesh) this.flesh.reset(); if (this.face) this.face.reset(); this.simReset = true; for (const j of this.jigs) j.init = false;
   }
   place(x, rotY, mirror) {
-    const g = this.group; g.position.set(x, 0, 0); g.rotation.y = rotY; if (mirror) g.scale.x = -1;
+    const g = this.group; g.position.set(x, 0, 0); g.rotation.y = rotY; this.mir0 = !!mirror; this.stanceSet(false);
     g.updateMatrixWorld(true); this.simReset = true;
   }
+  // a southpaw is his own mirror image: the whole group flips in x on top of the side's own mirror (P2 is placed mirrored)
+  stanceSet(upd = true) { const g = this.group, s = (this.mir0 ? -1 : 1) * (((this.gear && this.gear.look) || {}).stance === 'south' ? -1 : 1); if (g.scale.x !== s) { g.scale.x = s; this.simReset = true; } if (upd) g.updateMatrixWorld(true); }
   attach(name, worldRest) { const b = this.bones[name]; const a = { b, local: b.worldToLocal(worldRest.clone()), w: new V3() }; this.ATT.push(a); return a; }
   bpos(name, v) { return v.setFromMatrixPosition(this.bones[name].matrixWorld); }
   mpos(bone, v) { v.setFromMatrixPosition(bone.matrixWorld); return this.group.worldToLocal(v); }
@@ -349,7 +351,7 @@ class Fighter {
     hairApply(this, L);   // cut, hair colour, beard (04g_hair.js); handGear, called from dress below, decides what of it shows (hairVis)
     skinApply(this, L); tatApply(this, L);   // skin tone, tattoos (04h_skin_tattoo.js)
     if (this.wmat) this.wmat.color.set((WRAPS_LOOKS.find(x => x.id === L.wraps) || WRAPS_LOOKS[0]).c);
-    this.dress(L);
+    this.dress(L); this.stanceSet();
   }
   dress(L) {
     const G2 = this.gear, U = this.flesh.u.uGear.value, W = wearDress(this, L), bt = W.bottom, tp = W.top, sh = W.shoes;   // 04e_wardrobe.js: the meshes of what he wears (model + colour from the registry)
