@@ -100,12 +100,13 @@ function netCfgUI() {
   swatches('net-rounds', [1, 3, 5].map(n => ({ id: n, label: String(n) })), () => C.rounds, v => { C.rounds = v; }, true, true);
   swatches('net-len', [[60, '1 мин'], [120, '2 мин'], [180, '3 мин']].map(([id, label]) => ({ id, label })), () => C.len, v => { C.len = v; }, true, true);
   swatches('net-rules', [{ id: false, label: 'Голые кулаки' }, { id: true, label: 'Спарринг: перчатки и шлем' }], () => C.spar, v => { C.spar = v; }, true, true);
+  swatches('net-weap', [{ id: false, label: 'Без оружия' }, { id: true, label: 'Кастеты разрешены' }], () => !!C.weap, v => { C.weap = v; }, true, true);   // issue 54: knuckle dusters — off by default
   const tip = () => { const M = NET_MODES.find(x => x.id === C.mode) || NET_MODES[0]; $('net-mode-tip').textContent = M.tip; $('net-rounds').parentElement.style.opacity = C.mode === 'ko' ? 0.4 : ''; };
   swatches('net-mode', NET_MODES.map(M => ({ id: M.id, label: M.label })), () => C.mode, v => { C.mode = v; tip(); }, true, true); tip();
 }
 function netCfgApply(C) {   // both sides, before the bout is set up
   if (!C) return;
-  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar, mode: NET_MODES.some(M => M.id === C.mode) ? C.mode : 'std' };
+  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar, mode: NET_MODES.some(M => M.id === C.mode) ? C.mode : 'std', weap: !!C.weap };
   ROUNDS = netRounds(NET.cfg); ROUND_LEN = NET.cfg.len;
   if (G.loc !== NET.cfg.loc) { G.loc = NET.cfg.loc; try { setLocation(G.loc); } catch (e) { console.error(e); } }
   for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);

@@ -6,7 +6,7 @@
 // (the items themselves — tops, bottoms, shoes, hats, glasses, belts — are the registry ITEMS in 04e_wardrobe.js)
 const GUARDS = [{ id: 'clear', c: '#d8e4ea', label: 'прозрачная' }, { id: 'black', c: '#141416', label: 'чёрная' }, { id: 'red', c: '#b3202c', label: 'красная' }, { id: 'blue', c: '#2f55b5', label: 'синяя' }, { id: 'gold', c: '#d8b25a', label: 'золотая' }];
 const GLOVES = [{ id: 'red', c: '#b3202c', trim: '#efeae0', label: 'красные' }, { id: 'black', c: '#17181c', trim: '#a9a9b2', label: 'чёрные' }, { id: 'blue', c: '#1f3f9a', trim: '#efeae0', label: 'синие' }, { id: 'white', c: '#e6e2d8', trim: '#1b1c20', label: 'белые' }];
-const HANDS = [{ id: 'wraps', label: 'бинты' }, { id: 'mma', label: 'MMA 4 oz' }];
+const HANDS = [{ id: 'wraps', label: 'бинты' }, { id: 'mma', label: 'MMA 4 oz' }, { id: 'knux', label: 'кастет' }];
 const GEAR = { ready: false };
 function fabricTex(kind) {
   return canvasTex(512, 512, (g, w, h) => {

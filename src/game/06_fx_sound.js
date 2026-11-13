@@ -209,6 +209,13 @@ const sfx = (() => {
       { const n = a.createBufferSource(), f = filt('lowpass', 780 + 420 * k, 0.9), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.018 + 0.012 * k, (0.22 + 0.26 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // muffled slap of leather on leather
       { const n = a.createBufferSource(), f = filt('lowpass', 380, 0.8), g = a.createGain(); n.buffer = noise; env(g, t, 0.002, 0.03 + 0.02 * k, (0.16 + 0.2 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.09); }   // the dull knock behind it
       const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(112 + 26 * k, t); o.frequency.exponentialRampToValueAtTime(52, t + 0.07); env(g2, t, 0.002, 0.06, (0.2 + 0.18 * k) * L); o.connect(g2).connect(out); o.start(t); o.stop(t + 0.09); },
+    /* a knuckle duster landing (issue 54): a bright metallic ring over the thud — a few inharmonic partials of a small
+       hard plate (brass, struck) + a short high tick of the impact. p = power 0.2…1.6, loud = 1 clean, less on a block */
+    knux(p, loud = 1) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.2, 1.6);
+      { const n = a.createBufferSource(), f = filt('bandpass', 5200 + 900 * rr(), 1.6), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.03, (0.1 + 0.08 * k) * loud); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.05); }   // the hard tick
+      const f0 = 1850 + rr() * 700; for (const [m, pk, len] of [[1, 0.14, 0.2], [2.38, 0.07, 0.12], [4.13, 0.035, 0.08]]) {   // the ring of the plate
+        const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(f0 * m, t); o.frequency.exponentialRampToValueAtTime(f0 * m * 0.985, t + len);
+        env(g, t, 0.001, len * (0.7 + rr() * 0.6), pk * loud * (0.4 + 0.7 * k)); o.connect(g).connect(bus); o.start(t); o.stop(t + len + 0.15); } },
     /* A clean body shot forces the air out of him (issue 44): a short breath — noise through a bandpass falling
        900 → 320 Hz, straight to master (no room echo: close to the mic), plus a faint chest thump. p = effective power. */
     exhale(p) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.2, 1.6);

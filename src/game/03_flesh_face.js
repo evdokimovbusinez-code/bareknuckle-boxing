@@ -109,7 +109,7 @@ class Flesh {
   down(out) { this.b2w(this.hi, this.M); this.Mi.copy(this.M).invert(); return out.set(0, -1, 0).transformDirection(this.Mi); }
   world(w, out) { return out.copy(w.p).applyMatrix4(this.M); }
   /* a punch landed: dent + wave, swelling, maybe a cut or a nose bleed; returns where blood sprays from */
-  onHit(cW, dirW, power, name, body, F) {
+  onHit(cW, dirW, power, name, body, F, att) {
     const i = body ? this.si : this.hi; this.b2w(i, this.M); this.Mi.copy(this.M).invert();
     const at = this.snap(body ? T.bodyV : T.headV, cW.clone().applyMatrix4(this.Mi)), db = dirW.clone().transformDirection(this.Mi);
     const w = clamp(power, 0.25, 1.5); this.dent(at.p, db, w); this.bruise(at.p, 0.22 * w);
@@ -137,7 +137,7 @@ class Flesh {
     if (l.z > 0 && l.y > -0.035) {
       const near = this.wounds.find(x => x.kind === 'cut' && x.p.distanceTo(at.p) < 0.02 * this.U);
       if (near) { near.sev = Math.min(1, near.sev + 0.25 * w); near.L *= 0.5; res.spray.push(near); }
-      else if (rr() < (0.05 + 0.25 * hurt * w + (P.type === 'hook' || P.type === 'over' ? 0.08 : 0)) * (pvp('blood') ? 3.5 : 1)) {   // «Кровавая бойня»: cuts ×3.5
+      else if (rr() < (0.05 + 0.25 * hurt * w + (P.type === 'hook' || P.type === 'over' ? 0.08 : 0)) * (pvp('blood') ? 3.5 : 1) * (att && knuxOn(att) ? KNUX.cut : 1)) {   // «Кровавая бойня»: cuts ×3.5; a knuckle duster ×2.5 (04i_knux.js)
         const tan = _f1.crossVectors(at.n, this.up).normalize().clone();
         const c = sparOn() ? null : this.wound('cut', at, 0.35 + 0.4 * rr() * w, tan, 0.012 + 0.012 * rr()); if (c) { res.spray.push(c); res.cut = true; }   // the headgear's padding: no cuts in sparring
       }

@@ -530,6 +530,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
             <div class="fld"><span>раунды</span><div class="sw" id="net-rounds"></div></div>
             <div class="fld"><span>время раунда</span><div class="sw" id="net-len"></div></div>
             <div class="fld"><span>правила</span><div class="sw" id="net-rules"></div></div>
+            <div class="fld"><span>оружие</span><div class="sw" id="net-weap"></div></div>
             <div class="fld"><span>режим · только PvP</span><div class="sw" id="net-mode"></div><small class="net-tip" id="net-mode-tip"></small></div>
           </div>
         </div>
@@ -2134,7 +2135,7 @@ const NET = {
   role: null, host: false, guest: false, started: false, closing: false,
   peer: null, conn: null, loading: null, code: '', link: '', nm: '',
   saved: null, over: null,
-  cfg: { loc: 'gym', rounds: 3, len: 120, spar: false, mode: 'std' },   // the host's match settings (room screen), sent in hello
+  cfg: { loc: 'gym', rounds: 3, len: 120, spar: false, mode: 'std', weap: false },   // the host's match settings (room screen), sent in hello; weap = knuckle dusters allowed
   rate: 1 / 30, buf: 0.10, acc: 0, pingAcc: 0, ping: 0, silent: 0, silenceMax: 1.5,
   snaps: [], evs: [], pops: [], playT: 0, first: true,
   mv: { x: 0, y: 0, b: false }, blk: false, q: [], iq: [], evI: 0, pop: [],
@@ -3191,7 +3192,7 @@ class Flesh {
   down(out) { this.b2w(this.hi, this.M); this.Mi.copy(this.M).invert(); return out.set(0, -1, 0).transformDirection(this.Mi); }
   world(w, out) { return out.copy(w.p).applyMatrix4(this.M); }
   /* a punch landed: dent + wave, swelling, maybe a cut or a nose bleed; returns where blood sprays from */
-  onHit(cW, dirW, power, name, body, F) {
+  onHit(cW, dirW, power, name, body, F, att) {
     const i = body ? this.si : this.hi; this.b2w(i, this.M); this.Mi.copy(this.M).invert();
     const at = this.snap(body ? T.bodyV : T.headV, cW.clone().applyMatrix4(this.Mi)), db = dirW.clone().transformDirection(this.Mi);
     const w = clamp(power, 0.25, 1.5); this.dent(at.p, db, w); this.bruise(at.p, 0.22 * w);
@@ -3219,7 +3220,7 @@ class Flesh {
     if (l.z > 0 && l.y > -0.035) {
       const near = this.wounds.find(x => x.kind === 'cut' && x.p.distanceTo(at.p) < 0.02 * this.U);
       if (near) { near.sev = Math.min(1, near.sev + 0.25 * w); near.L *= 0.5; res.spray.push(near); }
-      else if (rr() < (0.05 + 0.25 * hurt * w + (P.type === 'hook' || P.type === 'over' ? 0.08 : 0)) * (pvp('blood') ? 3.5 : 1)) {   // «Кровавая бойня»: cuts ×3.5
+      else if (rr() < (0.05 + 0.25 * hurt * w + (P.type === 'hook' || P.type === 'over' ? 0.08 : 0)) * (pvp('blood') ? 3.5 : 1) * (att && knuxOn(att) ? KNUX.cut : 1)) {   // «Кровавая бойня»: cuts ×3.5; a knuckle duster ×2.5 (04i_knux.js)
         const tan = _f1.crossVectors(at.n, this.up).normalize().clone();
         const c = sparOn() ? null : this.wound('cut', at, 0.35 + 0.4 * rr() * w, tan, 0.012 + 0.012 * rr()); if (c) { res.spray.push(c); res.cut = true; }   // the headgear's padding: no cuts in sparring
       }
@@ -3566,7 +3567,7 @@ function faceWeights(W, X, f) {
 // (the items themselves — tops, bottoms, shoes, hats, glasses, belts — are the registry ITEMS in 04e_wardrobe.js)
 const GUARDS = [{ id: 'clear', c: '#d8e4ea', label: 'прозрачная' }, { id: 'black', c: '#141416', label: 'чёрная' }, { id: 'red', c: '#b3202c', label: 'красная' }, { id: 'blue', c: '#2f55b5', label: 'синяя' }, { id: 'gold', c: '#d8b25a', label: 'золотая' }];
 const GLOVES = [{ id: 'red', c: '#b3202c', trim: '#efeae0', label: 'красные' }, { id: 'black', c: '#17181c', trim: '#a9a9b2', label: 'чёрные' }, { id: 'blue', c: '#1f3f9a', trim: '#efeae0', label: 'синие' }, { id: 'white', c: '#e6e2d8', trim: '#1b1c20', label: 'белые' }];
-const HANDS = [{ id: 'wraps', label: 'бинты' }, { id: 'mma', label: 'MMA 4 oz' }];
+const HANDS = [{ id: 'wraps', label: 'бинты' }, { id: 'mma', label: 'MMA 4 oz' }, { id: 'knux', label: 'кастет' }];
 const GEAR = { ready: false };
 function fabricTex(kind) {
   return canvasTex(512, 512, (g, w, h) => {
@@ -4214,6 +4215,7 @@ const ITEMS = {
   wraps: { cat: 'hands', label: 'бинты', model: {}, colors: ['white', 'black', 'red', 'blue', 'gold'], price: 0, tags: ['ring', 'basic'] },
   mma: { cat: 'hands', label: 'MMA 4 oz', model: {}, colors: ['red', 'black', 'blue', 'white'], price: 600, tags: ['ring'], brand: 'IRON JAW' },
   box16: { cat: 'hands', label: 'спарринговые 16 oz', model: {}, colors: ['red', 'black', 'blue', 'white'], price: 0, noShop: 1, tags: ['ring'], brand: '16OZ' },
+  knux: { cat: 'hands', label: 'кастет', model: {}, colors: ['black'], price: 1200, tags: ['street'], brand: 'BLACKOUT SUPPLY' },
   guard: { cat: 'guard', label: 'капа', model: {}, colors: ['clear', 'black', 'red', 'blue', 'gold'], price: 0, noShop: 1, tags: ['ring'], brand: 'LOW BLOW' },
 };
 for (const k in ITEMS) ITEMS[k].id = k;
@@ -5618,6 +5620,63 @@ function tatApply(F, L) {
     m.userData.uTatR.value.set(tl[0] / TAT_W, 1 - (tl[1] + tl[3]) / TAT_H, tl[2] / TAT_W, tl[3] / TAT_H); m.userData.uTatB.value.set(bx[0], bx[1], 1 / (bx[2] - bx[0]), 1 / (bx[3] - bx[1]));
   }
 }
+/* ───────── knuckle duster (brass knuckles) — issue 54 ─────────
+   One piece of metal on each hand: four rings around the first phalanges (index…pinky), a bridge between every pair of rings,
+   and a transverse bar the palm presses on (you grip it in the fist). All geometry is built from the hand itself in the body's
+   bind space (cm × HF.u, the same frames as the MMA pads in 04c_mma_pads.js), and every part rides rigidly on one bone
+   (ring + its bridge halves on the finger's first phalanx, the grip bar on the hand bone) — so the duster follows the fingers
+   in the stance, on a punch, in the block and in the knockout ragdoll exactly like the pads do.
+   Underneath the rings the hand wraps stay on (look.hands = 'knux' keeps the wrap mesh). */
+const KNUX = { dmg: 1.4, cut: 2.5, brk: 15 };   // × damage, × cut chance, + stamina points on the guard-break threshold
+// weapons are only allowed in a friendly match if the host switched the rule on (NET.cfg.weap, «Оружие» in the room)
+function knuxAllowed() { return G.mode !== 'net' || !!NET.cfg.weap; }
+function knuxOn(F) { const L = F && F.gear && F.gear.look; return !!L && L.hands === 'knux' && knuxAllowed(); }
+const knuxMat = () => GEAR.knuxMat || (GEAR.knuxMat = new THREE.MeshStandardMaterial({ color: '#b8913f', roughness: 0.3, metalness: 1, envMapIntensity: 1.1 }));
+// rings of one hand, in the bind space: [{ bn, geo }] — measured from the hand's own skin, like mmaPadGeo does
+function knuxGeo(F, S) {
+  GEAR.knux = GEAR.knux || {}; if (GEAR.knux[S]) return GEAR.knux[S];
+  const f = GEAR.HF[S], u = f.u, gh = GEAR.gh, gv = GEAR.gv, dom = GEAR.dom, names = GEAR.names, pos = F.body.geometry.attributes.position, n = pos.count;
+  const hx = p => q.copy(p).sub(f.H).dot(f.X) / u, hy = p => q.copy(p).sub(f.H).dot(f.Y) / u, bp = nm => GEAR.bpos(S + '_' + nm);
+  const q = new V3(), nr = new V3(), TAU = Math.PI * 2, out = [];
+  // one ring per finger: an elliptical hoop around the middle of the first phalanx, sized from that bone's own skin
+  const RING = ['Index', 'Mid', 'Ring', 'Pinky'], rings = [];
+  for (const fn of RING) {
+    const P1 = bp(fn + '1'), Ax = bp(fn + '2').sub(P1), L = Ax.length() / u; Ax.normalize();
+    const Bk = f.Z.clone().negate(); Bk.addScaledVector(Ax, -Bk.dot(Ax)).normalize(); const Sd = new V3().crossVectors(Ax, Bk);
+    let hb = 0, w = 0, c = 0; const bi = names.indexOf('CC_Base_' + S + '_' + fn + '1');
+    for (let i = 0; i < n; i++) { if (dom[i] !== bi) continue; q.fromBufferAttribute(pos, i).sub(P1); const al = q.dot(Ax) / u; if (al < 0.3 * L || al > 0.8 * L) continue; hb = Math.max(hb, q.dot(Bk) / u); w = Math.max(w, Math.abs(q.dot(Sd)) / u); c++; }
+    if (!c) { hb = 0.9; w = 0.9; }
+    const rx = w + 0.34, ry = hb + 0.34, t = 0.38, C = P1.clone().addScaledVector(Ax, 0.5 * L * u);   // the hoop sits mid-phalanx, its bar sunk into the wraps
+    out.push({ bn: fn + '1', geo: gridGeo((s, v, p) => { const a = s * TAU, b = v * TAU;   // around the finger (a) and around the bar (b)
+      nr.set(Sd.x * Math.cos(a) / rx + Bk.x * Math.sin(a) / ry, Sd.y * Math.cos(a) / rx + Bk.y * Math.sin(a) / ry, Sd.z * Math.cos(a) / rx + Bk.z * Math.sin(a) / ry).normalize();
+      return p.copy(C).addScaledVector(Sd, rx * Math.cos(a) * u).addScaledVector(Bk, ry * Math.sin(a) * u).addScaledVector(nr, t * Math.cos(b) * u).addScaledVector(Ax, t * Math.sin(b) * u); }, 24, 12, { c: C }) });
+    rings.push({ fn, C, Bk, rx, ry, t, Sd, Ax });
+  }
+  // the bridge: a half-bar from each ring towards its neighbour, each half riding on its own finger (the two halves meet over the gap)
+  for (let i = 0; i < 3; i++) for (const [A, B] of [[rings[i], rings[i + 1]], [rings[i + 1], rings[i]]]) {
+    const pts = [new V3().copy(A.C).addScaledVector(A.Bk, (A.ry - A.t) * u),   // anchored inside the ring's own tube
+      new V3().lerpVectors(A.C, B.C, 0.5).addScaledVector(A.Bk, (Math.min(A.ry, B.ry) - 0.12) * u)];   // low between the knuckles, not floating
+    out.push({ bn: A.fn + '1', geo: pipeGeo(pts, 0.32 * u) });
+  }
+  // the grip bar: a transverse capsule across the palm below the knuckles, on the hand bone (the fist closes around it)
+  const x0 = Math.min(...rings.map(r => hx(r.C))) - 0.35, x1 = Math.max(...rings.map(r => hx(r.C))) + 0.35;
+  const yBar = Math.min(...rings.map(r => hy(r.C))) - 2.1;
+  let zP = -9; const hiB = names.indexOf('CC_Base_' + S + '_Hand');
+  for (let i = 0; i < n; i++) { if (dom[i] !== hiB || gh[i * 3 + 1] !== 4 || gv[i * 4 + 2] !== 0) continue;   // hand-bone skin only
+    const x = gv[i * 4 + 3], y = gv[i * 4]; if (y < yBar - 1.1 || y > yBar + 1.1 || x < x0 - 0.5 || x > x1 + 0.5 || gv[i * 4 + 1] > -0.6) continue;
+    zP = Math.max(zP, q.fromBufferAttribute(pos, i).sub(f.H).dot(f.Z) / u); }
+  if (zP < -8) zP = 1.6;
+  const R = 0.52, zBar = zP + R - 0.08, C = f.H.clone().addScaledVector(f.X, (x0 + x1) / 2 * u).addScaledVector(f.Y, yBar * u).addScaledVector(f.Z, zBar * u);
+  out.push({ bn: 'Hand', geo: gridGeo((s, v, p) => { const a = s * TAU, k = Math.abs(2 * v - 1) < 0.72 ? 1 : Math.sqrt(Math.max(0, 1 - ((Math.abs(2 * v - 1) - 0.72) / 0.28) ** 2));   // rounded ends
+    return p.copy(C).addScaledVector(f.X, ((x1 - x0) / 2) * (2 * v - 1) * u).addScaledVector(f.Y, R * k * Math.cos(a) * u).addScaledVector(f.Z, R * k * Math.sin(a) * u); }, 16, 12, { c: C }) });
+  return GEAR.knux[S] = out;
+}
+function knuxMesh(F, mat) {   // rigid on the bones, exactly like mmaPads: world = bone.matrixWorld × (bone inverse × bind matrix)
+  const sk = F.body.skeleton, list = [];
+  for (const S of ['L', 'R']) for (const pd of knuxGeo(F, S)) { const b = F.bones['CC_Base_' + S + '_' + pd.bn], m = new THREE.Mesh(pd.geo, mat);
+    m.matrixAutoUpdate = false; m.castShadow = m.receiveShadow = true; scene.add(m); list.push({ m, b, rel: new M4().multiplyMatrices(sk.boneInverses[sk.bones.indexOf(b)], F.body.bindMatrix) }); }
+  return list;
+}
 /* ───────── fighter ───────── */
 // scratch for the per-frame fighter code (walk, ik, pose, plantFeet, armClear): nothing there allocates
 const _walkQ = [], _ik1 = new Quat(), _ik2 = new Quat(), _ik3 = new Quat(), _po1 = new V3(), _po2 = new V3(), _po3 = new V3(), _po4 = new V3(), _poq1 = new Quat(), _poq2 = new Quat();
@@ -5988,14 +6047,16 @@ class Fighter {
   sparGear(on) { this.gear.spar = on; this.handGear(); }   // sparring: 16 oz gloves and headgear, always
   // what is on the hands and head: sparring → boxing gloves + headgear; otherwise wraps or 4 oz MMA gloves (look.hands)
   handGear() {
-    const G2 = this.gear, L = G2.look || {}, box = G2.spar, mma = !box && L.hands === 'mma', mine = LOOK.gloves || 'red';
+    const G2 = this.gear, L = G2.look || {}, box = G2.spar, mma = !box && L.hands === 'mma', kn = !box && L.hands === 'knux' && knuxAllowed(), mine = LOOK.gloves || 'red';
     const gc = GLOVES.find(x => x.id === (this.isPlayer ? mine : L.gloves || (mine === 'blue' ? 'red' : 'blue'))) || GLOVES[0];   // the opponent never wears the player's colour
     if ((box || mma) && !G2.mat) { G2.mat = leatherMat(gc.c); G2.trim = new THREE.MeshPhysicalMaterial({ color: gc.trim, roughness: 0.6 }); }
     if (box && !G2.gloves) { G2.gloves = ['L', 'R'].map(S => gloveMesh(this, S, G2.mat, G2.trim)); G2.hg = headgearMesh(this, G2.mat, G2.trim); }
     if (mma && !G2.mma) { G2.mma = mmaShell(this, G2.mat); G2.mmaPads = mmaPads(this, G2.mat); }
+    if (kn && !G2.knux) G2.knux = knuxMesh(this, knuxMat());   // brass knuckles over the wraps (04i_knux.js)
     if (G2.mat) { G2.mat.color.set(gc.c); G2.trim.color.set(gc.trim); }
     if (G2.gloves) { for (const gl of G2.gloves) gl.g.visible = box; G2.hg.visible = box; }
     if (G2.mma) { G2.mma.visible = mma; G2.mma.material.color.set(gc.c); for (const pd of G2.mmaPads) pd.m.visible = mma; }
+    if (G2.knux) for (const pd of G2.knux) pd.m.visible = kn;
     this.flesh.u.uGlv.value = box ? 1 : mma ? 2 : 0;   // the hand inside a boxing glove / the skin under an MMA glove is not drawn
     this.wrapMesh.visible = !box && !mma; for (const t of this.tails) t.mesh.visible = !box && !mma;
     hairVis(this);   // long hair is tucked under the headgear, the short layer shows through the open crown
@@ -6540,7 +6601,8 @@ class Fighter {
     { const G2 = this.gear, hf = _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInvT); G2.guard.matrix.copy(hf); G2.guard.matrixWorldNeedsUpdate = true; wearPose(this, hf);
       if (G2.spar && G2.gloves) { G2.hg.matrix.copy(hf); G2.hg.matrixWorldNeedsUpdate = true; for (const gl of G2.gloves) { gl.g.matrix.multiplyMatrices(gl.h.matrixWorld, gl.rel); gl.g.matrixWorldNeedsUpdate = true; } }
       if (G2.pants) pantsTick(this, G2.pants, 1 / 60); if (G2.top) topTick(this, G2.top, 1 / 60);
-      if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
+      if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; }
+      if (G2.knux && G2.knux[0].m.visible) for (const pd of G2.knux) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
   }
   capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; arr.set(this.flesh.u.uFW.value, 4 * n + 5); }   // + the face shape weights
   restore(a, b2, t) {
@@ -6807,6 +6869,13 @@ const sfx = (() => {
       { const n = a.createBufferSource(), f = filt('lowpass', 780 + 420 * k, 0.9), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.018 + 0.012 * k, (0.22 + 0.26 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // muffled slap of leather on leather
       { const n = a.createBufferSource(), f = filt('lowpass', 380, 0.8), g = a.createGain(); n.buffer = noise; env(g, t, 0.002, 0.03 + 0.02 * k, (0.16 + 0.2 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.09); }   // the dull knock behind it
       const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(112 + 26 * k, t); o.frequency.exponentialRampToValueAtTime(52, t + 0.07); env(g2, t, 0.002, 0.06, (0.2 + 0.18 * k) * L); o.connect(g2).connect(out); o.start(t); o.stop(t + 0.09); },
+    /* a knuckle duster landing (issue 54): a bright metallic ring over the thud — a few inharmonic partials of a small
+       hard plate (brass, struck) + a short high tick of the impact. p = power 0.2…1.6, loud = 1 clean, less on a block */
+    knux(p, loud = 1) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.2, 1.6);
+      { const n = a.createBufferSource(), f = filt('bandpass', 5200 + 900 * rr(), 1.6), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.03, (0.1 + 0.08 * k) * loud); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.05); }   // the hard tick
+      const f0 = 1850 + rr() * 700; for (const [m, pk, len] of [[1, 0.14, 0.2], [2.38, 0.07, 0.12], [4.13, 0.035, 0.08]]) {   // the ring of the plate
+        const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(f0 * m, t); o.frequency.exponentialRampToValueAtTime(f0 * m * 0.985, t + len);
+        env(g, t, 0.001, len * (0.7 + rr() * 0.6), pk * loud * (0.4 + 0.7 * k)); o.connect(g).connect(bus); o.start(t); o.stop(t + len + 0.15); } },
     /* A clean body shot forces the air out of him (issue 44): a short breath — noise through a bandpass falling
        900 → 320 Hz, straight to master (no room echo: close to the mic), plus a faint chest thump. p = effective power. */
     exhale(p) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.2, 1.6);
@@ -7304,7 +7373,7 @@ function followHit(att, name, contact) {
   const R = def.rag, qi = _qa.copy(def.group.quaternion).invert(), pl = def.group.worldToLocal(pos.clone());
   for (const [k, J] of [['head', 9 + 9 * power], ['neck', 3 * power], ['chest', 2 * power]]) { const d = R.by[k]; if (!d || !d.body || !d.body.invMass) continue;
     const b = d.body, Jl = _v2.copy(dir).applyQuaternion(qi).multiplyScalar(J), r = _v3.set(pl.x - b.position.x, pl.y - b.position.y, pl.z - b.position.z).multiplyScalar(k === 'head' ? 1 : 0); b.applyImpulse(Jl, r); }
-  const fr = def.flesh.onHit(pos, dir, power, name, false, def), ev = { t: G.t, pos: fr.skin, dir, power, who: def === P1 ? 0 : 1, dent: fr.dent };
+  const fr = def.flesh.onHit(pos, dir, power, name, false, def, att), ev = { t: G.t, pos: fr.skin, dir, power, who: def === P1 ? 0 : 1, dent: fr.dent };
   const sp = def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.06 * def.flesh.U); if (sp.length || fr.spray.length) { const s2 = fr.spray.length ? fr.spray : sp; def.flesh.spray(s2, dir, power, def); ev.spray = s2.map(w => def.flesh.wounds.indexOf(w)); }
   def.face.hit && def.face.hit(power, true, fr.skin); FX.spawn(fr.skin, dir, power); { const bl = Math.min(1, def.flesh.wounds.reduce((a, x) => a + x.sev, 0) * 0.8); if (bl > 0.12) { FX.mist(fr.skin, dir, power, bl); ev.mist = bl; } } REC.events.push(ev);
   if (att.fs) { att.fs.land++; att.fs.dmg += P.dmg * DMG_K; } if (G.state === 'kd') { def.hp = Math.max(0, def.hp - P.dmg * DMG_K); G.kd.up += 0.8; }
@@ -7323,7 +7392,8 @@ function resolveHit(att, name, contact) {
     if (def === P1) { G.slow = 0.4; G.slowT = 0.3; }
     return;
   }
-  let dmg = P.dmg * (att.dmgMul || 1) * (1 + 0.06 * SK(att, 'pow')) * (att.sig && sigOf(name) === att.sig ? 1.12 : 1) * (1 - 0.05 * SK(def, 'chin')); const counter = att.counterUntil > G.t; if (counter) { dmg *= 1.5; att.counterUntil = 0; }
+  const kn = knuxOn(att);   // brass knuckles (04i_knux.js): heavier shots, more cuts, a softer guard — only when the weapon is worn and allowed
+  let dmg = P.dmg * (att.dmgMul || 1) * (1 + 0.06 * SK(att, 'pow')) * (att.sig && sigOf(name) === att.sig ? 1.12 : 1) * (1 - 0.05 * SK(def, 'chin')) * (kn ? KNUX.dmg : 1); const counter = att.counterUntil > G.t; if (counter) { dmg *= 1.5; att.counterUntil = 0; }
   // walking onto a punch: the target's own momentum adds to the impact (a man hit while throwing is hit hardest)
   const caught = def.cur && !def.resolved && !(def.blockW > 0.55); if (caught) dmg *= 1.25;
   if (att.adv > 0.04) dmg *= 1.08;   // stepping in behind it
@@ -7333,9 +7403,9 @@ function resolveHit(att, name, contact) {
   const blocked = def.blockW > 0.55 && (!def.cur || def.dodge) && !guardBroken;
   // The raw force of the shot before the guard eats it: it drives the recoil, the breath it costs, the nod and the break.
   // `power` below is computed from the reduced damage, so without this every block would read as the same light jab.
-  const bforce = clamp(P.dmg / 18 * (att.punchK ?? 1) * (att.dmgMul || 1) * (counter ? 1.5 : 1), 0.25, 1.6);
+  const bforce = clamp(P.dmg / 18 * (att.punchK ?? 1) * (att.dmgMul || 1) * (counter ? 1.5 : 1) * (kn ? KNUX.dmg : 1), 0.25, 1.6);
   const isPow = !!att.heavy, isHook = P.type === 'hook';
-  const breakIt = blocked && def.stamina < BLK.breakSta && (isPow || isHook);
+  const breakIt = blocked && def.stamina < BLK.breakSta + (kn ? KNUX.brk : 0) && (isPow || isHook);
   const sag = blocked ? blkSag(def) : 0;   // < 20 % stamina: gloves at the chin, up to ×2 damage leaks through
   if (blocked) {
     dmg *= (body ? 0.6 : P.type === 'upper' ? 0.55 : 0.18) * (1 + sag);   // was a flat ×0.18 / ×0.55 / ×0.6
@@ -7399,7 +7469,7 @@ function resolveHit(att, name, contact) {
   const ev = { t: G.t, pos, dir, power, who: def === P1 ? 0 : 1, blocked };
   if (!blocked && !body) wearHit(def, pos, dir, power);   // hats fly off, glasses crack (04e_wardrobe.js)
   if (!blocked) {
-    const fr = def.flesh.onHit(pos, dir, power, name, body, def); ev.dent = fr.dent; ev.pos = pos = fr.skin;
+    const fr = def.flesh.onHit(pos, dir, power, name, body, def, att); ev.dent = fr.dent; ev.pos = pos = fr.skin;
     // blood comes out of the wounds (an old cut reopens, the nose runs) — never out of thin air
     const sp = blood || fr.cut || fr.nose ? fr.spray.length ? fr.spray : def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.05 * def.flesh.U) : [];
     if (sp.length) { def.flesh.spray(sp, dir, power, def); ev.spray = sp.map(w => def.flesh.wounds.indexOf(w)); }
@@ -7422,6 +7492,7 @@ function resolveHit(att, name, contact) {
   if (!blocked && power > 1.05 && G.slowT <= 0.02) { G.slow = 0.6; G.slowT = 0.06; }
   G.shake = Math.max(G.shake, 0.012 + 0.03 * power + (breakIt ? 0.02 : 0));
   if (blocked) sfx.block(bforce, breakIt ? 1.8 : 1); else sfx.thud(power, body);   // dull/short on gloves, louder on a break
+  if (kn) sfx.knux(power, blocked ? 0.55 : 1);   // the metal ring on top of the thud / the block
   EVT.emit('hit', { pos, power, blocked });
   popup(pos, String(Math.round(dmg)), counter ? 'crit' : 'hit');
   // feel it: the screen edge flushes red when you are hit, the phone kicks on what you land and harder on what you take
@@ -7686,7 +7757,7 @@ const itemTag = it => itemOwned(it.id) ? (it.price ? 'есть' : 'базово�
 // whatever is worn but not owned (after a reset, or a try-on that was left) goes back to the defaults
 function wearSanitize(L = LOOK) {
   for (const c of WCATS) { const s = wearGet(L, c); if (s.id !== 'none' && !itemOwned(s.id)) L[c] = c === 'bottom' ? { id: 'shorts', color: 'red' } : { id: 'none' }; }
-  if (L.hands === 'mma' && !itemOwned('mma')) L.hands = 'wraps';
+  if ((L.hands === 'mma' || L.hands === 'knux') && !itemOwned(L.hands)) L.hands = 'wraps';
 }
 // an older save: everything chosen so far stays available, and the wins already won are paid back a little
 if (!PROF.eco) {
@@ -7826,7 +7897,7 @@ function rollOpponent() {
 const BAG = { on: false, score: 0, hits: 0, combo: 0, best: 0, lastT: -9, mass: 40, x: null };   // the bag itself — model, chains, physics — is in 09a_bag_rig.js
 function showP2(v) { if (!P2) return; P2.group.visible = v; for (const o of P2.sceneObjs || []) o.visible = v;
   if (v) { P2.handGear(); if (P2.gear.look) P2.dress(P2.gear.look); P2.sparGear(!!P2.gear.spar); }   // re-apply what the outfit hides (trunks under trousers, hair under the headgear)
-  else { const g = P2.gear; if (g.gloves) { for (const gl of g.gloves) gl.g.visible = false; g.hg.visible = false; } if (g.mma) { g.mma.visible = false; for (const pd of g.mmaPads) pd.m.visible = false; } } }   // (his gear decides what of the wraps / hair shows)
+  else { const g = P2.gear; if (g.gloves) { for (const gl of g.gloves) gl.g.visible = false; g.hg.visible = false; } if (g.mma) { g.mma.visible = false; for (const pd of g.mmaPads) pd.m.visible = false; } if (g.knux) for (const pd of g.knux) pd.m.visible = false; } }   // (his gear decides what of the wraps / hair shows)
 function startBag() {
   G.mode = 'bag'; if (G.diff !== G.userDiff && G.userDiff) G.diff = G.userDiff;
   startFight(true); BAG.on = true; showP2(false); BAG.g.visible = true;
@@ -12687,12 +12758,13 @@ function netCfgUI() {
   swatches('net-rounds', [1, 3, 5].map(n => ({ id: n, label: String(n) })), () => C.rounds, v => { C.rounds = v; }, true, true);
   swatches('net-len', [[60, '1 мин'], [120, '2 мин'], [180, '3 мин']].map(([id, label]) => ({ id, label })), () => C.len, v => { C.len = v; }, true, true);
   swatches('net-rules', [{ id: false, label: 'Голые кулаки' }, { id: true, label: 'Спарринг: перчатки и шлем' }], () => C.spar, v => { C.spar = v; }, true, true);
+  swatches('net-weap', [{ id: false, label: 'Без оружия' }, { id: true, label: 'Кастеты разрешены' }], () => !!C.weap, v => { C.weap = v; }, true, true);   // issue 54: knuckle dusters — off by default
   const tip = () => { const M = NET_MODES.find(x => x.id === C.mode) || NET_MODES[0]; $('net-mode-tip').textContent = M.tip; $('net-rounds').parentElement.style.opacity = C.mode === 'ko' ? 0.4 : ''; };
   swatches('net-mode', NET_MODES.map(M => ({ id: M.id, label: M.label })), () => C.mode, v => { C.mode = v; tip(); }, true, true); tip();
 }
 function netCfgApply(C) {   // both sides, before the bout is set up
   if (!C) return;
-  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar, mode: NET_MODES.some(M => M.id === C.mode) ? C.mode : 'std' };
+  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar, mode: NET_MODES.some(M => M.id === C.mode) ? C.mode : 'std', weap: !!C.weap };
   ROUNDS = netRounds(NET.cfg); ROUND_LEN = NET.cfg.len;
   if (G.loc !== NET.cfg.loc) { G.loc = NET.cfg.loc; try { setLocation(G.loc); } catch (e) { console.error(e); } }
   for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
