@@ -14,4 +14,7 @@ echo "== 2/3 выкройка футболки =="
 python3 "$HERE/pattern.py"
 echo "== 3/3 раскладка деталей вокруг тела =="
 python3 "$HERE/place.py"
+
+echo "== брюки: выкройка + раскладка =="
+python3 "$HERE/pants.py"
 echo "== готово: данные в out/, превью в preview/ =="
