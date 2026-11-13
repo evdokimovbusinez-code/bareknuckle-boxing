@@ -82,7 +82,7 @@ function netRoomUI(code) {
   $('net-wait').textContent = NET.host ? 'Ждём соперника…' : 'Подключаемся…';
   show('net-cfg', NET.host); if (NET.host) netCfgUI();
 }
-/* the host's match settings: place, rounds, round length, rules (bare knuckle / sparring gloves + headgear); the guest gets them in hello */
+/* the host's match settings: place, rounds, round length, rules (bare knuckle / sparring gloves + headgear), weapons (issue 52); the guest gets them in hello */
 function netRounds(C) { return C.mode === 'ko' ? 99 : C.rounds; }   // «До нокаута»: no judges, the rounds just keep coming
 /* your own stance (kept in LOOK, so it goes over in hello and stays for the creator / quick fights) */
 function netStanceUI() {
@@ -100,12 +100,13 @@ function netCfgUI() {
   swatches('net-rounds', [1, 3, 5].map(n => ({ id: n, label: String(n) })), () => C.rounds, v => { C.rounds = v; }, true, true);
   swatches('net-len', [[60, '1 мин'], [120, '2 мин'], [180, '3 мин']].map(([id, label]) => ({ id, label })), () => C.len, v => { C.len = v; }, true, true);
   swatches('net-rules', [{ id: false, label: 'Голые кулаки' }, { id: true, label: 'Спарринг: перчатки и шлем' }], () => C.spar, v => { C.spar = v; }, true, true);
+  swatches('net-weap', [{ id: false, label: 'Без оружия' }, { id: true, label: 'Кастеты разрешены' }], () => C.weap, v => { C.weap = v; }, true, true);   // issue 52
   const tip = () => { const M = NET_MODES.find(x => x.id === C.mode) || NET_MODES[0]; $('net-mode-tip').textContent = M.tip; $('net-rounds').parentElement.style.opacity = C.mode === 'ko' ? 0.4 : ''; };
   swatches('net-mode', NET_MODES.map(M => ({ id: M.id, label: M.label })), () => C.mode, v => { C.mode = v; tip(); }, true, true); tip();
 }
 function netCfgApply(C) {   // both sides, before the bout is set up
   if (!C) return;
-  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar, mode: NET_MODES.some(M => M.id === C.mode) ? C.mode : 'std' };
+  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar, mode: NET_MODES.some(M => M.id === C.mode) ? C.mode : 'std', weap: !!C.weap };   // issue 52: the host's weapon rule
   ROUNDS = netRounds(NET.cfg); ROUND_LEN = NET.cfg.len;
   if (G.loc !== NET.cfg.loc) { G.loc = NET.cfg.loc; try { setLocation(G.loc); } catch (e) { console.error(e); } }
   for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
@@ -292,6 +293,7 @@ function netEv(e) {
   if (e.pos) o.s = [r3(e.pos.x), r3(e.pos.y), r3(e.pos.z)]; else o.s = [0, 0, 0];
   if (e.dir) o.d = [r3(e.dir.x), r3(e.dir.y), r3(e.dir.z)]; else o.d = [0, 0, 1];
   if (e.mist) o.m = r3(e.mist);
+  if (e.knux) o.k = 1;   // issue 52: the guest plays the metallic ring too
   return o;
 }
 function netCapturePopup(pos, text, cls) {
@@ -389,6 +391,7 @@ function netPlayEvent(e) {
   FX.spawn(pos, dir, e.b ? e.p * 0.4 : e.p);
   if (e.m) FX.mist(pos, dir, e.p, e.m);
   if (e.b) sfx.block(clamp(e.p * 2, 0.3, 1.4)); else sfx.thud(e.p * 0.7);
+  if (e.k) sfx.knux(e.p * 0.7, !!e.b);
   G.shake = Math.max(G.shake, 0.01 + 0.02 * e.p);
   EVT.emit('hit', { pos, power: e.p, blocked: !!e.b });
   const hb = $(e.w ? 'hpb2' : 'hpb1'); if (hb) { hb.classList.remove('hit'); void hb.offsetWidth; hb.classList.add('hit'); }
@@ -510,7 +513,7 @@ function netClose() {
   NET.conn = null; NET.dropT = 0; NET.closing = true; NET.roomShown = false;
   show('net-drop', false); $('net-ping').hidden = true; $('net-ping').textContent = '';
   if (NET.saved) {
-    G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; ROUND_LEN = NET.saved.len || 120; NET.cfg.spar = false; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
+    G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; ROUND_LEN = NET.saved.len || 120; NET.cfg.spar = false; NET.cfg.weap = false; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
     NET.saved = null; try { setLocation(G.loc); } catch (e) {}
   }
   try { if (NET.peer && !NET.peer.destroyed) NET.peer.destroy(); } catch (e) {}
