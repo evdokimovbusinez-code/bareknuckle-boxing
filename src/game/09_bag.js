@@ -31,11 +31,13 @@ function bagHit(att, name, contact) {
 }
 function bagEnd() {
   G.state = 'result'; G.winner = P1; G.loser = P2; BAG.on = true; sfx.bell(3); $('pad').hidden = true; Q.length = 0;
-  const rec = BAG.score > G.bagBest; if (rec) G.bagBest = BAG.score; const bp = (BAG.score >= 400 ? 1 : 0) + (BAG.score >= 800 ? 1 : 0); PROF.pts += bp; save();
+  const rec = BAG.score > G.bagBest; if (rec) G.bagBest = BAG.score; const bp = (BAG.score >= 400 ? 1 : 0) + (BAG.score >= 800 ? 1 : 0); PROF.pts += bp;
+  const aw = trainAward('bag', trainBagGrade(BAG.score), BAG.score);   // stat XP for the bag (09e_train.js): сила; the same once-a-day rule as the other drills
+  save();
   $('r-stats').innerHTML = ''; payShow(null);
   $('r-title').textContent = rec ? 'Рекорд!' : 'Время'; $('r-title').className = 'rt win';
   $('r-sub').textContent = `очки ${BAG.score} · попаданий ${BAG.hits} · лучшая серия ×${BAG.best} · рекорд ${G.bagBest}`;
-  $('r-car').textContent = (BAG.score >= 900 ? 'Готов к титулу' : BAG.score >= 600 ? 'Боевая форма' : BAG.score >= 350 ? 'Неплохо — добавь серий' : 'Разминка') + (bp ? ` · +${bp} ${bp === 1 ? 'очко' : 'очка'} бойцу` : ' · 400+ очков дают очко бойцу');
+  $('r-car').textContent = (BAG.score >= 900 ? 'Готов к титулу' : BAG.score >= 600 ? 'Боевая форма' : BAG.score >= 350 ? 'Неплохо — добавь серий' : 'Разминка') + (bp ? ` · +${bp} ${bp === 1 ? 'очко' : 'очка'} бойцу` : ' · 400+ очков дают очко бойцу') + ' · ' + trainRewardLine(aw);
   $('r-again').textContent = 'Ещё раз'; $('r-replay').hidden = true; $('result').hidden = false;
 }
 function updateMenu() {

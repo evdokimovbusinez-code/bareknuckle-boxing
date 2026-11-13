@@ -208,7 +208,7 @@ function trainHud() {
     $('tr-ring-i').style.transform = 'scale(' + (0.3 + 0.7 * k).toFixed(3) + ')';
     ring.classList.toggle('hot', Math.abs(until) <= (b.win || T.window));
     ring.classList.add('on');
-    $('tr-glyph').textContent = b.glyph || '⤴';
+    $('tr-glyph').textContent = b.glyph || '↑';
   }
   const ch = $('tr-combo-hint');
   if (T.game === 'mitts' && b && b.combo) {
@@ -221,6 +221,17 @@ function trainHud() {
 /* ── the two hooks in frame() (11_arena_loop.js) ── */
 function trainAim() { return TRAIN.on && TRAIN.def && TRAIN.def.aim ? TRAIN.def.aim() : null; }
 function trainFrame(dt) { if (TRAIN.on && TRAIN.def && TRAIN.def.frame) TRAIN.def.frame(dt, TRAIN); }
+
+/* ── the drill camera (camUpdate branch for G.state === 'train') ──
+   rope: P1 stands at x = 0 and the cord spins in the world x–y plane → a side shot from +z wide enough for the
+   whole circle (≈1.7 m tall); mitts: the pair at ±0.575 m — a two-shot close enough to read the pads. */
+function trainCam(cp, cl) {
+  const T = TRAIN;
+  // fov 30°: half height = 0.27·z — the rope shot must reach the canvas (the cord passes at the feet), the mitts shot frames the pair waist-up
+  if (T.game === 'rope') { cp.set(0.45, 1.28, 4.05); cl.set(0, 0.96, 0); }
+  else { cp.set(0.15, 1.44, 2.9); cl.set(0, 1.22, 0); }
+  return 3.2;
+}
 
 /* ── keyboard + pointer. trainKey is called from 12_ui.js before uiKey, so a training screen owns every key ── */
 function trainKey(e) {
@@ -293,6 +304,8 @@ function trainPlay(id, mode) {
 window.__train = {
   start: trainStart, countdown: trainCountdown, quit: trainQuit, again: trainAgain,
   press: a => trainInput(a), play: trainPlay, boot: trainBoot,
+  // for the checks (tools/train_test.py): put the profile counters wherever the test needs them
+  set: o => { if (o.xp) Object.assign(PROF.xp, o.xp); if (o.stats) Object.assign(PROF.stats, o.stats); if (o.done) PROF.train.done = o.done; },
   state: () => ({ on: TRAIN.on, phase: TRAIN.phase, game: TRAIN.game, t: TRAIN.t, i: TRAIN.i,
     beats: TRAIN.beats.length, hits: TRAIN.hits, misses: TRAIN.misses, score: TRAIN.score,
     combo: TRAIN.combo, grade: TRAIN.res && TRAIN.res.grade, res: TRAIN.res,

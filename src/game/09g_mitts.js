@@ -257,3 +257,4 @@ function tmMittsLeave() {
   if (MITTS.parts) for (const s of ['L', 'R']) MITTS.parts[s].g.visible = false;
   P2.flesh.u.uGlv.value = 0;   // toMenu() → showP2(true) puts the ordinary hand gear back
 }
+window.__mitts = MITTS;   // debug: the mitt state (feed, active pad, pending punch)

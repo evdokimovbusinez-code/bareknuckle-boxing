@@ -198,6 +198,11 @@ const sfx = (() => {
       g.gain.setTargetAtTime(AMB_LVL, t, 0.7); amb = { g, L }; },
     // the referee claps his hands — the start of a round in a street fight: two palms never land together (a flam of two short bursts)
     clap() { const a = ac; if (!a) return; for (const [d, pk] of [[0, 1.1], [0.011, 0.8]]) { const t = a.currentTime + d, n = a.createBufferSource(), f = filt('bandpass', 1400 + 500 * rr(), 1.1), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.09, pk); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.12); } },
+    /* a fist on a trainer's focus mitt (09g_mitts.js): a short dry «шлепок» — a bright leather crack on top of a duller
+       padded thump; p = power 0…1. Quieter and shorter than a punch on a man: the pad gives, there is no body behind it. */
+    mitt(p = 0.7) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0, 1);
+      { const n = a.createBufferSource(), f = filt('bandpass', 2100 + 500 * rr(), 1.3), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.045, 0.18 + 0.32 * k); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.09); }
+      { const n = a.createBufferSource(), f = filt('lowpass', 900 + 500 * k, 0.8), g = a.createGain(); n.buffer = noise; f.frequency.setValueAtTime(900 + 500 * k, t); f.frequency.exponentialRampToValueAtTime(160, t + 0.09); env(g, t, 0.003, 0.10, 0.3 + 0.4 * k); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.18); } },
     thud(p, body) { const a = ac; if (!a) return; const t = a.currentTime, master = bus;   // (shadows master: a punch goes through the echo of the place)
       { const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 0.9; f.frequency.value = body ? 1700 : 2600; env(g, t, 0.002, 0.035, 0.22 + 0.2 * p); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // skin slap
       const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'lowpass'; f.frequency.setValueAtTime(1400 + 900 * p, t); f.frequency.exponentialRampToValueAtTime(180, t + 0.12); env(g, t, 0.004, 0.13, 0.5 + 0.4 * p); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.2);

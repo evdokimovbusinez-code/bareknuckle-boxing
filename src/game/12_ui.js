@@ -190,6 +190,7 @@ window.addEventListener('blur', () => { HELD.clear(); mvKeys(); setBlock(false);
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (!e.repeat && introSkip()) { e.preventDefault(); return; }   // the card before a fight / the fly-round: any key skips
+  if (trainKey(e)) return;   // a training drill owns every key while it runs (09e_train.js): rhythm, punches, Esc = exit
   if (uiKey(e)) return;   // menu screens / pause: arrows, Enter, Esc
   const live = G.state === 'fight' || G.state === 'ko' || G.state === 'kd';
   if (e.code === 'Space' && G.state === 'fight') { e.preventDefault(); if (!e.repeat) { setBlock(true); kbLit('kb-blk', true); } return; }

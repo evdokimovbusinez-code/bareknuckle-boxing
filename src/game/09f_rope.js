@@ -7,7 +7,7 @@
 const JRP = {
   on: false, mode: 'spin',                      // 'spin' | 'catch'
   phase: 3 * Math.PI / 2, subPhase: 3 * Math.PI / 2, omega: 8.0,
-  ropeLen: 2.7, N: 40, L0: 2.7 / 40,
+  ropeLen: 2.95, N: 40, L0: 2.95 / 40,   // m: the hairpin reaches ≈1.82 at the top (over the crown) and grazes the canvas under the feet
   drive: 0.16, lag: 0.55,                       // tension toward the hand-driven backbone; the tip trails the hands
   cx: 0, cy: 0.92, cz: 0, w: 0.5, capR: 0.25, capLen: 0.79, D: 0.95, halfZ: 0.25,
   jumpH: 0.135, jumpY: 0,                      // toe-hop height (m)
@@ -226,8 +226,8 @@ function ropeReset(T) {
   while (t < dur - 0.7) {
     const u = t / dur, bpm = 100 + 50 * u, len = 60 / bpm, mode = ropePickMode(n, u), win = T.def.window;
     if (mode === 'double') {
-      beats.push({ t, action: 'jump', glyph: '⤴⤴', win, bpm });
-      beats.push({ t: t + Math.min(0.17, len * 0.45), action: 'jump', glyph: '⤴', win, bpm });
+      beats.push({ t, action: 'jump', glyph: '↑↑', win, bpm });
+      beats.push({ t: t + Math.min(0.17, len * 0.45), action: 'jump', glyph: '↑', win, bpm });
       t += len * 1.15;
     } else if (mode === 'run') {
       for (let k = 0; k < 4 && t < dur - 0.7; k++) {
@@ -235,7 +235,7 @@ function ropeReset(T) {
         t += len * 0.9;
       }
     } else {
-      beats.push({ t, action: 'jump', glyph: '⤴', win, bpm }); t += len;
+      beats.push({ t, action: 'jump', glyph: '↑', win, bpm }); t += len;
     }
     n++;
   }
@@ -301,3 +301,4 @@ function ropeLeave() {
   P1.group.position.y = 0; P1.group.updateMatrixWorld(true);
   P1.place(-D_SEP / 2, Math.PI / 2, false); P1.mark = P1.group.position.clone();
 }
+window.__rope = JRP;   // debug: the rope state (mode 'spin' / 'catch', phase, the mesh)

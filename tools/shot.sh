@@ -12,6 +12,8 @@ mkdir -p "$(dirname "$1")"
 python3 src/assemble.py >/dev/null
 # issue 45: the tutorial check — all steps on desktop keys and touch PointerEvents (tools/tut_test.py)
 if [ "${2:-}" = "tut" ]; then exec python3 tools/tut_test.py; fi
+# issue 50: the training mini-games check — grades, XP, the day rule, reload persistence, regressions (tools/train_test.py)
+if [ "${2:-}" = "train" ]; then exec python3 tools/train_test.py; fi
 [ -e node_modules ] || { [ -d /home/claude/cc/node_modules ] && ln -s /home/claude/cc/node_modules node_modules; }
 [ -d node_modules/three ] || npm i --no-save --silent three@0.160.0 cannon-es@0.20.0 >/dev/null
 # one server per checkout (worktrees run side by side): the port comes from this directory's path

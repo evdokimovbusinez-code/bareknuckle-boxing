@@ -510,6 +510,37 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
   </div>
 
+  <!-- training mini-games (issue 50): the shell HUD over the scene — rules / result cards, score readouts, the rhythm ring, the called combo, the countdown -->
+  <div class="tr" id="train" hidden>
+    <div class="tr-top" id="tr-top" hidden>
+      <div class="tr-stat"><small>очки</small><b id="tr-score">0</b></div>
+      <div class="tr-stat"><small>серия</small><b id="tr-combo">×0</b></div>
+      <div class="tr-stat"><small>секунд</small><b id="tr-time">0</b></div>
+    </div>
+    <div class="tr-mid" id="tr-mid" hidden>
+      <div class="tr-combo" id="tr-combo-hint" hidden></div>
+      <div class="tr-ring" id="tr-ring"><i id="tr-ring-i"></i><span id="tr-glyph">↑</span></div>
+      <div class="tr-fb" id="tr-fb"></div>
+    </div>
+    <div class="tr-count" id="tr-count" hidden>3</div>
+    <div class="tr-bot" id="tr-bot" hidden>
+      <span id="tr-hint"></span><button class="btn" id="tr-quit">Esc — в меню</button>
+    </div>
+    <div class="tr-card" id="tr-rules" hidden>
+      <span class="eyebrow" id="tr-r-title">Скакалка</span>
+      <h2 id="tr-r-h"></h2>
+      <p id="tr-r-keys"></p>
+      <div class="tr-rew" id="tr-r-reward"></div>
+      <div class="modal-b"><button class="btn pri" id="tr-start">Начать</button><button class="btn" id="tr-r-menu">В меню</button></div>
+    </div>
+    <div class="tr-card" id="tr-res" hidden>
+      <span class="eyebrow" id="tr-res-title"></span>
+      <div class="tr-grade" id="tr-grade">C</div>
+      <div class="tr-res"><div id="tr-res-score"></div><div class="gain" id="tr-res-gain"></div><div id="tr-res-best"></div></div>
+      <div class="modal-b"><button class="btn pri" id="tr-again">Ещё раз</button><button class="btn" id="tr-res-menu">В меню</button></div>
+    </div>
+  </div>
+
   <!-- main menu: logo, the column of modes; the scene (the fighter warming up in the current location) shows through -->
   <div class="ui mm" id="menu" hidden>
     <div class="mm-l">
@@ -517,7 +548,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <nav class="mnav" id="nav-main">
         <button id="go-car"><i>01</i><b>Карьера</b><small id="car-lbl"></small></button>
         <button id="go-quick"><i>02</i><b>Быстрый бой</b><small>место и соперник</small></button>
-        <button id="go-train"><i>03</i><b>Тренировка</b><small>груша · спарринг</small></button>
+        <button id="go-train"><i>03</i><b>Тренировка</b><small>скакалка · лапы · груша</small></button>
         <button id="go-fighter"><i>04</i><b>Боец</b><small id="fighter-lbl"></small></button>
         <button id="go-shop"><i>05</i><b>Магазин</b><small id="shop-lbl"></small></button>
         <button id="go-social"><i>06</i><b>Соцсети</b><small id="soc-lbl"></small></button>
@@ -620,7 +651,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           <div class="cpane" data-cat="style" hidden>
             <div class="fld"><span>коронный удар (+12 % урона)</span><div class="sw" id="o-sig"></div></div>
             <div class="stats" id="o-stats"></div>
-            <div class="hint">Очки за победы в карьере (+2, пояс +3), в быстром бою (+1) и за грушу (400+ очков: +1, 800+: ещё +1).</div>
+            <div class="hint">Очки за победы в карьере (+2, пояс +3), в быстром бою (+1) и за грушу (400+ очков: +1, 800+: ещё +1). Тренировки (скакалка · лапы · груша) дают опыт характеристик: каждые 100 опыта = +1.</div>
           </div>
         </div>
       </div>
@@ -6944,6 +6975,11 @@ const sfx = (() => {
       g.gain.setTargetAtTime(AMB_LVL, t, 0.7); amb = { g, L }; },
     // the referee claps his hands — the start of a round in a street fight: two palms never land together (a flam of two short bursts)
     clap() { const a = ac; if (!a) return; for (const [d, pk] of [[0, 1.1], [0.011, 0.8]]) { const t = a.currentTime + d, n = a.createBufferSource(), f = filt('bandpass', 1400 + 500 * rr(), 1.1), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.09, pk); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.12); } },
+    /* a fist on a trainer's focus mitt (09g_mitts.js): a short dry «шлепок» — a bright leather crack on top of a duller
+       padded thump; p = power 0…1. Quieter and shorter than a punch on a man: the pad gives, there is no body behind it. */
+    mitt(p = 0.7) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0, 1);
+      { const n = a.createBufferSource(), f = filt('bandpass', 2100 + 500 * rr(), 1.3), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.045, 0.18 + 0.32 * k); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.09); }
+      { const n = a.createBufferSource(), f = filt('lowpass', 900 + 500 * k, 0.8), g = a.createGain(); n.buffer = noise; f.frequency.setValueAtTime(900 + 500 * k, t); f.frequency.exponentialRampToValueAtTime(160, t + 0.09); env(g, t, 0.003, 0.10, 0.3 + 0.4 * k); n.connect(f).connect(g).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.18); } },
     thud(p, body) { const a = ac; if (!a) return; const t = a.currentTime, master = bus;   // (shadows master: a punch goes through the echo of the place)
       { const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'bandpass'; f.Q.value = 0.9; f.frequency.value = body ? 1700 : 2600; env(g, t, 0.002, 0.035, 0.22 + 0.2 * p); n.connect(f).connect(g).connect(master); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // skin slap
       const n = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); n.buffer = noise; f.type = 'lowpass'; f.frequency.setValueAtTime(1400 + 900 * p, t); f.frequency.exponentialRampToValueAtTime(180, t + 0.12); env(g, t, 0.004, 0.13, 0.5 + 0.4 * p); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.2);
@@ -8019,11 +8055,13 @@ function bagHit(att, name, contact) {
 }
 function bagEnd() {
   G.state = 'result'; G.winner = P1; G.loser = P2; BAG.on = true; sfx.bell(3); $('pad').hidden = true; Q.length = 0;
-  const rec = BAG.score > G.bagBest; if (rec) G.bagBest = BAG.score; const bp = (BAG.score >= 400 ? 1 : 0) + (BAG.score >= 800 ? 1 : 0); PROF.pts += bp; save();
+  const rec = BAG.score > G.bagBest; if (rec) G.bagBest = BAG.score; const bp = (BAG.score >= 400 ? 1 : 0) + (BAG.score >= 800 ? 1 : 0); PROF.pts += bp;
+  const aw = trainAward('bag', trainBagGrade(BAG.score), BAG.score);   // stat XP for the bag (09e_train.js): сила; the same once-a-day rule as the other drills
+  save();
   $('r-stats').innerHTML = ''; payShow(null);
   $('r-title').textContent = rec ? 'Рекорд!' : 'Время'; $('r-title').className = 'rt win';
   $('r-sub').textContent = `очки ${BAG.score} · попаданий ${BAG.hits} · лучшая серия ×${BAG.best} · рекорд ${G.bagBest}`;
-  $('r-car').textContent = (BAG.score >= 900 ? 'Готов к титулу' : BAG.score >= 600 ? 'Боевая форма' : BAG.score >= 350 ? 'Неплохо — добавь серий' : 'Разминка') + (bp ? ` · +${bp} ${bp === 1 ? 'очко' : 'очка'} бойцу` : ' · 400+ очков дают очко бойцу');
+  $('r-car').textContent = (BAG.score >= 900 ? 'Готов к титулу' : BAG.score >= 600 ? 'Боевая форма' : BAG.score >= 350 ? 'Неплохо — добавь серий' : 'Разминка') + (bp ? ` · +${bp} ${bp === 1 ? 'очко' : 'очка'} бойцу` : ' · 400+ очков дают очко бойцу') + ' · ' + trainRewardLine(aw);
   $('r-again').textContent = 'Ещё раз'; $('r-replay').hidden = true; $('result').hidden = false;
 }
 function updateMenu() {
@@ -9079,7 +9117,7 @@ function trainHud() {
     $('tr-ring-i').style.transform = 'scale(' + (0.3 + 0.7 * k).toFixed(3) + ')';
     ring.classList.toggle('hot', Math.abs(until) <= (b.win || T.window));
     ring.classList.add('on');
-    $('tr-glyph').textContent = b.glyph || '⤴';
+    $('tr-glyph').textContent = b.glyph || '↑';
   }
   const ch = $('tr-combo-hint');
   if (T.game === 'mitts' && b && b.combo) {
@@ -9092,6 +9130,17 @@ function trainHud() {
 /* ── the two hooks in frame() (11_arena_loop.js) ── */
 function trainAim() { return TRAIN.on && TRAIN.def && TRAIN.def.aim ? TRAIN.def.aim() : null; }
 function trainFrame(dt) { if (TRAIN.on && TRAIN.def && TRAIN.def.frame) TRAIN.def.frame(dt, TRAIN); }
+
+/* ── the drill camera (camUpdate branch for G.state === 'train') ──
+   rope: P1 stands at x = 0 and the cord spins in the world x–y plane → a side shot from +z wide enough for the
+   whole circle (≈1.7 m tall); mitts: the pair at ±0.575 m — a two-shot close enough to read the pads. */
+function trainCam(cp, cl) {
+  const T = TRAIN;
+  // fov 30°: half height = 0.27·z — the rope shot must reach the canvas (the cord passes at the feet), the mitts shot frames the pair waist-up
+  if (T.game === 'rope') { cp.set(0.45, 1.28, 4.05); cl.set(0, 0.96, 0); }
+  else { cp.set(0.15, 1.44, 2.9); cl.set(0, 1.22, 0); }
+  return 3.2;
+}
 
 /* ── keyboard + pointer. trainKey is called from 12_ui.js before uiKey, so a training screen owns every key ── */
 function trainKey(e) {
@@ -9164,6 +9213,8 @@ function trainPlay(id, mode) {
 window.__train = {
   start: trainStart, countdown: trainCountdown, quit: trainQuit, again: trainAgain,
   press: a => trainInput(a), play: trainPlay, boot: trainBoot,
+  // for the checks (tools/train_test.py): put the profile counters wherever the test needs them
+  set: o => { if (o.xp) Object.assign(PROF.xp, o.xp); if (o.stats) Object.assign(PROF.stats, o.stats); if (o.done) PROF.train.done = o.done; },
   state: () => ({ on: TRAIN.on, phase: TRAIN.phase, game: TRAIN.game, t: TRAIN.t, i: TRAIN.i,
     beats: TRAIN.beats.length, hits: TRAIN.hits, misses: TRAIN.misses, score: TRAIN.score,
     combo: TRAIN.combo, grade: TRAIN.res && TRAIN.res.grade, res: TRAIN.res,
@@ -9180,7 +9231,7 @@ window.__train = {
 const JRP = {
   on: false, mode: 'spin',                      // 'spin' | 'catch'
   phase: 3 * Math.PI / 2, subPhase: 3 * Math.PI / 2, omega: 8.0,
-  ropeLen: 2.7, N: 40, L0: 2.7 / 40,
+  ropeLen: 2.95, N: 40, L0: 2.95 / 40,   // m: the hairpin reaches ≈1.82 at the top (over the crown) and grazes the canvas under the feet
   drive: 0.16, lag: 0.55,                       // tension toward the hand-driven backbone; the tip trails the hands
   cx: 0, cy: 0.92, cz: 0, w: 0.5, capR: 0.25, capLen: 0.79, D: 0.95, halfZ: 0.25,
   jumpH: 0.135, jumpY: 0,                      // toe-hop height (m)
@@ -9399,8 +9450,8 @@ function ropeReset(T) {
   while (t < dur - 0.7) {
     const u = t / dur, bpm = 100 + 50 * u, len = 60 / bpm, mode = ropePickMode(n, u), win = T.def.window;
     if (mode === 'double') {
-      beats.push({ t, action: 'jump', glyph: '⤴⤴', win, bpm });
-      beats.push({ t: t + Math.min(0.17, len * 0.45), action: 'jump', glyph: '⤴', win, bpm });
+      beats.push({ t, action: 'jump', glyph: '↑↑', win, bpm });
+      beats.push({ t: t + Math.min(0.17, len * 0.45), action: 'jump', glyph: '↑', win, bpm });
       t += len * 1.15;
     } else if (mode === 'run') {
       for (let k = 0; k < 4 && t < dur - 0.7; k++) {
@@ -9408,7 +9459,7 @@ function ropeReset(T) {
         t += len * 0.9;
       }
     } else {
-      beats.push({ t, action: 'jump', glyph: '⤴', win, bpm }); t += len;
+      beats.push({ t, action: 'jump', glyph: '↑', win, bpm }); t += len;
     }
     n++;
   }
@@ -9474,6 +9525,7 @@ function ropeLeave() {
   P1.group.position.y = 0; P1.group.updateMatrixWorld(true);
   P1.place(-D_SEP / 2, Math.PI / 2, false); P1.mark = P1.group.position.clone();
 }
+window.__rope = JRP;   // debug: the rope state (mode 'spin' / 'catch', phase, the mesh)
 /* ───────── the focus-mitt drill (issue 50, adapted from issue #32's 09d_mitts.js) ─────────
    A pair of procedural leather focus mitts worn on the trainer's (P2) hands. Geometry is built in the hand/mitt
    frame (cm, +y = fingers, +z = the striking face) and carried by a rigid group: every frame the trainer's
@@ -9733,6 +9785,7 @@ function tmMittsLeave() {
   if (MITTS.parts) for (const s of ['L', 'R']) MITTS.parts[s].g.visible = false;
   P2.flesh.u.uGlv.value = 0;   // toMenu() → showP2(true) puts the ordinary hand gear back
 }
+window.__mitts = MITTS;   // debug: the mitt state (feed, active pad, pending punch)
 /* ───────── camera ───────── */
 const camP = new V3(1.2, 1.4, 3), camL = new V3(0, 1, 0), _cp = new V3(), _cl = new V3(); let camCut = true, camClock = 0;
 const FLY_R = 6.3, FLY_H = 2.25;   // m: where the intro fly-round starts — behind the back row of the crowd, over its heads (under the parking's ceiling)
@@ -9745,6 +9798,7 @@ function camUpdate(dt) {
   if (G.state === 'menu') { menuCam(dt, _cp, _cl); k = 1e3; }   // already eased inside menuCam (orbit about P1, 14_screens.js): taken as is
   else if (G.state === 'replay' && RP.segs[RP.seg].hlc) { k = hlCam(RP.segs[RP.seg]); if (RP.cut) { camCut = true; RP.cut = false; } }   // the highlights of a round (09b_cine.js)
   else if (G.state === 'rend') k = rendCam();   // the close-up of the faces at the end of a round
+  else if (G.state === 'train') k = trainCam(_cp, _cl);   // a training drill (09e_train.js): the jumper alone / the pair at the mitts
   else if (G.state === 'replay') {
     const s = RP.segs[RP.seg], h = G.loser.headNow, side = Math.sign(G.loser.group.position.x) || 1;
     const p = clamp((RP.tau - s.from) / Math.max(0.01, s.to - s.from), 0, 1), c = G.loser.jp[0], w = G.winner.headNow;
@@ -9975,6 +10029,7 @@ function frame(now) {
     else if (G.state === 'fight') { playerInput(); ai(dt); }
     else if (G.state === 'ko' || G.state === 'kd') { if (followOK(P1)) playerInput(); aiFollow(); }
     P1.aimTarget = aimFor(P1, P2); P2.aimTarget = aimFor(P2, P1);
+    if (TRAIN.on) P1.aimTarget = trainAim();   // training drills (09e–09g): the fist aims at the pad, the rope aims at nothing
     P1.update(dt); P2.update(dt);
     // both men are posed: now keep each one's arms out of the other's head and torso (against this frame's head, not last frame's)
     headFrames(P1); headFrames(P2);
@@ -9982,8 +10037,10 @@ function frame(now) {
     if (G.state === 'kd') kdTick(dt);
     if ((G.state === 'fight' || G.state === 'ko' || G.state === 'kd') && dt > 0) recFrame();
     stateTick(dtReal);
+    trainTick(dt);   // the training mini-games' clock, beats and HUD (09e_train.js)
   }
   tq = performance.now(); pm.anim += tq - tp - PERF.rag; pm.phys += PERF.rag; tp = tq;
+  trainFrame(simDt);   // rope pose layer + cord physics / mitt springs (09f/09g) — after all the fighter code, before cloth/hair
   P1.simulate(simDt); P2.simulate(simDt);
   ropeTick(simDt); bagStep(simDt);
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
@@ -10189,6 +10246,7 @@ window.addEventListener('blur', () => { HELD.clear(); mvKeys(); setBlock(false);
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (!e.repeat && introSkip()) { e.preventDefault(); return; }   // the card before a fight / the fly-round: any key skips
+  if (trainKey(e)) return;   // a training drill owns every key while it runs (09e_train.js): rhythm, punches, Esc = exit
   if (uiKey(e)) return;   // menu screens / pause: arrows, Enter, Esc
   const live = G.state === 'fight' || G.state === 'ko' || G.state === 'kd';
   if (e.code === 'Space' && G.state === 'fight') { e.preventDefault(); if (!e.repeat) { setBlock(true); kbLit('kb-blk', true); } return; }
@@ -12965,7 +13023,9 @@ function randomLook() {
 }
 function renderStats() {
   const box = $('o-stats');
-  box.innerHTML = `<div class="rec-line">свободных очков: <b>${PROF.pts}</b></div>` + STATS.map(S => `<div class="stt"><b>${S.label}<small>${S.d}</small></b><div class="pips">${[0, 1, 2, 3, 4].map(i => `<i class="${i < PROF.stats[S.id] ? 'on' : ''}"></i>`).join('')}</div><button data-st="${S.id}" aria-label="${S.label} +1" ${PROF.pts > 0 && PROF.stats[S.id] < 5 ? '' : 'disabled'}>+</button></div>`).join('');
+  // the training drills (09e_train.js) fill PROF.xp: every 100 XP = +1 pip, shown next to the description
+  const xpv = s => { const x = (PROF.xp || {})[s] | 0; return x > 0 && PROF.stats[s] < 5 ? ' · опыт ' + x + '/100' : ''; };
+  box.innerHTML = `<div class="rec-line">свободных очков: <b>${PROF.pts}</b></div>` + STATS.map(S => `<div class="stt"><b>${S.label}<small>${S.d}${xpv(S.id)}</small></b><div class="pips">${[0, 1, 2, 3, 4].map(i => `<i class="${i < PROF.stats[S.id] ? 'on' : ''}"></i>`).join('')}</div><button data-st="${S.id}" aria-label="${S.label} +1" ${PROF.pts > 0 && PROF.stats[S.id] < 5 ? '' : 'disabled'}>+</button></div>`).join('');
   for (const b of box.querySelectorAll('[data-st]')) b.onclick = () => { const id = b.dataset.st; if (PROF.pts <= 0 || PROF.stats[id] >= 5) return; PROF.pts--; PROF.stats[id]++; save(); renderStats(); sfx.thud(0.3, true); const n = box.querySelector(`[data-st="${id}"]:not([disabled])`); n && n.focus(); };
   const rec = `побед <b>${G.wins}</b> · поражений <b>${G.losses}</b> · карьера <b>${Math.min(G.career, LADDER.length)}/${LADDER.length}</b>${PROF.champ ? ` · пояс ×<b>${PROF.champ}</b>` : ''} · груша <b>${G.bagBest}</b>`;
   $('rec-line').innerHTML = rec; $('rec-line2').innerHTML = rec;

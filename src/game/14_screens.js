@@ -118,7 +118,9 @@ function randomLook() {
 }
 function renderStats() {
   const box = $('o-stats');
-  box.innerHTML = `<div class="rec-line">свободных очков: <b>${PROF.pts}</b></div>` + STATS.map(S => `<div class="stt"><b>${S.label}<small>${S.d}</small></b><div class="pips">${[0, 1, 2, 3, 4].map(i => `<i class="${i < PROF.stats[S.id] ? 'on' : ''}"></i>`).join('')}</div><button data-st="${S.id}" aria-label="${S.label} +1" ${PROF.pts > 0 && PROF.stats[S.id] < 5 ? '' : 'disabled'}>+</button></div>`).join('');
+  // the training drills (09e_train.js) fill PROF.xp: every 100 XP = +1 pip, shown next to the description
+  const xpv = s => { const x = (PROF.xp || {})[s] | 0; return x > 0 && PROF.stats[s] < 5 ? ' · опыт ' + x + '/100' : ''; };
+  box.innerHTML = `<div class="rec-line">свободных очков: <b>${PROF.pts}</b></div>` + STATS.map(S => `<div class="stt"><b>${S.label}<small>${S.d}${xpv(S.id)}</small></b><div class="pips">${[0, 1, 2, 3, 4].map(i => `<i class="${i < PROF.stats[S.id] ? 'on' : ''}"></i>`).join('')}</div><button data-st="${S.id}" aria-label="${S.label} +1" ${PROF.pts > 0 && PROF.stats[S.id] < 5 ? '' : 'disabled'}>+</button></div>`).join('');
   for (const b of box.querySelectorAll('[data-st]')) b.onclick = () => { const id = b.dataset.st; if (PROF.pts <= 0 || PROF.stats[id] >= 5) return; PROF.pts--; PROF.stats[id]++; save(); renderStats(); sfx.thud(0.3, true); const n = box.querySelector(`[data-st="${id}"]:not([disabled])`); n && n.focus(); };
   const rec = `побед <b>${G.wins}</b> · поражений <b>${G.losses}</b> · карьера <b>${Math.min(G.career, LADDER.length)}/${LADDER.length}</b>${PROF.champ ? ` · пояс ×<b>${PROF.champ}</b>` : ''} · груша <b>${G.bagBest}</b>`;
   $('rec-line').innerHTML = rec; $('rec-line2').innerHTML = rec;

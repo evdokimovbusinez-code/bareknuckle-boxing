@@ -510,6 +510,37 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
     <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
   </div>
 
+  <!-- training mini-games (issue 50): the shell HUD over the scene — rules / result cards, score readouts, the rhythm ring, the called combo, the countdown -->
+  <div class="tr" id="train" hidden>
+    <div class="tr-top" id="tr-top" hidden>
+      <div class="tr-stat"><small>очки</small><b id="tr-score">0</b></div>
+      <div class="tr-stat"><small>серия</small><b id="tr-combo">×0</b></div>
+      <div class="tr-stat"><small>секунд</small><b id="tr-time">0</b></div>
+    </div>
+    <div class="tr-mid" id="tr-mid" hidden>
+      <div class="tr-combo" id="tr-combo-hint" hidden></div>
+      <div class="tr-ring" id="tr-ring"><i id="tr-ring-i"></i><span id="tr-glyph">↑</span></div>
+      <div class="tr-fb" id="tr-fb"></div>
+    </div>
+    <div class="tr-count" id="tr-count" hidden>3</div>
+    <div class="tr-bot" id="tr-bot" hidden>
+      <span id="tr-hint"></span><button class="btn" id="tr-quit">Esc — в меню</button>
+    </div>
+    <div class="tr-card" id="tr-rules" hidden>
+      <span class="eyebrow" id="tr-r-title">Скакалка</span>
+      <h2 id="tr-r-h"></h2>
+      <p id="tr-r-keys"></p>
+      <div class="tr-rew" id="tr-r-reward"></div>
+      <div class="modal-b"><button class="btn pri" id="tr-start">Начать</button><button class="btn" id="tr-r-menu">В меню</button></div>
+    </div>
+    <div class="tr-card" id="tr-res" hidden>
+      <span class="eyebrow" id="tr-res-title"></span>
+      <div class="tr-grade" id="tr-grade">C</div>
+      <div class="tr-res"><div id="tr-res-score"></div><div class="gain" id="tr-res-gain"></div><div id="tr-res-best"></div></div>
+      <div class="modal-b"><button class="btn pri" id="tr-again">Ещё раз</button><button class="btn" id="tr-res-menu">В меню</button></div>
+    </div>
+  </div>
+
   <!-- main menu: logo, the column of modes; the scene (the fighter warming up in the current location) shows through -->
   <div class="ui mm" id="menu" hidden>
     <div class="mm-l">
@@ -517,7 +548,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <nav class="mnav" id="nav-main">
         <button id="go-car"><i>01</i><b>Карьера</b><small id="car-lbl"></small></button>
         <button id="go-quick"><i>02</i><b>Быстрый бой</b><small>место и соперник</small></button>
-        <button id="go-train"><i>03</i><b>Тренировка</b><small>груша · спарринг</small></button>
+        <button id="go-train"><i>03</i><b>Тренировка</b><small>скакалка · лапы · груша</small></button>
         <button id="go-fighter"><i>04</i><b>Боец</b><small id="fighter-lbl"></small></button>
         <button id="go-shop"><i>05</i><b>Магазин</b><small id="shop-lbl"></small></button>
         <button id="go-social"><i>06</i><b>Соцсети</b><small id="soc-lbl"></small></button>
@@ -620,7 +651,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           <div class="cpane" data-cat="style" hidden>
             <div class="fld"><span>коронный удар (+12 % урона)</span><div class="sw" id="o-sig"></div></div>
             <div class="stats" id="o-stats"></div>
-            <div class="hint">Очки за победы в карьере (+2, пояс +3), в быстром бою (+1) и за грушу (400+ очков: +1, 800+: ещё +1).</div>
+            <div class="hint">Очки за победы в карьере (+2, пояс +3), в быстром бою (+1) и за грушу (400+ очков: +1, 800+: ещё +1). Тренировки (скакалка · лапы · груша) дают опыт характеристик: каждые 100 опыта = +1.</div>
           </div>
         </div>
       </div>

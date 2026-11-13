@@ -67,6 +67,7 @@ function frame(now) {
     else if (G.state === 'fight') { playerInput(); ai(dt); }
     else if (G.state === 'ko' || G.state === 'kd') { if (followOK(P1)) playerInput(); aiFollow(); }
     P1.aimTarget = aimFor(P1, P2); P2.aimTarget = aimFor(P2, P1);
+    if (TRAIN.on) P1.aimTarget = trainAim();   // training drills (09e–09g): the fist aims at the pad, the rope aims at nothing
     P1.update(dt); P2.update(dt);
     // both men are posed: now keep each one's arms out of the other's head and torso (against this frame's head, not last frame's)
     headFrames(P1); headFrames(P2);
@@ -74,8 +75,10 @@ function frame(now) {
     if (G.state === 'kd') kdTick(dt);
     if ((G.state === 'fight' || G.state === 'ko' || G.state === 'kd') && dt > 0) recFrame();
     stateTick(dtReal);
+    trainTick(dt);   // the training mini-games' clock, beats and HUD (09e_train.js)
   }
   tq = performance.now(); pm.anim += tq - tp - PERF.rag; pm.phys += PERF.rag; tp = tq;
+  trainFrame(simDt);   // rope pose layer + cord physics / mitt springs (09f/09g) — after all the fighter code, before cloth/hair
   P1.simulate(simDt); P2.simulate(simDt);
   ropeTick(simDt); bagStep(simDt);
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
