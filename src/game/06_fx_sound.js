@@ -107,6 +107,7 @@ const sfx = (() => {
     tires: { len: 0.2, lp: 2400, wet: 0.03 },
     parking: { len: 2.2, lp: 1700, wet: 0.6, amb: 0.3, taps: [[0.04, 0.5], [0.075, 0.4], [0.13, 0.3]] },
     warehouse: { len: 2.8, lp: 3200, wet: 0.55, amb: 0.5, taps: [[0.055, 0.5], [0.12, 0.4], [0.2, 0.3], [0.31, 0.2]] },
+    bar: { len: 0.85, lp: 2600, wet: 0.34, amb: 0.5, taps: [[0.026, 0.55], [0.058, 0.38], [0.115, 0.22]] },   // a low tight room: the slap is back on you almost at once
     metro: { len: 2.6, lp: 2900, wet: 0.5, amb: 0.4, taps: [[0.035, 0.5], [0.07, 0.4], [0.16, 0.3], [0.26, 0.2]] } };   // a long stone hall: the slap comes back off the track walls, then from the ends
   const AMB_LVL = 1;
   const impulse = S => { const sr = ac.sampleRate, n = (sr * S.len) | 0, b = ac.createBuffer(2, n, sr), k = 1 - Math.exp(-2 * Math.PI * S.lp / sr);
@@ -156,6 +157,17 @@ const sfx = (() => {
           for (let i = 0; i < n && i0 + i < d.length; i++) { const x = i / sr; d[i0 + i] += a * Math.sin(2 * Math.PI * (f0 * x + 9000 * x * x)) * Math.exp(-x / 0.014) * Math.min(1, x / 0.001); }   // a plink: the pitch runs up
           t += Math.random() < 0.25 ? 0.13 + 0.1 * Math.random() : 0.5 + 1.6 * Math.random(); } }));
       const n = loop(b), g = gain(0.1); n.connect(g).connect(out); L.push(n);
+    },
+    // the bar (issue 51): the murmur of the regulars, the fridge hum under the counter, a glass clinking somewhere on the bar
+    bar(out, L) {
+      const [m, mg] = band(L, out, 'bandpass', 430, 1.7, 0.05); wander(L, mg.gain, 0.05, 0.0007, 3); wander(L, m.frequency, 170, 0.0004, 1.2);   // voices, no words
+      const [, lo] = band(L, out, 'lowpass', 110, 0.7, 0.22); wander(L, lo.gain, 0.05, 0.0003, 1);
+      for (const [fq, lvl] of [[100, 0.014], [200, 0.005]]) { const o = ac.createOscillator(), g = gain(lvl); o.frequency.value = fq; o.connect(g).connect(out); L.push(o); }   // the compressor
+      const b = BUF.glass || (BUF.glass = render(8, (d, sr) => {   // taps of glasses: 15 ms pings, metal-bright, sparse
+        let t = 0.4; while (t < 7.5) { const f0 = 1600 + 1800 * Math.random(), a = 0.1 + 0.25 * Math.random(), i0 = (t * sr) | 0, n = (0.05 * sr) | 0;
+          for (let i = 0; i < n && i0 + i < d.length; i++) { const x = i / sr; d[i0 + i] += a * Math.sin(2 * Math.PI * (f0 * x)) * Math.exp(-x / 0.008) * Math.min(1, x / 0.0005); }
+          t += 0.7 + 1.9 * Math.random(); } }));
+      const n = loop(b, 0.93), g2 = gain(0.12); n.connect(g2).connect(out); L.push(n);
     },
     // the metro station at night: the ventilation shafts breathe, the escalators grind far away, a transformer hums
     metro(out, L) {

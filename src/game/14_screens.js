@@ -3,7 +3,7 @@
    All of them except the pause (and the settings opened from it) live in G.state === 'menu'; the pause sets G.paused, frame() then
    runs with dt = 0. The menu camera (menuCam) orbits P1: the creator turns it by dragging, the other screens just frame him. */
 const UI = { scr: null, from: null, cat: 'name', spar: false, mouth: false, drag: 0, orb: { yaw: 0.85, zoom: 1 } };   // mouth: the gum-shield close-up of the creator (he bares his teeth: Face.update)
-const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', settings: 'settings', credits: 'credits', pause: 'pause', net: 'net' };   // net: issue 49 «Бой с другом»
+const UI_IDS = { main: 'menu', train: 'menu', quick: 'quick', creator: 'creator', shop: 'shop', social: 'social', story: 'story', settings: 'settings', credits: 'credits', pause: 'pause', net: 'net' };   // net: issue 49 «Бой с другом»; story: issue 51 «История»
 const VIEW_MOUTH = { yaw: 1.38, zoom: 0 }, _mouthP = new V3(), VIEW_FACE = { yaw: 1.25, zoom: 0 }, VIEW_FULL = { yaw: 0.85, zoom: 1 }, VIEW_HANDS = { yaw: 0.95, zoom: 0.22 };
 const VIEW_BACK = { yaw: -2.3, zoom: 0.55 };   // his back (the back tattoo)
 const myName = () => PROF.nick || PROF.name || 'Ты';
@@ -11,13 +11,14 @@ function uiItems() { const root = UI.scr && $(UI_IDS[UI.scr]); return root ? [..
 function uiShow(scr, focusId) {
   if (UI.scr === 'shop' && scr !== 'shop') shopLeave();   // a try-on that was not bought comes off (14b_shop.js)
   UI.scr = scr; const on = scr ? UI_IDS[scr] : null;
-  for (const id of ['menu', 'quick', 'creator', 'shop', 'social', 'settings', 'credits', 'pause', 'net']) $(id).hidden = id !== on;
+  for (const id of ['menu', 'quick', 'creator', 'shop', 'social', 'story', 'settings', 'credits', 'pause', 'net']) $(id).hidden = id !== on;
   if (on === 'menu') { $('nav-main').hidden = scr !== 'main'; $('nav-train').hidden = scr !== 'train'; }
   if (scr === 'settings') { const p = UI.from === 'pause'; $('settings').classList.toggle('dim', p); $('reset-row').hidden = p; buildSettings(); setTab('opt'); }
   if (scr === 'credits') buildCredits();
   if (scr === 'pause') $('p-quit-l').textContent = BAG.on ? 'Выйти' : 'Сдаться';
   if (scr === 'shop') shopEnter();
   if (scr === 'social') socEnter();
+  if (scr === 'story') buildStory();   // issue 51: the chapter timeline (19_story.js)
   if (scr !== 'creator') UI.mouth = false;
   if (scr !== 'creator' && UI.spar) { UI.spar = false; if (G.state === 'menu') P1.sparGear(false); }   // the glove preview of the creator
   const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur();
@@ -27,7 +28,7 @@ function uiBack() {
   if (UI.scr === 'credits') return uiShow('settings', 'set-credits');
   if (UI.scr === 'settings' && UI.from === 'pause') return uiShow('pause', 'p-set');
   if (UI.scr === 'main' || G.state !== 'menu') return;
-  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', social: 'go-social', settings: 'go-set', net: 'go-net' }[UI.scr];
+  const back = { train: 'go-train', quick: 'go-quick', creator: 'go-fighter', shop: 'go-shop', social: 'go-social', story: 'go-story', settings: 'go-set', net: 'go-net' }[UI.scr];
   updateMenu(); uiShow('main', back);
 }
 /* keys of the screens; true = the key is taken (12_ui.js then leaves it alone). Esc: back / pause / skip the replay / leave the result */
@@ -68,7 +69,7 @@ function menuCam(dt, cp, cl) {
   if (UI.scr === 'creator' || UI.scr === 'shop') { const z = UI.orb.zoom; T.yaw = UI.orb.yaw; T.d = lerp(0.37 / th, dFull, z); T.ty = lerp(hd.y - 0.05, 0.95, z); T.tx = lerp(hd.x, x, z); T.tz = lerp(hd.z, 0, z); T.sh = 0.5; T.h = 0.1;
     if (UI.mouth && UI.scr === 'creator') { const m = _mouthP.set(0, -0.08, 0.075).applyMatrix4(P1.gear.guard.matrix); T.d = 0.13 / th; T.tx = m.x; T.ty = m.y; T.tz = m.z; T.h = 0.012; } }   // the gum shield, close
   else if (UI.scr === 'quick') { T.yaw = 0.2; T.d = dFull * 1.18; T.ty = 1.02; T.sh = 0.4; T.h = 0.32; }
-  else { T.yaw = 0.52 + 0.05 * Math.sin(camClock * 0.4); T.d = dFull * 0.84; T.ty = 1.05; T.sh = UI.scr === 'settings' || UI.scr === 'social' ? 0.5 : 0.38; T.h = 0.12; }
+  else { T.yaw = 0.52 + 0.05 * Math.sin(camClock * 0.4); T.d = dFull * 0.84; T.ty = 1.05; T.sh = UI.scr === 'settings' || UI.scr === 'social' || UI.scr === 'story' ? 0.5 : 0.38; T.h = 0.12; }
   const M = MCAM, a = camCut || !M.init ? 1 : 1 - Math.exp(-dt * (UI.drag ? 16 : 4.2)); M.init = true;
   for (const k in T) M[k] += (T[k] - M[k]) * a;
   const s = M.sh * M.d * th * asp, c = Math.cos(M.yaw), sn = Math.sin(M.yaw);
@@ -170,7 +171,7 @@ function resetAsk(sure) {   // wiping the progress takes a second, explicit pres
   const no = btn('отмена', '', () => resetAsk(false).focus()); btn('да, стереть всё', 'warn', () => { resetProgress(); resetAsk(false).focus(); }); return no;
 }
 function resetProgress() {   // record, career, belt, points and stats; the name and the look stay (minus wraps that are locked again)
-  G.wins = G.losses = G.career = G.bagBest = 0; Object.assign(PROF, { sig: null, pts: 1, champ: 0, cash: 0, own: {} }); socReset(); for (const k in PROF.stats) PROF.stats[k] = 0;
+  G.wins = G.losses = G.career = G.bagBest = 0; Object.assign(PROF, { sig: null, pts: 1, champ: 0, cash: 0, own: {}, story: { done: 0, mig: 1, pick: {} } }); socReset(); for (const k in PROF.stats) PROF.stats[k] = 0;   // story progress resets too (mig: 1 — no career gift on reload)
   wearSanitize(); const w = WRAPS_LOOKS.find(x => x.id === (LOOK.wraps || 'white')); if (w && w.need > 0) LOOK.wraps = 'white'; P1.applyLook(LOOK);   // bought and career clothes go away with the money
   save(); buildCreator(); updateMenu(); msg('Прогресс сброшен', 'tip');
 }
@@ -181,7 +182,7 @@ function buildQuick() {
   const box = $('o-loc'); box.textContent = '';
   if (!locOpen(G.loc)) G.loc = 'gym';
   for (const L of Object.values(LOCS)) { if (L.train) continue;   // the training gym is not a place for fights; a place can wait for followers (LOC_FANS, 15_social.js)
-    const open = locOpen(L.id), b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${open ? L.desc || '' : '🔒 от ' + numF(LOC_FANS[L.id]) + ' подписчиков'}</small>`; b.setAttribute('aria-pressed', String(G.loc === L.id)); b.disabled = !open;
+    const open = locOpen(L.id), b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${open ? L.desc || '' : L.lockLbl || '🔒 от ' + numF(LOC_FANS[L.id]) + ' подписчиков'}</small>`; b.setAttribute('aria-pressed', String(G.loc === L.id)); b.disabled = !open;   // lockLbl: a non-follower gate (LOC_LOCK, the story bar — #51)
     // #47: hover prebuilds the place while the player is still reading the list; a cold click first paints the
     // «Готовим площадку…» pill, then builds on the next macrotask so the frozen frame is never silent.
     if (open) b.addEventListener('pointerenter', () => locPrefetchOne(L.id));
@@ -198,7 +199,10 @@ function buildQuick() {
 function buildMenu() {
   buildCreator(); buildSettings(); buildQuick(); applyOpt(); setCat(UI.cat);
   const on = (id, fn) => $(id).addEventListener('click', fn);
-  on('go-car', () => { if (G.career >= LADDER.length) G.career = 0; startCareer(); });
+  // issue 51: «КАРЬЕРА» became «ИСТОРИЯ»; the old ladder lives under «Лестница» on the story screen
+  on('go-story', () => uiShow('story', 'st-play'));
+  on('st-back', uiBack);
+  on('go-ladder', () => { if (G.career >= LADDER.length) G.career = 0; startCareer(); });
   on('go-quick', () => { buildQuick(); uiShow('quick', 'go'); });
   on('go', startQuick); on('quick-back', uiBack);
   on('go-train', () => uiShow('train')); on('train-back', uiBack); on('go-bag', startBag); on('go-spar', startSpar);

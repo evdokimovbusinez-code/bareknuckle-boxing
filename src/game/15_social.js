@@ -10,6 +10,7 @@
 const SOC = { feed: [], tab: 'feed', cand: null, want: null, pend: null, cv: null, sp: {} };
 const SOC_KEY = 'ko-feed', SOC_FEED_MAX = 14, SOC_HIST = 24, SOC_W = 480, SOC_DM_MAX = 3;
 const LOC_FANS = { parking: 500, warehouse: 1500 };   // followers needed for a place in the quick fight (the career opens its places by itself)
+const LOC_LOCK = {};   // non-follower gates of a place: id → () => true when open (the story sets its own, 19_story.js)
 const numF = n => String(Math.round(n)).replace(/\B(?=(\d{3})+$)/g, ' ');
 const SPONSORS = [
   { id: 'fox', name: 'ЛИСИЙ ХВОСТ', what: 'энергетик', need: 300, pay: 60, fights: 5, c: '#e8742a', ink: '#1b120a', mark: 'tri' },
@@ -18,7 +19,7 @@ const SPONSORS = [
   { id: 'brick', name: 'ГРАНИТ-ДОМ', what: 'стройматериалы', need: 4500, pay: 400, fights: 6, c: '#b8352f', ink: '#f6eee4', mark: 'ring' }];
 const spById = id => SPONSORS.find(s => s.id === id);
 const socOn = () => (G.mode === 'career' || G.mode === 'quick') && !BAG.on;
-const locOpen = id => PROF.soc.fans >= (LOC_FANS[id] || 0);
+const locOpen = id => PROF.soc.fans >= (LOC_FANS[id] || 0) && !(LOC_LOCK[id] && !LOC_LOCK[id]());
 const hypeTier = h => h < 15 ? 'тишина' : h < 40 ? 'теплеет' : h < 70 ? 'горячо' : 'вирусный';
 
 function socInit() {   // a fresh save, or the first start with the feature: the fame of the wins already won

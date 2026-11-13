@@ -10,6 +10,7 @@ function camUpdate(dt) {
   if (G.state === 'menu') { menuCam(dt, _cp, _cl); k = 1e3; }   // already eased inside menuCam (orbit about P1, 14_screens.js): taken as is
   else if (G.state === 'replay' && RP.segs[RP.seg].hlc) { k = hlCam(RP.segs[RP.seg]); if (RP.cut) { camCut = true; RP.cut = false; } }   // the highlights of a round (09b_cine.js)
   else if (G.state === 'rend') k = rendCam();   // the close-up of the faces at the end of a round
+  else if (G.state === 'talk') k = talkCam();   // a story dialog: the face of whoever speaks (19_story.js, issue 51)
   else if (G.state === 'replay') {
     const s = RP.segs[RP.seg], h = G.loser.headNow, side = Math.sign(G.loser.group.position.x) || 1;
     const p = clamp((RP.tau - s.from) / Math.max(0.01, s.to - s.from), 0, 1), c = G.loser.jp[0], w = G.winner.headNow;
@@ -71,7 +72,9 @@ function hudUpdate(dt) {
   const ME = NET.guest && NET.started ? P2 : P1, OP = ME === P1 ? P2 : P1;
   hudBar(0, ME.hp / 100); hudBar(1, ME.hp / 100); hudBar(2, OP.hp / 100); hudBar(3, OP.hp / 100); hudBar(4, ME.stamina / 100); hudBar(5, OP.stamina / 100);
   $('cnt').hidden = !(G.state === 'fight' && ME.counterUntil > G.t);
-  if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), txt = `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`; if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
+  if (G.round) { const t = Math.max(0, Math.ceil(G.roundT));   // issue 51: a story bout has no rounds — the pill says «ДО НОКАУТА»
+    const txt = G.mode === 'story' ? 'ДО НОКАУТА' : `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`;
+    if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
   const k = Math.min(1, dt * 3); P1.u.uDmg.value += (clamp(1 - P1.hp / 100, 0, 1) - P1.u.uDmg.value) * k; P2.u.uDmg.value += (clamp(1 - P2.hp / 100, 0, 1) - P2.u.uDmg.value) * k;
   // (issue 46) the get-up bar during the referee's count: how close the man is to beating it (mashing punches adds)
   const kb = $('kdbar');

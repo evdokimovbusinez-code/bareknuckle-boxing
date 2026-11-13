@@ -27,6 +27,11 @@ wearSanitize();
 /* the purse: lines [label, roubles]; `how` = 'dec' | 'ko' | 'tko'; stage = the career step of this fight (before the win is counted) */
 function purse(win, draw, how, stage) {
   if (G.mode === 'spar') return { lines: [], total: 0, note: 'Спарринг — без оплаты' };
+  if (G.mode === 'story') { const R = (storyCh() || {}).reward || {}, lines = [];   // issue 51: the chapter's own purse (money under the bar counter)
+    if (win) { lines.push(['Победа', R.win || 500]); if ((how === 'ko' || how === 'tko') && R.ko) lines.push(['Нокаут', R.ko]); }
+    const sp = socSponsorLine(win); if (sp) lines.push(sp);
+    return { lines, total: lines.reduce((s, l) => s + l[1], 0), note: win ? '' : 'Никаких денег — ты проиграл' };
+  }
   if (G.mode !== 'career' && G.mode !== 'quick') return { lines: [], total: 0 };
   const car = G.mode === 'career', T = car ? PAY.career : PAY.quick, k = car ? 1 + T.step * stage : PAY_DIFF[G.diff] || 1, r10 = v => Math.round(v * k / 10) * 10, lines = [];
   lines.push(['Участие', r10(T.part)]);
