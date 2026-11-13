@@ -98,6 +98,8 @@ async def run():
                 }""", key)
             await step(30)
         await B.evaluate('__mp.move(0, 0)')
+        for _ in range(3):
+            await step(10, 0.3)   # let the last punches land and their snapshot reach the guest (a backed-up channel skips some)
 
         hpA = await A.evaluate('__mp.hp()')
         hpB = await B.evaluate('__mp.hp()')
@@ -161,6 +163,13 @@ async def run():
         for _ in range(3):
             await step()
         print('  реванш:', await A.evaluate('__mp.state()'), await B.evaluate('__mp.stat().over'))
+        lk = "JSON.stringify([__g.P1.gear.look, __g.P2.gear.look])"
+        la, lb = await A.evaluate(lk), await B.evaluate(lk)
+        print('  внешность после реванша: хост', la, 'гость', lb)
+        if la != lb:
+            print('  ✗ после реванша внешность бойцов у хоста и гостя разная'); bad += 1
+        else:
+            print('  ✓ после реванша внешность та же')
 
         await A.evaluate('__step(1, 1/60)')
         await A.screenshot(path=path('host'), **FMT)

@@ -175,6 +175,7 @@ function netHostStart() {
   showP2(true);
   for (const F of [P1, P2]) F.sparGear(false);
   rollOpponent();   // a stand-in until the guest's hello arrives with his own look
+  if (NET.oLook) try { P2.applyLook(NET.oLook); } catch (e) {}   // a rematch: rollOpponent just re-dressed the guest's man as a random one
   startFight(true);
   NET.evI = REC.events.length; NET.pop.length = 0; NET.q.length = 0; NET.acc = 0; NET.pingAcc = 0; NET.first = true;
   netLabels();
@@ -184,6 +185,7 @@ function netGuestSetup() {
   // issue 49: here the local player's man is P2 (left on the mirrored camera); hello sends LOOK,
   // so dress him in that same look instead of the random opponent left over from the menu boot
   P2.applyLook(LOOK);
+  if (NET.oLook) try { P1.applyLook(NET.oLook); } catch (e) {}
   for (const F of [P1, P2]) F.sparGear(false);
   P1.stat = PROF.stats; P2.stat = lvlStats(1); P1.speed = 1.5; P2.speed = DIFFS.normal.speed;
   P1.resetState(); P2.resetState();
@@ -374,6 +376,7 @@ function netMsg(m) {
   if (!m || !m.c) return;
   NET.silent = 0;   // any inbound traffic proves the link is alive (issue 49 watchdog)
   if (m.c === 'hello') {
+    NET.oLook = m.look;   // kept for rematches
     try { if (NET.host) P2.applyLook(m.look); else P1.applyLook(m.look); } catch (e) {}
     NET.nm = m.nm || '';
   } else if (m.c === 'in') netInput(m);
@@ -467,7 +470,7 @@ function netWinByDrop() {
 function netClose() {
   const had = !!NET.role;
   clearTimeout(NET.retryT);
-  NET.role = null; NET.host = false; NET.guest = false; NET.started = false; NET.over = null;
+  NET.role = null; NET.host = false; NET.guest = false; NET.started = false; NET.oLook = null; NET.over = null;
   NET.conn = null; NET.dropT = 0; NET.closing = true; NET.roomShown = false;
   show('net-drop', false); $('net-ping').hidden = true; $('net-ping').textContent = '';
   if (NET.saved) {
