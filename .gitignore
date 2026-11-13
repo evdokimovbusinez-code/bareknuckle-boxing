@@ -1,6 +1,8 @@
 gtest.html
 __pycache__/
 *.png
+# issue #55: cloth pipeline report PNGs (tools/assets/cloth/out) are kept in git
+!tools/assets/cloth/out/*.png
 .DS_Store
 .claude-summary.md
 .claude-result.json
