@@ -3,10 +3,12 @@
 
     python3 tools/assets/cloth/pattern.py
 
-Reads out/body.obj (+ out/body_skin.json for the shoulder/neck bones) and measures the body
-with horizontal plane slices: triangle cuts are chained into closed loops and their perimeter
-is the girth (chest / hips / neck / bicep / elbow), the loop centre gives the body axis and the
-arm axis. Drafts the pattern in CENTIMETRES, y down from the nape point (y=0):
+Reads out/body.obj (+ out/body_skin.json for the bind-pose bones). Torso girths (chest / hips /
+neck) come from horizontal plane slices; triangle cuts are chained into closed loops and their
+perimeter is the girth. The arms are in an A-pose (~30 deg below horizontal), so their sections
+are cut PERPENDICULAR to the shoulder->hand bone axis instead (arm_measure) — a horizontal cut
+would land on the forearm and the cropped fist would give no closed loop. Drafts the pattern in
+CENTIMETRES, y down from the nape point (y=0):
 
   front, back  — width (chest+ease)/2, straight sides, hem near the hip, shoulder seams,
                  curved armholes and necklines (16+ points each);
@@ -18,10 +20,11 @@ Seams are pairs of edges; every pair is measured, the script checks ±2% and pri
 Writes out/tee.json (parts, edges, seams, body anchors for step 2 place.py) and out/tee.svg,
 and tries to rasterise the SVG to out/tee.png (cairosvg, then headless chromium, else warn).
 """
-import json, math, os, sys
+import json, math, os, shutil, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, 'out')
+PREVIEW = os.path.join(HERE, 'preview')     # committed report PNGs (out/ is git-ignored)
 
 EASE_CHEST = 6.0     # cm of ease around the chest girth
 EASE_ARM = 4.0       # cm around the bicep
@@ -117,6 +120,78 @@ def scan(P, tris, y0, y1, step=0.01):
                 break
 
 
+# ─────────────────── 3D helpers + arm sections perpendicular to the bone ───────────────────
+def sub3(a, b): return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+def dot3(a, b): return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+def cross3(a, b): return (a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0])
+def nrm3(a):
+    l = math.sqrt(dot3(a, a)) or 1.0
+    return (a[0] / l, a[1] / l, a[2] / l)
+
+
+def arm_axis_from_mesh(P, side):
+    """Fallback A-pose axis when body_skin.json has no bones: shoulder / hand rings from the mesh."""
+    sg = 1 if side == 'L' else -1
+    def band(xlo, xhi, ylo, yhi):
+        sel = [p for p in P if xlo < sg * p[0] < xhi and ylo < p[1] < yhi]
+        return tuple(sum(p[k] for p in sel) / len(sel) for k in range(3)) if sel else None
+    S = band(0.16, 0.24, 1.46, 1.56) or (sg * 0.193, 1.509, -0.058)
+    H = band(0.62, 0.70, 1.15, 1.27) or (sg * 0.690, 1.212, -0.064)
+    return S, H
+
+
+def arm_measure(P, tris, S, H, fracs):
+    """Girth and 3-D centre of the arm cross-sections cut PERPENDICULAR to the shoulder->hand
+    bone axis (the bind pose is an A-pose: the arms hang ~30 deg below horizontal, so a
+    horizontal plane would see the forearm instead of the bicep and miss the cropped fist).
+
+    The whole body is rotated into a frame whose Y runs along that bone; slice_loops() then
+    cuts a plane of constant Y = a square cross-section. Only the triangles of this arm tube
+    are passed in, so an oblique plane cannot also cut the torso / the other arm / a leg.
+    Returns (y, L) — L.cx / L.cz / y are the true 3-D centre of the largest-area loop found
+    over `fracs` (fractions of the shoulder->hand length), L.per is its girth in metres.
+    """
+    d = nrm3(sub3(H, S))
+    Lax = math.sqrt(dot3(sub3(H, S), sub3(H, S)))
+    up = (0, 1, 0)
+    if abs(dot3(d, up)) > 0.9:
+        up = (0, 0, 1)
+    eu = nrm3(cross3(up, d))          # two axes spanning any plane perpendicular to d
+    ev = cross3(d, eu)
+    Q = [(dot3(sub3(p, S), eu), dot3(sub3(p, S), d), dot3(sub3(p, S), ev)) for p in P]
+    arm_tris = []
+    for a, b, c in tris:
+        g = ((P[a][0] + P[b][0] + P[c][0]) / 3,
+             (P[a][1] + P[b][1] + P[c][1]) / 3,
+             (P[a][2] + P[b][2] + P[c][2]) / 3)
+        rel = sub3(g, S)
+        s = dot3(rel, d)
+        if not (0.12 * Lax < s < 0.85 * Lax):       # away from the shoulder join and the cropped hand
+            continue
+        perp = (rel[0] - s*d[0], rel[1] - s*d[1], rel[2] - s*d[2])
+        if dot3(perp, perp) > 0.15 ** 2:            # inside a 15 cm tube around the bone
+            continue
+        arm_tris.append((a, b, c))
+    best = None
+    for frac in fracs:
+        yh = frac * Lax
+        loops = []
+        for off in (0.004, 0.009, 0.0, 0.0021):    # dodge a flat vertex row
+            yh = frac * Lax + off
+            loops = slice_loops(Q, arm_tris, yh)
+            if loops:
+                break
+        for lp in loops:
+            if not (0.10 < lp['per'] < 0.55):        # plausible arm girth, m
+                continue
+            c3 = (S[0] + lp['cx']*eu[0] + yh*d[0] + lp['cz']*ev[0],
+                  S[1] + lp['cx']*eu[1] + yh*d[1] + lp['cz']*ev[1],
+                  S[2] + lp['cx']*eu[2] + yh*d[2] + lp['cz']*ev[2])
+            if best is None or lp['area'] > best[1]['area']:
+                best = (c3[1], dict(cx=c3[0], cz=c3[2], per=lp['per'], area=lp['area'], pts=lp['pts']))
+    return best
+
+
 def measure(P, tris, bones):
     m = {}
     best = None
@@ -137,16 +212,6 @@ def measure(P, tris, bones):
             if 0.24 < L['per'] < 0.70 and (best is None or L['per'] < best[1]['per']):
                 best = (y, L)
     m['neck'] = best
-    arms = {'L': {'bicep': None, 'elbow': None}, 'R': {'bicep': None, 'elbow': None}}
-    for band, tag in ((1.28, 'bicep'), (1.20, 'elbow')):        # narrow bands + biggest AREA: on the wider ones the
-        for y, ls in scan(P, tris, band, band + 0.025):         # deltoid (bicep band) and forearm (elbow band) would win
-            for L in ls:
-                if abs(L['cx']) > 0.40:
-                    side = 'L' if L['cx'] > 0 else 'R'
-                    cur = arms[side][tag]
-                    if cur is None or L['area'] > cur[1]['area']:
-                        arms[side][tag] = (y, L)
-    m['arms'] = arms
 
     def bt(suffix):
         for nm, mm in bones.items():
@@ -154,6 +219,21 @@ def measure(P, tris, bones):
                 return (mm[12], mm[13], mm[14])
         return None
     m['sho_bone'] = bt('L_UpperarmTwist01') or bt('L_Upperarm') or bt('L_Arm') or bt('R_UpperarmTwist01')
+
+    # Arms are in an A-pose, so measure square sections perpendicular to the bone axis (see
+    # arm_measure) instead of horizontal ones — a horizontal cut lands on the forearm and the
+    # cropped fist gives no closed loop (issue #55 discussion).
+    arms = {}
+    for side in ('L', 'R'):
+        S = bt(side + '_UpperarmTwist01') or bt(side + '_Upperarm') or bt(side + '_Arm')
+        H = bt(side + '_Hand')
+        if not (S and H):
+            S, H = arm_axis_from_mesh(P, side)
+        arms[side] = {
+            'bicep': arm_measure(P, tris, S, H, (0.24, 0.28, 0.32, 0.36, 0.40)),   # widest upper arm
+            'elbow': arm_measure(P, tris, S, H, (0.60, 0.66, 0.72, 0.78)),         # forearm near the elbow
+        }
+    m['arms'] = arms
     return m
 
 
@@ -357,9 +437,9 @@ def curve_checks(parts):
 
 def sheet_svg(parts, params):
     sc = 4.5                                            # px per cm
-    lay = {'front': (0, 0), 'back': (340, 0), 'sleeveP': (0, 340), 'sleeveM': (300, 340), 'band': (0, 560)}
+    lay = {'front': (0, 0), 'back': (340, 0), 'sleeveP': (0, 340), 'sleeveM': (300, 340), 'band': (0, 545)}
     ru = {'front': 'перед', 'back': 'спинка', 'sleeveP': 'рукав +X', 'sleeveM': 'рукав −X', 'band': 'бейка горловины'}
-    W, H = 780, 700
+    W, H = 780, 730
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">',
          f'<rect width="{W}" height="{H}" fill="#fdfbf5"/>']
     for x in range(0, W, int(10 * sc)):
@@ -368,7 +448,7 @@ def sheet_svg(parts, params):
         o.append(f'<line x1="0" y1="{y}" x2="{W}" y2="{y}" stroke="#e8e3d4" stroke-width="0.7"/>')
     for name, (ox, oy) in lay.items():
         pts = parts[name]['pts']
-        X = lambda p: ox + sc * p[0] + 130
+        X = lambda p: ox + sc * p[0] + 150      # keep the front's -X armhole inside the sheet
         Y = lambda p: oy + sc * p[1] + 130
         d = ' '.join(('M' if i == 0 else 'L') + f'{X(p):.1f},{Y(p):.1f}' for i, p in enumerate(pts)) + ' Z'
         o.append(f'<path d="{d}" fill="#ffffffcc" stroke="#20242a" stroke-width="1.6"/>')
@@ -376,9 +456,10 @@ def sheet_svg(parts, params):
             ep = edge_pts(parts[name], e)
             dd = ' '.join(('M' if i == 0 else 'L') + f'{X(p):.1f},{Y(p):.1f}' for i, p in enumerate(ep))
             o.append(f'<path d="{dd}" fill="none" stroke="#c0392b" stroke-width="2.3"/>')
-        cx = ox + sc * sum(p[0] for p in pts) / len(pts) + 130
+        cx = ox + sc * sum(p[0] for p in pts) / len(pts) + 150
         cy = oy + sc * sum(p[1] for p in pts) / len(pts) + 130
-        o.append(f'<text x="{cx:.0f}" y="{cy:.0f}" font-family="sans-serif" font-size="16" fill="#333">{ru[name]}</text>')
+        ly = cy - 12 if name == 'band' else cy          # the band strip is only ~10 px tall
+        o.append(f'<text x="{cx:.0f}" y="{ly:.0f}" font-family="sans-serif" font-size="16" fill="#333">{ru[name]}</text>')
     o.append(f'<text x="12" y="22" font-family="sans-serif" font-size="15" fill="#333">выкройка футболки: грудь '
              f'{params["C_bust"]:.0f}, шея {params["C_neck"]:.0f}, бицепс {params["C_bicep"]:.0f} см · 1 см = {sc} px · красным — швы</text>')
     o.append('</svg>')
@@ -419,6 +500,11 @@ def main():
     bones = json.load(open(skp))['bones'] if os.path.exists(skp) else {}
     print(f'— тело: {len(P)} вершин, {len(tris)} треугольников')
     M = measure(P, tris, bones)
+    missing = [k for k in ('chest', 'hips', 'neck') if M[k] is None] + \
+              [f'рука {s}.{t}' for s in ('L', 'R') for t in ('bicep', 'elbow') if M['arms'][s][t] is None]
+    if missing:
+        print('✗ не найдены сечения тела: ' + ', '.join(missing))
+        return 1
     print('— замеры:')
     for k in ('chest', 'hips', 'neck'):
         y, L = M[k]
@@ -445,7 +531,11 @@ def main():
     open(svgp, 'w').write(svg)
     jp = os.path.join(OUT, 'tee.json')
     print(f'— {jp} ({os.path.getsize(jp) // 1024} КБ), {svgp} ({os.path.getsize(svgp) // 1024} КБ)')
-    svg_to_png(svgp, os.path.join(OUT, 'tee.png'))
+    png_out = os.path.join(OUT, 'tee.png')
+    if svg_to_png(svgp, png_out):
+        os.makedirs(PREVIEW, exist_ok=True)
+        shutil.copyfile(png_out, os.path.join(PREVIEW, 'tee.png'))
+        print(f'  → {os.path.join(PREVIEW, "tee.png")} (превью ≤1024 px для отчёта)')
     print('ИТОГ: ' + ('выкройка сходится' if not bad else f'ОШИБОК: {bad}'))
     return 1 if bad else 0
 

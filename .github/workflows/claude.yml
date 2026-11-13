@@ -18,8 +18,9 @@ jobs:
       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event_name == 'issues' && github.event.issue.author_association || github.event.comment.author_association) &&
       ((github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')))
-    runs-on: ubuntu-latest
-    timeout-minutes: 100
+    # "[gpu]" in the title: the RunPod pod (self-hosted runner, label gpu — tools/runpod/setup.sh): many cores + a GPU, no 100-min cap
+    runs-on: ${{ contains(github.event.issue.title, '[gpu]') && fromJSON('["self-hosted","gpu"]') || 'ubuntu-latest' }}
+    timeout-minutes: ${{ contains(github.event.issue.title, '[gpu]') && 300 || 100 }}
     permissions:
       contents: write
       pull-requests: write
@@ -73,7 +74,7 @@ jobs:
           BOT_EFFORT: high
           ISSUE_TITLE: ${{ github.event.issue.title }}   # "[m=vendor/model]" in the title = any OpenRouter model (e.g. a :free one)
           COMMENT_BODY: ${{ github.event.comment.body }}   # a polish pass: a model tag in the @claude comment overrides the title's for that run
-          BOT_MINUTES: "80"            # the agent stops itself after this (job limit 100), partial work is committed
+          BOT_MINUTES: ${{ contains(github.event.issue.title, '[gpu]') && '270' || '80' }}            # the agent stops itself after this (job limit 100), partial work is committed
           BOT_BUDGET: "8"               # hard cap per task, USD (Claude models; OpenRouter spend is capped by the key's own limit)
         run: |
           if [[ "$ISSUE_TITLE" =~ \[m=([A-Za-z0-9._:/-]+)\] ]]; then BOT_MODEL="${BASH_REMATCH[1]}"; fi

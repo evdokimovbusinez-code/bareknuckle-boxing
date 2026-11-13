@@ -15,16 +15,19 @@ springs. Stored in out/tee_placed.json and in out/tee_placed.blend (objects + a 
 mesh + a JSON text block).
 
 Renders front/side/back (1024 px) to out/place_front.png / place_side.png / place_back.png:
-body grey, pieces coloured, seams as dark lines. Uses Blender Workbench; when there is no
-usable GL context headless (typical in CI), falls back to a built-in pure-Python z-buffer
-rasteriser so the PNGs always get produced.
+body grey, pieces coloured, seams as thin dark lines. The PNGs come from a built-in pure-Python
+z-buffer rasteriser (headless-safe: calling Workbench's bpy.ops.render.render() aborts the
+process in CI with no EGL/Vulkan context). bpy is still used to save tee_placed.blend with the
+objects + sewing edges; no GL render is invoked.
 """
-import json, math, os, sys, zlib, struct
+import json, math, os, shutil, sys, zlib, struct
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, 'out')
+PREVIEW = os.path.join(HERE, 'preview')     # committed report PNGs (out/ is git-ignored)
 GAP = {'body': 0.030, 'sleeve': 0.025, 'band': 0.015}   # metres off the skin per piece kind
-MIN_CLEAR = 0.012                                       # vertices closer than this get pushed
+MIN_CLEAR = 0.020                                       # no cloth vertex may sit closer than 2 cm to the skin
+PUSH_TO = 0.032                                         # such vertices are pushed out to ~3.2 cm (2–4 cm band)
 STEP = 1.0                                              # cm grid
 
 COLORS = {'body': (0.42, 0.42, 0.44), 'front': (0.82, 0.28, 0.28), 'back': (0.24, 0.42, 0.80),
@@ -190,7 +193,7 @@ class Body:
                         self.grid.setdefault((gx, gy, gz), []).append(ti)
 
     def d2tri(self, p, ti):
-        """squared distance from point p to triangle ti"""
+        """(squared distance, closest point) from point p to triangle ti"""
         a, b, c = self.tris[ti]
         A, B, C = self.P[a], self.P[b], self.P[c]
         ab, ac = sub(B, A), sub(C, A)
@@ -207,12 +210,13 @@ class Body:
         if u + w > 1.0:
             u = min(u, w); w = 1.0 - u
         cp = (A[0] + ab[0] * u + ac[0] * w, A[1] + ab[1] * u + ac[1] * w, A[2] + ab[2] * u + ac[2] * w)
-        return (p[0] - cp[0])**2 + (p[1] - cp[1])**2 + (p[2] - cp[2])**2
+        return (p[0] - cp[0])**2 + (p[1] - cp[1])**2 + (p[2] - cp[2])**2, cp
 
-    def nearest2(self, p):
+    def nearest(self, p):
+        """(squared distance to the skin, that closest point) — the point lets a vertex be
+        pushed straight out along the surface normal instead of a possibly-tangential radius."""
         gx = int(p[0] / self.cell); gy = int(p[1] / self.cell); gz = int(p[2] / self.cell)
-        best = 1e18
-        seen = set()
+        best, bestcp = 1e18, None
         for r in range(1, 4):
             if best < (r - 1) * self.cell * (r - 1) * self.cell:
                 break
@@ -222,12 +226,15 @@ class Body:
                         if max(abs(dx), abs(dy), abs(dz)) != r:
                             continue
                         for ti in self.grid.get((gx + dx, gy + dy, gz + dz), ()):
-                            d2 = self.d2tri(p, ti)
+                            d2, cp = self.d2tri(p, ti)
                             if d2 < best:
-                                best = d2
+                                best, bestcp = d2, cp
             if best < (r * self.cell) ** 2:
                 break
-        return best
+        return best, bestcp
+
+    def nearest2(self, p):
+        return self.nearest(p)[0]
 
 
 # ───────────────────────── seams ─────────────────────────
@@ -337,21 +344,21 @@ def raster(body, parts3, seams3, view, path, W=1024, H=1024):
             steps = int(max(abs(b[0] - a[0]), abs(b[1] - a[1]))) + 1
             for s in range(steps + 1):
                 x = int(a[0] + (b[0] - a[0]) * s / steps); y = int(a[1] + (b[1] - a[1]) * s / steps)
-                for ox in (-1, 0, 1):
-                    for oy in (-1, 0, 1):
-                        xx, yy = x + ox, y + oy
-                        if 0 <= xx < W and 0 <= yy < H:
-                            o = (yy * W + xx) * 3
-                            img[o] = 30; img[o + 1] = 20; img[o + 2] = 60
+                if 0 <= x < W and 0 <= y < H:           # thin 1 px lines keep the side view readable
+                    o = (y * W + x) * 3
+                    img[o] = 45; img[o + 1] = 35; img[o + 2] = 95
     write_png(path, W, H, img)
 
 
 def try_blender(body, parts3, seams3, png_paths):
-    """Workbench renders; returns True on success"""
+    """Build tee_placed.blend (objects + seamEdges + a JSON text block) with bpy.
+    The report PNGs are deliberately NOT rendered here: headless Workbench has no EGL/Vulkan
+    context and bpy.ops.render.render() aborts the whole process (seen on bpy 5.3 in CI);
+    they are produced by the built-in z-buffer raster in main() instead."""
     try:
         import bpy
     except Exception as e:
-        print(f'  bpy недоступен ({e.__class__.__name__}) — сработает встроенный растер')
+        print(f'  bpy недоступен ({e.__class__.__name__}) — только встроенный растер')
         return False
     try:
         bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -388,34 +395,11 @@ def try_blender(body, parts3, seams3, png_paths):
         txt = bpy.data.texts.new('tee_placed.json')
         txt.from_string(json.dumps({'parts': {k: {'n': len(v['verts3'])} for k, v in parts3.items()},
                                     'seams': len(seams3)}, ensure_ascii=False))
-        sc.render.engine = 'BLENDER_WORKBENCH'
-        sc.display.shading.light = 'FLAT'
-        sc.display.color_type = 'MATERIAL'
-        sc.render.film_transparent = False
-        sc.render.resolution_x = 1024; sc.render.resolution_y = 1024
-        import mathutils
-        cams = {'front': ((0, 1.25, 3.2), (0, 1.25, 0)), 'side': ((3.2, 1.25, 0), (0, 1.25, 0)),
-                'back': ((0, 1.25, -3.2), (0, 1.25, 0))}
-        for view, (loc, look) in cams.items():
-            cam = bpy.data.cameras.new('c'); cam.type = 'ORTHO'; cam.ortho_scale = 2.15
-            cob = bpy.data.objects.new('cam', cam)
-            sc.collection.objects.link(cob)
-            cob.location = loc
-            d = mathutils.Vector(look) - mathutils.Vector(loc)
-            cob.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler()
-            sc.camera = cob
-            sc.render.filepath = png_paths[view]
-            bpy.ops.render.render(write_still=True)
-            bpy.data.objects.remove(cob); bpy.data.cameras.remove(cam)
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'tee_placed.blend'))
-        print('  blend + Workbench-ренды — Blender')
+        print('  tee_placed.blend: объекты + seamEdges + JSON (Blender, без GL-рендера)')
         return True
     except Exception as e:
-        print(f'  ! Blender-рендер не вышел ({type(e).__name__}: {str(e)[:120]}) — встроенный растер')
-        try:
-            bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'tee_placed.blend'))
-        except Exception:
-            pass
+        print(f'  ! .blend не сохранился ({type(e).__name__}: {str(e)[:120]})')
         return False
 
 
@@ -461,27 +445,32 @@ def main():
             D = (0, 1, 0); AX = (0, 0, A['neck']['zc'])
         else:
             D = (0, 1, 0); AX = (0, 0, A['chest']['zc'])
-        for _ in range(6):
+        for _ in range(10):
             worst = 0
             for i, p in enumerate(V3):
-                d2 = skin.nearest2(p)
-                if d2 < MIN_CLEAR * MIN_CLEAR:
-                    r = sub(p, AX)
-                    perp = (r[0] - dot(r, D) * D[0], r[1] - dot(r, D) * D[1], r[2] - dot(r, D) * D[2])
-                    pl = math.sqrt(dot(perp, perp))
-                    if pl < 1e-6:
-                        continue
-                    push = 2 * MIN_CLEAR - math.sqrt(d2)
-                    V3[i] = tuple(p[k] + perp[k] / pl * push for k in range(3))
+                d2, cp = skin.nearest(p)
+                if d2 < MIN_CLEAR * MIN_CLEAR and cp is not None:
+                    d = math.sqrt(d2)
+                    out = sub(p, cp)                    # straight out along the skin normal
+                    ol = math.sqrt(dot(out, out))
+                    if ol < 1e-6:                      # degenerate: radial fallback
+                        r = sub(p, AX)
+                        out = (r[0] - dot(r, D)*D[0], r[1] - dot(r, D)*D[1], r[2] - dot(r, D)*D[2])
+                        ol = math.sqrt(dot(out, out)) or 1.0
+                    push = PUSH_TO - d
+                    V3[i] = tuple(p[k] + out[k] / ol * push for k in range(3))
                     worst = max(worst, push)
             if worst == 0:
                 break
-        mins = min(math.sqrt(skin.nearest2(p)) for p in V3)
+        dists = sorted(math.sqrt(skin.nearest2(p)) for p in V3)
+        mins, med = dists[0], dists[len(dists) // 2]
         gapmin = GAP[kind]
-        mark = '✓' if mins > MIN_CLEAR else '✗'
-        if mins <= MIN_CLEAR:
+        ok = mins >= MIN_CLEAR - 1e-6                  # ≥2 cm clearance => no intersection with the body
+        mark = '✓' if ok else '✗'
+        if not ok:
             bad += 1
-        print(f'    {name:8}: {len(V3)} вершин, {len(F)} граней, до кожи min {mins*100:4.1f} см (зазор целился {gapmin*100:.1f})')
+        print(f'    {name:8}: {len(V3)} вершин, {len(F)} граней, до кожи min {mins*100:4.1f} / мед. {med*100:.1f} см '
+              f'(цель {gapmin*100:.1f}, без пересечений ≥{MIN_CLEAR*100:.0f}) {mark}')
         parts3[name] = dict(verts3=V3, V2=V, faces=F, color=COLORS[name], grid=(idxmap, cols, nrows))
     # seams -> vertex pairs: sample each edge polyline in pattern space, snap to the nearest
     # (post-push-out) grid vertex, pair the two sides index by index
@@ -525,12 +514,15 @@ def main():
                        for nm, pr in seam_pairs])
     open(os.path.join(OUT, 'tee_placed.json'), 'w').write(json.dumps(jout, ensure_ascii=False))
     png_paths = {v: os.path.join(OUT, f'place_{v}.png') for v in ('front', 'side', 'back')}
-    done = try_blender(bd, parts3, [pr for _, pr in seam_pairs], png_paths)
-    if not done:
-        print('  растер: собственный z-buffer рендер (1024 px)…')
-        for view, path in png_paths.items():
-            raster(bd, parts3, [pr for _, pr in seam_pairs], view, path)
-            print(f'    → {path}')
+    try_blender(bd, parts3, [pr for _, pr in seam_pairs], png_paths)   # .blend for step 3
+    print('  растер: собственный z-buffer рендер (1024 px) — отчётные PNG…')
+    for view, path in png_paths.items():
+        raster(bd, parts3, [pr for _, pr in seam_pairs], view, path)
+        print(f'    → {path}')
+    os.makedirs(PREVIEW, exist_ok=True)
+    for view, path in png_paths.items():
+        shutil.copyfile(path, os.path.join(PREVIEW, f'place_{view}.png'))
+    print(f'  превью → {PREVIEW} (place_front/side/back.png, ≤1024 px)')
     print('ИТОГ: ' + ('раскладка без пересечений' if not bad else f'ПРОБЛЕМ: {bad}'))
     return 1 if bad else 0
 
