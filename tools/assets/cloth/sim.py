@@ -1,110 +1,71 @@
 #!/usr/bin/env python3
-"""Issue #56 — sew the tee pieces and simulate them into a high-poly T-shirt (Blender cloth, headless).
+"""Issue #56 — sew the pattern pieces into a T-shirt with Blender cloth (headless), Marvelous/CLO style.
 
-    python3 tools/assets/cloth/sim.py        (also: python3 tools/assets/ --only sim)
+    bash tools/assets/cloth/run_all.sh      # full pipeline (tee sim, then pants placement + pants sim)
+    python3 tools/assets/ --only sim [--garment pants]
 
-Reads out/body.obj + out/tee.json + out/tee_placed.json from step 1 (place.py).
+Reads out/body.obj (+ body_skin.json) and the step-1 pattern (out/tee.json / out/pants.json).
+The pieces are re-laid at the sim resolution with the SAME benders as place.py / pants.py; they
+are NOT pre-sewn: the seam gaps (shoulders up to ~30 cm) are left exactly as the placement gives
+them, like separate panels in a real sewing room.
 
-Step 1 lays the pieces on body cylinders 2–4 cm off the skin, so the seam edges start FAR apart
-(shoulders ≈30 cm, sleeve caps ≈15–20 cm — see the seam report of place.py). Blender's sewing
-springs cannot close gaps that size in 30–60 frames without tearing or exploding the mesh, so
-the sewing happens in three stages:
+Method (two physics phases; no Laplacian relax, no weld before the sim — issue #56 discussion):
 
- 1. pre-sew (deterministic, pure Python): the pieces are re-placed at a finer grid (STEP_SIM cm),
-    every seam pair of vertices from tee_placed.json is moved to its midpoint (this lays the
-    shoulder seams over the shoulders and closes the side/sleeve seams), the pieces are relaxed
-    with a Laplacian pass over their warp grid and pushed clear of the body again (≥2 cm);
- 2. weld: each seam pair is merged into one vertex — the shirt becomes a single manifold shell.
-    Measured: with the pairs merely coincident-but-separate, self-collision repels every crossing
-    pair at once and hurls whole panels metres away (seam gaps of 8 m by frame ~30). The weld is
-    exactly what the springs converge to, but stable; sewing springs stay enabled
-    (use_sewing_springs + sewing_force_max 15) and the seam vertices are pinned as extra insurance;
- 3. cloth simulation (bpy, knit cotton): mass 0.15 kg/m², tension/compression 15, shear 5,
-    bending 0.5, self-collision ~3 mm; body = Collision modifier (thickness_outer
-    5 mm, cloth friction 5). The task asks quality ≥8 — measured 37 s/frame on this CI box
-    (≈75 min for the run), so the default here is 6 (≈3.5 s/frame, same geometry/resolution);
-    SIM_QUALITY=8 reproduces the spec value on the [gpu] pod. FRAMES_SEW frames of sewing +
-    FRAMES_SETTLE of settling. The cache is baked by stepping the frames, the modifier is
-    applied on the last frame.
+  1. JOIN: pieces become ONE mesh with separate islands. Each seam is a set of LOOSE EDGES
+     connecting a pair of boundary vertices (an edge with no face). Blender Cloth turns those
+     into "Sewing springs" (use_sewing_springs + sewing_force_max).
+  2. SEW phase (~50 frames): gravity 0, shrink_min ~0.08, self-collision OFF, body collision ON.
+     The sewing springs pull the seams together by themselves; fabric settles on the shoulders /
+     chest against the collider.
+  3. WELD: once seam gaps are < 3 mm, merge the seam pairs (union-find over seam vertices only)
+     into one manifold shell; drop the loose sewing edges. Pattern UVs are kept PER FACE CORNER
+     (a welded vertex belongs to two UV islands, so a per-vertex UV would tear the atlas).
+  4. SETTLE phase (~60 frames): gravity ON, shrink_min 0, self-collision ON (3 mm), knit-cotton
+     settings. The welded shell drapes and forms folds.
+  5. OUTPUT: out/{tee|pants}_high.obj (triangles + per-corner pattern UV normalised 0..1 over the
+     sheet, needed for baking) and out/{tee|pants}_high.blend. Previews come from place.py's
+     z-buffer raster (bpy.ops.render.render aborts headless CI): front/side/back + a close-up.
 
-Outputs: out/tee_high.obj (triangles + UVs kept from the pattern: each vertex carries its 2D
-coordinate on the pattern sheet, normalised to 0..1 — needed for baking in the next step) and
-out/tee_high.blend. Previews preview/sim_front|side|back.png + sim_close.png (shoulder/armpit)
-come from place.py's z-buffer raster (bpy.ops.render.render() aborts headless CI — see step 1).
+Prints the checks: triangles (20–120k), mean seam gap (<0.3 cm), share of vertices inside the body
+(<0.5%), max edge stretch (<3x the rest length), simulation time. A tiny self-test at startup
+verifies the sewing-spring mechanism and dumps this build's cloth RNA.
 
-Prints the checks: triangle count (target 40–120k), mean seam gap (<0.3 cm), share of vertices
-inside the body (<0.5%), max edge stretch (<3× the rest length), simulation time.
+The task asks quality >= 8; measured on this CPU-only CI box that is ~37 s/frame. The reviewer
+explicitly allows a coarser/cheaper run when CPU-bound (net step 1–1.2 cm, quality 5) — clean
+form matters more than density. SIM_QUALITY / SIM_STEP / SIM_SEW / SIM_SETTLE override the defaults.
 """
 import json, math, os, shutil, sys, time
 from collections import defaultdict
+import bpy                                              # Blender as a module (headless CI)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, 'out')
 PREVIEW = os.path.join(HERE, 'preview')
 sys.path.insert(0, HERE)
-import place                                            # reuse grid/bender/Body/raster from step 1
-from place import (sub, dot, cross, nrm, build_grid, bender, band_bender, Body,
-                   edge_pts, sample_polyline, COLORS)
+import place
+from place import sub, dot, cross, nrm, build_grid, bender, band_bender, Body, \
+    edge_pts, sample_polyline, COLORS
 
-STEP_SIM = float(os.environ.get('SIM_STEP', '0.70'))   # cm, warp grid of the high-poly cloth (≈44k triangles — target 40–120k)
-MIN_CLEAR, PUSH_TO = 0.020, 0.032                       # same clearance band as place.py
-RELAX_ITERS, RELAX_LAMBDA = 150, 0.30                   # pre-sew Laplacian passes over the grid
+# ── tunables (metres, seconds; the reviewer's Marvelous/CLO recipe) ────────────────────────────
+STEP_SIM = float(os.environ.get('SIM_STEP', '0.9'))     # cm, warp grid of the high-poly cloth
+MIN_CLEAR, PUSH_TO = 0.020, 0.032                       # push-out band, same as place.py
 FPS = 24
-FRAMES_SEW = int(os.environ.get('SIM_SEW', '30'))       # sewing springs close/hold, then shrink-settle
-FRAMES_SETTLE = int(os.environ.get('SIM_SETTLE', '60'))
+FRAMES_SEW = int(os.environ.get('SIM_SEW', '55'))       # phase 1: seams close by sewing springs
+FRAMES_SETTLE = int(os.environ.get('SIM_SETTLE', '60')) # phase 2: gravity + self-collision settle
+QUALITY = int(os.environ.get('SIM_QUALITY', '5'))       # CPU-bound default; SIM_QUALITY=8 on [gpu]
 FABRIC = dict(area_mass=0.15, tension=15.0, compression=15.0, shear=5.0, bending=0.5,
-              # the task asks quality >= 8: measured 37 s/frame on this 4-core CI box (≈75 min for
-              # 120 frames, doesn't fit the job window). 6 = 64 substeps, ~9 s/frame; the heavy q8
-              # run goes to the [gpu] pod later. SIM_QUALITY=8 reproduces the spec value.
-              quality=int(os.environ.get('SIM_QUALITY', '6')), self_dist=0.003, coll_thick=0.005,
-              friction=5.0, sew_dist=0.02, sew_force=15.0, sew_influence=1.0)
-PRESEW_CACHE = 'tee_presew.json'                        # cached sewn rest mesh (resume without re-running the slow pure-Python steps)
-PRESEW_VER = 2                                          # bump when the pre-sew logic changes (invalidates the cache)
-END_SEAM = 'бейка, конец к концу'                       # its corners are also pinned by the neckline seam — applied last
-PART_ORDER = ['front', 'back', 'sleeveP', 'sleeveM', 'band']
-# pattern-sheet layout of pattern.py sheet_svg (px at 4.5 px/cm + margin) → non-overlapping UV atlas
-SHEET_LAY = {'front': (0, 0), 'back': (340, 0), 'sleeveP': (0, 340), 'sleeveM': (300, 340), 'band': (0, 545)}
-SHEET_SC, SHEET_MX, SHEET_MY, SHEET_W, SHEET_H = 4.5, 150.0, 130.0, 780.0, 730.0
+              self_dist=0.003, coll_thick=0.005, friction=5.0,
+              sew_force=float(os.environ.get('SIM_SEW_FORCE', '25')))   # reviewer: 10–30
+SHRINK_SEW = float(os.environ.get('SIM_SHRINK', '0.08'))  # reviewer: 0.05–0.1
+WELD_GAP = 0.003                                          # weld seam pairs closer than 3 mm
+REST_VER = 3                                              # bump to invalidate the cached rest mesh
+COTTON = (0.78, 0.74, 0.68)
 
 
-# ───────────────────────── 1. re-place the pieces at the sim resolution ─────────────────────────
-def build_parts(tee, skin):
-    A = dict(tee['anchors'])
-    prm = tee['params']
-    A['cap_h'] = prm['cap_h']
-    A['band_y'] = A['neck']['y'] - 0.02
-    ytip = A['nape_y'] - prm['y_tip'] / 100
-    A['sleeve_tip'] = {1: (prm['tipx'] / 100, ytip, A['arms']['L']['bicep_cz']),
-                       -1: (-prm['tipx'] / 100, ytip, A['arms']['R']['bicep_cz'])}
-    parts = {}
-    print(f'— раскладка деталей (сетка {STEP_SIM} см):')
-    for name, part in tee['parts'].items():
-        poly = [tuple(p) for p in part['pts']]
-        V, F, idxmap, cols, nrows = build_grid(poly, STEP_SIM)
-        f = bender(name, A)
-        if f is None:
-            f = band_bender(A, tee, bender('front', A), bender('back', A))
-        V3 = [f(u, v) for u, v in V]
-        kind = 'sleeve' if name.startswith('sleeve') else ('band' if name == 'band' else 'body')
-        if kind == 'sleeve':
-            s = 1 if name == 'sleeveP' else -1
-            ar = A['arms']['L' if s > 0 else 'R']
-            axp0 = (ar['bicep_cx'], ar['bicep_y'], ar['bicep_cz'])
-            axp1 = (ar['elbow_cx'], ar['elbow_y'], ar['elbow_cz'])
-            D = nrm(sub(axp1, axp0))
-        elif kind == 'band':
-            D = (0, 1, 0)
-        else:
-            D = (0, 1, 0)
-        pushclear(V3, skin, D, (0, 0, A['neck']['zc'] if kind == 'band' else A['chest']['zc']))
-        parts[name] = dict(verts3=V3, V2=V, faces=F, idxmap=idxmap, cols=cols, nrows=nrows)
-        print(f'    {name:8}: {len(V3)} вершин, {len(F)} граней')
-    return parts
-
-
-def pushclear(V3, skin, D=(0, 1, 0), AX=(0, 0, 0)):
-    """move vertices to at least MIN_CLEAR from the skin, along the skin normal (as place.py)"""
-    for _ in range(10):
+# ───────────────────────── 1. re-lay the pieces at sim resolution ─────────────────────────
+def pushclear(V3, skin, iters=12):
+    """move vertices to at least MIN_CLEAR from the skin, along the surface normal (as place.py)"""
+    for _ in range(iters):
         worst = 0.0
         for i, p in enumerate(V3):
             d2, cp = skin.nearest(p)
@@ -113,8 +74,7 @@ def pushclear(V3, skin, D=(0, 1, 0), AX=(0, 0, 0)):
                 out = sub(p, cp)
                 ol = math.sqrt(dot(out, out))
                 if ol < 1e-6:
-                    r = sub(p, AX)
-                    out = (r[0] - dot(r, D) * D[0], r[1] - dot(r, D) * D[1], r[2] - dot(r, D) * D[2])
+                    out = (p[0], 0.0, p[2])         # radial fallback from the world Y axis
                     ol = math.sqrt(dot(out, out)) or 1.0
                 push = PUSH_TO - d
                 V3[i] = tuple(p[k] + out[k] / ol * push for k in range(3))
@@ -123,32 +83,66 @@ def pushclear(V3, skin, D=(0, 1, 0), AX=(0, 0, 0)):
             break
 
 
-# ───────────────────────── 2. seams as vertex-index pairs ─────────────────────────
-def edge_idx_list(part, pt3, ename):
+def build_parts(garment, pat, skin, bodyP, bodyT):
+    """returns {name: {verts3, V2 (pattern cm), faces}}. Uses the SAME benders as step 1."""
+    if garment == 'tee':
+        A = dict(pat['anchors']); prm = pat['params']
+        A['cap_h'] = prm['cap_h']
+        A['band_y'] = A['neck']['y'] - 0.02
+        ytip = A['nape_y'] - prm['y_tip'] / 100
+        A['sleeve_tip'] = {1: (prm['tipx'] / 100, ytip, A['arms']['L']['bicep_cz']),
+                           -1: (-prm['tipx'] / 100, ytip, A['arms']['R']['bicep_cz'])}
+        benders = {}
+        for name in pat['parts']:
+            f = bender(name, A)
+            if f is None:                                   # the collar strip, along the neckline
+                f = band_bender(A, pat, bender('front', A), bender('back', A))
+            benders[name] = f
+    else:                                                    # pants: step-1 bender needs its measures
+        import pants as PN
+        sk = json.load(open(os.path.join(OUT, 'body_skin.json')))
+        M = PN.measure(bodyP, bodyT, sk)
+        benders = {name: PN.bender(M, name, [tuple(p) for p in part['pts']])
+                   for name, part in pat['parts'].items()}
+    parts = {}
+    print(f'— раскладка деталей без пошива (сетка {STEP_SIM} см):')
+    for name, part in pat['parts'].items():
+        poly = [tuple(p) for p in part['pts']]
+        V, F, idxmap, cols, nrows = build_grid(poly, STEP_SIM)
+        f = benders[name]
+        V3 = [f(u, v) for u, v in V]
+        pushclear(V3, skin, 30 if garment == 'pants' else 12)
+        parts[name] = dict(verts3=V3, V2=V, faces=F)
+        print(f'    {name:9}: {len(V3)} вершин, {len(F)} граней')
+    return parts
+
+
+# ───────────────────────── 2. seams as vertex-index pairs (→ loose edges) ─────────────────────────
+def edge_idx_list(part, pt, ename):
     """grid vertices along a pattern edge, ordered along it (same sampling as place.py)"""
     poly = edge_pts(part, ename)
     out, last = [], -1
-    for sp in sample_polyline([(x, y, 0) for x, y in poly], every=1.2):
+    for sp in sample_polyline([(x, y, 0) for x, y in poly], every=STEP_SIM * 1.2):
         u, v = sp[0], sp[1]
         best, bi = 1e18, None
-        for i, (vu, vv) in enumerate(pt3['V2']):
+        for i, (vu, vv) in enumerate(pt['V2']):
             if i == last:
                 continue
             d2 = (vu - u) ** 2 + (vv - v) ** 2
             if d2 < best:
                 best, bi = d2, i
-        if bi is not None and best < 3.6 ** 2:
-            out.append(bi)
-            last = bi
+        if bi is not None and best < (3.6) ** 2:
+            out.append(bi); last = bi
     return out
 
 
-def seam_index_pairs(tee, parts):
+def seam_pairs(pat, parts):
+    """[(name, [(partA_index, partB_index), ...])] in PATTERN-LOCAL vertex indices"""
     seams = []
-    for s in tee['seams']:
+    for s in pat['seams']:
         def side(spec):
             pname, ename = spec[0], spec[1]
-            idx = edge_idx_list(tee['parts'][pname], parts[pname], ename)
+            idx = edge_idx_list(pat['parts'][pname], parts[pname], ename)
             return list(reversed(idx)) if len(spec) > 2 and spec[2] else idx
         a, b = [], []
         for spec in s['a']:
@@ -159,119 +153,73 @@ def seam_index_pairs(tee, parts):
     return seams
 
 
-# ───────────────────────── 3. pre-sew: midpoints + Laplacian relax + push clear ─────────────────────────
-def presew(parts, seams, skin):
-    print('— пошив (предварительная стяжка швов):')
-    pins = defaultdict(list)                              # (part, idx) -> midpoint targets
-    for name, pairs in seams:
-        if name == END_SEAM:
-            continue                                      # applied last, see below
-        for (pa, ia), (pb, ib) in pairs:
-            va, vb = parts[pa]['verts3'][ia], parts[pb]['verts3'][ib]
-            mid = tuple((va[k] + vb[k]) / 2 for k in range(3))
-            pins[(pa, ia)].append(mid)
-            pins[(pb, ib)].append(mid)
-    for (pa, ia), mids in pins.items():
-        parts[pa]['verts3'][ia] = tuple(sum(m[k] for m in mids) / len(mids) for k in range(3))
-    # the band's two end corners are also pinned by the neckline seam (whose midpoints differ by
-    # ~18 cm across the shoulder) — re-pin the end pairs to the midpoint of their CURRENT spots,
-    # both sides to one point, so the collar ring actually closes
-    for name, pairs in seams:
-        if name != END_SEAM:
-            continue
-        for (pa, ia), (pb, ib) in pairs:
-            va, vb = parts[pa]['verts3'][ia], parts[pb]['verts3'][ib]
-            mid = tuple((va[k] + vb[k]) / 2 for k in range(3))
-            parts[pa]['verts3'][ia] = mid
-            parts[pb]['verts3'][ib] = mid
-    for name, pt in parts.items():                        # the pulled-together band may sit in the body
-        pushclear(pt['verts3'], skin)
-    pinned = defaultdict(set)
-    for pa, ia in pins:
-        pinned[pa].add(ia)
-    # Laplacian relaxation over each piece's warp grid, pinned seam vertices stay
-    nbr = {}
-    for name, pt in parts.items():
-        idxmap, nrows = pt['idxmap'], pt['nrows']
-        nb = defaultdict(list)
-        for ci, row in enumerate(idxmap):
-            for j, vi in enumerate(row):
-                if ci > 0:
-                    nb[vi].append(idxmap[ci - 1][j])
-                if ci + 1 < len(idxmap):
-                    nb[vi].append(idxmap[ci + 1][j])
-                if j > 0:
-                    nb[vi].append(row[j - 1])
-                if j < nrows:
-                    nb[vi].append(row[j + 1])
-        nbr[name] = nb
-        pt['free'] = [v for v in nb if v not in pinned[name]]
-    for it in range(RELAX_ITERS):
-        for name, pt in parts.items():
-            V3, nb = pt['verts3'], nbr[name]
-            new = {}
-            for vi in pt['free']:
-                ns = nb[vi]
-                avg = tuple(sum(V3[k][c] for k in ns) / len(ns) for c in range(3))
-                p = V3[vi]
-                new[vi] = tuple(p[c] + RELAX_LAMBDA * (avg[c] - p[c]) for c in range(3))
-            for vi, q in new.items():
-                V3[vi] = q
-    for name, pt in parts.items():
-        pushclear(pt['verts3'], skin)
-    for name, pairs in seams:
-        g = [math.dist(parts[pa]['verts3'][ia], parts[pb]['verts3'][ib]) for (pa, ia), (pb, ib) in pairs]
-        print(f'    {name:22}: {len(pairs)} пар, зазор после стяжки '
-              f'сред. {sum(g)/len(g)*100:4.2f} / макс {max(g)*100:4.1f} см')
+# ───────────────────────── 3. pattern UV (non-overlapping atlas, 0..1) ─────────────────────────
+def sheet_uv(parts):
+    """each vertex gets its 2D coordinate on its pattern piece (cm), normalised to 0..1 over a
+    sheet of tiled pieces (parts must not overlap in UV space — needed for the baking step)"""
+    boxes, order = {}, list(parts)
+    for name in order:
+        us = [p[0] for p in parts[name]['V2']]; vs = [p[1] for p in parts[name]['V2']]
+        boxes[name] = (min(us), min(vs), max(us), max(vs))
+    cw = max(b[2] - b[0] for b in boxes.values()) * 1.12 + 1.0
+    ch = max(b[3] - b[1] for b in boxes.values()) * 1.12 + 1.0
+    ncol = math.ceil(math.sqrt(len(order)))
+    nrow = math.ceil(len(order) / ncol)
+    W, H = cw * ncol, ch * nrow
+    uv = {}
+    for k, name in enumerate(order):
+        u0, v0 = boxes[name][0], boxes[name][1]
+        ox, oy = (k % ncol) * cw, (k // ncol) * ch
+        uv[name] = [((ox + (u - u0) + 0.5) / W, 1.0 - (oy + (v - v0) + 0.5) / H)
+                    for u, v in parts[name]['V2']]
+    return uv
 
 
-# ───────────────────────── 4. join pieces into one mesh + pattern UVs ─────────────────────────
-def join(parts, seams, tee):
-    V, F, PID, UV = [], [], [], []
-    off = {}
-    for name in PART_ORDER:
-        pt = parts[name]
+def join(parts, seams, uv):
+    """ONE mesh, separate islands. Seam pairs become LOOSE edges (Blender sewing springs)."""
+    V, F, UV, off = [], [], [], {}
+    for name, pt in parts.items():
         off[name] = len(V)
         base = len(V)
         V += pt['verts3']
-        PID += [name] * len(pt['verts3'])
         F += [[a + base, b + base, c + base] for a, b, c in pt['faces']]
-        ox, oy = SHEET_LAY[name]
-        for u, v in pt['V2']:
-            UV.append(((ox + SHEET_MX + SHEET_SC * u) / SHEET_W,
-                       1.0 - (oy + SHEET_MY + SHEET_SC * v) / SHEET_H))
-    seamG = [(nm, [(off[pa] + ia, off[pb] + ib) for (pa, ia), (pb, ib) in pr]) for nm, pr in seams]
-    return V, F, PID, UV, seamG, off
+        UV += uv[name]
+    seamG, E = [], []
+    for nm, pr in seams:
+        pairs = [(off[pa] + ia, off[pb] + ib) for (pa, ia), (pb, ib) in pr]
+        seamG.append((nm, pairs))
+        E += pairs
+    # de-duplicate loose edges (a corner vertex can be shared by two seams)
+    E = sorted({(min(a, b), max(a, b)) for a, b in E if a != b})
+    return V, F, UV, seamG, E, off
 
 
 def mesh_area(V, F):
     s = 0.0
     for a, b, c in F:
-        s += math.sqrt(dot(cross(sub(V[b], V[a]), sub(V[c], V[a])), cross(sub(V[b], V[a]), sub(V[c], V[a])))) / 2
+        e1, e2 = sub(V[b], V[a]), sub(V[c], V[a])
+        n = cross(e1, e2)
+        s += math.sqrt(dot(n, n)) / 2
     return s
 
 
-# ───────────────────────── 5. Blender cloth simulation ─────────────────────────
+# ───────────────────────── 4. Blender RNA helpers ─────────────────────────
 def setp(ob, name, val, log, miss):
     try:
-        setattr(ob, name, val)
-        log.append(f'{name}={val}')
-        return True
-    except (AttributeError, TypeError):
-        miss.append(name)
-        return False
+        setattr(ob, name, val); log.append(f'{name}={val}'); return True
+    except (AttributeError, TypeError, ValueError):
+        miss.append(name); return False
 
 
 def try_names(ob, candidates, val, log, miss):
     for nm in candidates:
         if hasattr(ob, nm):
             return setp(ob, nm, val, log, miss)
-    miss.extend(candidates)
-    return False
+    miss.extend(candidates); return False
 
 
-def fix_degenerate(V, F, minlen=0.002):
-    """rest edges shorter than 2 mm give zero-length springs and blow up the solver — stretch them out"""
+def fix_degenerate(V, F, minlen=0.0015):
+    """rest edges shorter than 1.5 mm give zero-length springs → nudge them apart"""
     seen, fixed = set(), 0
     for a, b, c in F:
         for u, v in ((a, b), (b, c), (a, c)):
@@ -283,184 +231,226 @@ def fix_degenerate(V, F, minlen=0.002):
             d = math.dist(pu, pv)
             if d < minlen:
                 fixed += 1
-                dirv = tuple((pv[k] - pu[k]) / d for k in range(3)) if d > 1e-6 else (0.0, 0.0, 1.0)
+                dirv = tuple((pv[k] - pu[k]) / d for k in range(3)) if d > 1e-9 else (0.0, 0.0, 1.0)
                 V[e[1]] = [pu[k] + dirv[k] * (minlen + 0.0005) for k in range(3)]
     if fixed:
         print(f'— исправлено коротких рёбер: {fixed} (<{minlen*1000:.0f} мм)')
     return fixed
 
 
-def weld(V, F, UV, seamG):
-    """sewing = merging each seam pair into one vertex: the shirt becomes a single manifold
-    shell. Coincident-but-separate seam vertices are what blew up self-collision (it repels
-    every crossing pair at once and hurls whole panels metres away); a welded seam is exact,
-    stable and what the springs converge to anyway. Sewing springs stay enabled for anything
-    the weld left open."""
-    par = list(range(len(V)))
-
-    def find(i):
-        while par[i] != i:
-            par[i] = par[par[i]]
-            i = par[i]
-        return i
-
-    for _, pr in seamG:
-        for a, b in pr:
-            ra, rb = find(a), find(b)
-            if ra != rb:
-                par[rb] = ra
-    remap, WV, WUV = {}, [], []
-    for i in range(len(V)):
-        r = find(i)
-        if r not in remap:
-            remap[r] = len(WV)
-            WV.append(list(V[r]))
-            WUV.append(UV[r])
-    WF, dropped = [], 0
-    for a, b, c in F:
-        x, y, z = remap[find(a)], remap[find(b)], remap[find(c)]
-        if x == y or y == z or x == z:
-            dropped += 1
-            continue
-        WF.append((x, y, z))
-    WseamG = [(nm, [(remap[find(a)], remap[find(b)]) for a, b in pr]) for nm, pr in seamG]
-    print(f'— сшивка сваркой: {len(V) - len(WV)} пар вершин слито, граней потеряно {dropped}, '
-          f'осталось {len(WV)} вершин / {len(WF)} треугольников')
-    return WV, WF, WUV, WseamG
+# ───────────────────────── 5. cloth settings (both phases) ─────────────────────────
+def cfg(st, cs, mass, sewing, shrink, self_coll, quality):
+    log, miss = [], []
+    def S(ob, names, val):
+        try_names(ob, names, val, log, miss)
+    S(st, ['quality'], quality)
+    S(st, ['mass'], mass)
+    S(st, ['tension_stiffness'], FABRIC['tension'])
+    S(st, ['compression_stiffness'], FABRIC['compression'])
+    S(st, ['shear_stiffness'], FABRIC['shear'])
+    S(st, ['bending_stiffness'], FABRIC['bending'])
+    S(st, ['shrink_min'], shrink)                       # sewing phase contracts the knit a little
+    S(st, ['shrink_max'], shrink)
+    S(st, ['use_sewing_springs'], bool(sewing))
+    if sewing:
+        S(st, ['sewing_force_max', 'sewing_spring_max', 'max_sewing_force'], FABRIC['sew_force'])
+    S(st, ['max_velocity'], 50.0)                       # clamp a diverging frame
+    S(cs, ['use_collision'], True)
+    S(cs, ['distance_min'], FABRIC['self_dist'])
+    S(cs, ['use_self_collision'], bool(self_coll))
+    if self_coll:
+        S(cs, ['self_distance_min', 'self_distance'], FABRIC['self_dist'])
+    S(cs, ['friction', 'object_friction'], FABRIC['friction'])
+    return log, miss
 
 
-def simulate(V, F, UV, bodyP, bodyT, mass, seamG):
-    import bpy
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    sc = bpy.context.scene
-    sc.render.fps = FPS
-    sc.frame_start, sc.frame_end = 1, FRAMES_SEW + FRAMES_SETTLE
-    # body: Collision
+def make_body_collider(sc, bodyP, bodyT):
     me = bpy.data.meshes.new('body')
     me.from_pydata([list(p) for p in bodyP], [], [list(t) for t in bodyT])
-    me.validate()
-    me.update()
+    me.validate(); me.update()
     ob = bpy.data.objects.new('body', me)
     sc.collection.objects.link(ob)
     cm = ob.modifiers.new('Collision', 'COLLISION')
-    log, miss = [], []
     cset = getattr(cm, 'settings', cm)
-    print('  collision modifier RNA:', ', '.join(p.identifier for p in cset.bl_rna.properties if not p.is_readonly))
+    log, miss = [], []
     try_names(cset, ['thickness_outer'], FABRIC['coll_thick'], log, miss)
     try_names(cset, ['thickness_inner'], 0.001, log, miss)
-    # bpy 5.3: the collider has a global friction_factor (default 50) scaled per effect by cloth_friction
     try_names(cset, ['cloth_friction', 'friction'], FABRIC['friction'], log, miss)
-    print('  collision: ' + ', '.join(log) + (f'  (нет: {miss})' if miss else ''))
-    # cloth: one mesh, loose parts, sewing springs
-    cme = bpy.data.meshes.new('tee_cloth')
-    cme.from_pydata([list(p) for p in V], [], [list(f) for f in F])
-    cme.validate()
-    cme.update()
-    cob = bpy.data.objects.new('tee', cme)
+    return ob, log, miss
+
+
+def run_phase(tag, V, F, E_sew, bodyP, bodyT, mass, frames, gravity, sewing, shrink,
+              self_coll, quality, blend=None):
+    """one cloth bake in a fresh scene. blend=(path, WV, WF, loop_uv) saves the final .blend."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    sc = bpy.context.scene
+    sc.render.fps = FPS
+    sc.gravity = gravity
+    sc.frame_start, sc.frame_end = 1, frames
+    make_body_collider(sc, bodyP, bodyT)
+    cme = bpy.data.meshes.new('cloth')
+    cme.from_pydata([list(p) for p in V], [list(e) for e in E_sew], [list(f) for f in F])
+    cme.update()          # NOTE: do NOT validate() — it drops the loose sewing edges
+    nloose = sum(1 for e in cme.edges if e.is_loose) if hasattr(cme.edges[0], 'is_loose') else \
+        (len(cme.edges) - len({tuple(sorted(e.vertices)) for p in cme.polygons for e in p.edge_keys}))
+    cob = bpy.data.objects.new('cloth', cme)
     sc.collection.objects.link(cob)
     md = cob.modifiers.new('Cloth', 'CLOTH')
     st, cs = md.settings, md.collision_settings
-    # pin every seam vertex: the sewn pairs sit coincident, and self-collision between coincident
-    # vertices of different islands is what blew the solver up (8 m gaps by frame ~30). The pins
-    # hold the seam line exactly where the pre-sew put it; the free fabric settles around it.
-    vg = cob.vertex_groups.new(name='sew_pins')
-    ids = sorted({i for _, pr in seamG for ab in pr for i in ab})
-    vg.add(ids, 1.0, 'REPLACE')
-    st.vertex_group_mass = 'sew_pins'
-    print(f'    pinned seam vertices: {len(ids)}')
-    log, miss = [], []
-    print('  cloth settings RNA:', ', '.join(p.identifier for p in st.bl_rna.properties if not p.is_readonly))
-    print('  cloth collision RNA:', ', '.join(p.identifier for p in cs.bl_rna.properties if not p.is_readonly))
-    try_names(st, ['quality'], FABRIC['quality'], log, miss)
-    try_names(st, ['mass'], mass, log, miss)
-    try_names(st, ['tension_stiffness'], FABRIC['tension'], log, miss)
-    try_names(st, ['compression_stiffness'], FABRIC['compression'], log, miss)
-    try_names(st, ['shear_stiffness'], FABRIC['shear'], log, miss)
-    try_names(st, ['bending_stiffness'], FABRIC['bending'], log, miss)
-    try_names(st, ['use_sewing_springs'], True, log, miss)
-    try_names(st, ['sewing_force_max', 'sewing_spring_max', 'max_sewing_force'], FABRIC['sew_force'], log, miss)
-    # bpy 5.3 has no max_sew_distance/sewing_influence RNA any more — sewing distance is automatic;
-    # our pre-sew leaves seam pairs coincident, so any sane default catches them
-    try_names(st, ['max_sew_distance'], FABRIC['sew_dist'], log, miss)
-    try_names(st, ['sewing_influence'], FABRIC['sew_influence'], log, miss)
-    try_names(st, ['max_velocity'], 50.0, log, miss)      # clamp: a diverging frame must not teleport vertices
-    try_names(cs, ['use_collision'], True, log, miss)
-    try_names(cs, ['distance_min'], FABRIC['self_dist'], log, miss)
-    try_names(cs, ['use_self_collision'], True, log, miss)
-    try_names(cs, ['self_distance_min', 'self_thickness'], FABRIC['self_dist'], log, miss)
-    try_names(cs, ['friction', 'object_friction'], FABRIC['friction'], log, miss)
-    print('  cloth: ' + ', '.join(log) + (f'  (нет: {sorted(set(miss))})' if miss else ''))
-    # step the frames (this is the cache bake)
+    log, miss = cfg(st, cs, mass, sewing, shrink, self_coll, quality)
+    print(f'  [{tag}] гравитация {gravity}, кадров {frames}, quality {quality}, '
+          f'рёбер-швов {len(E_sew)} (loose={nloose}), вершин {len(V)}')
+    print(f'  [{tag}] ткань: ' + ', '.join(log) + (f'  (нет RNA: {sorted(set(miss))})' if miss else ''))
     t0 = time.time()
-    for fr in range(1, sc.frame_end + 1):
+    for fr in range(1, frames + 1):
         sc.frame_set(fr)
-        if fr == 5 or fr % 20 == 0:
+        if fr == 5 or fr % 15 == 0 or fr == frames:
             el = time.time() - t0
-            print(f'    кадр {fr}/{sc.frame_end}: {el:.0f} с (~{el/fr:.2f} с/кадр)')
+            print(f'    кадр {fr}/{frames}: {el:.0f} с (~{el/fr:.2f} с/кадр)')
     t_sim = time.time() - t0
     dep = bpy.context.evaluated_depsgraph_get()
     ev = cob.evaluated_get(dep)
     m2 = ev.to_mesh()
     Vs = [tuple(v.co) for v in m2.vertices]
-    # apply on the last frame: bake the evaluated geometry back into the mesh, drop the modifier
-    fin = bpy.data.meshes.new('tee_high')
-    fin.from_pydata([list(p) for p in Vs], [], [list(f) for f in F])
-    fin.validate()
-    fin.update()
-    uvl = fin.uv_layers.new(name='UVMap')
-    for p in fin.polygons:
-        for k, vi in enumerate(p.vertices):
-            uvl.data[p.loop_start + k].uv = UV[vi]
-    fin.update()
-    cob.modifiers.remove(md)
-    cob.data = fin
-    cob.name = 'tee_high'
     ev.to_mesh_clear()
-    bpy.data.meshes.remove(cme)
-    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'tee_high.blend'))
-    print(f'  tee_high.blend сохранён (модификатор применён на кадре {sc.frame_end})')
+    if blend:
+        path, WV, WF, loop_uv = blend
+        fin = bpy.data.meshes.new('high')
+        fin.from_pydata([list(p) for p in WV], [], [list(f) for f in WF])
+        fin.update()
+        uvl = fin.uv_layers.new(name='UVMap')
+        for pi, poly in enumerate(fin.polygons):
+            for k, li in enumerate(poly.loop_indices):
+                uvl.data[li].uv = loop_uv[pi][k]
+        fin.update()
+        cob.modifiers.remove(md)
+        cob.data = fin
+        cob.name = 'high'
+        bpy.ops.wm.save_as_mainfile(filepath=path)
+        print(f'  → {os.path.basename(path)} (модификатор применён на кадре {frames})')
     return Vs, t_sim
 
 
-# ───────────────────────── 6. checks ─────────────────────────
-def check_seams(V, seamG):
+def probe():
+    """cheap self-test: two quads 30 cm apart joined by ONE loose edge. If sewing springs work,
+    that edge collapses to ~0. Also dumps this build's cloth RNA. No input files needed."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    sc = bpy.context.scene
+    sc.render.fps = FPS
+    sc.gravity = (0, 0, 0)
+    V = [(-.1, -.1, 0), (.1, -.1, 0), (.1, .1, 0), (-.1, .1, 0),
+         (-.1, -.1, .3), (.1, -.1, .3), (.1, .1, .3), (-.1, .1, .3)]
+    F = [(0, 1, 2), (0, 2, 3), (4, 6, 5), (4, 7, 6)]
+    E = [(0, 4)]
+    me = bpy.data.meshes.new('probe')
+    me.from_pydata([list(p) for p in V], [list(e) for e in E], [list(f) for f in F])
+    me.update()
+    ob = bpy.data.objects.new('probe', me); sc.collection.objects.link(ob)
+    md = ob.modifiers.new('Cloth', 'CLOTH')
+    st, cs = md.settings, md.collision_settings
+    print('  [probe] cloth RNA:', ', '.join(p.identifier for p in st.bl_rna.properties if not p.is_readonly))
+    print('  [probe] coll  RNA:', ', '.join(p.identifier for p in cs.bl_rna.properties if not p.is_readonly))
+    log, miss = [], []
+    try_names(st, ['quality'], 5, log, miss)
+    try_names(st, ['use_sewing_springs'], True, log, miss)
+    try_names(st, ['sewing_force_max', 'sewing_spring_max', 'max_sewing_force'], 25, log, miss)
+    try_names(cs, ['use_self_collision'], False, log, miss)
+    print('  [probe] set:', ', '.join(log), (' miss=' + str(sorted(set(miss))) if miss else ''))
+    print(f'  [probe] меш: {len(me.vertices)} вершин, {len(me.edges)} рёбер, {len(me.polygons)} граней')
+    for fr in range(1, 31):
+        sc.frame_set(fr)
+    dep = bpy.context.evaluated_depsgraph_get()
+    ev = ob.evaluated_get(dep); m2 = ev.to_mesh()
+    d = math.dist(m2.vertices[0].co, m2.vertices[4].co)
+    ev.to_mesh_clear()
+    ok = d < 0.05
+    print(f'  [probe] зазор шва 30 см → {d*100:.2f} см за 30 кадров: '
+          f'{"OK — швы стягиваются сами" if ok else "ВНИМАНИЕ — механизм sewing springs не сработал"}')
+    return ok
+
+
+# ───────────────────────── 6. weld AFTER sewing ─────────────────────────
+def weld(Vs, V0, F0, UV0, seamG):
+    """merge converged seam pairs into one vertex (a single manifold shell). Returns
+    WV (positions), faces_w=[(welded_tri, orig_tri)], remap (orig→welded)."""
+    par = list(range(len(V0)))
+    def find(i):
+        while par[i] != i:
+            par[i] = par[par[i]]; i = par[i]
+        return i
+    nclose = nfar = 0
+    for _, pr in seamG:
+        for a, b in pr:
+            g = math.dist(Vs[a], Vs[b])
+            if g < WELD_GAP:
+                nclose += 1
+            else:
+                nfar += 1
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                par[rb] = ra
+    groups = defaultdict(list)
+    for i in range(len(V0)):
+        groups[find(i)].append(i)
+    remap, WV = {}, []
+    for r, members in groups.items():
+        remap[r] = len(WV)
+        WV.append(tuple(sum(Vs[m][k] for m in members) / len(members) for k in range(3)))
+        for m in members:
+            remap[m] = remap[r]                        # flat lookup for every original vertex
+    faces_w, dropped = [], 0
+    for f0 in F0:
+        wf = tuple(remap[i] for i in f0)
+        if len(set(wf)) < 3:
+            dropped += 1
+            continue
+        faces_w.append((wf, f0))
+    print(f'— сварка после пошива: пар сошлось {nclose} / не дошли {nfar}, '
+          f'слито {len(V0)-len(WV)} вершин, граней-вырожек {dropped}, '
+          f'осталось {len(WV)} вершин / {len(faces_w)} треугольников')
+    return WV, faces_w, remap
+
+
+def loop_uv(faces_w, UV0):
+    return [[UV0[f0[k]] for k in range(3)] for wf, f0 in faces_w]
+
+
+# ───────────────────────── 7. checks ─────────────────────────
+def check_seams(Vs, seamG):
     print('— проверки:')
-    bad = 0
-    allg = []
+    bad, allg = 0, []
     for nm, pr in seamG:
         if not pr:
-            print(f'    ✗ шов {nm:22}: нет пар вершин')
-            bad += 1
-            continue
-        g = [math.dist(V[a], V[b]) for a, b in pr]
-        m = sum(g) / len(g)
+            print(f'    ✗ шов {nm:22}: нет пар вершин'); bad += 1; continue
+        g = [math.dist(Vs[a], Vs[b]) for a, b in pr]
         allg += g
+        m = sum(g) / len(g)
         ok = m < 0.003
         bad += 0 if ok else 1
-        print(f'    {"✓" if ok else "✗"} шов {nm:22}: {len(pr)} пар, средний зазор {m*100:.2f} см (цель <0.3)')
-    return bad, allg
+        print(f'    {"✓" if ok else "✗"} шов {nm:22}: {len(pr)} пар, зазор сред. {m*100:.2f} / '
+              f'макс {max(g)*100:.1f} см (цель <0.3)')
+    mean = sum(allg) / len(allg) if allg else 9.9
+    print(f'    средний зазор по всем швам: {mean*100:.2f} см')
+    return bad, mean
 
 
 def check_penetration(V, bodyP, bodyT):
     skin = Body(bodyP, bodyT)
     vol = sum(dot(bodyP[a], cross(bodyP[b], bodyP[c])) for a, b, c in bodyT) / 6.0
-    sgn = 1.0 if vol > 0 else -1.0          # outward winding: positive signed volume
-    tn = []
-    for a, b, c in bodyT:
-        n = cross(sub(bodyP[b], bodyP[a]), sub(bodyP[c], bodyP[a]))
-        tn.append(tuple(sgn * k for k in nrm(n)))
+    sgn = 1.0 if vol > 0 else -1.0
+    tn = [tuple(sgn * k for k in nrm(cross(sub(bodyP[b], bodyP[a]), sub(bodyP[c], bodyP[a]))))
+          for a, b, c in bodyT]
     inside = 0
     for p in V:
         d2, cp = skin.nearest(p)
         if d2 > 0.02 ** 2 or cp is None:
             continue
-        # behind the local surface (wrong side of the skin) → inside the body
-        gx = int(p[0] / skin.cell); gy = int(p[1] / skin.cell); gz = int(p[2] / skin.cell)
+        gx, gy, gz = int(p[0]/skin.cell), int(p[1]/skin.cell), int(p[2]/skin.cell)
         found = False
-        for dx in range(-1, 2):
-            for dy in range(-1, 2):
-                for dz in range(-1, 2):
-                    for ti in skin.grid.get((gx + dx, gy + dy, gz + dz), ()):
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    for ti in skin.grid.get((gx+dx, gy+dy, gz+dz), ()):
                         dt2, cpt = skin.d2tri(p, ti)
                         if dt2 < 0.02 ** 2 and dot(sub(p, cpt), tn[ti]) < 0:
                             found = True
@@ -472,145 +462,162 @@ def check_penetration(V, bodyP, bodyT):
     return 0 if ok else 1
 
 
-def check_stretch(V0, V1, F):
+def check_stretch(V0, V1, F0):
     edges = set()
-    for a, b, c in F:
+    for a, b, c in F0:
         edges.add((min(a, b), max(a, b)))
         edges.add((min(b, c), max(b, c)))
         edges.add((min(a, c), max(a, c)))
-    worst, wr = 0.0, (0, 0)
+    worst = 0.0
     for a, b in edges:
         r0 = max(math.dist(V0[a], V0[b]), 1e-6)
-        r1 = math.dist(V1[a], V1[b])
-        if r1 / r0 > worst:
-            worst, wr = r1 / r0, (a, b)
+        worst = max(worst, math.dist(V1[a], V1[b]) / r0)
     ok = worst < 3.0
     print(f'    {"✓" if ok else "✗"} растяжение: макс ребро {worst:.2f}× от исходной (цель <3×), '
           f'рёбер {len(edges)}')
     return 0 if ok else 1
 
 
-# ───────────────────────── 7. obj export ─────────────────────────
-def write_obj(path, V, F, UV):
-    nrmv = [[0.0, 0.0, 0.0] for _ in V]
-    for a, b, c in F:
-        n = cross(sub(V[b], V[a]), sub(V[c], V[a]))
-        for vi in (a, b, c):
+# ───────────────────────── 8. outputs ─────────────────────────
+def write_obj(path, V, faces_w, UV0):
+    """per-corner pattern UV: a welded vertex sits on two UV islands, so vt is indexed by the
+    ORIGINAL vertex of each face corner while v/vn use the welded vertex."""
+    nrmv = [[0.0]*3 for _ in V]
+    for wf, f0 in faces_w:
+        n = cross(sub(V[wf[1]], V[wf[0]]), sub(V[wf[2]], V[wf[0]]))
+        for vi in wf:
             for k in range(3):
                 nrmv[vi][k] += n[k]
     with open(path, 'w') as f:
-        f.write('# tee_high — issue #56: sewn + simulated T-shirt, metres, Y up, face +Z\n')
-        f.write('o tee_high\n')
+        f.write(f'# {os.path.basename(path)} — issue #56: sewn + simulated, metres, Y up, face +Z\n')
+        f.write('o high\n')
         for p in V:
             f.write(f'v {p[0]:.5f} {p[1]:.5f} {p[2]:.5f}\n')
-        for u, v in UV:
+        for u, v in UV0:
             f.write(f'vt {u:.5f} {v:.5f}\n')
         for n in nrmv:
             ln = math.sqrt(dot(n, n)) or 1.0
             f.write(f'vn {n[0]/ln:.4f} {n[1]/ln:.4f} {n[2]/ln:.4f}\n')
-        for a, b, c in F:
-            f.write(f'f {a+1}/{a+1}/{a+1} {b+1}/{b+1}/{b+1} {c+1}/{c+1}/{c+1}\n')
+        for wf, f0 in faces_w:
+            f.write('f ' + ' '.join(f'{wf[k]+1}/{f0[k]+1}/{wf[k]+1}' for k in range(3)) + '\n')
 
 
-# ───────────────────────── 8. previews (place.py raster, no GL) ─────────────────────────
-def previews(Vs, bodyP, bodyT, off, parts):
+def previews(Vs, WF, bodyP, bodyT, garment):
     bd = dict(verts3=bodyP, tris=bodyT)
-    p3 = {}
-    for name in parts:
-        o, pt = off[name], parts[name]
-        p3[name] = dict(verts3=Vs[o:o + len(pt['verts3'])], faces=pt['faces'],
-                        color=COLORS.get(name, (0.78, 0.74, 0.68)))   # welded tee: natural jersey cotton
-    paths = {}
-    for view in ('front', 'side', 'back'):
-        paths[f'sim_{view}'] = (view, None, None)
-    paths['sim_close'] = ('front', (0.19, 1.43), 0.17)          # right shoulder + armpit
-    for tag, (view, center, radius) in paths.items():
-        p = os.path.join(OUT, tag + '.png')
+    p3 = {'g': dict(verts3=Vs, faces=WF, color=COTTON)}
+    if garment == 'tee':
+        tag, views = 'sim', {'front': ('front', None, None), 'side': ('side', None, None),
+                            'back': ('back', None, None), 'close': ('front', (0.19, 1.43), 0.17)}
+    else:
+        tag, views = 'pants_sim', {'front': ('front', None, None), 'side': ('side', None, None),
+                                  'back': ('back', None, None), 'close': ('front', (0.0, 0.97), 0.22)}
+    os.makedirs(PREVIEW, exist_ok=True)
+    for name, (view, center, radius) in views.items():
+        p = os.path.join(OUT, f'{tag}_{name}.png')
         place.raster(bd, p3, [], view, p, 800, 800, center=center, radius=radius)
-        shutil.copyfile(p, os.path.join(PREVIEW, tag + '.png'))
-        print(f'    превью → preview/{tag}.png')
+        shutil.copyfile(p, os.path.join(PREVIEW, f'{tag}_{name}.png'))
+        print(f'    превью → preview/{tag}_{name}.png')
+
+
+# ───────────────────────── 9. cached rest mesh ─────────────────────────
+def rest_path(garment):
+    return os.path.join(OUT, f'{garment}_rest.json')
+
+
+def load_rest(garment):
+    if os.environ.get('SIM_FRESH'):
+        return None
+    p = rest_path(garment)
+    if not os.path.exists(p):
+        return None
+    d = json.load(open(p))
+    if abs(d.get('step', -1) - STEP_SIM) > 1e-9 or d.get('ver') != REST_VER:
+        print('— кеш покоя устарел — пересобираю'); return None
+    V = [tuple(v) for v in d['V']]; F = [tuple(f) for f in d['F']]
+    UV = [tuple(u) for u in d['UV']]
+    seamG = [(nm, [tuple(x) for x in pr]) for nm, pr in d['seams']]
+    E = [tuple(e) for e in d['E']]
+    print(f'— кеш покоя: {p} ({len(V)} вершин; SIM_FRESH=1 пересобрать)')
+    return V, F, UV, seamG, E
+
+
+def save_rest(garment, V, F, UV, seamG, E):
+    json.dump(dict(step=STEP_SIM, ver=REST_VER,
+                   V=[[round(c, 5) for c in p] for p in V], F=[list(f) for f in F],
+                   UV=[[round(c, 5) for c in u] for u in UV],
+                   seams=[[nm, [list(x) for x in pr]] for nm, pr in seamG], E=[list(e) for e in E]),
+              open(rest_path(garment), 'w'))
 
 
 # ───────────────────────── main ─────────────────────────
-def load_cache():
-    """the pre-sewn rest mesh, cached by a previous run (SIM_FRESH=1 to rebuild)"""
-    if os.environ.get('SIM_FRESH'):
-        return None
-    path = os.path.join(OUT, PRESEW_CACHE)
-    if not os.path.exists(path):
-        return None
-    d = json.load(open(path))
-    if abs(d.get('step', -1) - STEP_SIM) > 1e-9:
-        print('— кеш собран на другой сетке — пересобираю')
-        return None
-    V = [tuple(v) for v in d['V']]
-    F = [tuple(f) for f in d['F']]
-    UV = [tuple(u) for u in d['UV']]
-    seamG = [(nm, [tuple(p) for p in pr]) for nm, pr in d['seams']]
-    off = d['off']
-    parts = {k: dict(verts3=[None] * v['n'], faces=[tuple(f) for f in v['faces']])
-             for k, v in d['parts'].items()}
-    print(f'— кеш пошитого меша: {path} ({len(V)} вершин; SIM_FRESH=1 пересобрать)')
-    if d.get('ver', 1) < PRESEW_VER:
-        # v1 presew averaged the band end corners against the neckline pins, so the collar ends
-        # stayed ~4 cm apart — zip them now (cheap patch instead of a full 13-minute rebuild)
-        for nm, pr in seamG:
-            if nm != END_SEAM:
-                continue
-            for a, b in pr:
-                mid = tuple((V[a][k] + V[b][k]) / 2 for k in range(3))
-                V[a], V[b] = mid, mid
-        save_cache(V, F, UV, seamG, off, parts)
-        print('    концы бейки сшиты (патч v1 → v2)')
-    return V, F, UV, seamG, off, parts
-
-
-def save_cache(V, F, UV, seamG, off, parts):
-    json.dump(dict(step=STEP_SIM, ver=PRESEW_VER, V=[[round(c, 5) for c in p] for p in V], F=[list(f) for f in F],
-                   UV=[[round(c, 5) for c in u] for u in UV],
-                   seams=[[nm, [list(p) for p in pr]] for nm, pr in seamG],
-                   off=off, parts={k: dict(n=len(parts[k]['verts3']), faces=[list(f) for f in parts[k]['faces']])
-                                   for k in PART_ORDER}),
-              open(os.path.join(OUT, PRESEW_CACHE), 'w'))
-
-
 def main():
-    objp, teep, placedp = (os.path.join(OUT, x) for x in ('body.obj', 'tee.json', 'tee_placed.json'))
-    if not (os.path.exists(objp) and os.path.exists(teep) and os.path.exists(placedp)):
-        print('нет out/body.obj / out/tee.json / out/tee_placed.json — сначала run_all.sh (шаги 1–3)')
-        return 1
+    args = sys.argv[1:]
+    garment = args[args.index('--garment') + 1] if '--garment' in args and \
+        args.index('--garment') + 1 < len(args) else 'tee'
+    if garment not in ('tee', 'pants'):
+        print(f'неизвестный --garment {garment}'); return 1
+    pat_name = 'tee.json' if garment == 'tee' else 'pants.json'
+    objp, patp = os.path.join(OUT, 'body.obj'), os.path.join(OUT, pat_name)
+    print(f'=== issue #56: пошив и симуляция — {garment} ===')
+    sew_ok = probe()                                     # verifies sewing springs, no inputs needed
+    if not (os.path.exists(objp) and os.path.exists(patp)):
+        print(f'нет out/body.obj / out/{pat_name} — сначала run_all.sh (шаги 1–3)')
+        return 0 if sew_ok else 1
     bodyP, bodyT = place.load_obj(objp)
-    cached = load_cache()
+    pat = json.load(open(patp))
+    cached = load_rest(garment)
     if cached:
-        V, F, UV, seamG, off, parts = cached
+        V0, F0, UV0, seamG, E = cached
     else:
-        tee = json.load(open(teep))
         skin = Body(bodyP, bodyT)
-        parts = build_parts(tee, skin)
-        seams = seam_index_pairs(tee, parts)
-        presew(parts, seams, skin)
-        V, F, PID, UV, seamG, off = join(parts, seams, tee)
-        save_cache(V, F, UV, seamG, off, parts)
-    area = mesh_area(V, F)
+        parts = build_parts(garment, pat, skin, bodyP, bodyT)
+        seams = seam_pairs(pat, parts)
+        V0, F0, UV0, seamG, E, off = join(parts, seams, sheet_uv(parts))
+        save_rest(garment, V0, F0, UV0, seamG, E)
+    print('— швы до пошива (рёбра-пружины, зазоры как из раскладки):')
+    for nm, pr in seamG:
+        g = [math.dist(V0[a], V0[b]) for a, b in pr]
+        print(f'    {nm:22}: {len(pr)} пар, зазор сред. {sum(g)/max(1,len(g))*100:.1f} / '
+              f'макс {max(g)*100:.1f} см')
+    V0 = [list(p) for p in V0]
+    F0 = [tuple(f) for f in F0]
+    fix_degenerate(V0, F0)
+    area = mesh_area(V0, F0)
     mass = FABRIC['area_mass'] * area
-    V = [list(p) for p in V]
-    fix_degenerate(V, F)
-    V, F, UV, seamG = weld(V, F, UV, seamG)
-    parts = {'tee': dict(verts3=[None] * len(V), faces=F)}
-    off = {'tee': 0}
-    print(f'— меш: {len(V)} вершин, {len(F)} треугольников (цель 40–120k), площадь {area:.2f} м², '
-          f'масса {mass:.3f} кг ({FABRIC["area_mass"]} кг/м²)')
-    bad = 0 if 40000 <= len(F) <= 120000 else 1
+    print(f'— меш: {len(V0)} вершин, {len(F0)} треугольников (цель 20–120k), площадь {area:.2f} м², '
+          f'масса {mass:.3f} кг')
+    bad = 0 if 20000 <= len(F0) <= 120000 else 1
     print(f'    {"✓" if not bad else "✗"} число треугольников')
-    Vs, t_sim = simulate(V, F, UV, bodyP, bodyT, mass, seamG)
-    bad += check_seams(Vs, seamG)[0]
-    bad += check_penetration(Vs, bodyP, bodyT)
-    bad += check_stretch(V, Vs, F)
-    print(f'    время симуляции: {t_sim:.0f} с ({t_sim/FPS:.1f} с экранного времени)')
-    write_obj(os.path.join(OUT, 'tee_high.obj'), Vs, F, UV)
-    print(f'  → {os.path.join(OUT, "tee_high.obj")}')
-    os.makedirs(PREVIEW, exist_ok=True)
-    previews(Vs, bodyP, bodyT, off, parts)
+
+    # ── PHASE 1: sew (gravity 0, no self-collision, slight shrink) ──
+    Vs_A, t1 = run_phase('пошив', V0, F0, E, bodyP, bodyT, mass, FRAMES_SEW,
+                         gravity=(0, 0, 0), sewing=True, shrink=SHRINK_SEW,
+                         self_coll=False, quality=QUALITY)
+    seam_bad, mean_gap = check_seams(Vs_A, seamG)
+
+    # ── WELD after sewing ──
+    WV, faces_w, remap = weld(Vs_A, V0, F0, UV0, seamG)
+    WF = [wf for wf, f0 in faces_w]
+    luv = loop_uv(faces_w, UV0)
+
+    # ── PHASE 2: settle (gravity on, self-collision on) ──
+    blendp = os.path.join(OUT, f'{garment}_high.blend')
+    Vs_B, t2 = run_phase('усадка', WV, WF, [], bodyP, bodyT, mass, FRAMES_SETTLE,
+                         gravity=(0, 0, -9.81), sewing=False, shrink=0.0,
+                         self_coll=True, quality=QUALITY,
+                         blend=(blendp, WV, WF, luv))
+
+    # ── checks on the FINAL (settle) result ──
+    Vs_final_orig = [Vs_B[remap[i]] for i in range(len(V0))]   # un-weld for the edge check
+    bad += check_penetration(Vs_B, bodyP, bodyT)
+    bad += check_stretch(V0, Vs_final_orig, F0)
+    bad += seam_bad
+    print(f'    время симуляции: пошив {t1:.0f} с + усадка {t2:.0f} с = {t1+t2:.0f} с '
+          f'({(t1+t2)/FPS:.1f} с экранного времени)')
+    objp2 = os.path.join(OUT, f'{garment}_high.obj')
+    write_obj(objp2, Vs_B, faces_w, UV0)
+    print(f'  → {objp2}')
+    previews(Vs_B, WF, bodyP, bodyT, garment)
     print('ИТОГ: ' + ('пошив и симуляция сошлись' if not bad else f'ПРОБЛЕМ: {bad}'))
     return 1 if bad else 0
 
