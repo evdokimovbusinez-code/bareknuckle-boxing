@@ -3,7 +3,7 @@
 const BAG = { on: false, score: 0, hits: 0, combo: 0, best: 0, lastT: -9, mass: 40, x: null };   // the bag itself — model, chains, physics — is in 09a_bag_rig.js
 function showP2(v) { if (!P2) return; P2.group.visible = v; for (const o of P2.sceneObjs || []) o.visible = v;
   if (v) { P2.handGear(); if (P2.gear.look) P2.dress(P2.gear.look); P2.sparGear(!!P2.gear.spar); }   // re-apply what the outfit hides (trunks under trousers, hair under the headgear)
-  else { const g = P2.gear; if (g.gloves) { for (const gl of g.gloves) gl.g.visible = false; g.hg.visible = false; } if (g.mma) { g.mma.visible = false; for (const pd of g.mmaPads) pd.m.visible = false; } } }   // (his gear decides what of the wraps / hair shows)
+  else { const g = P2.gear; if (g.gloves) { for (const gl of g.gloves) gl.g.visible = false; g.hg.visible = false; } if (g.mma) { g.mma.visible = false; for (const pd of g.mmaPads) pd.m.visible = false; } if (g.knuxPads) for (const pd of g.knuxPads) pd.m.visible = false; } }   // (his gear decides what of the wraps / hair shows)
 function startBag() {
   G.mode = 'bag'; if (G.diff !== G.userDiff && G.userDiff) G.diff = G.userDiff;
   startFight(true); BAG.on = true; showP2(false); BAG.g.visible = true;
@@ -67,9 +67,9 @@ function startQuick() { if (G.mode === 'career') { G.diff = G.userDiff; rollOppo
 function startFight(fromMode) {
   if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); }
   hintFightStart(); window.goFull && window.goFull();   // touch: full screen + landscape (12_ui.js)   // control hints: the first three bouts are the learning ones (12_ui.js)
-  for (const F of [P1, P2]) F.sparGear(G.mode === 'spar');
+  for (const F of [P1, P2]) F.sparGear(G.mode === 'spar' || (G.mode === 'net' && NET.cfg.spar));   // a P2P host may pick «Спарринг» (18_net.js)
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
-  if (G.mode !== 'career') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }
+  if (G.mode !== 'career' && G.mode !== 'net') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }
   CROWD.fill = G.mode === 'career' ? LADDER[Math.min(G.career, LADDER.length - 1)].crowd ?? 1 : 1;   // the semi-final in the warehouse: a half-empty hall; the title fight: everybody came
   setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'boxgym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the training gym (13e_loc_boxgym.js); a career fight is where the ladder says
   G.paused = false; UI.from = null; uiShow(null);
@@ -160,10 +160,10 @@ function decision() {
 // a cut over the eye that keeps running into it: the referee calls time for the doctor; if it can't be controlled, the fight is stopped
 function cutCheck() {
   for (const F of [P1, P2]) for (const w of F.flesh.wounds) {
-    if (w.kind !== 'cut' || w.sev < 0.85) continue;
+    if (w.kind !== 'cut' || w.sev < 0.85 || pvp('blood')) continue;   // «Кровавая бойня»: no doctor
     const near = Math.min(w.p.distanceTo(F.flesh.u.uEyeL.value), w.p.distanceTo(F.flesh.u.uEyeR.value)) / F.flesh.U; if (near > 0.045) continue;
     if (!F.cutLook) { F.cutLook = true; msg('Врач смотрит рассечение'); G.state = 'break'; G.breakT = 3.5; G.doc = true; corner(F, 0.35); return; }
-    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; fightOver(A === P1, false, 'tko'); $('pad').hidden = true;
+    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; fightOver(A === P1, false, 'tko'); $('pad').hidden = true; if (NET.role) return netResult();   // P2P: the shared result (the guest was left hanging)
       $('r-title').textContent = A === P1 ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (A === P1 ? 'win' : 'lose');
       $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false; msg('Стоп! Рассечение', 'ko'); return; }
   }

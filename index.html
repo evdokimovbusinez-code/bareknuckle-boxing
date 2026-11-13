@@ -315,6 +315,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .so-sp .so-logo{width:120px;height:36px;image-rendering:auto}.so-sp.lock{opacity:.62}.so-lock{font:500 10.5px var(--mono);letter-spacing:.06em;color:var(--muted)}.so-lock.on{color:#8fd49a}
 .dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
 .views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
+#net-room,#net-home,#net-stance-f{flex-shrink:0}.net-tip{display:block;margin-top:4px;font:400 11px var(--mono);color:#a9a9a9}#net-cfg{display:flex;flex-direction:column;gap:8px;margin-top:6px}#net-cfg[hidden]{display:none}
+#net-cfg .locs{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}#net-cfg .locs small{display:none}#net-cfg .locs button{padding:7px 10px}
 .locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .locs button{display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid rgba(255,255,255,.16);border-radius:2px;background:rgba(255,255,255,.04);padding:clamp(7px,1.6vmin,11px) 12px;transition:border-color .15s,background .15s}
 .locs button b{font-family:var(--poster);font-weight:700;font-size:clamp(16px,3.2vmin,21px);letter-spacing:.04em;text-transform:uppercase}
@@ -373,7 +375,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .net-acts{display:flex;gap:8px}.net-acts .btn{flex:1}
 .net-wait{font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--gold);text-align:center;padding-top:6px}
 .net-wait::before{content:'';display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--gold);animation:locpulse 1s ease-in-out infinite;vertical-align:middle}
-.net-ping{pointer-events:none;display:block;margin:4px auto 0;font:500 10px var(--mono);letter-spacing:.06em;color:#8fd49a;white-space:nowrap}
+.net-ping{pointer-events:none;display:block;margin:4px auto 0;font:600 13px var(--mono);letter-spacing:.06em;color:#8fd49a;white-space:nowrap}
 .net-ping.bad{color:var(--gold)}
 .net-ping[hidden]{display:none}
 .net-drop{position:absolute;left:50%;top:calc(var(--pt,8px) + 78px);transform:translateX(-50%);z-index:12;min-width:min(420px,86%);box-sizing:border-box;text-align:center;
@@ -553,6 +555,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="ptitle"><small>мультиплеер · P2P</small>Бой с другом</div>
       <div class="pbody">
         <div class="net-st" id="net-st">Бой 1 на 1 по ссылке. Хост считает бой, гость видит его со своей стороны. Без регистрации и своих серверов.</div>
+        <div class="fld" id="net-stance-f"><span>твоя стойка</span><div class="sw" id="net-stance"></div></div>
         <div class="net-home" id="net-home">
           <button class="btn pri" id="net-create">Создать комнату</button>
           <div class="fld"><span>или войти по коду</span>
@@ -565,6 +568,14 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           <div class="fld"><span>ссылка другу</span><div class="net-link" id="net-link"></div></div>
           <div class="net-acts"><button class="btn" id="net-copy">Копировать</button><button class="btn" id="net-share">Поделиться</button></div>
           <div class="net-wait" id="net-wait">Ждём соперника…</div>
+          <div id="net-cfg">
+            <div class="fld"><span>место</span><div class="locs" id="net-loc"></div></div>
+            <div class="fld"><span>раунды</span><div class="sw" id="net-rounds"></div></div>
+            <div class="fld"><span>время раунда</span><div class="sw" id="net-len"></div></div>
+            <div class="fld"><span>правила</span><div class="sw" id="net-rules"></div></div>
+            <div class="fld"><span>оружие</span><div class="sw" id="net-weap"></div></div>
+            <div class="fld"><span>режим · только PvP</span><div class="sw" id="net-mode"></div><small class="net-tip" id="net-mode-tip"></small></div>
+          </div>
         </div>
       </div>
       <div class="pfoot"><button class="btn" id="net-back">Назад</button></div>
@@ -2167,6 +2178,7 @@ const NET = {
   role: null, host: false, guest: false, started: false, closing: false,
   peer: null, conn: null, loading: null, code: '', link: '', nm: '',
   saved: null, over: null,
+  cfg: { loc: 'gym', rounds: 3, len: 120, spar: false, mode: 'std', weap: false },   // the host's match settings (room screen), sent in hello; weap = «Оружие» (issue 52)
   rate: 1 / 30, buf: 0.10, acc: 0, pingAcc: 0, ping: 0, silent: 0, silenceMax: 1.5,
   snaps: [], evs: [], pops: [], playT: 0, first: true,
   mv: { x: 0, y: 0, b: false }, blk: false, q: [], iq: [], evI: 0, pop: [],
@@ -2187,6 +2199,20 @@ const NET_ERR = {
   'network': 'Нет связи с сервером PeerJS.', 'server-error': 'Сервер PeerJS недоступен.',
   'socket-error': 'Соединение с сервером прервано.', 'webrtc': 'Не удалось пробить P2P-соединение (строгий NAT).',
 };
+
+/* P2P-only match modes (the host picks one in the room, 18_net.js); every check goes through these two */
+const NET_MODES = [
+  { id: 'std', label: 'Обычный', tip: 'Как в быстром бою' },
+  { id: 'blood', label: 'Кровавая бойня', tip: 'Рассечения на каждом шагу, всё в крови, врач бой не останавливает, урон ×1.25' },
+  { id: 'kd1', label: 'Первый нокдаун', tip: 'Кто первым упал — тот проиграл' },
+  { id: 'glass', label: 'Стеклянные челюсти', tip: 'Урон ×2.2: пара чистых — и спать' },
+  { id: 'iron', label: 'Железные лёгкие', tip: 'Выносливость не кончается: рубка без остановки' },
+  { id: 'ko', label: 'До нокаута', tip: 'Раунды без конца, судей нет — только нокаут' },
+];
+function pvp(m) { return G.mode === 'net' && NET.cfg.mode === m; }
+function sparOn() { return G.mode === 'spar' || (G.mode === 'net' && NET.cfg.spar); }   // 16 oz gloves + headgear: less damage, no cuts
+// issue 52: weapons (brass knuckles) are allowed everywhere except a P2P bout whose host forbade them
+function weaponOn() { return !(G.mode === 'net' && !NET.cfg.weap); }
 /* ───────── ragdoll: rigid bodies (cannon-es) with soft joint limits and muscle tone toward the neutral body posture ─────────
    Every joint has three anatomical axes taken from the bind pose: flex (child swings forward; for the knee "+" is hyperextension),
    side (left limbs: "+" = adduction toward the midline) and twist (about the bone). Inside the limits a weak tone pulls toward the
@@ -3211,7 +3237,7 @@ class Flesh {
   down(out) { this.b2w(this.hi, this.M); this.Mi.copy(this.M).invert(); return out.set(0, -1, 0).transformDirection(this.Mi); }
   world(w, out) { return out.copy(w.p).applyMatrix4(this.M); }
   /* a punch landed: dent + wave, swelling, maybe a cut or a nose bleed; returns where blood sprays from */
-  onHit(cW, dirW, power, name, body, F) {
+  onHit(cW, dirW, power, name, body, F, knux) {
     const i = body ? this.si : this.hi; this.b2w(i, this.M); this.Mi.copy(this.M).invert();
     const at = this.snap(body ? T.bodyV : T.headV, cW.clone().applyMatrix4(this.Mi)), db = dirW.clone().transformDirection(this.Mi);
     const w = clamp(power, 0.25, 1.5); this.dent(at.p, db, w); this.bruise(at.p, 0.22 * w);
@@ -3228,7 +3254,7 @@ class Flesh {
       const d = at.p.distanceTo(lips.p) / this.U;
       if (d < 0.045) {
         this.lipBleed = Math.min(1, this.lipBleed + 0.25 * w);
-        if (!this.wounds.some(x => x.kind === 'lip') && rr() < 0.2 + 0.4 * (1 - F.hp / 100) * w) {
+        if (!this.wounds.some(x => x.kind === 'lip') && rr() < (0.2 + 0.4 * (1 - F.hp / 100) * w) * (pvp('blood') ? 2.5 : 1)) {
           const side = rr() < 0.5 ? -1 : 1;
           const c = this.snap(T.headV, lips.p.clone().addScaledVector(this.lat, side * 0.012 * this.U).addScaledVector(this.up, -0.004 * this.U)); c.n.copy(this.fwdB);
           const x = this.wound('lip', c, 0.3 + 0.35 * w, this.lat.clone(), 0.008); if (x) { res.spray.push(x); res.lip = true; }
@@ -3239,16 +3265,16 @@ class Flesh {
     if (l.z > 0 && l.y > -0.035) {
       const near = this.wounds.find(x => x.kind === 'cut' && x.p.distanceTo(at.p) < 0.02 * this.U);
       if (near) { near.sev = Math.min(1, near.sev + 0.25 * w); near.L *= 0.5; res.spray.push(near); }
-      else if (rr() < 0.05 + 0.25 * hurt * w + (P.type === 'hook' || P.type === 'over' ? 0.08 : 0)) {
+      else if (rr() < (0.05 + 0.25 * hurt * w + (P.type === 'hook' || P.type === 'over' ? 0.08 : 0)) * (pvp('blood') ? 3.5 : 1) * (knux ? KNUX.cut : 1)) {   // «Кровавая бойня»: cuts ×3.5; a knux punch (issue 52): ×KNUX.cut more often
         const tan = _f1.crossVectors(at.n, this.up).normalize().clone();
-        const c = G.mode === 'spar' ? null : this.wound('cut', at, 0.35 + 0.4 * rr() * w, tan, 0.012 + 0.012 * rr()); if (c) { res.spray.push(c); res.cut = true; }   // the headgear's padding: no cuts in sparring
+        const c = sparOn() ? null : this.wound('cut', at, 0.35 + 0.4 * rr() * w, tan, 0.012 + 0.012 * rr()); if (c) { res.spray.push(c); res.cut = true; }   // the headgear's padding: no cuts in sparring
       }
     }
     // the nose: straights and overhands to the middle of the face
     if (l.z > 0 && l.y < 0.01 && l.y > -0.09 && Math.abs(l.x) < 0.06 && P.type !== 'upper') {
       const nose = this.wounds.filter(x => x.kind === 'nose');
       if (nose.length) { for (const x of nose) { x.sev = Math.min(1, x.sev + 0.2 * w); res.spray.push(x); } }
-      else if (rr() < 0.15 + 0.6 * hurt * w) { for (const ns of this.nose.nostrils) { const x = this.wound('nose', ns, 0.25 + 0.3 * w); if (x) res.spray.push(x); } res.nose = true; }
+      else if (rr() < (0.15 + 0.6 * hurt * w) * (pvp('blood') ? 2.5 : 1)) { for (const ns of this.nose.nostrils) { const x = this.wound('nose', ns, 0.25 + 0.3 * w); if (x) res.spray.push(x); } res.nose = true; }
       if (nose.length && nose[0].sev > 0.7 && w > 0.9 && this.u.uNB.value.w === 0 && rr() < 0.5) {   // the nose breaks: it sits crooked from now on
         const t = this.nose.tip, side = _f1.crossVectors(db, this.up).normalize(); this.u.uNB.value.set(t.x, t.y, t.z, 1); this.u.uNBD.value.set(side.x, side.y, side.z, 0); res.broke = true;
       }
@@ -3586,7 +3612,7 @@ function faceWeights(W, X, f) {
 // (the items themselves — tops, bottoms, shoes, hats, glasses, belts — are the registry ITEMS in 04e_wardrobe.js)
 const GUARDS = [{ id: 'clear', c: '#d8e4ea', label: 'прозрачная' }, { id: 'black', c: '#141416', label: 'чёрная' }, { id: 'red', c: '#b3202c', label: 'красная' }, { id: 'blue', c: '#2f55b5', label: 'синяя' }, { id: 'gold', c: '#d8b25a', label: 'золотая' }];
 const GLOVES = [{ id: 'red', c: '#b3202c', trim: '#efeae0', label: 'красные' }, { id: 'black', c: '#17181c', trim: '#a9a9b2', label: 'чёрные' }, { id: 'blue', c: '#1f3f9a', trim: '#efeae0', label: 'синие' }, { id: 'white', c: '#e6e2d8', trim: '#1b1c20', label: 'белые' }];
-const HANDS = [{ id: 'wraps', label: 'бинты' }, { id: 'mma', label: 'MMA 4 oz' }];
+const HANDS = [{ id: 'wraps', label: 'бинты' }, { id: 'mma', label: 'MMA 4 oz' }, { id: 'knux', label: 'кастет' }];   // issue 52: brass knuckles (04i_knux.js)
 const GEAR = { ready: false };
 function fabricTex(kind) {
   return canvasTex(512, 512, (g, w, h) => {
@@ -4233,6 +4259,7 @@ const ITEMS = {
   // hands and the gum shield: the registry knows them (brand, price); their look fields are still LOOK.hands / wraps / gloves / guard
   wraps: { cat: 'hands', label: 'бинты', model: {}, colors: ['white', 'black', 'red', 'blue', 'gold'], price: 0, tags: ['ring', 'basic'] },
   mma: { cat: 'hands', label: 'MMA 4 oz', model: {}, colors: ['red', 'black', 'blue', 'white'], price: 600, tags: ['ring'], brand: 'IRON JAW' },
+  knux: { cat: 'hands', label: 'кастет', model: {}, colors: ['yellow', 'grey', 'black'], price: 800, tags: ['street'], brand: 'IRON JAW' },   // issue 52: the metal frame in 04i_knux.js
   box16: { cat: 'hands', label: 'спарринговые 16 oz', model: {}, colors: ['red', 'black', 'blue', 'white'], price: 0, noShop: 1, tags: ['ring'], brand: '16OZ' },
   guard: { cat: 'guard', label: 'капа', model: {}, colors: ['clear', 'black', 'red', 'blue', 'gold'], price: 0, noShop: 1, tags: ['ring'], brand: 'LOW BLOW' },
 };
@@ -5638,6 +5665,102 @@ function tatApply(F, L) {
     m.userData.uTatR.value.set(tl[0] / TAT_W, 1 - (tl[1] + tl[3]) / TAT_H, tl[2] / TAT_W, tl[3] / TAT_H); m.userData.uTatB.value.set(bx[0], bx[1], 1 / (bx[2] - bx[0]), 1 / (bx[3] - bx[1]));
   }
 }
+/* ───────── brass knuckles (issue 52) ─────────
+   One rigid metal frame per hand: four finger rings (index…pinky), the bridge joining them over the
+   knuckles, and the crossbar the fist grips. It rides on the Hand bone like mmaPads (04c_mma_pads.js):
+   world = bone.matrixWorld × local geometry, so the metal follows the fist in the stance, on a punch,
+   in the block and through the KO ragdoll. The whole piece is built in the Hand bone's LOCAL frame
+   from the LIVE finger bones (measured off the man's own hand skin, which the clips keep curled into
+   a fist) — a real knuckle duster is rigid and the fingers curl inside the holes, so nothing floats
+   in the air or sinks into the palm. The wraps stay visible underneath. The damage / cut / guard
+   constants KNUX live in 07_state_replay_hits.js (one ES module scope with all NN_ files). */
+function knuxMat() {   // polished brass: high metalness, a tight highlight, a warm lift in dark places
+  return new THREE.MeshStandardMaterial({ color: '#c9a24c', metalness: 0.9, roughness: 0.28, envMapIntensity: 1.2, emissive: '#3a2408', emissiveIntensity: 0.3 });
+}
+/* a closed parametric surface (u, v wrap around): smooth finite-difference normals, no seam. The
+   winding is fixed from the signed volume, so a torus / rounded bar never renders inside out. */
+function knuxSurface(fn, nu, nv) {
+  const N = (nu + 1) * (nv + 1), pos = new Float32Array(N * 3), nor = new Float32Array(N * 3), uv = new Float32Array(N * 2), col = new Float32Array(N * 3).fill(1), idx = [];
+  const p = new V3(), a = new V3(), b = new V3(), c = new V3(), e = 2e-3;
+  for (let j = 0, k = 0; j <= nv; j++) for (let i = 0; i <= nu; i++, k++) {
+    const s = i / nu, v = j / nv, vc = clamp(v, 0.006, 0.994);
+    fn(s, v, p); pos.set([p.x, p.y, p.z], k * 3);
+    fn(s + e, vc, a); fn(s - e, vc, b); c.copy(a).sub(b);
+    fn(s, vc + e, a); fn(s, vc - e, b); c.cross(a.sub(b)).normalize();
+    nor.set([c.x, c.y, c.z], k * 3); uv.set([s, v], k * 2);
+  }
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const k = j * (nu + 1) + i, k2 = k + nu + 1; idx.push(k, k + 1, k2, k + 1, k2 + 1, k2); }
+  let vol = 0;
+  for (let t = 0; t < idx.length; t += 3) {
+    const i0 = idx[t] * 3, i1 = idx[t + 1] * 3, i2 = idx[t + 2] * 3;
+    vol += pos[i0] * (pos[i1 + 1] * pos[i2 + 2] - pos[i1 + 2] * pos[i2 + 1])
+         + pos[i0 + 1] * (pos[i1 + 2] * pos[i2] - pos[i1] * pos[i2 + 2])
+         + pos[i0 + 2] * (pos[i1] * pos[i2 + 1] - pos[i1 + 1] * pos[i2]);
+  }
+  if (vol < 0) { for (let t = 0; t < idx.length; t += 3) { const s = idx[t + 1]; idx[t + 1] = idx[t + 2]; idx[t + 2] = s; } for (let i = 0; i < nor.length; i++) nor[i] = -nor[i]; }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(idx); return g;
+}
+const _knuxD = new V3();
+/* a rounded bar / plate: C = centre, A/B/D = its axes, u = world units per cm, h = half-sizes in cm */
+function knuxBlob(C, A, B, D, u, h) {
+  return knuxSurface((s, v, o) => {
+    sphDir(s, v, _knuxD); const k = sqK(_knuxD, 3) * u;
+    return o.copy(C).addScaledVector(A, _knuxD.x * k * h[0]).addScaledVector(B, _knuxD.y * k * h[1]).addScaledVector(D, _knuxD.z * k * h[2]);
+  }, 18, 12);
+}
+function knuxGeo(F, S) {
+  GEAR.knux = GEAR.knux || {}; if (GEAR.knux[S]) return GEAR.knux[S];
+  F.cc.updateMatrixWorld(true);
+  const sk = F.body.skeleton, B = F.bones, f = GEAR.HF[S], u = f.u, dom = GEAR.dom, names = GEAR.names;
+  const pos = F.body.geometry.attributes.position, n = pos.count, q = new V3(), parts = [], kn = [];
+  const invH = B['CC_Base_' + S + '_Hand'].matrixWorld.clone().invert();
+  const rel = nm => new M4().multiplyMatrices(sk.boneInverses[sk.bones.indexOf(B['CC_Base_' + S + '_' + nm])], F.body.bindMatrix);
+  const W = nm => new V3().setFromMatrixPosition(B['CC_Base_' + S + '_' + nm].matrixWorld).applyMatrix4(invH);   // live bone origin, Hand-local
+  const M = nm => new M4().multiplyMatrices(invH, B['CC_Base_' + S + '_' + nm].matrixWorld).multiply(rel(nm));   // bind space → Hand-local, as skinned on that bone
+  // the palm / back axes belong to the HAND, not to the curled finger: the finger bone has turned ~90° in the fist,
+  // so transforming the bind palm normal by it would leave the bridge pointing out of the side of the hand
+  const palmH = f.Z.clone().transformDirection(rel('Hand')).normalize();
+  for (const fn of ['Index', 'Mid', 'Ring', 'Pinky']) {
+    const p1 = W(fn + '1'), p2 = W(fn + '2'), Ax = p2.clone().sub(p1), L = Ax.length() / u; Ax.normalize();
+    const Mf = M(fn + '1'), Bk = palmH.clone().negate(); Bk.addScaledVector(Ax, -Bk.dot(Ax)).normalize();
+    const Sd = new V3().crossVectors(Ax, Bk), bi = names.indexOf('CC_Base_' + S + '_' + fn + '1');
+    let hb = 0, hp = 0, w = 0, c = 0;
+    for (let i = 0; i < n; i++) { if (dom[i] !== bi) continue; q.fromBufferAttribute(pos, i).applyMatrix4(Mf).sub(p1);
+      const al = q.dot(Ax) / u; if (al < 0.3 * L || al > 0.8 * L) continue;
+      const d = q.dot(Bk) / u; hb = Math.max(hb, d); hp = Math.max(hp, -d); w = Math.max(w, Math.abs(q.dot(Sd)) / u); c++; }
+    if (!c) { hb = hp = 0.9; w = 0.9; }
+    // flat metal bands (wide along the finger, thin through it), a hole wide enough for the wrapped finger
+    const Rx = w + 0.55, Rz = (hb + hp) / 2 + 0.55, tR = 0.30, tA = 0.72;
+    const C = p1.clone().addScaledVector(Ax, 0.30 * L * u).addScaledVector(Bk, (hb - hp) / 2 * u);
+    parts.push(knuxSurface((s, v, o) => {
+      const th = s * 2 * Math.PI, ph = v * 2 * Math.PI, ct = Math.cos(th), st = Math.sin(th), cp = Math.cos(ph), sp = Math.sin(ph);
+      return o.copy(C).addScaledVector(Sd, (Rx + tR * cp) * ct * u).addScaledVector(Bk, (Rz + tR * cp) * st * u).addScaledVector(Ax, tA * sp * u);
+    }, 24, 10));
+    kn.push({ p1, Ax, hb });
+  }
+  // the frame: one bridge across the knuckles, four rounded impact bumps, the palm crossbar and two side rails
+  const mid = kn.reduce((s, k) => s.add(k.p1), new V3()).multiplyScalar(1 / 4);
+  const Xl = kn[0].p1.clone().sub(kn[3].p1).normalize(), Yl = kn.reduce((s, k) => s.add(k.Ax), new V3()).normalize();
+  const Zl = new V3().crossVectors(Xl, Yl).normalize(); if (Zl.dot(palmH) < 0) Zl.negate();   // +z = palm side
+  const P = (x, y, z) => mid.clone().addScaledVector(Xl, x * u).addScaledVector(Yl, y * u).addScaledVector(Zl, z * u);
+  const xs = kn.map(k => k.p1.clone().sub(mid).dot(Xl) / u), x0 = Math.min(...xs) - 1.0, x1 = Math.max(...xs) + 1.0, xm = (x0 + x1) / 2;
+  const zK = kn.reduce((s, k) => s - k.hb, 0) / 4;
+  parts.push(knuxBlob(P(xm, 0.9, zK - 0.3), Xl, Yl, Zl, u, [(x1 - x0) / 2, 0.95, 0.62]));
+  for (let i = 0; i < 4; i++) parts.push(knuxBlob(P(xs[i], 0.9, zK - 0.65), Xl, Yl, Zl, u, [0.86, 1.05, 0.66]));
+  const zP = zK + 2.2;
+  parts.push(knuxBlob(P(xm, 0.9, zP), Xl, Yl, Zl, u, [(x1 - x0) / 2 - 0.4, 0.5, 0.42]));   // the bar the curled fingers grip
+  for (const x of [x0 + 0.4, x1 - 0.4]) parts.push(knuxBlob(P(x, 0.9, (zK - 0.3 + zP) / 2), Xl, Yl, Zl, u, [0.34, 0.72, (zP - zK + 0.3) / 2 + 0.12]));
+  return GEAR.knux[S] = mergeGeos(parts);
+}
+function knuxPads(F, mat) {   // rigid: world = Hand.matrixWorld × local geometry (one mesh per hand)
+  const list = [];
+  for (const S of ['L', 'R']) { const b = F.bones['CC_Base_' + S + '_Hand'], m = new THREE.Mesh(knuxGeo(F, S), mat);
+    m.matrixAutoUpdate = false; m.castShadow = m.receiveShadow = true; scene.add(m); list.push({ m, b, rel: new M4() }); }
+  return list;
+}
 /* ───────── fighter ───────── */
 // scratch for the per-frame fighter code (walk, ik, pose, plantFeet, armClear): nothing there allocates
 const _walkQ = [], _ik1 = new Quat(), _ik2 = new Quat(), _ik3 = new Quat(), _po1 = new V3(), _po2 = new V3(), _po3 = new V3(), _po4 = new V3(), _poq1 = new Quat(), _poq2 = new Quat();
@@ -5814,9 +5937,11 @@ class Fighter {
     this.u.uDmg.value = 0; this.dmgShow = 0; if (this.flesh) this.flesh.reset(); if (this.face) this.face.reset(); this.simReset = true; for (const j of this.jigs) j.init = false;
   }
   place(x, rotY, mirror) {
-    const g = this.group; g.position.set(x, 0, 0); g.rotation.y = rotY; if (mirror) g.scale.x = -1;
+    const g = this.group; g.position.set(x, 0, 0); g.rotation.y = rotY; this.mir0 = !!mirror; this.stanceSet(false);
     g.updateMatrixWorld(true); this.simReset = true;
   }
+  // a southpaw is his own mirror image: the whole group flips in x on top of the side's own mirror (P2 is placed mirrored)
+  stanceSet(upd = true) { const g = this.group, s = (this.mir0 ? -1 : 1) * (((this.gear && this.gear.look) || {}).stance === 'south' ? -1 : 1); if (g.scale.x !== s) { g.scale.x = s; this.simReset = true; } if (upd) g.updateMatrixWorld(true); }
   attach(name, worldRest) { const b = this.bones[name]; const a = { b, local: b.worldToLocal(worldRest.clone()), w: new V3() }; this.ATT.push(a); return a; }
   bpos(name, v) { return v.setFromMatrixPosition(this.bones[name].matrixWorld); }
   mpos(bone, v) { v.setFromMatrixPosition(bone.matrixWorld); return this.group.worldToLocal(v); }
@@ -5989,7 +6114,7 @@ class Fighter {
     hairApply(this, L);   // cut, hair colour, beard (04g_hair.js); handGear, called from dress below, decides what of it shows (hairVis)
     skinApply(this, L); tatApply(this, L);   // skin tone, tattoos (04h_skin_tattoo.js)
     if (this.wmat) this.wmat.color.set((WRAPS_LOOKS.find(x => x.id === L.wraps) || WRAPS_LOOKS[0]).c);
-    this.dress(L);
+    this.dress(L); this.stanceSet();
   }
   dress(L) {
     const G2 = this.gear, U = this.flesh.u.uGear.value, W = wearDress(this, L), bt = W.bottom, tp = W.top, sh = W.shoes;   // 04e_wardrobe.js: the meshes of what he wears (model + colour from the registry)
@@ -6007,15 +6132,19 @@ class Fighter {
   // what is on the hands and head: sparring → boxing gloves + headgear; otherwise wraps or 4 oz MMA gloves (look.hands)
   handGear() {
     const G2 = this.gear, L = G2.look || {}, box = G2.spar, mma = !box && L.hands === 'mma', mine = LOOK.gloves || 'red';
+    const knux = !box && !mma && L.hands === 'knux' && weaponOn();   // issue 52: the metal only in a bout that allows weapons
     const gc = GLOVES.find(x => x.id === (this.isPlayer ? mine : L.gloves || (mine === 'blue' ? 'red' : 'blue'))) || GLOVES[0];   // the opponent never wears the player's colour
     if ((box || mma) && !G2.mat) { G2.mat = leatherMat(gc.c); G2.trim = new THREE.MeshPhysicalMaterial({ color: gc.trim, roughness: 0.6 }); }
     if (box && !G2.gloves) { G2.gloves = ['L', 'R'].map(S => gloveMesh(this, S, G2.mat, G2.trim)); G2.hg = headgearMesh(this, G2.mat, G2.trim); }
     if (mma && !G2.mma) { G2.mma = mmaShell(this, G2.mat); G2.mmaPads = mmaPads(this, G2.mat); }
+    if (knux && !G2.knuxPads) G2.knuxPads = knuxPads(this, G2.knuxMat || (G2.knuxMat = knuxMat()));
+    G2.knux = knux;   // read by resolveHit (07): damage, cuts, guard break, metallic sound
     if (G2.mat) { G2.mat.color.set(gc.c); G2.trim.color.set(gc.trim); }
     if (G2.gloves) { for (const gl of G2.gloves) gl.g.visible = box; G2.hg.visible = box; }
     if (G2.mma) { G2.mma.visible = mma; G2.mma.material.color.set(gc.c); for (const pd of G2.mmaPads) pd.m.visible = mma; }
+    if (G2.knuxPads) for (const pd of G2.knuxPads) pd.m.visible = knux;
     this.flesh.u.uGlv.value = box ? 1 : mma ? 2 : 0;   // the hand inside a boxing glove / the skin under an MMA glove is not drawn
-    this.wrapMesh.visible = !box && !mma; for (const t of this.tails) t.mesh.visible = !box && !mma;
+    this.wrapMesh.visible = !box && !mma; for (const t of this.tails) t.mesh.visible = !box && !mma;   // the wraps stay on under the knux
     hairVis(this);   // long hair is tucked under the headgear, the short layer shows through the open crown
   }
 
@@ -6043,19 +6172,22 @@ class Fighter {
     } else {
       let tgt;
       if (!fight) tgt = 0;
-      else if (this === P2) {   // he keeps his range: closes if you back off (a little slower than you can retreat), steps off if crowded
+      else if (this === P2 && !NET.host) {   // he keeps his range (a P2P guest's man holds where the guest left him — he was pulled back to 1.13 m): closes if you back off (a little slower than you can retreat), steps off if crowded
         const want = 1.13 - AI.style.adv - (this.cur && !this.release ? 0.08 : 0) + (this.daze > 0.5 ? 0.12 * this.daze : 0) + (AI.backT > G.t ? 0.45 : 0);
         tgt = a + (dist - want);
       } else { if (this.hold == null) this.hold = a; tgt = this.hold + (this.cur && !this.release ? 0.09 : 0); }
       if (G.state === 'kd' && G.kd && G.kd.att === this) tgt = a + (dist - 1.6);   // the referee sends him away while the other man is counted
       if (followOK(this)) tgt = a + Math.max(0, Math.abs(o.headNow.x - this.group.position.x) - 0.62);   // he goes after the falling man
       if (fight && this.daze > 0.5 && this === P1) tgt -= 0.1 * this.daze;
-      const vmax = (this === P2 ? 1.15 : 1.5) * tiredK;
+      const vmax = (this === P2 && !NET.host ? 1.15 : 1.5) * tiredK;
       this.advV += (clamp((tgt - a) * 6, -vmax, vmax) - this.advV) * Math.min(1, dt * 8);
     }
     if (this.knock) { this.advV -= this.knock * 0.9; this.knock = 0; }
     a += this.advV * dt;
-    const sum = a + (o.adv || 0); if (sum > 0.1 && !(o.rag.on && o.rag.mode === 'ko')) { a -= sum - 0.1; this.advV = Math.min(this.advV, 0); }   // can't walk through him
+    // how far in the two may come together past their marks: 0.1 m vs the AI (it keeps its range anyway); in a P2P bout both are
+    // people and one standing still must not freeze the other at ~1.05 m — down to 0.9 m apart, the body spheres below do the rest
+    const sumMax = NET.role && o.mark ? Math.abs(o.mark.x - this.mark.x) - 0.9 : 0.1;
+    const sum = a + (o.adv || 0); if (sum > sumMax && !(o.rag.on && o.rag.mode === 'ko')) { a -= sum - sumMax; this.advV = Math.min(this.advV, 0); }   // can't walk through him
     // bodies never share space: torso, head, knees and elbows of both men as spheres (from the posed skeleton, so the lunge
     // of a punch animation counts); the overlap along the fight line is taken out — half each, all of it if he can't move
     if (!(window.__tw || {}).noSep && !o.ko && !o.gu && o.jp[15].y > 1.2) { const pen = BAG.on ? bagBodyPen(this, fwd) : bodyOverlap(this, o, fwd); if (pen > 0) { const share = o.rag.on || o.slide ? 1 : 0.5; a -= Math.min(0.08, pen * share); this.advV = Math.min(this.advV, 0); } }
@@ -6555,7 +6687,8 @@ class Fighter {
     { const G2 = this.gear, hf = _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInvT); G2.guard.matrix.copy(hf); G2.guard.matrixWorldNeedsUpdate = true; wearPose(this, hf);
       if (G2.spar && G2.gloves) { G2.hg.matrix.copy(hf); G2.hg.matrixWorldNeedsUpdate = true; for (const gl of G2.gloves) { gl.g.matrix.multiplyMatrices(gl.h.matrixWorld, gl.rel); gl.g.matrixWorldNeedsUpdate = true; } }
       if (G2.pants) pantsTick(this, G2.pants, 1 / 60); if (G2.top) topTick(this, G2.top, 1 / 60);
-      if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
+      if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; }
+      if (G2.knux) for (const pd of G2.knuxPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
   }
   capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; arr.set(this.flesh.u.uFW.value, 4 * n + 5); }   // + the face shape weights
   restore(a, b2, t) {
@@ -6822,6 +6955,14 @@ const sfx = (() => {
       { const n = a.createBufferSource(), f = filt('lowpass', 780 + 420 * k, 0.9), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.018 + 0.012 * k, (0.22 + 0.26 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // muffled slap of leather on leather
       { const n = a.createBufferSource(), f = filt('lowpass', 380, 0.8), g = a.createGain(); n.buffer = noise; env(g, t, 0.002, 0.03 + 0.02 * k, (0.16 + 0.2 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.09); }   // the dull knock behind it
       const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(112 + 26 * k, t); o.frequency.exponentialRampToValueAtTime(52, t + 0.07); env(g2, t, 0.002, 0.06, (0.2 + 0.18 * k) * L); o.connect(g2).connect(out); o.start(t); o.stop(t + 0.09); },
+    /* (issue 52) a brass knuckle landing: a short inharmonic metallic ring laid over the punch —
+       quieter and duller on a guard, sent through the room echo like the other impacts. p = effective power. */
+    knux(p, blocked) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.2, 1.6), L = blocked ? 0.65 : 1, f0 = 1750 + 260 * k;
+      for (const [m, pk, len] of [[1, 0.10, 0.17], [2.71, 0.055, 0.12], [4.13, 0.03, 0.085], [6.4, 0.015, 0.055]]) {
+        const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.value = Math.min(15000, f0 * m);
+        env(g, t, 0.0008, len, pk * (0.45 + 0.55 * k) * L); o.connect(g).connect(bus); o.start(t); o.stop(t + len + 0.06); }
+      const n = a.createBufferSource(), f = filt('highpass', 3800), g2 = a.createGain(); n.buffer = noise;
+      env(g2, t, 0.0006, 0.02, 0.09 * k * L); n.connect(f).connect(g2).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.05); },
     /* A clean body shot forces the air out of him (issue 44): a short breath — noise through a bandpass falling
        900 → 320 Hz, straight to master (no room echo: close to the mic), plus a faint chest thump. p = effective power. */
     exhale(p) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.2, 1.6);
@@ -7117,6 +7258,10 @@ const AUDIO = (() => {
 /* damage per landed punch is scaled so a fight lasts: ~25–35 clean head shots to empty a full bar, so cuts and swelling
    have time to show (BKFC bouts that end inside the distance mostly end in rounds 1–3, not in the first ten seconds) */
 const DMG_K = 0.18;
+/* issue 52 — brass knuckles (04i_knux.js): one object for the whole mechanic. A punch from a worn,
+   allowed knux does ×KNUX.dmg damage, opens cuts (Flesh.onHit, 03) ×KNUX.cut as often, and breaks
+   the guard at BLK.breakSta × KNUX.brk stamina, i.e. earlier. 06_fx_sound.js adds the metallic ring. */
+const KNUX = { dmg: 1.4, cut: 2.5, brk: 1.6 };
 /* issue 44 — hit reactions: read the place, the force and the series off the recoil (metres / seconds).
    Before this stage every clean shot drove the same springs at the same instant: no series, no per-punch direction,
    no light/heavy split, head and trunk together. These are the tuned values the reactions now use. */
@@ -7214,7 +7359,6 @@ function recFrame() {
 }
 const RP = { seg: 0, tau: 0, i: 0, segs: [], cut: false, hl: false };   // hl: the segments are the end-of-round highlights (09b_cine.js), not the knockout
 function startReplay() {
-  if (NET.role) return netResult();   // issue 49: a P2P bout goes straight from the «Нокаут!» plate to the result screen
   if (REC.frames.length < 4) return endReplay();
   G.state = 'replay'; RP.hl = false; const F = REC.frames, t0 = F[0].t, t1 = F[F.length - 1].t;
   // the knockout from several cameras, like a broadcast: tight on the face, from the canvas looking up, straight down from
@@ -7247,6 +7391,7 @@ function stepReplay(dtReal) {
     const F = e.who ? P2 : P1; FX.spawn(e.pos, e.dir, e.power); if (e.dent) F.flesh.dent(...e.dent); if (e.mist) FX.mist(e.pos, e.dir, e.power, e.mist);
     if (e.spray) F.flesh.spray(e.spray.map(i => F.flesh.wounds[i]).filter(Boolean), e.dir, e.power, F);
     if (e.blocked) sfx.block(clamp(e.power * 2, 0.3, 1.4)); else sfx.thud(e.power * 0.7);
+    if (e.knux) sfx.knux(e.power * 0.7, e.blocked);   // issue 52: the metal rings again in the replay
     G.shake = Math.max(G.shake, 0.01 + 0.02 * e.power); EVT.emit('hit', { pos: e.pos, power: e.power, replay: true }); }
   RP.wd = sdt > 1e-6 || dtReal === 0 ? 0 : (RP.wd || 0) + dtReal;   // a replay whose clock stopped (bad segment) must not hang the game
   if (RP.tau >= s.to) nextSeg(); else if (RP.wd > 1.5 && !s.enter) { RP.wd = 0; endReplay(); }
@@ -7256,6 +7401,7 @@ function endReplay() {
   if (RP.hl) return endHighlights();
   const F = REC.frames; if (F.length) { const l = F[F.length - 1]; P1.restore(l.d[0], l.d[0], 0); P2.restore(l.d[1], l.d[1], 0); if (l.gx) { P1.group.position.x = l.gx[0]; P2.group.position.x = l.gx[1]; P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true); } }
   G.loser.frozen = true; G.loser.rag.on = false; G.winner.simReset = true; G.loser.simReset = true;
+  if (NET.role) { $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true; return netResult(); }   // P2P: the host played the replay (streamed to the guest), then the shared result
   G.state = 'result'; $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true;
   const win = G.winner === P1; $('r-title').textContent = win ? 'Победа' : 'Нокаут'; $('r-title').className = 'rt ' + (win ? 'win' : 'lose');
   $('r-sub').textContent = `${win ? 'соперник на полу' : 'ты на полу'} · счёт ${G.wins} : ${G.losses}`;
@@ -7311,7 +7457,7 @@ function followOK(att) {
   return G.t - (ko ? G.koT : G.kd.t0) < 1.3 && def.headNow.y > 0.6;
 }
 function followHit(att, name, contact) {
-  const def = att.other, P = PUNCH[name];
+  const def = att.other, P = PUNCH[name], knux = !!att.gear.knux;
   if (!contact && nearMiss(att, def) > 0.08) return whiffPunch(att);
   const pos = contact ? contact.clone() : def.headNow.clone(), power = clamp(P.dmg / 18, 0.3, 1.2) * Math.min(1.3, att.punchK ?? 1);
   const dir = _v1.copy(def.headNow).sub(att.headNow).setY(P.type === 'upper' ? 0.5 : P.type === 'over' ? -0.3 : 0.05).normalize().clone();
@@ -7319,18 +7465,19 @@ function followHit(att, name, contact) {
   const R = def.rag, qi = _qa.copy(def.group.quaternion).invert(), pl = def.group.worldToLocal(pos.clone());
   for (const [k, J] of [['head', 9 + 9 * power], ['neck', 3 * power], ['chest', 2 * power]]) { const d = R.by[k]; if (!d || !d.body || !d.body.invMass) continue;
     const b = d.body, Jl = _v2.copy(dir).applyQuaternion(qi).multiplyScalar(J), r = _v3.set(pl.x - b.position.x, pl.y - b.position.y, pl.z - b.position.z).multiplyScalar(k === 'head' ? 1 : 0); b.applyImpulse(Jl, r); }
-  const fr = def.flesh.onHit(pos, dir, power, name, false, def), ev = { t: G.t, pos: fr.skin, dir, power, who: def === P1 ? 0 : 1, dent: fr.dent };
+  const fr = def.flesh.onHit(pos, dir, power, name, false, def, knux), ev = { t: G.t, pos: fr.skin, dir, power, who: def === P1 ? 0 : 1, dent: fr.dent, knux: knux ? 1 : 0 };
   const sp = def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.06 * def.flesh.U); if (sp.length || fr.spray.length) { const s2 = fr.spray.length ? fr.spray : sp; def.flesh.spray(s2, dir, power, def); ev.spray = s2.map(w => def.flesh.wounds.indexOf(w)); }
   def.face.hit && def.face.hit(power, true, fr.skin); FX.spawn(fr.skin, dir, power); { const bl = Math.min(1, def.flesh.wounds.reduce((a, x) => a + x.sev, 0) * 0.8); if (bl > 0.12) { FX.mist(fr.skin, dir, power, bl); ev.mist = bl; } } REC.events.push(ev);
-  if (att.fs) { att.fs.land++; att.fs.dmg += P.dmg * DMG_K; } if (G.state === 'kd') { def.hp = Math.max(0, def.hp - P.dmg * DMG_K); G.kd.up += 0.8; }
-  att.lastLand = G.t; sfx.thud(power, false); EVT.emit('hit', { pos, power }); G.shake = Math.max(G.shake, 0.02 + 0.03 * power); G.hitstop = 0.02 + 0.02 * power;
+  const fd = P.dmg * DMG_K * (knux ? KNUX.dmg : 1);
+  if (att.fs) { att.fs.land++; att.fs.dmg += fd; } if (G.state === 'kd') { def.hp = Math.max(0, def.hp - fd); G.kd.up += 0.8; }
+  att.lastLand = G.t; sfx.thud(power, false); if (knux) sfx.knux(power, false); EVT.emit('hit', { pos, power }); G.shake = Math.max(G.shake, 0.02 + 0.03 * power); G.hitstop = 0.02 + 0.02 * power;
   popup(fr.skin.clone().add(_v4.set(0, 0.15, 0)), 'добил', 'crit');
 }
 function resolveHit(att, name, contact) {
   if (window.__tutOn) return;   // (issue 45) the tutorial: nobody takes damage, no cuts / knockdown / KO
   const def = att.other; if (def.ko || G.state !== 'fight') { if (followOK(att)) followHit(att, name, contact); return; }
   if (BAG.on) { if (att === P1) bagHit(att, name, contact); return; }
-  const P = PUNCH[name], d = def.dodge, evading = !!d && d.t > 0.05 && d.t < 0.44, body = att.bodyShot;
+  const P = PUNCH[name], d = def.dodge, evading = !!d && d.t > 0.05 && d.t < 0.44, body = att.bodyShot, knux = !!att.gear.knux;
   const evaded = evading && evades(att, name, d);
   let pos = contact || (body ? def.ribs[att.ribIdx].w.clone() : def.headNow.clone().add(_v3.copy(att.knuckle(_v4)).sub(def.headNow).setLength(0.1)));
   if (evaded) {
@@ -7343,6 +7490,7 @@ function resolveHit(att, name, contact) {
   const caught = def.cur && !def.resolved && !(def.blockW > 0.55); if (caught) dmg *= 1.25;
   if (att.adv > 0.04) dmg *= 1.08;   // stepping in behind it
   dmg *= att.punchK ?? 1; if (evading) dmg *= 1.35; if (body) dmg *= 0.8;
+  if (knux) dmg *= KNUX.dmg;   // issue 52: a punch with the knux on hits harder (only when worn and allowed)
   const stamBefore = def.stamina;
   const guardBroken = (def.guardDown || 0) > G.t;   // the next punch after a break gets through clean (issue 41)
   const blocked = def.blockW > 0.55 && (!def.cur || def.dodge) && !guardBroken;
@@ -7350,7 +7498,7 @@ function resolveHit(att, name, contact) {
   // `power` below is computed from the reduced damage, so without this every block would read as the same light jab.
   const bforce = clamp(P.dmg / 18 * (att.punchK ?? 1) * (att.dmgMul || 1) * (counter ? 1.5 : 1), 0.25, 1.6);
   const isPow = !!att.heavy, isHook = P.type === 'hook';
-  const breakIt = blocked && def.stamina < BLK.breakSta && (isPow || isHook);
+  const breakIt = blocked && def.stamina < BLK.breakSta * (knux ? KNUX.brk : 1) && (isPow || isHook);   // issue 52: the metal gets through the guard sooner
   const sag = blocked ? blkSag(def) : 0;   // < 20 % stamina: gloves at the chin, up to ×2 damage leaks through
   if (blocked) {
     dmg *= (body ? 0.6 : P.type === 'upper' ? 0.55 : 0.18) * (1 + sag);   // was a flat ×0.18 / ×0.55 / ×0.6
@@ -7359,7 +7507,7 @@ function resolveHit(att, name, contact) {
     if (isPow) def.knock = (def.knock || 0) + 0.7 * bforce;   // a power shot takes a short step back
     if (breakIt) { def.guardDown = G.t + BLK.downT; def.brkT0 = G.t; def.blockW = 0; }
   }
-  dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (G.mode === 'spar' ? 0.6 : 1);   // 16 oz and a helmet
+  dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (sparOn() ? 0.6 : 1) * (pvp('glass') ? 2.2 : pvp('blood') ? 1.25 : 1);   // 16 oz and a helmet; P2P modes (00a_net_state.js)
   if (window.__dmgLog) window.__dmgLog.push([def === P1 ? 1 : 2, +dmg.toFixed(1), name, counter ? 'C' : '', caught ? 'K' : '', blocked ? 'B' : '', evading ? 'E' : '', +G.t.toFixed(1)]);
   if (att.fs) { if (blocked) att.fs.blk++; else { att.fs.land++; if (P.type !== 'straight' || name === 'cross') att.fs.pow++; if (att.sig && sigOf(name) === att.sig) att.fs.sig++; } att.fs.dmg += dmg; }
   def.hp = Math.max(0, def.hp - dmg); def.hpCap = Math.max(def.hp, def.hpCap - dmg * (blocked ? 0.15 : 0.4)); def.hitT = G.t; if (G.rd) G.rd[att === P1 ? 0 : 1] += blocked ? dmg * 0.3 : dmg;
@@ -7368,7 +7516,7 @@ function resolveHit(att, name, contact) {
   else if (P.type === 'upper') dir.set(fwd * 0.4, 1, 0);
   else if (P.type === 'over') dir.set(fwd, -0.45, 0);
   dir.normalize();
-  const power = clamp(dmg / (18 * ((window.__tw || {}).dmgK ?? DMG_K)), 0.2, 1.6), blood = !blocked && (def.hp < 62 || dmg >= 14);
+  const power = clamp(dmg / (18 * ((window.__tw || {}).dmgK ?? DMG_K)), 0.2, 1.6), blood = !blocked && (def.hp < 62 || dmg >= 14 || pvp('blood'));
   // ── issue 44: the series + the reaction descriptor handed to takeHit ──
   // A clean hit inside REACT.gap of the last one compounds (×1.0 → ×1.3 → ×1.6); a block keeps its own 1.2 recoil.
   let combo = 0, mult = 1;
@@ -7411,10 +7559,10 @@ function resolveHit(att, name, contact) {
       else if (power > 0.9) AI.backT = G.t + 0.5 + rr() * 0.4;
     } else if (def.hitLog.length >= 3) def.shellT = G.t + 0.45;
   }
-  const ev = { t: G.t, pos, dir, power, who: def === P1 ? 0 : 1, blocked };
+  const ev = { t: G.t, pos, dir, power, who: def === P1 ? 0 : 1, blocked, knux: knux ? 1 : 0 };
   if (!blocked && !body) wearHit(def, pos, dir, power);   // hats fly off, glasses crack (04e_wardrobe.js)
   if (!blocked) {
-    const fr = def.flesh.onHit(pos, dir, power, name, body, def); ev.dent = fr.dent; ev.pos = pos = fr.skin;
+    const fr = def.flesh.onHit(pos, dir, power, name, body, def, knux); ev.dent = fr.dent; ev.pos = pos = fr.skin;
     // blood comes out of the wounds (an old cut reopens, the nose runs) — never out of thin air
     const sp = blood || fr.cut || fr.nose ? fr.spray.length ? fr.spray : def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.05 * def.flesh.U) : [];
     if (sp.length) { def.flesh.spray(sp, dir, power, def); ev.spray = sp.map(w => def.flesh.wounds.indexOf(w)); }
@@ -7437,6 +7585,7 @@ function resolveHit(att, name, contact) {
   if (!blocked && power > 1.05 && G.slowT <= 0.02) { G.slow = 0.6; G.slowT = 0.06; }
   G.shake = Math.max(G.shake, 0.012 + 0.03 * power + (breakIt ? 0.02 : 0));
   if (blocked) sfx.block(bforce, breakIt ? 1.8 : 1); else sfx.thud(power, body);   // dull/short on gloves, louder on a break
+  if (knux) sfx.knux(power, blocked);   // issue 52: the brass ring over the punch
   EVT.emit('hit', { pos, power, blocked });
   popup(pos, String(Math.round(dmg)), counter ? 'crit' : 'hit');
   // feel it: the screen edge flushes red when you are hit, the phone kicks on what you land and harder on what you take
@@ -7477,6 +7626,7 @@ function kdProgress(K) {
 }
 /* knockdown: down but conscious — a knee taken, or a flash fall. The referee counts (BKFC: 10 s to stand; the other man to a neutral spot) */
 function knockdown(att, def, dir, power, name, fwd, sev, kind, bodyArg) {
+  if (pvp('kd1')) return knockout(att, def, dir, power, name, fwd, true, bodyArg);   // P2P «Первый нокдаун»: the first fall ends it
   if (att.fs) att.fs.kd++;
   G.state = 'kd'; def.kdCount = (def.kdCount || 0) + 1; if (G.rkd) G.rkd[def === P1 ? 0 : 1]++;
   const body = !!bodyArg || kind === 'liver';
@@ -7700,12 +7850,13 @@ const itemTag = it => itemOwned(it.id) ? (it.price ? 'есть' : 'базово�
 // whatever is worn but not owned (after a reset, or a try-on that was left) goes back to the defaults
 function wearSanitize(L = LOOK) {
   for (const c of WCATS) { const s = wearGet(L, c); if (s.id !== 'none' && !itemOwned(s.id)) L[c] = c === 'bottom' ? { id: 'shorts', color: 'red' } : { id: 'none' }; }
-  if (L.hands === 'mma' && !itemOwned('mma')) L.hands = 'wraps';
+  if ((L.hands === 'mma' || L.hands === 'knux') && !itemOwned(L.hands)) L.hands = 'wraps';
 }
 // an older save: everything chosen so far stays available, and the wins already won are paid back a little
 if (!PROF.eco) {
   for (const c of WCATS) { const s = wearGet(LOOK, c); if (ITEMS[s.id]) PROF.own[s.id] = 1; }
   if (LOOK.hands === 'mma') PROF.own.mma = 1;
+  if (LOOK.hands === 'knux') PROF.own.knux = 1;
   PROF.cash = Math.min(G.wins, 20) * 150; PROF.eco = 1;
 }
 wearSanitize();
@@ -7740,7 +7891,7 @@ function payShow(p) {
 /* ───────── AI ───────── */
 /* opponent styles, after how bare-knuckle bouts actually go: short range, lots of hooks and overhands, fighters who stand and trade,
    counter-punchers who make you miss and make you pay, and pressure fighters who walk you to the ropes with combinations and body shots */
-const ROUND_LEN = 120, BREAK_LEN = 7; let ROUNDS = 5;   // issue 49: a P2P match is 3 rounds (was a const = 5)
+let ROUND_LEN = 120; const BREAK_LEN = 7; let ROUNDS = 5;   // ROUND_LEN: a P2P host may set 60 / 120 / 180 s (18_net.js); ROUNDS: 3 in a P2P match by default (issue 49)
 const STYLES = {
   brawler: { label: 'рубака', gap: 0.72, w: { jab: 2, cross: 3, hookL: 3.5, hookR: 3.2, upperL: 1, upperR: 1.4, over: 2.4 }, dodge: 0.55, block: 0.5, combo: 0.55, trade: 0.55, feint: 0.03, body: 0.15, adv: 0.05, counter: 0.15 },
   counter: { label: 'контрпанчер', gap: 1.35, w: { jab: 4, cross: 3.5, hookL: 2.5, hookR: 1.2, upperL: 1.4, upperR: 1.8, over: 0.6 }, dodge: 1.35, block: 0.9, combo: 0.3, trade: 0.12, feint: 0.16, body: 0.12, adv: -0.06, counter: 0.6 },
@@ -7840,7 +7991,7 @@ function rollOpponent() {
 const BAG = { on: false, score: 0, hits: 0, combo: 0, best: 0, lastT: -9, mass: 40, x: null };   // the bag itself — model, chains, physics — is in 09a_bag_rig.js
 function showP2(v) { if (!P2) return; P2.group.visible = v; for (const o of P2.sceneObjs || []) o.visible = v;
   if (v) { P2.handGear(); if (P2.gear.look) P2.dress(P2.gear.look); P2.sparGear(!!P2.gear.spar); }   // re-apply what the outfit hides (trunks under trousers, hair under the headgear)
-  else { const g = P2.gear; if (g.gloves) { for (const gl of g.gloves) gl.g.visible = false; g.hg.visible = false; } if (g.mma) { g.mma.visible = false; for (const pd of g.mmaPads) pd.m.visible = false; } } }   // (his gear decides what of the wraps / hair shows)
+  else { const g = P2.gear; if (g.gloves) { for (const gl of g.gloves) gl.g.visible = false; g.hg.visible = false; } if (g.mma) { g.mma.visible = false; for (const pd of g.mmaPads) pd.m.visible = false; } if (g.knuxPads) for (const pd of g.knuxPads) pd.m.visible = false; } }   // (his gear decides what of the wraps / hair shows)
 function startBag() {
   G.mode = 'bag'; if (G.diff !== G.userDiff && G.userDiff) G.diff = G.userDiff;
   startFight(true); BAG.on = true; showP2(false); BAG.g.visible = true;
@@ -7904,9 +8055,9 @@ function startQuick() { if (G.mode === 'career') { G.diff = G.userDiff; rollOppo
 function startFight(fromMode) {
   if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); }
   hintFightStart(); window.goFull && window.goFull();   // touch: full screen + landscape (12_ui.js)   // control hints: the first three bouts are the learning ones (12_ui.js)
-  for (const F of [P1, P2]) F.sparGear(G.mode === 'spar');
+  for (const F of [P1, P2]) F.sparGear(G.mode === 'spar' || (G.mode === 'net' && NET.cfg.spar));   // a P2P host may pick «Спарринг» (18_net.js)
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
-  if (G.mode !== 'career') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }
+  if (G.mode !== 'career' && G.mode !== 'net') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }
   CROWD.fill = G.mode === 'career' ? LADDER[Math.min(G.career, LADDER.length - 1)].crowd ?? 1 : 1;   // the semi-final in the warehouse: a half-empty hall; the title fight: everybody came
   setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'boxgym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the training gym (13e_loc_boxgym.js); a career fight is where the ladder says
   G.paused = false; UI.from = null; uiShow(null);
@@ -7997,10 +8148,10 @@ function decision() {
 // a cut over the eye that keeps running into it: the referee calls time for the doctor; if it can't be controlled, the fight is stopped
 function cutCheck() {
   for (const F of [P1, P2]) for (const w of F.flesh.wounds) {
-    if (w.kind !== 'cut' || w.sev < 0.85) continue;
+    if (w.kind !== 'cut' || w.sev < 0.85 || pvp('blood')) continue;   // «Кровавая бойня»: no doctor
     const near = Math.min(w.p.distanceTo(F.flesh.u.uEyeL.value), w.p.distanceTo(F.flesh.u.uEyeR.value)) / F.flesh.U; if (near > 0.045) continue;
     if (!F.cutLook) { F.cutLook = true; msg('Врач смотрит рассечение'); G.state = 'break'; G.breakT = 3.5; G.doc = true; corner(F, 0.35); return; }
-    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; fightOver(A === P1, false, 'tko'); $('pad').hidden = true;
+    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; fightOver(A === P1, false, 'tko'); $('pad').hidden = true; if (NET.role) return netResult();   // P2P: the shared result (the guest was left hanging)
       $('r-title').textContent = A === P1 ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (A === P1 ? 'win' : 'lose');
       $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false; msg('Стоп! Рассечение', 'ko'); return; }
   }
@@ -13525,9 +13676,12 @@ function netBoot() {
     move: (x, y) => { MV.kx = x || 0; MV.ky = y || 0; netMove(); },
     drop: () => { NET.closing = true; if (NET.conn) NET.conn.close(); },   // a hard drop: no auto-reconnect, so the host's banner stays
     net: () => NET,
+    room: c => netRoomUI(c || 'ABC234'),   // debug: the room panel (with the host's settings when NET.host)
+    cfg: () => NET.cfg,
   };
 }
 function netHome() {
+  netStanceUI();
   show('net-room', false); show('net-home', true); NET.roomShown = false;
   $('net-code-in').value = '';
   $('net-st').textContent = 'Бой 1 на 1 по ссылке. Хост считает бой, гость видит его со своей стороны. Без регистрации и своих серверов.';
@@ -13542,6 +13696,36 @@ function netRoomUI(code) {
   $('net-code').textContent = code;
   $('net-link').textContent = NET.link;
   $('net-wait').textContent = NET.host ? 'Ждём соперника…' : 'Подключаемся…';
+  show('net-cfg', NET.host); if (NET.host) netCfgUI();
+}
+/* the host's match settings: place, rounds, round length, rules (bare knuckle / sparring gloves + headgear), weapons (issue 52); the guest gets them in hello */
+function netRounds(C) { return C.mode === 'ko' ? 99 : C.rounds; }   // «До нокаута»: no judges, the rounds just keep coming
+/* your own stance (kept in LOOK, so it goes over in hello and stays for the creator / quick fights) */
+function netStanceUI() {
+  swatches('net-stance', [{ id: 'orth', label: 'Правша' }, { id: 'south', label: 'Левша' }], () => LOOK.stance === 'south' ? 'south' : 'orth', v => { LOOK.stance = v; try { save(); } catch (e) {} P1.applyLook(LOOK); }, true, true);
+}
+function netCfgUI() {
+  const C = NET.cfg, box = $('net-loc'); box.textContent = '';
+  if (!LOCS[C.loc] || !locOpen(C.loc)) C.loc = 'gym';
+  for (const L of Object.values(LOCS)) { if (L.train || !locOpen(L.id)) continue;
+    const b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${L.desc || ''}</small>`;
+    b.setAttribute('aria-pressed', String(C.loc === L.id));
+    b.onclick = () => { C.loc = L.id; for (const o of box.children) o.setAttribute('aria-pressed', String(o === b)); locPrefetchOne(L.id); };
+    box.appendChild(b);
+  }
+  swatches('net-rounds', [1, 3, 5].map(n => ({ id: n, label: String(n) })), () => C.rounds, v => { C.rounds = v; }, true, true);
+  swatches('net-len', [[60, '1 мин'], [120, '2 мин'], [180, '3 мин']].map(([id, label]) => ({ id, label })), () => C.len, v => { C.len = v; }, true, true);
+  swatches('net-rules', [{ id: false, label: 'Голые кулаки' }, { id: true, label: 'Спарринг: перчатки и шлем' }], () => C.spar, v => { C.spar = v; }, true, true);
+  swatches('net-weap', [{ id: false, label: 'Без оружия' }, { id: true, label: 'Кастеты разрешены' }], () => C.weap, v => { C.weap = v; }, true, true);   // issue 52
+  const tip = () => { const M = NET_MODES.find(x => x.id === C.mode) || NET_MODES[0]; $('net-mode-tip').textContent = M.tip; $('net-rounds').parentElement.style.opacity = C.mode === 'ko' ? 0.4 : ''; };
+  swatches('net-mode', NET_MODES.map(M => ({ id: M.id, label: M.label })), () => C.mode, v => { C.mode = v; tip(); }, true, true); tip();
+}
+function netCfgApply(C) {   // both sides, before the bout is set up
+  if (!C) return;
+  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar, mode: NET_MODES.some(M => M.id === C.mode) ? C.mode : 'std', weap: !!C.weap };   // issue 52: the host's weapon rule
+  ROUNDS = netRounds(NET.cfg); ROUND_LEN = NET.cfg.len;
+  if (G.loc !== NET.cfg.loc) { G.loc = NET.cfg.loc; try { setLocation(G.loc); } catch (e) { console.error(e); } }
+  for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
 }
 async function netCopy() {
   const b = $('net-copy');
@@ -13615,7 +13799,7 @@ function netOpen(c) {
   NET.conn = c; NET.closing = false; NET.dropT = 0; NET.silent = 0; clearTimeout(NET.retryT);
   show('net-drop', false);
   if (!NET.started) netBeginMatch(); else netSt('Соперник вернулся');
-  netSend({ c: 'hello', look: LOOK, nm: myName() });
+  netSend(NET.host ? { c: 'hello', look: LOOK, nm: myName(), cfg: NET.cfg } : { c: 'hello', look: LOOK, nm: myName() });
 }
 function netErr(e) {
   const t = (e && (e.type || e.message)) || '';
@@ -13629,17 +13813,20 @@ function netErr(e) {
 function netBeginMatch() {
   if (NET.started) return;
   NET.started = true;
-  NET.saved = { loc: G.loc, cine: OPT.cine, rounds: ROUNDS, diff: G.diff, mode: G.mode };
-  G.mode = 'net'; G.loc = 'gym'; G.diff = 'normal'; ROUNDS = 3; OPT.cine = false;
-  try { setLocation('gym'); } catch (e) {}
+  NET.saved = { loc: G.loc, cine: OPT.cine, rounds: ROUNDS, len: ROUND_LEN, diff: G.diff, mode: G.mode };
+  G.mode = 'net'; G.diff = 'normal'; OPT.cine = false;
+  const C = NET.host ? NET.cfg : { loc: 'gym', rounds: 3, len: 120, spar: false };   // the guest's real settings come with the host's hello
+  ROUNDS = netRounds(C); ROUND_LEN = C.len; G.loc = C.loc;
+  try { setLocation(G.loc); } catch (e) {}
   uiShow(null); show('net-drop', false); $('net-ping').hidden = false; $('net-ping').textContent = '… мс';
   camCut = true;
   if (NET.host) netHostStart(); else netGuestSetup();
 }
 function netHostStart() {
   showP2(true);
-  for (const F of [P1, P2]) F.sparGear(false);
   rollOpponent();   // a stand-in until the guest's hello arrives with his own look
+  if (NET.oLook) try { P2.applyLook(NET.oLook); } catch (e) {}   // a rematch: rollOpponent just re-dressed the guest's man as a random one
+  for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
   startFight(true);
   NET.evI = REC.events.length; NET.pop.length = 0; NET.q.length = 0; NET.acc = 0; NET.pingAcc = 0; NET.first = true;
   netLabels();
@@ -13649,7 +13836,8 @@ function netGuestSetup() {
   // issue 49: here the local player's man is P2 (left on the mirrored camera); hello sends LOOK,
   // so dress him in that same look instead of the random opponent left over from the menu boot
   P2.applyLook(LOOK);
-  for (const F of [P1, P2]) F.sparGear(false);
+  if (NET.oLook) try { P1.applyLook(NET.oLook); } catch (e) {}
+  for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
   P1.stat = PROF.stats; P2.stat = lvlStats(1); P1.speed = 1.5; P2.speed = DIFFS.normal.speed;
   P1.resetState(); P2.resetState();
   P1.place(-D_SEP / 2, Math.PI / 2, false); P2.place(D_SEP / 2, -Math.PI / 2, true);
@@ -13699,6 +13887,7 @@ function netInput(m) {
   if (m.q) for (const p of m.q) if (NET.q.length < 6) NET.q.push({ t: p.t, n: p.n, body: !!p.body, pow: !!p.pow, at: G.real });
 }
 function netHostAI(dt) {   // called from ai(dt) instead of the AI (08_ai_flow.js)
+  if (pvp('iron')) { P1.stamina = Math.max(P1.stamina, 100); P2.stamina = Math.max(P2.stamina, 100); }   // «Железные лёгкие»
   const me = P2, m = NET.mv;
   me.moveDir = m.x; me.moveLat = -m.y;   // mirrored camera: the guest's right is toward the opponent, up circles the other way
   me.blocking = !!m.b && G.state === 'fight';
@@ -13720,6 +13909,7 @@ function netEv(e) {
   if (e.pos) o.s = [r3(e.pos.x), r3(e.pos.y), r3(e.pos.z)]; else o.s = [0, 0, 0];
   if (e.dir) o.d = [r3(e.dir.x), r3(e.dir.y), r3(e.dir.z)]; else o.d = [0, 0, 1];
   if (e.mist) o.m = r3(e.mist);
+  if (e.knux) o.k = 1;   // issue 52: the guest plays the metallic ring too
   return o;
 }
 function netCapturePopup(pos, text, cls) {
@@ -13727,26 +13917,45 @@ function netCapturePopup(pos, text, cls) {
   NET.pop.push({ t: r3(G.t), p: [r3(pos.x), r3(pos.y), r3(pos.z)], s: String(text), c: cls });
   if (NET.pop.length > 32) NET.pop.shift();
 }
+// bone quaternions go as Int16 (×32767) in base64 — ~2.5× smaller than r3 JSON numbers; the tail (hip position, lids, face weights) stays r3
+function netPack(a, n4) {
+  const q = NET.q16 || (NET.q16 = new Int16Array(n4));
+  for (let i = 0; i < n4; i++) q[i] = Math.round(clamp(a[i], -1, 1) * 32767);
+  const u = new Uint8Array(q.buffer, 0, n4 * 2); let s = '';
+  for (let i = 0; i < u.length; i += 4096) s += String.fromCharCode.apply(null, u.subarray(i, i + 4096));
+  return [btoa(s), Array.from(a.subarray(n4), r3)];
+}
+function netUnpack(p) {
+  if (!Array.isArray(p) || typeof p[0] !== 'string') return Float32Array.from(p);   // old peer: plain numbers
+  const b = atob(p[0]), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+  const q = new Int16Array(u.buffer), out = new Float32Array(q.length + p[1].length);
+  for (let i = 0; i < q.length; i++) out[i] = q[i] / 32767;
+  out.set(p[1], q.length); return out;
+}
 function netSnapshot() {
+  // don't queue snapshots behind a congested link (that is what made the ping climb to hundreds of ms): skip this one,
+  // the guest interpolates over the gap; events / popups stay pending and ride the next snapshot
+  const dc = NET.conn && NET.conn.dataChannel;
+  if (dc && dc.bufferedAmount > 12000) { NET.stat.skip = (NET.stat.skip || 0) + 1; return; }
   const f = NET.tmp || (NET.tmp = { d: [new Float32Array(REC.N), new Float32Array(REC.N)] });
   P1.capture(f.d[0]); P2.capture(f.d[1]);
   const m = {
-    c: 's', t: r3(G.t), st: G.state,
-    d: [Array.from(f.d[0], r3), Array.from(f.d[1], r3)],
+    c: 's', t: r3(NET.clk), gt: r3(G.t), st: G.state,   // own clock: G.t stands still in a replay, the guest's playback must not
+    d: [netPack(f.d[0], 4 * P1.allBones.length), netPack(f.d[1], 4 * P2.allBones.length)],
     gx: [r3(P1.group.position.x), r3(P2.group.position.x)],
     ar: [r3(ARENA.position.x), r3(ARENA.position.z), r3(ARENA.rotation.y)],
     r: ROPES.map(R => [r3(R.cur.x), r3(R.cur.y), r3(R.cur.z), r3(R.s)]).flat(),
     h: [r3(P1.hp), r3(P2.hp)], e: [r3(P1.stamina), r3(P2.stamina)],
-    rd: G.round, rt: r3(G.roundT), ev: [], p: NET.pop.slice(),
+    rd: G.round, rt: r3(G.roundT), ev: [], p: NET.pop.map(p => Object.assign({}, p, { t: r3(NET.clk) })),
   };
   NET.pop.length = 0;
-  for (let i = NET.evI; i < REC.events.length; i++) { const e = netEv(REC.events[i]); if (e) m.ev.push(e); }
+  for (let i = NET.evI; i < REC.events.length; i++) { const e = netEv(REC.events[i]); if (e) { e.t = r3(NET.clk); m.ev.push(e); } }
   NET.evI = REC.events.length;
   netSend(m);
 }
 function netOnSnapshot(m) {
   NET.stat.recv++;
-  m.d[0] = Float32Array.from(m.d[0]); m.d[1] = Float32Array.from(m.d[1]);
+  m.d[0] = netUnpack(m.d[0]); m.d[1] = netUnpack(m.d[1]);
   NET.snaps.push(m); if (NET.snaps.length > 90) NET.snaps.shift();
   for (const e of m.ev) NET.evs.push(e);
   for (const p of m.p) NET.pops.push(p);
@@ -13755,7 +13964,7 @@ function netOnSnapshot(m) {
 }
 function netApplyState(m) {
   const prev = G.state;
-  G.t = m.t; G.round = m.rd; G.roundT = m.rt;
+  G.t = m.gt != null ? m.gt : m.t; G.round = m.rd; G.roundT = m.rt;
   P1.hp = m.h[0]; P2.hp = m.h[1]; P1.stamina = m.e[0]; P2.stamina = m.e[1];
   if (m.st !== 'result' || NET.over) G.state = m.st;
   // captions / bells / crowd follow the host's state, exactly like the events in a replay
@@ -13764,6 +13973,8 @@ function netApplyState(m) {
     else if (m.st === 'fight') { msg('Раунд ' + G.round); roundSnd(); show('pad', true); EVT.emit('round'); }
     else if (m.st === 'break') msg('Перерыв');
     else if (m.st === 'ko') msg('Нокаут', 'ko');
+    if (m.st === 'replay') { $('rec').hidden = false; $('skip').hidden = true; $('bar-t').hidden = $('bar-b').hidden = false; }   // the host's replay, streamed
+    else if (prev === 'replay') { $('rec').hidden = true; $('skip').hidden = false; $('bar-t').hidden = $('bar-b').hidden = true; }
   }
 }
 
@@ -13796,6 +14007,7 @@ function netPlayEvent(e) {
   FX.spawn(pos, dir, e.b ? e.p * 0.4 : e.p);
   if (e.m) FX.mist(pos, dir, e.p, e.m);
   if (e.b) sfx.block(clamp(e.p * 2, 0.3, 1.4)); else sfx.thud(e.p * 0.7);
+  if (e.k) sfx.knux(e.p * 0.7, !!e.b);
   G.shake = Math.max(G.shake, 0.01 + 0.02 * e.p);
   EVT.emit('hit', { pos, power: e.p, blocked: !!e.b });
   const hb = $(e.w ? 'hpb2' : 'hpb1'); if (hb) { hb.classList.remove('hit'); void hb.offsetWidth; hb.classList.add('hit'); }
@@ -13818,6 +14030,8 @@ function netMsg(m) {
   if (!m || !m.c) return;
   NET.silent = 0;   // any inbound traffic proves the link is alive (issue 49 watchdog)
   if (m.c === 'hello') {
+    NET.oLook = m.look;   // kept for rematches
+    if (NET.guest && m.cfg) netCfgApply(m.cfg);
     try { if (NET.host) P2.applyLook(m.look); else P1.applyLook(m.look); } catch (e) {}
     NET.nm = m.nm || '';
   } else if (m.c === 'in') netInput(m);
@@ -13828,8 +14042,8 @@ function netMsg(m) {
   else if (m.c === 'again') netRestart();
 }
 function netPing(rtt) {
-  NET.ping = Math.round(rtt);
-  const el = $('net-ping'); el.hidden = false; el.textContent = NET.ping + ' мс';
+  NET.ping = Math.round(NET.ping ? NET.ping * 0.6 + rtt * 0.4 : rtt);   // smoothed: one late pong doesn't flash a spike
+  const el = $('net-ping'); el.hidden = false; el.textContent = 'пинг ' + NET.ping + ' мс';
   el.classList.toggle('bad', NET.ping > 200);
 }
 function netShowResult(win, draw) {
@@ -13878,11 +14092,11 @@ function netTick(dt) {
   NET.silent += Math.min(dt, 0.25);   // cap one stalled frame so a slow render cannot look like a dropout
   NET.pingAcc += dt;
   if (NET.pingAcc >= 1) { NET.pingAcc = 0; netSend({ c: 'ping', t: performance.now() }); }
-  if (NET.over) return;
+  if (NET.over && (NET.guest || NET.over.sent)) return;   // the host's NET.over is set at the KO (fightOver): keep streaming through the replay until netResult
   // a lost link does not always raise PeerJS's remote 'close' (crashed tab, dead NAT mapping):
   // if nothing has arrived for silenceMax seconds, open the 10 s recovery window on our own
   if (NET.dropT === 0 && NET.silent > NET.silenceMax) return netLost(NET.conn);
-  NET.acc += dt;
+  NET.acc += dt; NET.clk = (NET.clk || 0) + dt;
   if (NET.acc >= NET.rate) { NET.acc = 0; if (NET.host) netSnapshot(); else netFlushInput(); }
 }
 function netLost(c) {
@@ -13911,11 +14125,11 @@ function netWinByDrop() {
 function netClose() {
   const had = !!NET.role;
   clearTimeout(NET.retryT);
-  NET.role = null; NET.host = false; NET.guest = false; NET.started = false; NET.over = null;
+  NET.role = null; NET.host = false; NET.guest = false; NET.started = false; NET.oLook = null; NET.over = null;
   NET.conn = null; NET.dropT = 0; NET.closing = true; NET.roomShown = false;
   show('net-drop', false); $('net-ping').hidden = true; $('net-ping').textContent = '';
   if (NET.saved) {
-    G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
+    G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; ROUND_LEN = NET.saved.len || 120; NET.cfg.spar = false; NET.cfg.weap = false; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
     NET.saved = null; try { setLocation(G.loc); } catch (e) {}
   }
   try { if (NET.peer && !NET.peer.destroyed) NET.peer.destroy(); } catch (e) {}

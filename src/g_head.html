@@ -315,6 +315,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .so-sp .so-logo{width:120px;height:36px;image-rendering:auto}.so-sp.lock{opacity:.62}.so-lock{font:500 10.5px var(--mono);letter-spacing:.06em;color:var(--muted)}.so-lock.on{color:#8fd49a}
 .dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
 .views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
+#net-room,#net-home,#net-stance-f{flex-shrink:0}.net-tip{display:block;margin-top:4px;font:400 11px var(--mono);color:#a9a9a9}#net-cfg{display:flex;flex-direction:column;gap:8px;margin-top:6px}#net-cfg[hidden]{display:none}
+#net-cfg .locs{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}#net-cfg .locs small{display:none}#net-cfg .locs button{padding:7px 10px}
 .locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .locs button{display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid rgba(255,255,255,.16);border-radius:2px;background:rgba(255,255,255,.04);padding:clamp(7px,1.6vmin,11px) 12px;transition:border-color .15s,background .15s}
 .locs button b{font-family:var(--poster);font-weight:700;font-size:clamp(16px,3.2vmin,21px);letter-spacing:.04em;text-transform:uppercase}
@@ -373,7 +375,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .net-acts{display:flex;gap:8px}.net-acts .btn{flex:1}
 .net-wait{font:500 11.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--gold);text-align:center;padding-top:6px}
 .net-wait::before{content:'';display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--gold);animation:locpulse 1s ease-in-out infinite;vertical-align:middle}
-.net-ping{pointer-events:none;display:block;margin:4px auto 0;font:500 10px var(--mono);letter-spacing:.06em;color:#8fd49a;white-space:nowrap}
+.net-ping{pointer-events:none;display:block;margin:4px auto 0;font:600 13px var(--mono);letter-spacing:.06em;color:#8fd49a;white-space:nowrap}
 .net-ping.bad{color:var(--gold)}
 .net-ping[hidden]{display:none}
 .net-drop{position:absolute;left:50%;top:calc(var(--pt,8px) + 78px);transform:translateX(-50%);z-index:12;min-width:min(420px,86%);box-sizing:border-box;text-align:center;
@@ -553,6 +555,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="ptitle"><small>мультиплеер · P2P</small>Бой с другом</div>
       <div class="pbody">
         <div class="net-st" id="net-st">Бой 1 на 1 по ссылке. Хост считает бой, гость видит его со своей стороны. Без регистрации и своих серверов.</div>
+        <div class="fld" id="net-stance-f"><span>твоя стойка</span><div class="sw" id="net-stance"></div></div>
         <div class="net-home" id="net-home">
           <button class="btn pri" id="net-create">Создать комнату</button>
           <div class="fld"><span>или войти по коду</span>
@@ -565,6 +568,14 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           <div class="fld"><span>ссылка другу</span><div class="net-link" id="net-link"></div></div>
           <div class="net-acts"><button class="btn" id="net-copy">Копировать</button><button class="btn" id="net-share">Поделиться</button></div>
           <div class="net-wait" id="net-wait">Ждём соперника…</div>
+          <div id="net-cfg">
+            <div class="fld"><span>место</span><div class="locs" id="net-loc"></div></div>
+            <div class="fld"><span>раунды</span><div class="sw" id="net-rounds"></div></div>
+            <div class="fld"><span>время раунда</span><div class="sw" id="net-len"></div></div>
+            <div class="fld"><span>правила</span><div class="sw" id="net-rules"></div></div>
+            <div class="fld"><span>оружие</span><div class="sw" id="net-weap"></div></div>
+            <div class="fld"><span>режим · только PvP</span><div class="sw" id="net-mode"></div><small class="net-tip" id="net-mode-tip"></small></div>
+          </div>
         </div>
       </div>
       <div class="pfoot"><button class="btn" id="net-back">Назад</button></div>

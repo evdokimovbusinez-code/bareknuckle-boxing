@@ -209,6 +209,14 @@ const sfx = (() => {
       { const n = a.createBufferSource(), f = filt('lowpass', 780 + 420 * k, 0.9), g = a.createGain(); n.buffer = noise; env(g, t, 0.001, 0.018 + 0.012 * k, (0.22 + 0.26 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.06); }   // muffled slap of leather on leather
       { const n = a.createBufferSource(), f = filt('lowpass', 380, 0.8), g = a.createGain(); n.buffer = noise; env(g, t, 0.002, 0.03 + 0.02 * k, (0.16 + 0.2 * k) * L); n.connect(f).connect(g).connect(out); n.start(t, rr() * 0.5); n.stop(t + 0.09); }   // the dull knock behind it
       const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(112 + 26 * k, t); o.frequency.exponentialRampToValueAtTime(52, t + 0.07); env(g2, t, 0.002, 0.06, (0.2 + 0.18 * k) * L); o.connect(g2).connect(out); o.start(t); o.stop(t + 0.09); },
+    /* (issue 52) a brass knuckle landing: a short inharmonic metallic ring laid over the punch —
+       quieter and duller on a guard, sent through the room echo like the other impacts. p = effective power. */
+    knux(p, blocked) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.2, 1.6), L = blocked ? 0.65 : 1, f0 = 1750 + 260 * k;
+      for (const [m, pk, len] of [[1, 0.10, 0.17], [2.71, 0.055, 0.12], [4.13, 0.03, 0.085], [6.4, 0.015, 0.055]]) {
+        const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.value = Math.min(15000, f0 * m);
+        env(g, t, 0.0008, len, pk * (0.45 + 0.55 * k) * L); o.connect(g).connect(bus); o.start(t); o.stop(t + len + 0.06); }
+      const n = a.createBufferSource(), f = filt('highpass', 3800), g2 = a.createGain(); n.buffer = noise;
+      env(g2, t, 0.0006, 0.02, 0.09 * k * L); n.connect(f).connect(g2).connect(bus); n.start(t, rr() * 0.5); n.stop(t + 0.05); },
     /* A clean body shot forces the air out of him (issue 44): a short breath — noise through a bandpass falling
        900 → 320 Hz, straight to master (no room echo: close to the mic), plus a faint chest thump. p = effective power. */
     exhale(p) { const a = ac; if (!a) return; const t = a.currentTime, k = clamp(p, 0.2, 1.6);

@@ -109,7 +109,7 @@ class Flesh {
   down(out) { this.b2w(this.hi, this.M); this.Mi.copy(this.M).invert(); return out.set(0, -1, 0).transformDirection(this.Mi); }
   world(w, out) { return out.copy(w.p).applyMatrix4(this.M); }
   /* a punch landed: dent + wave, swelling, maybe a cut or a nose bleed; returns where blood sprays from */
-  onHit(cW, dirW, power, name, body, F) {
+  onHit(cW, dirW, power, name, body, F, knux) {
     const i = body ? this.si : this.hi; this.b2w(i, this.M); this.Mi.copy(this.M).invert();
     const at = this.snap(body ? T.bodyV : T.headV, cW.clone().applyMatrix4(this.Mi)), db = dirW.clone().transformDirection(this.Mi);
     const w = clamp(power, 0.25, 1.5); this.dent(at.p, db, w); this.bruise(at.p, 0.22 * w);
@@ -126,7 +126,7 @@ class Flesh {
       const d = at.p.distanceTo(lips.p) / this.U;
       if (d < 0.045) {
         this.lipBleed = Math.min(1, this.lipBleed + 0.25 * w);
-        if (!this.wounds.some(x => x.kind === 'lip') && rr() < 0.2 + 0.4 * (1 - F.hp / 100) * w) {
+        if (!this.wounds.some(x => x.kind === 'lip') && rr() < (0.2 + 0.4 * (1 - F.hp / 100) * w) * (pvp('blood') ? 2.5 : 1)) {
           const side = rr() < 0.5 ? -1 : 1;
           const c = this.snap(T.headV, lips.p.clone().addScaledVector(this.lat, side * 0.012 * this.U).addScaledVector(this.up, -0.004 * this.U)); c.n.copy(this.fwdB);
           const x = this.wound('lip', c, 0.3 + 0.35 * w, this.lat.clone(), 0.008); if (x) { res.spray.push(x); res.lip = true; }
@@ -137,16 +137,16 @@ class Flesh {
     if (l.z > 0 && l.y > -0.035) {
       const near = this.wounds.find(x => x.kind === 'cut' && x.p.distanceTo(at.p) < 0.02 * this.U);
       if (near) { near.sev = Math.min(1, near.sev + 0.25 * w); near.L *= 0.5; res.spray.push(near); }
-      else if (rr() < 0.05 + 0.25 * hurt * w + (P.type === 'hook' || P.type === 'over' ? 0.08 : 0)) {
+      else if (rr() < (0.05 + 0.25 * hurt * w + (P.type === 'hook' || P.type === 'over' ? 0.08 : 0)) * (pvp('blood') ? 3.5 : 1) * (knux ? KNUX.cut : 1)) {   // «Кровавая бойня»: cuts ×3.5; a knux punch (issue 52): ×KNUX.cut more often
         const tan = _f1.crossVectors(at.n, this.up).normalize().clone();
-        const c = G.mode === 'spar' ? null : this.wound('cut', at, 0.35 + 0.4 * rr() * w, tan, 0.012 + 0.012 * rr()); if (c) { res.spray.push(c); res.cut = true; }   // the headgear's padding: no cuts in sparring
+        const c = sparOn() ? null : this.wound('cut', at, 0.35 + 0.4 * rr() * w, tan, 0.012 + 0.012 * rr()); if (c) { res.spray.push(c); res.cut = true; }   // the headgear's padding: no cuts in sparring
       }
     }
     // the nose: straights and overhands to the middle of the face
     if (l.z > 0 && l.y < 0.01 && l.y > -0.09 && Math.abs(l.x) < 0.06 && P.type !== 'upper') {
       const nose = this.wounds.filter(x => x.kind === 'nose');
       if (nose.length) { for (const x of nose) { x.sev = Math.min(1, x.sev + 0.2 * w); res.spray.push(x); } }
-      else if (rr() < 0.15 + 0.6 * hurt * w) { for (const ns of this.nose.nostrils) { const x = this.wound('nose', ns, 0.25 + 0.3 * w); if (x) res.spray.push(x); } res.nose = true; }
+      else if (rr() < (0.15 + 0.6 * hurt * w) * (pvp('blood') ? 2.5 : 1)) { for (const ns of this.nose.nostrils) { const x = this.wound('nose', ns, 0.25 + 0.3 * w); if (x) res.spray.push(x); } res.nose = true; }
       if (nose.length && nose[0].sev > 0.7 && w > 0.9 && this.u.uNB.value.w === 0 && rr() < 0.5) {   // the nose breaks: it sits crooked from now on
         const t = this.nose.tip, side = _f1.crossVectors(db, this.up).normalize(); this.u.uNB.value.set(t.x, t.y, t.z, 1); this.u.uNBD.value.set(side.x, side.y, side.z, 0); res.broke = true;
       }

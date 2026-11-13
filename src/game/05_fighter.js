@@ -174,9 +174,11 @@ class Fighter {
     this.u.uDmg.value = 0; this.dmgShow = 0; if (this.flesh) this.flesh.reset(); if (this.face) this.face.reset(); this.simReset = true; for (const j of this.jigs) j.init = false;
   }
   place(x, rotY, mirror) {
-    const g = this.group; g.position.set(x, 0, 0); g.rotation.y = rotY; if (mirror) g.scale.x = -1;
+    const g = this.group; g.position.set(x, 0, 0); g.rotation.y = rotY; this.mir0 = !!mirror; this.stanceSet(false);
     g.updateMatrixWorld(true); this.simReset = true;
   }
+  // a southpaw is his own mirror image: the whole group flips in x on top of the side's own mirror (P2 is placed mirrored)
+  stanceSet(upd = true) { const g = this.group, s = (this.mir0 ? -1 : 1) * (((this.gear && this.gear.look) || {}).stance === 'south' ? -1 : 1); if (g.scale.x !== s) { g.scale.x = s; this.simReset = true; } if (upd) g.updateMatrixWorld(true); }
   attach(name, worldRest) { const b = this.bones[name]; const a = { b, local: b.worldToLocal(worldRest.clone()), w: new V3() }; this.ATT.push(a); return a; }
   bpos(name, v) { return v.setFromMatrixPosition(this.bones[name].matrixWorld); }
   mpos(bone, v) { v.setFromMatrixPosition(bone.matrixWorld); return this.group.worldToLocal(v); }
@@ -349,7 +351,7 @@ class Fighter {
     hairApply(this, L);   // cut, hair colour, beard (04g_hair.js); handGear, called from dress below, decides what of it shows (hairVis)
     skinApply(this, L); tatApply(this, L);   // skin tone, tattoos (04h_skin_tattoo.js)
     if (this.wmat) this.wmat.color.set((WRAPS_LOOKS.find(x => x.id === L.wraps) || WRAPS_LOOKS[0]).c);
-    this.dress(L);
+    this.dress(L); this.stanceSet();
   }
   dress(L) {
     const G2 = this.gear, U = this.flesh.u.uGear.value, W = wearDress(this, L), bt = W.bottom, tp = W.top, sh = W.shoes;   // 04e_wardrobe.js: the meshes of what he wears (model + colour from the registry)
@@ -367,15 +369,19 @@ class Fighter {
   // what is on the hands and head: sparring → boxing gloves + headgear; otherwise wraps or 4 oz MMA gloves (look.hands)
   handGear() {
     const G2 = this.gear, L = G2.look || {}, box = G2.spar, mma = !box && L.hands === 'mma', mine = LOOK.gloves || 'red';
+    const knux = !box && !mma && L.hands === 'knux' && weaponOn();   // issue 52: the metal only in a bout that allows weapons
     const gc = GLOVES.find(x => x.id === (this.isPlayer ? mine : L.gloves || (mine === 'blue' ? 'red' : 'blue'))) || GLOVES[0];   // the opponent never wears the player's colour
     if ((box || mma) && !G2.mat) { G2.mat = leatherMat(gc.c); G2.trim = new THREE.MeshPhysicalMaterial({ color: gc.trim, roughness: 0.6 }); }
     if (box && !G2.gloves) { G2.gloves = ['L', 'R'].map(S => gloveMesh(this, S, G2.mat, G2.trim)); G2.hg = headgearMesh(this, G2.mat, G2.trim); }
     if (mma && !G2.mma) { G2.mma = mmaShell(this, G2.mat); G2.mmaPads = mmaPads(this, G2.mat); }
+    if (knux && !G2.knuxPads) G2.knuxPads = knuxPads(this, G2.knuxMat || (G2.knuxMat = knuxMat()));
+    G2.knux = knux;   // read by resolveHit (07): damage, cuts, guard break, metallic sound
     if (G2.mat) { G2.mat.color.set(gc.c); G2.trim.color.set(gc.trim); }
     if (G2.gloves) { for (const gl of G2.gloves) gl.g.visible = box; G2.hg.visible = box; }
     if (G2.mma) { G2.mma.visible = mma; G2.mma.material.color.set(gc.c); for (const pd of G2.mmaPads) pd.m.visible = mma; }
+    if (G2.knuxPads) for (const pd of G2.knuxPads) pd.m.visible = knux;
     this.flesh.u.uGlv.value = box ? 1 : mma ? 2 : 0;   // the hand inside a boxing glove / the skin under an MMA glove is not drawn
-    this.wrapMesh.visible = !box && !mma; for (const t of this.tails) t.mesh.visible = !box && !mma;
+    this.wrapMesh.visible = !box && !mma; for (const t of this.tails) t.mesh.visible = !box && !mma;   // the wraps stay on under the knux
     hairVis(this);   // long hair is tucked under the headgear, the short layer shows through the open crown
   }
 
@@ -403,19 +409,22 @@ class Fighter {
     } else {
       let tgt;
       if (!fight) tgt = 0;
-      else if (this === P2) {   // he keeps his range: closes if you back off (a little slower than you can retreat), steps off if crowded
+      else if (this === P2 && !NET.host) {   // he keeps his range (a P2P guest's man holds where the guest left him — he was pulled back to 1.13 m): closes if you back off (a little slower than you can retreat), steps off if crowded
         const want = 1.13 - AI.style.adv - (this.cur && !this.release ? 0.08 : 0) + (this.daze > 0.5 ? 0.12 * this.daze : 0) + (AI.backT > G.t ? 0.45 : 0);
         tgt = a + (dist - want);
       } else { if (this.hold == null) this.hold = a; tgt = this.hold + (this.cur && !this.release ? 0.09 : 0); }
       if (G.state === 'kd' && G.kd && G.kd.att === this) tgt = a + (dist - 1.6);   // the referee sends him away while the other man is counted
       if (followOK(this)) tgt = a + Math.max(0, Math.abs(o.headNow.x - this.group.position.x) - 0.62);   // he goes after the falling man
       if (fight && this.daze > 0.5 && this === P1) tgt -= 0.1 * this.daze;
-      const vmax = (this === P2 ? 1.15 : 1.5) * tiredK;
+      const vmax = (this === P2 && !NET.host ? 1.15 : 1.5) * tiredK;
       this.advV += (clamp((tgt - a) * 6, -vmax, vmax) - this.advV) * Math.min(1, dt * 8);
     }
     if (this.knock) { this.advV -= this.knock * 0.9; this.knock = 0; }
     a += this.advV * dt;
-    const sum = a + (o.adv || 0); if (sum > 0.1 && !(o.rag.on && o.rag.mode === 'ko')) { a -= sum - 0.1; this.advV = Math.min(this.advV, 0); }   // can't walk through him
+    // how far in the two may come together past their marks: 0.1 m vs the AI (it keeps its range anyway); in a P2P bout both are
+    // people and one standing still must not freeze the other at ~1.05 m — down to 0.9 m apart, the body spheres below do the rest
+    const sumMax = NET.role && o.mark ? Math.abs(o.mark.x - this.mark.x) - 0.9 : 0.1;
+    const sum = a + (o.adv || 0); if (sum > sumMax && !(o.rag.on && o.rag.mode === 'ko')) { a -= sum - sumMax; this.advV = Math.min(this.advV, 0); }   // can't walk through him
     // bodies never share space: torso, head, knees and elbows of both men as spheres (from the posed skeleton, so the lunge
     // of a punch animation counts); the overlap along the fight line is taken out — half each, all of it if he can't move
     if (!(window.__tw || {}).noSep && !o.ko && !o.gu && o.jp[15].y > 1.2) { const pen = BAG.on ? bagBodyPen(this, fwd) : bodyOverlap(this, o, fwd); if (pen > 0) { const share = o.rag.on || o.slide ? 1 : 0.5; a -= Math.min(0.08, pen * share); this.advV = Math.min(this.advV, 0); } }
@@ -915,7 +924,8 @@ class Fighter {
     { const G2 = this.gear, hf = _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInvT); G2.guard.matrix.copy(hf); G2.guard.matrixWorldNeedsUpdate = true; wearPose(this, hf);
       if (G2.spar && G2.gloves) { G2.hg.matrix.copy(hf); G2.hg.matrixWorldNeedsUpdate = true; for (const gl of G2.gloves) { gl.g.matrix.multiplyMatrices(gl.h.matrixWorld, gl.rel); gl.g.matrixWorldNeedsUpdate = true; } }
       if (G2.pants) pantsTick(this, G2.pants, 1 / 60); if (G2.top) topTick(this, G2.top, 1 / 60);
-      if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
+      if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; }
+      if (G2.knux) for (const pd of G2.knuxPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
   }
   capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; arr.set(this.flesh.u.uFW.value, 4 * n + 5); }   // + the face shape weights
   restore(a, b2, t) {

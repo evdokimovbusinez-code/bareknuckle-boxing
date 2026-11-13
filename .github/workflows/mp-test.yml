@@ -1,0 +1,21 @@
+name: MP test
+# Two browser pages, real PeerJS P2P (needs internet, so it runs here, not in the dev sandbox).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['src/**', 'tools/test/mp_test.py', '.github/workflows/mp-test.yml']
+jobs:
+  mp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13' }
+      - run: pip install playwright && npm i --no-save --silent three@0.160.0 cannon-es@0.20.0
+      - run: bash tools/check.sh
+      - run: mkdir -p /tmp/shots && python3 tools/test/mp_test.py /tmp/shots/mp.jpg
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: mp-shots, path: /tmp/shots }

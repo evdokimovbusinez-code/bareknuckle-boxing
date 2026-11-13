@@ -53,6 +53,10 @@ async def run():
         await A.evaluate("document.getElementById('go-net').click()")
         await A.evaluate("document.getElementById('net-create').click()")
         await wait(A, "window.__mp && __mp.stat().ready && __mp.code().length === 6", 60)
+        # the host's settings: «Двор», 1 round of 1 min, sparring gear — the guest must get them
+        await A.evaluate("""(() => { for (const b of document.querySelectorAll('#net-loc button')) if (b.textContent.includes('Двор')) b.click();
+            document.querySelector('#net-len button:nth-child(1)').click(); document.querySelector('#net-rules button:nth-child(2)').click(); document.querySelector('#net-mode button:nth-child(2)').click(); })()""")
+        print('  настройки хоста:', await A.evaluate('__mp.cfg()'))
         code = await A.evaluate('__mp.code()')
         print(f'  комната: {code}  ссылка: {await A.evaluate("__mp.link()")}')
         await A.evaluate('__step(1, 1/60)')
@@ -82,10 +86,19 @@ async def run():
         await wait(B, "__mp.stat().started && __mp.stat().conn && __mp.stat().recv >= 2", 60)
         print('  оба подключены:', await A.evaluate('__mp.stat()'), await B.evaluate('__mp.stat()'))
 
-        for _ in range(3):
-            await step()          # intro → fight
+        for _ in range(30):       # intro → fight (a street place adds the camera fly-round)
+            await step()
+            if await A.evaluate("__g.G.state === 'fight'") and await B.evaluate("__g.G.state === 'fight'"):
+                break
         await wait(A, "__g.G.state === 'fight'", 20)
         await wait(B, "__g.G.state === 'fight'", 20)
+        cf = "JSON.stringify([__g.G.loc, __g.P1.gear.spar, __g.P2.gear.spar, __mp.cfg().len, __mp.cfg().rounds, __mp.cfg().mode])"
+        ca, cb = await A.evaluate(cf), await B.evaluate(cf)
+        print('  настройки у хоста / гостя:', ca, cb)
+        if ca != cb or '"yard"' not in ca or 'true' not in ca or '"blood"' not in ca:
+            print('  ✗ гость не получил настройки хоста'); bad += 1
+        else:
+            print('  ✓ место, время раунда и правила у гостя те же')
         print('  раунд начался:', await A.evaluate('__mp.state()'), await B.evaluate('__mp.state()'))
 
         # B walks in and throws crosses / hooks through the real key pipeline (12_ui.js → press())
@@ -98,6 +111,8 @@ async def run():
                 }""", key)
             await step(30)
         await B.evaluate('__mp.move(0, 0)')
+        for _ in range(3):
+            await step(10, 0.3)   # let the last punches land and their snapshot reach the guest (a backed-up channel skips some)
 
         hpA = await A.evaluate('__mp.hp()')
         hpB = await B.evaluate('__mp.hp()')
@@ -119,6 +134,55 @@ async def run():
             print('  ✓ снимки идут в обе стороны')
         if stA['ping'] <= 0 or stB['ping'] <= 0:
             print('  ! пинг ещё не измерен (некритично)')
+
+        # ── the guest's man keeps the distance he walked to (he used to drift back to the AI's 1.13 m) ──
+        dist = "Math.abs(__g.P1.group.position.x - __g.P2.group.position.x)"
+        await B.evaluate('__mp.move(1, 0)')
+        for _ in range(4):
+            await step(30)
+        d0 = await A.evaluate(dist)
+        await B.evaluate('__mp.move(0, 0)')
+        for _ in range(4):
+            await step(30)
+        d1 = await A.evaluate(dist)
+        print(f'  дистанция: подошёл {d0:.2f} м → отпустил стик {d1:.2f} м')
+        if d1 > d0 + 0.1:
+            print('  ✗ боец гостя отходит назад сам'); bad += 1
+        else:
+            print('  ✓ боец гостя стоит, где его оставили')
+
+        # ── a KO: the host plays the replay, the guest sees it too («ПОВТОР»), then both get the result ──
+        await A.evaluate("(() => { const g = __g; g.P1.hp = 1; g.knockout(g.P2, g.P1, new g.THREE.Vector3(1, 0, 0), 1.4, 'cross', 1, true); })()")
+        seen = {'A': set(), 'B': set()}; recB = False
+        for _ in range(60):
+            await step(30)
+            seen['A'].add(await A.evaluate('__g.G.state')); stB = await B.evaluate('__g.G.state'); seen['B'].add(stB)
+            if stB == 'replay' and not await B.evaluate("document.getElementById('rec').hidden"):
+                recB = True
+            if await B.evaluate('__mp.stat().over') and await A.evaluate('__mp.stat().over'):
+                break
+        print('  состояния после нокаута: хост', sorted(seen['A']), 'гость', sorted(seen['B']))
+        if 'replay' not in seen['A'] or not recB:
+            print('  ✗ повтор нокаута не показан (хост / гость)'); bad += 1
+        else:
+            print('  ✓ повтор нокаута у обоих, у гостя плашка «ПОВТОР»')
+        if not (await A.evaluate('__mp.stat().over') and await B.evaluate('__mp.stat().over')):
+            print('  ✗ после повтора нет экрана результата'); bad += 1
+        else:
+            print('  ✓ после повтора — результат у обоих')
+
+        # rematch, so the drop check below runs on a live bout
+        await A.evaluate("document.getElementById('r-again').click()")
+        for _ in range(3):
+            await step()
+        print('  реванш:', await A.evaluate('__mp.state()'), await B.evaluate('__mp.stat().over'))
+        lk = "JSON.stringify([__g.P1.gear.look, __g.P2.gear.look])"
+        la, lb = await A.evaluate(lk), await B.evaluate(lk)
+        print('  внешность после реванша: хост', la, 'гость', lb)
+        if la != lb:
+            print('  ✗ после реванша внешность бойцов у хоста и гостя разная'); bad += 1
+        else:
+            print('  ✓ после реванша внешность та же')
 
         await A.evaluate('__step(1, 1/60)')
         await A.screenshot(path=path('host'), **FMT)

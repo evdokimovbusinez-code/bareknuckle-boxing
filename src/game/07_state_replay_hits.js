@@ -2,6 +2,10 @@
 /* damage per landed punch is scaled so a fight lasts: ~25–35 clean head shots to empty a full bar, so cuts and swelling
    have time to show (BKFC bouts that end inside the distance mostly end in rounds 1–3, not in the first ten seconds) */
 const DMG_K = 0.18;
+/* issue 52 — brass knuckles (04i_knux.js): one object for the whole mechanic. A punch from a worn,
+   allowed knux does ×KNUX.dmg damage, opens cuts (Flesh.onHit, 03) ×KNUX.cut as often, and breaks
+   the guard at BLK.breakSta × KNUX.brk stamina, i.e. earlier. 06_fx_sound.js adds the metallic ring. */
+const KNUX = { dmg: 1.4, cut: 2.5, brk: 1.6 };
 /* issue 44 — hit reactions: read the place, the force and the series off the recoil (metres / seconds).
    Before this stage every clean shot drove the same springs at the same instant: no series, no per-punch direction,
    no light/heavy split, head and trunk together. These are the tuned values the reactions now use. */
@@ -99,7 +103,6 @@ function recFrame() {
 }
 const RP = { seg: 0, tau: 0, i: 0, segs: [], cut: false, hl: false };   // hl: the segments are the end-of-round highlights (09b_cine.js), not the knockout
 function startReplay() {
-  if (NET.role) return netResult();   // issue 49: a P2P bout goes straight from the «Нокаут!» plate to the result screen
   if (REC.frames.length < 4) return endReplay();
   G.state = 'replay'; RP.hl = false; const F = REC.frames, t0 = F[0].t, t1 = F[F.length - 1].t;
   // the knockout from several cameras, like a broadcast: tight on the face, from the canvas looking up, straight down from
@@ -132,6 +135,7 @@ function stepReplay(dtReal) {
     const F = e.who ? P2 : P1; FX.spawn(e.pos, e.dir, e.power); if (e.dent) F.flesh.dent(...e.dent); if (e.mist) FX.mist(e.pos, e.dir, e.power, e.mist);
     if (e.spray) F.flesh.spray(e.spray.map(i => F.flesh.wounds[i]).filter(Boolean), e.dir, e.power, F);
     if (e.blocked) sfx.block(clamp(e.power * 2, 0.3, 1.4)); else sfx.thud(e.power * 0.7);
+    if (e.knux) sfx.knux(e.power * 0.7, e.blocked);   // issue 52: the metal rings again in the replay
     G.shake = Math.max(G.shake, 0.01 + 0.02 * e.power); EVT.emit('hit', { pos: e.pos, power: e.power, replay: true }); }
   RP.wd = sdt > 1e-6 || dtReal === 0 ? 0 : (RP.wd || 0) + dtReal;   // a replay whose clock stopped (bad segment) must not hang the game
   if (RP.tau >= s.to) nextSeg(); else if (RP.wd > 1.5 && !s.enter) { RP.wd = 0; endReplay(); }
@@ -141,6 +145,7 @@ function endReplay() {
   if (RP.hl) return endHighlights();
   const F = REC.frames; if (F.length) { const l = F[F.length - 1]; P1.restore(l.d[0], l.d[0], 0); P2.restore(l.d[1], l.d[1], 0); if (l.gx) { P1.group.position.x = l.gx[0]; P2.group.position.x = l.gx[1]; P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true); } }
   G.loser.frozen = true; G.loser.rag.on = false; G.winner.simReset = true; G.loser.simReset = true;
+  if (NET.role) { $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true; return netResult(); }   // P2P: the host played the replay (streamed to the guest), then the shared result
   G.state = 'result'; $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true;
   const win = G.winner === P1; $('r-title').textContent = win ? 'Победа' : 'Нокаут'; $('r-title').className = 'rt ' + (win ? 'win' : 'lose');
   $('r-sub').textContent = `${win ? 'соперник на полу' : 'ты на полу'} · счёт ${G.wins} : ${G.losses}`;
@@ -196,7 +201,7 @@ function followOK(att) {
   return G.t - (ko ? G.koT : G.kd.t0) < 1.3 && def.headNow.y > 0.6;
 }
 function followHit(att, name, contact) {
-  const def = att.other, P = PUNCH[name];
+  const def = att.other, P = PUNCH[name], knux = !!att.gear.knux;
   if (!contact && nearMiss(att, def) > 0.08) return whiffPunch(att);
   const pos = contact ? contact.clone() : def.headNow.clone(), power = clamp(P.dmg / 18, 0.3, 1.2) * Math.min(1.3, att.punchK ?? 1);
   const dir = _v1.copy(def.headNow).sub(att.headNow).setY(P.type === 'upper' ? 0.5 : P.type === 'over' ? -0.3 : 0.05).normalize().clone();
@@ -204,18 +209,19 @@ function followHit(att, name, contact) {
   const R = def.rag, qi = _qa.copy(def.group.quaternion).invert(), pl = def.group.worldToLocal(pos.clone());
   for (const [k, J] of [['head', 9 + 9 * power], ['neck', 3 * power], ['chest', 2 * power]]) { const d = R.by[k]; if (!d || !d.body || !d.body.invMass) continue;
     const b = d.body, Jl = _v2.copy(dir).applyQuaternion(qi).multiplyScalar(J), r = _v3.set(pl.x - b.position.x, pl.y - b.position.y, pl.z - b.position.z).multiplyScalar(k === 'head' ? 1 : 0); b.applyImpulse(Jl, r); }
-  const fr = def.flesh.onHit(pos, dir, power, name, false, def), ev = { t: G.t, pos: fr.skin, dir, power, who: def === P1 ? 0 : 1, dent: fr.dent };
+  const fr = def.flesh.onHit(pos, dir, power, name, false, def, knux), ev = { t: G.t, pos: fr.skin, dir, power, who: def === P1 ? 0 : 1, dent: fr.dent, knux: knux ? 1 : 0 };
   const sp = def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.06 * def.flesh.U); if (sp.length || fr.spray.length) { const s2 = fr.spray.length ? fr.spray : sp; def.flesh.spray(s2, dir, power, def); ev.spray = s2.map(w => def.flesh.wounds.indexOf(w)); }
   def.face.hit && def.face.hit(power, true, fr.skin); FX.spawn(fr.skin, dir, power); { const bl = Math.min(1, def.flesh.wounds.reduce((a, x) => a + x.sev, 0) * 0.8); if (bl > 0.12) { FX.mist(fr.skin, dir, power, bl); ev.mist = bl; } } REC.events.push(ev);
-  if (att.fs) { att.fs.land++; att.fs.dmg += P.dmg * DMG_K; } if (G.state === 'kd') { def.hp = Math.max(0, def.hp - P.dmg * DMG_K); G.kd.up += 0.8; }
-  att.lastLand = G.t; sfx.thud(power, false); EVT.emit('hit', { pos, power }); G.shake = Math.max(G.shake, 0.02 + 0.03 * power); G.hitstop = 0.02 + 0.02 * power;
+  const fd = P.dmg * DMG_K * (knux ? KNUX.dmg : 1);
+  if (att.fs) { att.fs.land++; att.fs.dmg += fd; } if (G.state === 'kd') { def.hp = Math.max(0, def.hp - fd); G.kd.up += 0.8; }
+  att.lastLand = G.t; sfx.thud(power, false); if (knux) sfx.knux(power, false); EVT.emit('hit', { pos, power }); G.shake = Math.max(G.shake, 0.02 + 0.03 * power); G.hitstop = 0.02 + 0.02 * power;
   popup(fr.skin.clone().add(_v4.set(0, 0.15, 0)), 'добил', 'crit');
 }
 function resolveHit(att, name, contact) {
   if (window.__tutOn) return;   // (issue 45) the tutorial: nobody takes damage, no cuts / knockdown / KO
   const def = att.other; if (def.ko || G.state !== 'fight') { if (followOK(att)) followHit(att, name, contact); return; }
   if (BAG.on) { if (att === P1) bagHit(att, name, contact); return; }
-  const P = PUNCH[name], d = def.dodge, evading = !!d && d.t > 0.05 && d.t < 0.44, body = att.bodyShot;
+  const P = PUNCH[name], d = def.dodge, evading = !!d && d.t > 0.05 && d.t < 0.44, body = att.bodyShot, knux = !!att.gear.knux;
   const evaded = evading && evades(att, name, d);
   let pos = contact || (body ? def.ribs[att.ribIdx].w.clone() : def.headNow.clone().add(_v3.copy(att.knuckle(_v4)).sub(def.headNow).setLength(0.1)));
   if (evaded) {
@@ -228,6 +234,7 @@ function resolveHit(att, name, contact) {
   const caught = def.cur && !def.resolved && !(def.blockW > 0.55); if (caught) dmg *= 1.25;
   if (att.adv > 0.04) dmg *= 1.08;   // stepping in behind it
   dmg *= att.punchK ?? 1; if (evading) dmg *= 1.35; if (body) dmg *= 0.8;
+  if (knux) dmg *= KNUX.dmg;   // issue 52: a punch with the knux on hits harder (only when worn and allowed)
   const stamBefore = def.stamina;
   const guardBroken = (def.guardDown || 0) > G.t;   // the next punch after a break gets through clean (issue 41)
   const blocked = def.blockW > 0.55 && (!def.cur || def.dodge) && !guardBroken;
@@ -235,7 +242,7 @@ function resolveHit(att, name, contact) {
   // `power` below is computed from the reduced damage, so without this every block would read as the same light jab.
   const bforce = clamp(P.dmg / 18 * (att.punchK ?? 1) * (att.dmgMul || 1) * (counter ? 1.5 : 1), 0.25, 1.6);
   const isPow = !!att.heavy, isHook = P.type === 'hook';
-  const breakIt = blocked && def.stamina < BLK.breakSta && (isPow || isHook);
+  const breakIt = blocked && def.stamina < BLK.breakSta * (knux ? KNUX.brk : 1) && (isPow || isHook);   // issue 52: the metal gets through the guard sooner
   const sag = blocked ? blkSag(def) : 0;   // < 20 % stamina: gloves at the chin, up to ×2 damage leaks through
   if (blocked) {
     dmg *= (body ? 0.6 : P.type === 'upper' ? 0.55 : 0.18) * (1 + sag);   // was a flat ×0.18 / ×0.55 / ×0.6
@@ -244,7 +251,7 @@ function resolveHit(att, name, contact) {
     if (isPow) def.knock = (def.knock || 0) + 0.7 * bforce;   // a power shot takes a short step back
     if (breakIt) { def.guardDown = G.t + BLK.downT; def.brkT0 = G.t; def.blockW = 0; }
   }
-  dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (G.mode === 'spar' ? 0.6 : 1);   // 16 oz and a helmet
+  dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (sparOn() ? 0.6 : 1) * (pvp('glass') ? 2.2 : pvp('blood') ? 1.25 : 1);   // 16 oz and a helmet; P2P modes (00a_net_state.js)
   if (window.__dmgLog) window.__dmgLog.push([def === P1 ? 1 : 2, +dmg.toFixed(1), name, counter ? 'C' : '', caught ? 'K' : '', blocked ? 'B' : '', evading ? 'E' : '', +G.t.toFixed(1)]);
   if (att.fs) { if (blocked) att.fs.blk++; else { att.fs.land++; if (P.type !== 'straight' || name === 'cross') att.fs.pow++; if (att.sig && sigOf(name) === att.sig) att.fs.sig++; } att.fs.dmg += dmg; }
   def.hp = Math.max(0, def.hp - dmg); def.hpCap = Math.max(def.hp, def.hpCap - dmg * (blocked ? 0.15 : 0.4)); def.hitT = G.t; if (G.rd) G.rd[att === P1 ? 0 : 1] += blocked ? dmg * 0.3 : dmg;
@@ -253,7 +260,7 @@ function resolveHit(att, name, contact) {
   else if (P.type === 'upper') dir.set(fwd * 0.4, 1, 0);
   else if (P.type === 'over') dir.set(fwd, -0.45, 0);
   dir.normalize();
-  const power = clamp(dmg / (18 * ((window.__tw || {}).dmgK ?? DMG_K)), 0.2, 1.6), blood = !blocked && (def.hp < 62 || dmg >= 14);
+  const power = clamp(dmg / (18 * ((window.__tw || {}).dmgK ?? DMG_K)), 0.2, 1.6), blood = !blocked && (def.hp < 62 || dmg >= 14 || pvp('blood'));
   // ── issue 44: the series + the reaction descriptor handed to takeHit ──
   // A clean hit inside REACT.gap of the last one compounds (×1.0 → ×1.3 → ×1.6); a block keeps its own 1.2 recoil.
   let combo = 0, mult = 1;
@@ -296,10 +303,10 @@ function resolveHit(att, name, contact) {
       else if (power > 0.9) AI.backT = G.t + 0.5 + rr() * 0.4;
     } else if (def.hitLog.length >= 3) def.shellT = G.t + 0.45;
   }
-  const ev = { t: G.t, pos, dir, power, who: def === P1 ? 0 : 1, blocked };
+  const ev = { t: G.t, pos, dir, power, who: def === P1 ? 0 : 1, blocked, knux: knux ? 1 : 0 };
   if (!blocked && !body) wearHit(def, pos, dir, power);   // hats fly off, glasses crack (04e_wardrobe.js)
   if (!blocked) {
-    const fr = def.flesh.onHit(pos, dir, power, name, body, def); ev.dent = fr.dent; ev.pos = pos = fr.skin;
+    const fr = def.flesh.onHit(pos, dir, power, name, body, def, knux); ev.dent = fr.dent; ev.pos = pos = fr.skin;
     // blood comes out of the wounds (an old cut reopens, the nose runs) — never out of thin air
     const sp = blood || fr.cut || fr.nose ? fr.spray.length ? fr.spray : def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.05 * def.flesh.U) : [];
     if (sp.length) { def.flesh.spray(sp, dir, power, def); ev.spray = sp.map(w => def.flesh.wounds.indexOf(w)); }
@@ -322,6 +329,7 @@ function resolveHit(att, name, contact) {
   if (!blocked && power > 1.05 && G.slowT <= 0.02) { G.slow = 0.6; G.slowT = 0.06; }
   G.shake = Math.max(G.shake, 0.012 + 0.03 * power + (breakIt ? 0.02 : 0));
   if (blocked) sfx.block(bforce, breakIt ? 1.8 : 1); else sfx.thud(power, body);   // dull/short on gloves, louder on a break
+  if (knux) sfx.knux(power, blocked);   // issue 52: the brass ring over the punch
   EVT.emit('hit', { pos, power, blocked });
   popup(pos, String(Math.round(dmg)), counter ? 'crit' : 'hit');
   // feel it: the screen edge flushes red when you are hit, the phone kicks on what you land and harder on what you take
@@ -362,6 +370,7 @@ function kdProgress(K) {
 }
 /* knockdown: down but conscious — a knee taken, or a flash fall. The referee counts (BKFC: 10 s to stand; the other man to a neutral spot) */
 function knockdown(att, def, dir, power, name, fwd, sev, kind, bodyArg) {
+  if (pvp('kd1')) return knockout(att, def, dir, power, name, fwd, true, bodyArg);   // P2P «Первый нокдаун»: the first fall ends it
   if (att.fs) att.fs.kd++;
   G.state = 'kd'; def.kdCount = (def.kdCount || 0) + 1; if (G.rkd) G.rkd[def === P1 ? 0 : 1]++;
   const body = !!bodyArg || kind === 'liver';
