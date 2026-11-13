@@ -6012,7 +6012,10 @@ class Fighter {
     }
     if (this.knock) { this.advV -= this.knock * 0.9; this.knock = 0; }
     a += this.advV * dt;
-    const sum = a + (o.adv || 0); if (sum > 0.1 && !(o.rag.on && o.rag.mode === 'ko')) { a -= sum - 0.1; this.advV = Math.min(this.advV, 0); }   // can't walk through him
+    // how far in the two may come together past their marks: 0.1 m vs the AI (it keeps its range anyway); in a P2P bout both are
+    // people and one standing still must not freeze the other at ~1.05 m — down to 0.9 m apart, the body spheres below do the rest
+    const sumMax = NET.role && o.mark ? Math.abs(o.mark.x - this.mark.x) - 0.9 : 0.1;
+    const sum = a + (o.adv || 0); if (sum > sumMax && !(o.rag.on && o.rag.mode === 'ko')) { a -= sum - sumMax; this.advV = Math.min(this.advV, 0); }   // can't walk through him
     // bodies never share space: torso, head, knees and elbows of both men as spheres (from the posed skeleton, so the lunge
     // of a punch animation counts); the overlap along the fight line is taken out — half each, all of it if he can't move
     if (!(window.__tw || {}).noSep && !o.ko && !o.gu && o.jp[15].y > 1.2) { const pen = BAG.on ? bagBodyPen(this, fwd) : bodyOverlap(this, o, fwd); if (pen > 0) { const share = o.rag.on || o.slide ? 1 : 0.5; a -= Math.min(0.08, pen * share); this.advV = Math.min(this.advV, 0); } }
