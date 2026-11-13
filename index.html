@@ -12820,12 +12820,31 @@ function netCapturePopup(pos, text, cls) {
   NET.pop.push({ t: r3(G.t), p: [r3(pos.x), r3(pos.y), r3(pos.z)], s: String(text), c: cls });
   if (NET.pop.length > 32) NET.pop.shift();
 }
+// bone quaternions go as Int16 (×32767) in base64 — ~2.5× smaller than r3 JSON numbers; the tail (hip position, lids, face weights) stays r3
+function netPack(a, n4) {
+  const q = NET.q16 || (NET.q16 = new Int16Array(n4));
+  for (let i = 0; i < n4; i++) q[i] = Math.round(clamp(a[i], -1, 1) * 32767);
+  const u = new Uint8Array(q.buffer, 0, n4 * 2); let s = '';
+  for (let i = 0; i < u.length; i += 4096) s += String.fromCharCode.apply(null, u.subarray(i, i + 4096));
+  return [btoa(s), Array.from(a.subarray(n4), r3)];
+}
+function netUnpack(p) {
+  if (!Array.isArray(p) || typeof p[0] !== 'string') return Float32Array.from(p);   // old peer: plain numbers
+  const b = atob(p[0]), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+  const q = new Int16Array(u.buffer), out = new Float32Array(q.length + p[1].length);
+  for (let i = 0; i < q.length; i++) out[i] = q[i] / 32767;
+  out.set(p[1], q.length); return out;
+}
 function netSnapshot() {
+  // don't queue snapshots behind a congested link (that is what made the ping climb to hundreds of ms): skip this one,
+  // the guest interpolates over the gap; events / popups stay pending and ride the next snapshot
+  const dc = NET.conn && NET.conn.dataChannel;
+  if (dc && dc.bufferedAmount > 12000) { NET.stat.skip = (NET.stat.skip || 0) + 1; return; }
   const f = NET.tmp || (NET.tmp = { d: [new Float32Array(REC.N), new Float32Array(REC.N)] });
   P1.capture(f.d[0]); P2.capture(f.d[1]);
   const m = {
     c: 's', t: r3(NET.clk), gt: r3(G.t), st: G.state,   // own clock: G.t stands still in a replay, the guest's playback must not
-    d: [Array.from(f.d[0], r3), Array.from(f.d[1], r3)],
+    d: [netPack(f.d[0], 4 * P1.allBones.length), netPack(f.d[1], 4 * P2.allBones.length)],
     gx: [r3(P1.group.position.x), r3(P2.group.position.x)],
     ar: [r3(ARENA.position.x), r3(ARENA.position.z), r3(ARENA.rotation.y)],
     r: ROPES.map(R => [r3(R.cur.x), r3(R.cur.y), r3(R.cur.z), r3(R.s)]).flat(),
@@ -12839,7 +12858,7 @@ function netSnapshot() {
 }
 function netOnSnapshot(m) {
   NET.stat.recv++;
-  m.d[0] = Float32Array.from(m.d[0]); m.d[1] = Float32Array.from(m.d[1]);
+  m.d[0] = netUnpack(m.d[0]); m.d[1] = netUnpack(m.d[1]);
   NET.snaps.push(m); if (NET.snaps.length > 90) NET.snaps.shift();
   for (const e of m.ev) NET.evs.push(e);
   for (const p of m.p) NET.pops.push(p);
@@ -12923,7 +12942,7 @@ function netMsg(m) {
   else if (m.c === 'again') netRestart();
 }
 function netPing(rtt) {
-  NET.ping = Math.round(rtt);
+  NET.ping = Math.round(NET.ping ? NET.ping * 0.6 + rtt * 0.4 : rtt);   // smoothed: one late pong doesn't flash a spike
   const el = $('net-ping'); el.hidden = false; el.textContent = 'пинг ' + NET.ping + ' мс';
   el.classList.toggle('bad', NET.ping > 200);
 }
