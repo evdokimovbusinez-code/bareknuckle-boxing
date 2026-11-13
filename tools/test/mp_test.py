@@ -156,6 +156,12 @@ async def run():
         else:
             print('  ✓ после повтора — результат у обоих')
 
+        # rematch, so the drop check below runs on a live bout
+        await A.evaluate("document.getElementById('r-again').click()")
+        for _ in range(3):
+            await step()
+        print('  реванш:', await A.evaluate('__mp.state()'), await B.evaluate('__mp.stat().over'))
+
         await A.evaluate('__step(1, 1/60)')
         await A.screenshot(path=path('host'), **FMT)
         await B.evaluate('__step(1, 1/60)')

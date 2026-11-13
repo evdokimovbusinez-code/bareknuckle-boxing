@@ -415,7 +415,7 @@ function netTick(dt) {
   NET.silent += Math.min(dt, 0.25);   // cap one stalled frame so a slow render cannot look like a dropout
   NET.pingAcc += dt;
   if (NET.pingAcc >= 1) { NET.pingAcc = 0; netSend({ c: 'ping', t: performance.now() }); }
-  if (NET.over) return;
+  if (NET.over && (NET.guest || NET.over.sent)) return;   // the host's NET.over is set at the KO (fightOver): keep streaming through the replay until netResult
   // a lost link does not always raise PeerJS's remote 'close' (crashed tab, dead NAT mapping):
   // if nothing has arrived for silenceMax seconds, open the 10 s recovery window on our own
   if (NET.dropT === 0 && NET.silent > NET.silenceMax) return netLost(NET.conn);
