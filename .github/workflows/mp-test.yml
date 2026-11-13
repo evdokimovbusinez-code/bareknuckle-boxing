@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.13' }
-      - run: pip install playwright
+      - run: pip install playwright && npm i --no-save --silent three@0.160.0 cannon-es@0.20.0
       - run: bash tools/check.sh
       - run: mkdir -p /tmp/shots && python3 tools/test/mp_test.py /tmp/shots/mp.jpg
       - if: always()
