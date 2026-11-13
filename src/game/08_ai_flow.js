@@ -1,7 +1,7 @@
 /* ───────── AI ───────── */
 /* opponent styles, after how bare-knuckle bouts actually go: short range, lots of hooks and overhands, fighters who stand and trade,
    counter-punchers who make you miss and make you pay, and pressure fighters who walk you to the ropes with combinations and body shots */
-const ROUND_LEN = 120, BREAK_LEN = 7; let ROUNDS = 5;   // issue 49: a P2P match is 3 rounds (was a const = 5)
+let ROUND_LEN = 120; const BREAK_LEN = 7; let ROUNDS = 5;   // ROUND_LEN: a P2P host may set 60 / 120 / 180 s (18_net.js); ROUNDS: 3 in a P2P match by default (issue 49)
 const STYLES = {
   brawler: { label: 'рубака', gap: 0.72, w: { jab: 2, cross: 3, hookL: 3.5, hookR: 3.2, upperL: 1, upperR: 1.4, over: 2.4 }, dodge: 0.55, block: 0.5, combo: 0.55, trade: 0.55, feint: 0.03, body: 0.15, adv: 0.05, counter: 0.15 },
   counter: { label: 'контрпанчер', gap: 1.35, w: { jab: 4, cross: 3.5, hookL: 2.5, hookR: 1.2, upperL: 1.4, upperR: 1.8, over: 0.6 }, dodge: 1.35, block: 0.9, combo: 0.3, trade: 0.12, feint: 0.16, body: 0.12, adv: -0.06, counter: 0.6 },

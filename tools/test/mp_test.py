@@ -53,6 +53,10 @@ async def run():
         await A.evaluate("document.getElementById('go-net').click()")
         await A.evaluate("document.getElementById('net-create').click()")
         await wait(A, "window.__mp && __mp.stat().ready && __mp.code().length === 6", 60)
+        # the host's settings: «Двор», 1 round of 1 min, sparring gear — the guest must get them
+        await A.evaluate("""(() => { for (const b of document.querySelectorAll('#net-loc button')) if (b.textContent.includes('Двор')) b.click();
+            document.querySelector('#net-len button:nth-child(1)').click(); document.querySelector('#net-rules button:nth-child(2)').click(); })()""")
+        print('  настройки хоста:', await A.evaluate('__mp.cfg()'))
         code = await A.evaluate('__mp.code()')
         print(f'  комната: {code}  ссылка: {await A.evaluate("__mp.link()")}')
         await A.evaluate('__step(1, 1/60)')
@@ -86,6 +90,13 @@ async def run():
             await step()          # intro → fight
         await wait(A, "__g.G.state === 'fight'", 20)
         await wait(B, "__g.G.state === 'fight'", 20)
+        cf = "JSON.stringify([__g.G.loc, __g.P1.gear.spar, __g.P2.gear.spar, __mp.cfg().len, __mp.cfg().rounds])"
+        ca, cb = await A.evaluate(cf), await B.evaluate(cf)
+        print('  настройки у хоста / гостя:', ca, cb)
+        if ca != cb or '"yard"' not in ca or 'true' not in ca:
+            print('  ✗ гость не получил настройки хоста'); bad += 1
+        else:
+            print('  ✓ место, время раунда и правила у гостя те же')
         print('  раунд начался:', await A.evaluate('__mp.state()'), await B.evaluate('__mp.state()'))
 
         # B walks in and throws crosses / hooks through the real key pipeline (12_ui.js → press())

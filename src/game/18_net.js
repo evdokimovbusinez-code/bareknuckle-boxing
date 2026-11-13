@@ -60,6 +60,8 @@ function netBoot() {
     move: (x, y) => { MV.kx = x || 0; MV.ky = y || 0; netMove(); },
     drop: () => { NET.closing = true; if (NET.conn) NET.conn.close(); },   // a hard drop: no auto-reconnect, so the host's banner stays
     net: () => NET,
+    room: c => netRoomUI(c || 'ABC234'),   // debug: the room panel (with the host's settings when NET.host)
+    cfg: () => NET.cfg,
   };
 }
 function netHome() {
@@ -77,6 +79,28 @@ function netRoomUI(code) {
   $('net-code').textContent = code;
   $('net-link').textContent = NET.link;
   $('net-wait').textContent = NET.host ? 'Ждём соперника…' : 'Подключаемся…';
+  show('net-cfg', NET.host); if (NET.host) netCfgUI();
+}
+/* the host's match settings: place, rounds, round length, rules (bare knuckle / sparring gloves + headgear); the guest gets them in hello */
+function netCfgUI() {
+  const C = NET.cfg, box = $('net-loc'); box.textContent = '';
+  if (!LOCS[C.loc] || !locOpen(C.loc)) C.loc = 'gym';
+  for (const L of Object.values(LOCS)) { if (L.train || !locOpen(L.id)) continue;
+    const b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${L.desc || ''}</small>`;
+    b.setAttribute('aria-pressed', String(C.loc === L.id));
+    b.onclick = () => { C.loc = L.id; for (const o of box.children) o.setAttribute('aria-pressed', String(o === b)); locPrefetchOne(L.id); };
+    box.appendChild(b);
+  }
+  swatches('net-rounds', [1, 3, 5].map(n => ({ id: n, label: String(n) })), () => C.rounds, v => { C.rounds = v; }, true, true);
+  swatches('net-len', [[60, '1 мин'], [120, '2 мин'], [180, '3 мин']].map(([id, label]) => ({ id, label })), () => C.len, v => { C.len = v; }, true, true);
+  swatches('net-rules', [{ id: false, label: 'Голые кулаки' }, { id: true, label: 'Спарринг: перчатки и шлем' }], () => C.spar, v => { C.spar = v; }, true, true);
+}
+function netCfgApply(C) {   // both sides, before the bout is set up
+  if (!C) return;
+  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar };
+  ROUNDS = NET.cfg.rounds; ROUND_LEN = NET.cfg.len;
+  if (G.loc !== NET.cfg.loc) { G.loc = NET.cfg.loc; try { setLocation(G.loc); } catch (e) { console.error(e); } }
+  for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
 }
 async function netCopy() {
   const b = $('net-copy');
@@ -150,7 +174,7 @@ function netOpen(c) {
   NET.conn = c; NET.closing = false; NET.dropT = 0; NET.silent = 0; clearTimeout(NET.retryT);
   show('net-drop', false);
   if (!NET.started) netBeginMatch(); else netSt('Соперник вернулся');
-  netSend({ c: 'hello', look: LOOK, nm: myName() });
+  netSend(NET.host ? { c: 'hello', look: LOOK, nm: myName(), cfg: NET.cfg } : { c: 'hello', look: LOOK, nm: myName() });
 }
 function netErr(e) {
   const t = (e && (e.type || e.message)) || '';
@@ -164,18 +188,20 @@ function netErr(e) {
 function netBeginMatch() {
   if (NET.started) return;
   NET.started = true;
-  NET.saved = { loc: G.loc, cine: OPT.cine, rounds: ROUNDS, diff: G.diff, mode: G.mode };
-  G.mode = 'net'; G.loc = 'gym'; G.diff = 'normal'; ROUNDS = 3; OPT.cine = false;
-  try { setLocation('gym'); } catch (e) {}
+  NET.saved = { loc: G.loc, cine: OPT.cine, rounds: ROUNDS, len: ROUND_LEN, diff: G.diff, mode: G.mode };
+  G.mode = 'net'; G.diff = 'normal'; OPT.cine = false;
+  const C = NET.host ? NET.cfg : { loc: 'gym', rounds: 3, len: 120, spar: false };   // the guest's real settings come with the host's hello
+  ROUNDS = C.rounds; ROUND_LEN = C.len; G.loc = C.loc;
+  try { setLocation(G.loc); } catch (e) {}
   uiShow(null); show('net-drop', false); $('net-ping').hidden = false; $('net-ping').textContent = '… мс';
   camCut = true;
   if (NET.host) netHostStart(); else netGuestSetup();
 }
 function netHostStart() {
   showP2(true);
-  for (const F of [P1, P2]) F.sparGear(false);
   rollOpponent();   // a stand-in until the guest's hello arrives with his own look
   if (NET.oLook) try { P2.applyLook(NET.oLook); } catch (e) {}   // a rematch: rollOpponent just re-dressed the guest's man as a random one
+  for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
   startFight(true);
   NET.evI = REC.events.length; NET.pop.length = 0; NET.q.length = 0; NET.acc = 0; NET.pingAcc = 0; NET.first = true;
   netLabels();
@@ -186,7 +212,7 @@ function netGuestSetup() {
   // so dress him in that same look instead of the random opponent left over from the menu boot
   P2.applyLook(LOOK);
   if (NET.oLook) try { P1.applyLook(NET.oLook); } catch (e) {}
-  for (const F of [P1, P2]) F.sparGear(false);
+  for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
   P1.stat = PROF.stats; P2.stat = lvlStats(1); P1.speed = 1.5; P2.speed = DIFFS.normal.speed;
   P1.resetState(); P2.resetState();
   P1.place(-D_SEP / 2, Math.PI / 2, false); P2.place(D_SEP / 2, -Math.PI / 2, true);
@@ -377,6 +403,7 @@ function netMsg(m) {
   NET.silent = 0;   // any inbound traffic proves the link is alive (issue 49 watchdog)
   if (m.c === 'hello') {
     NET.oLook = m.look;   // kept for rematches
+    if (NET.guest && m.cfg) netCfgApply(m.cfg);
     try { if (NET.host) P2.applyLook(m.look); else P1.applyLook(m.look); } catch (e) {}
     NET.nm = m.nm || '';
   } else if (m.c === 'in') netInput(m);
@@ -474,7 +501,7 @@ function netClose() {
   NET.conn = null; NET.dropT = 0; NET.closing = true; NET.roomShown = false;
   show('net-drop', false); $('net-ping').hidden = true; $('net-ping').textContent = '';
   if (NET.saved) {
-    G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
+    G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; ROUND_LEN = NET.saved.len || 120; NET.cfg.spar = false; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
     NET.saved = null; try { setLocation(G.loc); } catch (e) {}
   }
   try { if (NET.peer && !NET.peer.destroyed) NET.peer.destroy(); } catch (e) {}

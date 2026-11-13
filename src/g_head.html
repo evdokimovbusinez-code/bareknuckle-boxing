@@ -315,6 +315,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .so-sp .so-logo{width:120px;height:36px;image-rendering:auto}.so-sp.lock{opacity:.62}.so-lock{font:500 10.5px var(--mono);letter-spacing:.06em;color:var(--muted)}.so-lock.on{color:#8fd49a}
 .dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
 .views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
+#net-room,#net-home{flex-shrink:0}#net-cfg{display:flex;flex-direction:column;gap:8px;margin-top:6px}#net-cfg[hidden]{display:none}
+#net-cfg .locs{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}#net-cfg .locs small{display:none}#net-cfg .locs button{padding:7px 10px}
 .locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .locs button{display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid rgba(255,255,255,.16);border-radius:2px;background:rgba(255,255,255,.04);padding:clamp(7px,1.6vmin,11px) 12px;transition:border-color .15s,background .15s}
 .locs button b{font-family:var(--poster);font-weight:700;font-size:clamp(16px,3.2vmin,21px);letter-spacing:.04em;text-transform:uppercase}
@@ -522,6 +524,12 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           <div class="fld"><span>ссылка другу</span><div class="net-link" id="net-link"></div></div>
           <div class="net-acts"><button class="btn" id="net-copy">Копировать</button><button class="btn" id="net-share">Поделиться</button></div>
           <div class="net-wait" id="net-wait">Ждём соперника…</div>
+          <div id="net-cfg">
+            <div class="fld"><span>место</span><div class="locs" id="net-loc"></div></div>
+            <div class="fld"><span>раунды</span><div class="sw" id="net-rounds"></div></div>
+            <div class="fld"><span>время раунда</span><div class="sw" id="net-len"></div></div>
+            <div class="fld"><span>правила</span><div class="sw" id="net-rules"></div></div>
+          </div>
         </div>
       </div>
       <div class="pfoot"><button class="btn" id="net-back">Назад</button></div>

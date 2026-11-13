@@ -6,6 +6,7 @@ const NET = {
   role: null, host: false, guest: false, started: false, closing: false,
   peer: null, conn: null, loading: null, code: '', link: '', nm: '',
   saved: null, over: null,
+  cfg: { loc: 'gym', rounds: 3, len: 120, spar: false },   // the host's match settings (room screen), sent in hello
   rate: 1 / 30, buf: 0.10, acc: 0, pingAcc: 0, ping: 0, silent: 0, silenceMax: 1.5,
   snaps: [], evs: [], pops: [], playT: 0, first: true,
   mv: { x: 0, y: 0, b: false }, blk: false, q: [], iq: [], evI: 0, pop: [],

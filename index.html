@@ -315,6 +315,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .so-sp .so-logo{width:120px;height:36px;image-rendering:auto}.so-sp.lock{opacity:.62}.so-lock{font:500 10.5px var(--mono);letter-spacing:.06em;color:var(--muted)}.so-lock.on{color:#8fd49a}
 .dragl{position:absolute;inset:0;touch-action:none;cursor:grab}.dragl:active{cursor:grabbing}
 .views{position:absolute;right:var(--pr);bottom:var(--pb);display:flex;align-items:center;gap:8px;animation:mFade .4s .1s both}
+#net-room,#net-home{flex-shrink:0}#net-cfg{display:flex;flex-direction:column;gap:8px;margin-top:6px}#net-cfg[hidden]{display:none}
+#net-cfg .locs{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}#net-cfg .locs small{display:none}#net-cfg .locs button{padding:7px 10px}
 .locs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .locs button{display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid rgba(255,255,255,.16);border-radius:2px;background:rgba(255,255,255,.04);padding:clamp(7px,1.6vmin,11px) 12px;transition:border-color .15s,background .15s}
 .locs button b{font-family:var(--poster);font-weight:700;font-size:clamp(16px,3.2vmin,21px);letter-spacing:.04em;text-transform:uppercase}
@@ -522,6 +524,12 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           <div class="fld"><span>ссылка другу</span><div class="net-link" id="net-link"></div></div>
           <div class="net-acts"><button class="btn" id="net-copy">Копировать</button><button class="btn" id="net-share">Поделиться</button></div>
           <div class="net-wait" id="net-wait">Ждём соперника…</div>
+          <div id="net-cfg">
+            <div class="fld"><span>место</span><div class="locs" id="net-loc"></div></div>
+            <div class="fld"><span>раунды</span><div class="sw" id="net-rounds"></div></div>
+            <div class="fld"><span>время раунда</span><div class="sw" id="net-len"></div></div>
+            <div class="fld"><span>правила</span><div class="sw" id="net-rules"></div></div>
+          </div>
         </div>
       </div>
       <div class="pfoot"><button class="btn" id="net-back">Назад</button></div>
@@ -2124,6 +2132,7 @@ const NET = {
   role: null, host: false, guest: false, started: false, closing: false,
   peer: null, conn: null, loading: null, code: '', link: '', nm: '',
   saved: null, over: null,
+  cfg: { loc: 'gym', rounds: 3, len: 120, spar: false },   // the host's match settings (room screen), sent in hello
   rate: 1 / 30, buf: 0.10, acc: 0, pingAcc: 0, ping: 0, silent: 0, silenceMax: 1.5,
   snaps: [], evs: [], pops: [], playT: 0, first: true,
   mv: { x: 0, y: 0, b: false }, blk: false, q: [], iq: [], evI: 0, pop: [],
@@ -7700,7 +7709,7 @@ function payShow(p) {
 /* ───────── AI ───────── */
 /* opponent styles, after how bare-knuckle bouts actually go: short range, lots of hooks and overhands, fighters who stand and trade,
    counter-punchers who make you miss and make you pay, and pressure fighters who walk you to the ropes with combinations and body shots */
-const ROUND_LEN = 120, BREAK_LEN = 7; let ROUNDS = 5;   // issue 49: a P2P match is 3 rounds (was a const = 5)
+let ROUND_LEN = 120; const BREAK_LEN = 7; let ROUNDS = 5;   // ROUND_LEN: a P2P host may set 60 / 120 / 180 s (18_net.js); ROUNDS: 3 in a P2P match by default (issue 49)
 const STYLES = {
   brawler: { label: 'рубака', gap: 0.72, w: { jab: 2, cross: 3, hookL: 3.5, hookR: 3.2, upperL: 1, upperR: 1.4, over: 2.4 }, dodge: 0.55, block: 0.5, combo: 0.55, trade: 0.55, feint: 0.03, body: 0.15, adv: 0.05, counter: 0.15 },
   counter: { label: 'контрпанчер', gap: 1.35, w: { jab: 4, cross: 3.5, hookL: 2.5, hookR: 1.2, upperL: 1.4, upperR: 1.8, over: 0.6 }, dodge: 1.35, block: 0.9, combo: 0.3, trade: 0.12, feint: 0.16, body: 0.12, adv: -0.06, counter: 0.6 },
@@ -7864,7 +7873,7 @@ function startQuick() { if (G.mode === 'career') { G.diff = G.userDiff; rollOppo
 function startFight(fromMode) {
   if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); }
   hintFightStart(); window.goFull && window.goFull();   // touch: full screen + landscape (12_ui.js)   // control hints: the first three bouts are the learning ones (12_ui.js)
-  for (const F of [P1, P2]) F.sparGear(G.mode === 'spar');
+  for (const F of [P1, P2]) F.sparGear(G.mode === 'spar' || (G.mode === 'net' && NET.cfg.spar));   // a P2P host may pick «Спарринг» (18_net.js)
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
   if (G.mode !== 'career') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }
   CROWD.fill = G.mode === 'career' ? LADDER[Math.min(G.career, LADDER.length - 1)].crowd ?? 1 : 1;   // the semi-final in the warehouse: a half-empty hall; the title fight: everybody came
@@ -12621,6 +12630,8 @@ function netBoot() {
     move: (x, y) => { MV.kx = x || 0; MV.ky = y || 0; netMove(); },
     drop: () => { NET.closing = true; if (NET.conn) NET.conn.close(); },   // a hard drop: no auto-reconnect, so the host's banner stays
     net: () => NET,
+    room: c => netRoomUI(c || 'ABC234'),   // debug: the room panel (with the host's settings when NET.host)
+    cfg: () => NET.cfg,
   };
 }
 function netHome() {
@@ -12638,6 +12649,28 @@ function netRoomUI(code) {
   $('net-code').textContent = code;
   $('net-link').textContent = NET.link;
   $('net-wait').textContent = NET.host ? 'Ждём соперника…' : 'Подключаемся…';
+  show('net-cfg', NET.host); if (NET.host) netCfgUI();
+}
+/* the host's match settings: place, rounds, round length, rules (bare knuckle / sparring gloves + headgear); the guest gets them in hello */
+function netCfgUI() {
+  const C = NET.cfg, box = $('net-loc'); box.textContent = '';
+  if (!LOCS[C.loc] || !locOpen(C.loc)) C.loc = 'gym';
+  for (const L of Object.values(LOCS)) { if (L.train || !locOpen(L.id)) continue;
+    const b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${L.desc || ''}</small>`;
+    b.setAttribute('aria-pressed', String(C.loc === L.id));
+    b.onclick = () => { C.loc = L.id; for (const o of box.children) o.setAttribute('aria-pressed', String(o === b)); locPrefetchOne(L.id); };
+    box.appendChild(b);
+  }
+  swatches('net-rounds', [1, 3, 5].map(n => ({ id: n, label: String(n) })), () => C.rounds, v => { C.rounds = v; }, true, true);
+  swatches('net-len', [[60, '1 мин'], [120, '2 мин'], [180, '3 мин']].map(([id, label]) => ({ id, label })), () => C.len, v => { C.len = v; }, true, true);
+  swatches('net-rules', [{ id: false, label: 'Голые кулаки' }, { id: true, label: 'Спарринг: перчатки и шлем' }], () => C.spar, v => { C.spar = v; }, true, true);
+}
+function netCfgApply(C) {   // both sides, before the bout is set up
+  if (!C) return;
+  NET.cfg = { loc: LOCS[C.loc] ? C.loc : 'gym', rounds: clamp(C.rounds | 0 || 3, 1, 12), len: clamp(+C.len || 120, 30, 300), spar: !!C.spar };
+  ROUNDS = NET.cfg.rounds; ROUND_LEN = NET.cfg.len;
+  if (G.loc !== NET.cfg.loc) { G.loc = NET.cfg.loc; try { setLocation(G.loc); } catch (e) { console.error(e); } }
+  for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
 }
 async function netCopy() {
   const b = $('net-copy');
@@ -12711,7 +12744,7 @@ function netOpen(c) {
   NET.conn = c; NET.closing = false; NET.dropT = 0; NET.silent = 0; clearTimeout(NET.retryT);
   show('net-drop', false);
   if (!NET.started) netBeginMatch(); else netSt('Соперник вернулся');
-  netSend({ c: 'hello', look: LOOK, nm: myName() });
+  netSend(NET.host ? { c: 'hello', look: LOOK, nm: myName(), cfg: NET.cfg } : { c: 'hello', look: LOOK, nm: myName() });
 }
 function netErr(e) {
   const t = (e && (e.type || e.message)) || '';
@@ -12725,18 +12758,20 @@ function netErr(e) {
 function netBeginMatch() {
   if (NET.started) return;
   NET.started = true;
-  NET.saved = { loc: G.loc, cine: OPT.cine, rounds: ROUNDS, diff: G.diff, mode: G.mode };
-  G.mode = 'net'; G.loc = 'gym'; G.diff = 'normal'; ROUNDS = 3; OPT.cine = false;
-  try { setLocation('gym'); } catch (e) {}
+  NET.saved = { loc: G.loc, cine: OPT.cine, rounds: ROUNDS, len: ROUND_LEN, diff: G.diff, mode: G.mode };
+  G.mode = 'net'; G.diff = 'normal'; OPT.cine = false;
+  const C = NET.host ? NET.cfg : { loc: 'gym', rounds: 3, len: 120, spar: false };   // the guest's real settings come with the host's hello
+  ROUNDS = C.rounds; ROUND_LEN = C.len; G.loc = C.loc;
+  try { setLocation(G.loc); } catch (e) {}
   uiShow(null); show('net-drop', false); $('net-ping').hidden = false; $('net-ping').textContent = '… мс';
   camCut = true;
   if (NET.host) netHostStart(); else netGuestSetup();
 }
 function netHostStart() {
   showP2(true);
-  for (const F of [P1, P2]) F.sparGear(false);
   rollOpponent();   // a stand-in until the guest's hello arrives with his own look
   if (NET.oLook) try { P2.applyLook(NET.oLook); } catch (e) {}   // a rematch: rollOpponent just re-dressed the guest's man as a random one
+  for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
   startFight(true);
   NET.evI = REC.events.length; NET.pop.length = 0; NET.q.length = 0; NET.acc = 0; NET.pingAcc = 0; NET.first = true;
   netLabels();
@@ -12747,7 +12782,7 @@ function netGuestSetup() {
   // so dress him in that same look instead of the random opponent left over from the menu boot
   P2.applyLook(LOOK);
   if (NET.oLook) try { P1.applyLook(NET.oLook); } catch (e) {}
-  for (const F of [P1, P2]) F.sparGear(false);
+  for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
   P1.stat = PROF.stats; P2.stat = lvlStats(1); P1.speed = 1.5; P2.speed = DIFFS.normal.speed;
   P1.resetState(); P2.resetState();
   P1.place(-D_SEP / 2, Math.PI / 2, false); P2.place(D_SEP / 2, -Math.PI / 2, true);
@@ -12938,6 +12973,7 @@ function netMsg(m) {
   NET.silent = 0;   // any inbound traffic proves the link is alive (issue 49 watchdog)
   if (m.c === 'hello') {
     NET.oLook = m.look;   // kept for rematches
+    if (NET.guest && m.cfg) netCfgApply(m.cfg);
     try { if (NET.host) P2.applyLook(m.look); else P1.applyLook(m.look); } catch (e) {}
     NET.nm = m.nm || '';
   } else if (m.c === 'in') netInput(m);
@@ -13035,7 +13071,7 @@ function netClose() {
   NET.conn = null; NET.dropT = 0; NET.closing = true; NET.roomShown = false;
   show('net-drop', false); $('net-ping').hidden = true; $('net-ping').textContent = '';
   if (NET.saved) {
-    G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
+    G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; ROUND_LEN = NET.saved.len || 120; NET.cfg.spar = false; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
     NET.saved = null; try { setLocation(G.loc); } catch (e) {}
   }
   try { if (NET.peer && !NET.peer.destroyed) NET.peer.destroy(); } catch (e) {}
