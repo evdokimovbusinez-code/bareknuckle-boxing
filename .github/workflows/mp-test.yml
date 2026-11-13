@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['src/game/18_net.js', 'src/game/00a_net_state.js', 'src/game/05_fighter.js', 'src/game/07_state_replay_hits.js', 'tools/test/mp_test.py']
+    paths: ['src/**', 'tools/test/mp_test.py', '.github/workflows/mp-test.yml']
 jobs:
   mp:
     runs-on: ubuntu-latest
