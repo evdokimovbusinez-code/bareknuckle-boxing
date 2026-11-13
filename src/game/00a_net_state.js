@@ -6,7 +6,7 @@ const NET = {
   role: null, host: false, guest: false, started: false, closing: false,
   peer: null, conn: null, loading: null, code: '', link: '', nm: '',
   saved: null, over: null,
-  cfg: { loc: 'gym', rounds: 3, len: 120, spar: false, mode: 'std' },   // the host's match settings (room screen), sent in hello
+  cfg: { loc: 'gym', rounds: 3, len: 120, spar: false, mode: 'std', weap: false },   // the host's match settings (room screen), sent in hello; weap: brass knuckles allowed
   rate: 1 / 30, buf: 0.10, acc: 0, pingAcc: 0, ping: 0, silent: 0, silenceMax: 1.5,
   snaps: [], evs: [], pops: [], playT: 0, first: true,
   mv: { x: 0, y: 0, b: false }, blk: false, q: [], iq: [], evI: 0, pop: [],
@@ -39,3 +39,4 @@ const NET_MODES = [
 ];
 function pvp(m) { return G.mode === 'net' && NET.cfg.mode === m; }
 function sparOn() { return G.mode === 'spar' || (G.mode === 'net' && NET.cfg.spar); }   // 16 oz gloves + headgear: less damage, no cuts
+function weaponAllowed() { return G.mode !== 'net' || !!NET.cfg.weap; }   // a P2P room may forbid brass knuckles (18_net.js)

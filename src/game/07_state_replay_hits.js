@@ -2,6 +2,10 @@
 /* damage per landed punch is scaled so a fight lasts: ~25–35 clean head shots to empty a full bar, so cuts and swelling
    have time to show (BKFC bouts that end inside the distance mostly end in rounds 1–3, not in the first ten seconds) */
 const DMG_K = 0.18;
+/* issue 53 — brass knuckles (кастет): a hand item. Cuts and swelling are tuned for bare-fist BKFC fights;
+   a knuckle-duster is a weapon, so it pays for itself: more damage, far more cuts, guards break easier.
+   `brk` softens the stamina threshold at which a power shot / hook breaks the guard (BLK.breakSta). */
+const KNUX = { dmg: 1.4, cut: 2.5, brk: 0.6 };
 /* issue 44 — hit reactions: read the place, the force and the series off the recoil (metres / seconds).
    Before this stage every clean shot drove the same springs at the same instant: no series, no per-punch direction,
    no light/heavy split, head and trunk together. These are the tuned values the reactions now use. */
@@ -204,7 +208,7 @@ function followHit(att, name, contact) {
   const R = def.rag, qi = _qa.copy(def.group.quaternion).invert(), pl = def.group.worldToLocal(pos.clone());
   for (const [k, J] of [['head', 9 + 9 * power], ['neck', 3 * power], ['chest', 2 * power]]) { const d = R.by[k]; if (!d || !d.body || !d.body.invMass) continue;
     const b = d.body, Jl = _v2.copy(dir).applyQuaternion(qi).multiplyScalar(J), r = _v3.set(pl.x - b.position.x, pl.y - b.position.y, pl.z - b.position.z).multiplyScalar(k === 'head' ? 1 : 0); b.applyImpulse(Jl, r); }
-  const fr = def.flesh.onHit(pos, dir, power, name, false, def), ev = { t: G.t, pos: fr.skin, dir, power, who: def === P1 ? 0 : 1, dent: fr.dent };
+  const fr = def.flesh.onHit(pos, dir, power, name, false, def, att.gear.knuxOn ? KNUX.cut : 1), ev = { t: G.t, pos: fr.skin, dir, power, who: def === P1 ? 0 : 1, dent: fr.dent };
   const sp = def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.06 * def.flesh.U); if (sp.length || fr.spray.length) { const s2 = fr.spray.length ? fr.spray : sp; def.flesh.spray(s2, dir, power, def); ev.spray = s2.map(w => def.flesh.wounds.indexOf(w)); }
   def.face.hit && def.face.hit(power, true, fr.skin); FX.spawn(fr.skin, dir, power); { const bl = Math.min(1, def.flesh.wounds.reduce((a, x) => a + x.sev, 0) * 0.8); if (bl > 0.12) { FX.mist(fr.skin, dir, power, bl); ev.mist = bl; } } REC.events.push(ev);
   if (att.fs) { att.fs.land++; att.fs.dmg += P.dmg * DMG_K; } if (G.state === 'kd') { def.hp = Math.max(0, def.hp - P.dmg * DMG_K); G.kd.up += 0.8; }
@@ -224,6 +228,7 @@ function resolveHit(att, name, contact) {
     return;
   }
   let dmg = P.dmg * (att.dmgMul || 1) * (1 + 0.06 * SK(att, 'pow')) * (att.sig && sigOf(name) === att.sig ? 1.12 : 1) * (1 - 0.05 * SK(def, 'chin')); const counter = att.counterUntil > G.t; if (counter) { dmg *= 1.5; att.counterUntil = 0; }
+  if (att.gear.knuxOn) dmg *= KNUX.dmg;   // brass knuckles: ×damage (only when worn and allowed)
   // walking onto a punch: the target's own momentum adds to the impact (a man hit while throwing is hit hardest)
   const caught = def.cur && !def.resolved && !(def.blockW > 0.55); if (caught) dmg *= 1.25;
   if (att.adv > 0.04) dmg *= 1.08;   // stepping in behind it
@@ -235,7 +240,8 @@ function resolveHit(att, name, contact) {
   // `power` below is computed from the reduced damage, so without this every block would read as the same light jab.
   const bforce = clamp(P.dmg / 18 * (att.punchK ?? 1) * (att.dmgMul || 1) * (counter ? 1.5 : 1), 0.25, 1.6);
   const isPow = !!att.heavy, isHook = P.type === 'hook';
-  const breakIt = blocked && def.stamina < BLK.breakSta && (isPow || isHook);
+  const staThr = BLK.breakSta * (att.gear.knuxOn ? KNUX.brk : 1);   // the knuckles break a guard at a softer stamina
+  const breakIt = blocked && def.stamina < staThr && (isPow || isHook);
   const sag = blocked ? blkSag(def) : 0;   // < 20 % stamina: gloves at the chin, up to ×2 damage leaks through
   if (blocked) {
     dmg *= (body ? 0.6 : P.type === 'upper' ? 0.55 : 0.18) * (1 + sag);   // was a flat ×0.18 / ×0.55 / ×0.6
@@ -299,7 +305,7 @@ function resolveHit(att, name, contact) {
   const ev = { t: G.t, pos, dir, power, who: def === P1 ? 0 : 1, blocked };
   if (!blocked && !body) wearHit(def, pos, dir, power);   // hats fly off, glasses crack (04e_wardrobe.js)
   if (!blocked) {
-    const fr = def.flesh.onHit(pos, dir, power, name, body, def); ev.dent = fr.dent; ev.pos = pos = fr.skin;
+    const fr = def.flesh.onHit(pos, dir, power, name, body, def, att.gear.knuxOn ? KNUX.cut : 1); ev.dent = fr.dent; ev.pos = pos = fr.skin;
     // blood comes out of the wounds (an old cut reopens, the nose runs) — never out of thin air
     const sp = blood || fr.cut || fr.nose ? fr.spray.length ? fr.spray : def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.05 * def.flesh.U) : [];
     if (sp.length) { def.flesh.spray(sp, dir, power, def); ev.spray = sp.map(w => def.flesh.wounds.indexOf(w)); }
@@ -322,6 +328,7 @@ function resolveHit(att, name, contact) {
   if (!blocked && power > 1.05 && G.slowT <= 0.02) { G.slow = 0.6; G.slowT = 0.06; }
   G.shake = Math.max(G.shake, 0.012 + 0.03 * power + (breakIt ? 0.02 : 0));
   if (blocked) sfx.block(bforce, breakIt ? 1.8 : 1); else sfx.thud(power, body);   // dull/short on gloves, louder on a break
+  if (att.gear.knuxOn) sfx.knux(power, blocked);   // a brass-knuckle hit adds a metallic ring (06_fx_sound.js)
   EVT.emit('hit', { pos, power, blocked });
   popup(pos, String(Math.round(dmg)), counter ? 'crit' : 'hit');
   // feel it: the screen edge flushes red when you are hit, the phone kicks on what you land and harder on what you take
