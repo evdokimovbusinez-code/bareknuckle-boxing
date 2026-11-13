@@ -403,14 +403,14 @@ class Fighter {
     } else {
       let tgt;
       if (!fight) tgt = 0;
-      else if (this === P2) {   // he keeps his range: closes if you back off (a little slower than you can retreat), steps off if crowded
+      else if (this === P2 && !NET.host) {   // he keeps his range (a P2P guest's man holds where the guest left him — he was pulled back to 1.13 m): closes if you back off (a little slower than you can retreat), steps off if crowded
         const want = 1.13 - AI.style.adv - (this.cur && !this.release ? 0.08 : 0) + (this.daze > 0.5 ? 0.12 * this.daze : 0) + (AI.backT > G.t ? 0.45 : 0);
         tgt = a + (dist - want);
       } else { if (this.hold == null) this.hold = a; tgt = this.hold + (this.cur && !this.release ? 0.09 : 0); }
       if (G.state === 'kd' && G.kd && G.kd.att === this) tgt = a + (dist - 1.6);   // the referee sends him away while the other man is counted
       if (followOK(this)) tgt = a + Math.max(0, Math.abs(o.headNow.x - this.group.position.x) - 0.62);   // he goes after the falling man
       if (fight && this.daze > 0.5 && this === P1) tgt -= 0.1 * this.daze;
-      const vmax = (this === P2 ? 1.15 : 1.5) * tiredK;
+      const vmax = (this === P2 && !NET.host ? 1.15 : 1.5) * tiredK;
       this.advV += (clamp((tgt - a) * 6, -vmax, vmax) - this.advV) * Math.min(1, dt * 8);
     }
     if (this.knock) { this.advV -= this.knock * 0.9; this.knock = 0; }

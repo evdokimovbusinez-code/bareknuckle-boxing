@@ -120,6 +120,42 @@ async def run():
         if stA['ping'] <= 0 or stB['ping'] <= 0:
             print('  ! пинг ещё не измерен (некритично)')
 
+        # ── the guest's man keeps the distance he walked to (he used to drift back to the AI's 1.13 m) ──
+        dist = "Math.abs(__g.P1.group.position.x - __g.P2.group.position.x)"
+        await B.evaluate('__mp.move(1, 0)')
+        for _ in range(4):
+            await step(30)
+        d0 = await A.evaluate(dist)
+        await B.evaluate('__mp.move(0, 0)')
+        for _ in range(4):
+            await step(30)
+        d1 = await A.evaluate(dist)
+        print(f'  дистанция: подошёл {d0:.2f} м → отпустил стик {d1:.2f} м')
+        if d1 > d0 + 0.1:
+            print('  ✗ боец гостя отходит назад сам'); bad += 1
+        else:
+            print('  ✓ боец гостя стоит, где его оставили')
+
+        # ── a KO: the host plays the replay, the guest sees it too («ПОВТОР»), then both get the result ──
+        await A.evaluate("(() => { const g = __g; g.P1.hp = 1; g.knockout(g.P2, g.P1, new g.THREE.Vector3(1, 0, 0), 1.4, 'cross', 1, true); })()")
+        seen = {'A': set(), 'B': set()}; recB = False
+        for _ in range(60):
+            await step(30)
+            seen['A'].add(await A.evaluate('__g.G.state')); stB = await B.evaluate('__g.G.state'); seen['B'].add(stB)
+            if stB == 'replay' and not await B.evaluate("document.getElementById('rec').hidden"):
+                recB = True
+            if await B.evaluate('__mp.stat().over') and await A.evaluate('__mp.stat().over'):
+                break
+        print('  состояния после нокаута: хост', sorted(seen['A']), 'гость', sorted(seen['B']))
+        if 'replay' not in seen['A'] or not recB:
+            print('  ✗ повтор нокаута не показан (хост / гость)'); bad += 1
+        else:
+            print('  ✓ повтор нокаута у обоих, у гостя плашка «ПОВТОР»')
+        if not (await A.evaluate('__mp.stat().over') and await B.evaluate('__mp.stat().over')):
+            print('  ✗ после повтора нет экрана результата'); bad += 1
+        else:
+            print('  ✓ после повтора — результат у обоих')
+
         await A.evaluate('__step(1, 1/60)')
         await A.screenshot(path=path('host'), **FMT)
         await B.evaluate('__step(1, 1/60)')

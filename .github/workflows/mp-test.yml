@@ -1,0 +1,21 @@
+name: MP test
+# Two browser pages, real PeerJS P2P (needs internet, so it runs here, not in the dev sandbox).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['src/game/18_net.js', 'src/game/00a_net_state.js', 'src/game/05_fighter.js', 'src/game/07_state_replay_hits.js', 'tools/test/mp_test.py']
+jobs:
+  mp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13' }
+      - run: pip install playwright
+      - run: bash tools/check.sh
+      - run: mkdir -p /tmp/shots && python3 tools/test/mp_test.py /tmp/shots/mp.jpg
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: mp-shots, path: /tmp/shots }

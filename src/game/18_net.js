@@ -266,16 +266,16 @@ function netSnapshot() {
   const f = NET.tmp || (NET.tmp = { d: [new Float32Array(REC.N), new Float32Array(REC.N)] });
   P1.capture(f.d[0]); P2.capture(f.d[1]);
   const m = {
-    c: 's', t: r3(G.t), st: G.state,
+    c: 's', t: r3(NET.clk), gt: r3(G.t), st: G.state,   // own clock: G.t stands still in a replay, the guest's playback must not
     d: [Array.from(f.d[0], r3), Array.from(f.d[1], r3)],
     gx: [r3(P1.group.position.x), r3(P2.group.position.x)],
     ar: [r3(ARENA.position.x), r3(ARENA.position.z), r3(ARENA.rotation.y)],
     r: ROPES.map(R => [r3(R.cur.x), r3(R.cur.y), r3(R.cur.z), r3(R.s)]).flat(),
     h: [r3(P1.hp), r3(P2.hp)], e: [r3(P1.stamina), r3(P2.stamina)],
-    rd: G.round, rt: r3(G.roundT), ev: [], p: NET.pop.slice(),
+    rd: G.round, rt: r3(G.roundT), ev: [], p: NET.pop.map(p => Object.assign({}, p, { t: r3(NET.clk) })),
   };
   NET.pop.length = 0;
-  for (let i = NET.evI; i < REC.events.length; i++) { const e = netEv(REC.events[i]); if (e) m.ev.push(e); }
+  for (let i = NET.evI; i < REC.events.length; i++) { const e = netEv(REC.events[i]); if (e) { e.t = r3(NET.clk); m.ev.push(e); } }
   NET.evI = REC.events.length;
   netSend(m);
 }
@@ -290,7 +290,7 @@ function netOnSnapshot(m) {
 }
 function netApplyState(m) {
   const prev = G.state;
-  G.t = m.t; G.round = m.rd; G.roundT = m.rt;
+  G.t = m.gt != null ? m.gt : m.t; G.round = m.rd; G.roundT = m.rt;
   P1.hp = m.h[0]; P2.hp = m.h[1]; P1.stamina = m.e[0]; P2.stamina = m.e[1];
   if (m.st !== 'result' || NET.over) G.state = m.st;
   // captions / bells / crowd follow the host's state, exactly like the events in a replay
@@ -299,6 +299,8 @@ function netApplyState(m) {
     else if (m.st === 'fight') { msg('Раунд ' + G.round); roundSnd(); show('pad', true); EVT.emit('round'); }
     else if (m.st === 'break') msg('Перерыв');
     else if (m.st === 'ko') msg('Нокаут', 'ko');
+    if (m.st === 'replay') { $('rec').hidden = false; $('skip').hidden = true; $('bar-t').hidden = $('bar-b').hidden = false; }   // the host's replay, streamed
+    else if (prev === 'replay') { $('rec').hidden = true; $('skip').hidden = false; $('bar-t').hidden = $('bar-b').hidden = true; }
   }
 }
 
@@ -364,7 +366,7 @@ function netMsg(m) {
 }
 function netPing(rtt) {
   NET.ping = Math.round(rtt);
-  const el = $('net-ping'); el.hidden = false; el.textContent = NET.ping + ' мс';
+  const el = $('net-ping'); el.hidden = false; el.textContent = 'пинг ' + NET.ping + ' мс';
   el.classList.toggle('bad', NET.ping > 200);
 }
 function netShowResult(win, draw) {
@@ -417,7 +419,7 @@ function netTick(dt) {
   // a lost link does not always raise PeerJS's remote 'close' (crashed tab, dead NAT mapping):
   // if nothing has arrived for silenceMax seconds, open the 10 s recovery window on our own
   if (NET.dropT === 0 && NET.silent > NET.silenceMax) return netLost(NET.conn);
-  NET.acc += dt;
+  NET.acc += dt; NET.clk = (NET.clk || 0) + dt;
   if (NET.acc >= NET.rate) { NET.acc = 0; if (NET.host) netSnapshot(); else netFlushInput(); }
 }
 function netLost(c) {
