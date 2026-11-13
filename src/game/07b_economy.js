@@ -14,12 +14,13 @@ const itemTag = it => itemOwned(it.id) ? (it.price ? 'есть' : 'базово�
 // whatever is worn but not owned (after a reset, or a try-on that was left) goes back to the defaults
 function wearSanitize(L = LOOK) {
   for (const c of WCATS) { const s = wearGet(L, c); if (s.id !== 'none' && !itemOwned(s.id)) L[c] = c === 'bottom' ? { id: 'shorts', color: 'red' } : { id: 'none' }; }
-  if (L.hands === 'mma' && !itemOwned('mma')) L.hands = 'wraps';
+  if ((L.hands === 'mma' || L.hands === 'knux') && !itemOwned(L.hands)) L.hands = 'wraps';
 }
 // an older save: everything chosen so far stays available, and the wins already won are paid back a little
 if (!PROF.eco) {
   for (const c of WCATS) { const s = wearGet(LOOK, c); if (ITEMS[s.id]) PROF.own[s.id] = 1; }
   if (LOOK.hands === 'mma') PROF.own.mma = 1;
+  if (LOOK.hands === 'knux') PROF.own.knux = 1;
   PROF.cash = Math.min(G.wins, 20) * 150; PROF.eco = 1;
 }
 wearSanitize();
