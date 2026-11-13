@@ -78,11 +78,11 @@ def poly_cols(poly, step_cm=STEP):
     return out
 
 
-def build_grid(poly):
+def build_grid(poly, step_cm=STEP):
     """warp grid: columns of equal vertex count; boundary vertices lie exactly on the outline"""
-    cols = poly_cols(poly)
+    cols = poly_cols(poly, step_cm)
     hmax = max(v2 - v1 for _, v1, v2 in cols)
-    nrows = max(3, round(hmax / STEP))
+    nrows = max(3, round(hmax / step_cm))
     verts, idxmap = [], []
     for ci, (u, v1, v2) in enumerate(cols):
         row = []
@@ -278,9 +278,10 @@ def write_png(path, W, H, buf):
     open(path, 'wb').write(png)
 
 
-def raster(body, parts3, seams3, view, path, W=1024, H=1024):
+def raster(body, parts3, seams3, view, path, W=1024, H=1024, center=None, radius=None):
     """pure-Python z-buffer raster (no GL needed); view = 'front' | 'side' | 'back'.
-    depth(p) grows toward the camera: front cam at +Z, side cam at +X, back cam at -Z."""
+    depth(p) grows toward the camera: front cam at +Z, side cam at +X, back cam at -Z.
+    center/radius (in the view plane, metres) crop a close-up instead of framing the whole scene."""
     import array
     if view == 'front':
         ax = lambda p: (p[0], p[1]); dep = lambda p: p[2]
@@ -288,14 +289,19 @@ def raster(body, parts3, seams3, view, path, W=1024, H=1024):
         ax = lambda p: (-p[0], p[1]); dep = lambda p: -p[2]
     else:
         ax = lambda p: (-p[2], p[1]); dep = lambda p: p[0]
-    lo = [1e9, 1e9]; hi = [-1e9, -1e9]
-    for p in body['verts3'] + [v for pt in parts3.values() for v in pt['verts3']]:
-        a = ax(p)
-        lo[0] = min(lo[0], a[0]); lo[1] = min(lo[1], a[1]); hi[0] = max(hi[0], a[0]); hi[1] = max(hi[1], a[1])
-    pad = 0.06
-    span = max(hi[0] - lo[0], hi[1] - lo[1]) + pad
-    cx = (lo[0] + hi[0]) / 2; cy = (lo[1] + hi[1]) / 2
-    S = (W - 24) / span
+    if center is not None and radius:
+        cx, cy = center
+        span = 2 * radius
+        S = (W - 24) / span
+    else:
+        lo = [1e9, 1e9]; hi = [-1e9, -1e9]
+        for p in body['verts3'] + [v for pt in parts3.values() for v in pt['verts3']]:
+            a = ax(p)
+            lo[0] = min(lo[0], a[0]); lo[1] = min(lo[1], a[1]); hi[0] = max(hi[0], a[0]); hi[1] = max(hi[1], a[1])
+        pad = 0.06
+        span = max(hi[0] - lo[0], hi[1] - lo[1]) + pad
+        cx = (lo[0] + hi[0]) / 2; cy = (lo[1] + hi[1]) / 2
+        S = (W - 24) / span
     def proj(p):
         a = ax(p)
         return ((a[0] - cx) * S + W / 2, H / 2 - (a[1] - cy) * S)
@@ -527,4 +533,5 @@ def main():
     return 1 if bad else 0
 
 
-sys.exit(main())
+if __name__ == '__main__':
+    sys.exit(main())
