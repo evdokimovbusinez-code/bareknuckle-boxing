@@ -593,6 +593,8 @@ def run_phase(tag, V, F, E_sew, bodyP, bodyT, mass, frames, gravity, sewing, shr
     print(f'  [{tag}] гравитация {gravity}, кадров {frames}, quality {quality}, '
           f'рёбер-швов {len(E_sew)} (loose={nloose}), вершин {len(V)}')
     print(f'  [{tag}] ткань: ' + ', '.join(log) + (f'  (нет RNA: {sorted(set(miss))})' if miss else ''))
+    if os.environ.get('SIM_SAVE_START') and not sewing:   # the ready-to-play setup, for Blender's GUI
+        sc.frame_set(1); bpy.ops.wm.save_as_mainfile(filepath=os.environ['SIM_SAVE_START'], copy=True)
     t0 = time.time()
     for fr in range(1, frames + 1):
         sc.frame_set(fr)
