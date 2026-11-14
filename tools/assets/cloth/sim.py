@@ -458,10 +458,9 @@ def weld(Vs, V0, F0, UV0, seamG):
     for _, pr in seamG:
         for a, b in pr:
             g = math.dist(Vs[a], Vs[b])
-            if g < WELD_GAP:
-                nclose += 1
-            else:
-                nfar += 1
+            if g >= WELD_GAP:
+                nfar += 1; continue          # an open pair stays open: averaging points 10-40 cm apart made the huge shards
+            nclose += 1
             ra, rb = find(a), find(b)
             if ra != rb:
                 par[rb] = ra
@@ -679,7 +678,7 @@ def main():
     # ── PHASE 2: settle (gravity on, self-collision on) ──
     blendp = os.path.join(OUT, f'{garment}_high.blend')
     Vs_B, t2 = run_phase('усадка', WV, WF, [], bodyP, bodyT, mass, FRAMES_SETTLE,
-                         gravity=(0, 0, -9.81), sewing=False, shrink=0.0,
+                         gravity=(0, -9.81, 0), sewing=False, shrink=0.0,
                          self_coll=True, quality=QUALITY,
                          blend=(blendp, WV, WF, luv))
 
