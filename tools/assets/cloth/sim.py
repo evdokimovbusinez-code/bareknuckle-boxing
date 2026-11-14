@@ -47,20 +47,23 @@ from place import sub, dot, cross, nrm, build_grid, bender, band_bender, Body, \
     edge_pts, sample_polyline, COLORS
 
 # ── tunables (metres, seconds; the reviewer's Marvelous/CLO recipe) ────────────────────────────
-STEP_SIM = float(os.environ.get('SIM_STEP', '0.9'))     # cm, warp grid of the high-poly cloth
+STEP_SIM = float(os.environ.get('SIM_STEP', '1.2'))     # cm, warp grid of the high-poly cloth
 MIN_CLEAR, PUSH_TO = 0.020, 0.032                       # push-out band, same as place.py
 FPS = 24
 FRAMES_SEW = int(os.environ.get('SIM_SEW', '55'))       # phase 1: seams close by sewing springs
-FRAMES_SETTLE = int(os.environ.get('SIM_SETTLE', '60')) # phase 2: gravity + self-collision settle
-QUALITY = int(os.environ.get('SIM_QUALITY', '5'))       # CPU-bound default; SIM_QUALITY=8 on [gpu]
+FRAMES_SETTLE = int(os.environ.get('SIM_SETTLE', '50')) # phase 2: gravity + self-collision settle
+QUALITY = int(os.environ.get('SIM_QUALITY', '6'))       # CPU-bound default; SIM_QUALITY=8 on [gpu]
 FABRIC = dict(area_mass=0.15, tension=15.0, compression=15.0, shear=5.0, bending=0.5,
-              self_dist=0.003, coll_thick=0.005, friction=5.0,
+              self_dist=0.003, coll_thick=0.009, friction=5.0,
               sew_force=float(os.environ.get('SIM_SEW_FORCE', '25')))   # reviewer: 10–30
 SHRINK_SEW = float(os.environ.get('SIM_SHRINK', '0.02'))  # reviewer: 0.05–0.1
 SLEEVE_SLIDE = float(os.environ.get('SIM_SLIDE', '0.85'))   # share of the cap→armhole distance closed by placement
 FUNNEL_CM = 14.0                                          # the funnel fades out this far down the sleeve (pattern cm)
+PIN_DROP = float(os.environ.get('SIM_PIN_DROP', '0.05'))   # m below the nape: the pinned yoke
+PIN_STIFF = float(os.environ.get('SIM_PIN_STIFF', '0.25'))
+SHELL = os.environ.get('SIM_MODE', 'shell') == 'shell'   # sewn at placement (default) / 'sew' = springs
 WELD_GAP = 0.003                                          # weld seam pairs closer than 3 mm
-REST_VER = 'roll3'   # bump when the placement changes
+REST_VER = 'shell4'   # bump when the placement changes
 COTTON = (0.78, 0.74, 0.68)
 
 
@@ -85,14 +88,80 @@ def pushclear(V3, skin, iters=12):
             break
 
 
-def rollover(f, poly, sgn, z_mid):
+def nearest_ti(skin, p):
+    """Body.nearest + the triangle index (for its normal)"""
+    gx = int(p[0] / skin.cell); gy = int(p[1] / skin.cell); gz = int(p[2] / skin.cell)
+    best, bcp, bti = 1e18, None, -1
+    for r in range(1, 4):
+        for dx in range(-r, r + 1):
+            for dy in range(-r, r + 1):
+                for dz in range(-r, r + 1):
+                    if max(abs(dx), abs(dy), abs(dz)) != r: continue
+                    for ti in skin.grid.get((gx + dx, gy + dy, gz + dz), ()):
+                        d2, cp = skin.d2tri(p, ti)
+                        if d2 < best: best, bcp, bti = d2, cp, ti
+        if best < (r * skin.cell) ** 2: break
+    return best, bcp, bti
+
+
+def smooth_push(V, F, skin, rounds=5, smooth=8, clear=0.012, push_to=0.018):
+    """clear the cloth off the skin WITHOUT shredding it: (1) the push direction is the nearest skin triangle's
+    outward normal, so a vertex that is already INSIDE goes out (pushing along p - closest drove it deeper);
+    (2) the push is a displacement FIELD smoothed over the cloth mesh before it is applied, so the surface bulges
+    smoothly over a shoulder instead of single vertices jumping out as spikes."""
+    P, T = skin.P, skin.tris
+    TN = []
+    for a, b, c in T:
+        n = cross(sub(P[b], P[a]), sub(P[c], P[a])); l = math.sqrt(dot(n, n)) or 1e-12
+        TN.append((n[0] / l, n[1] / l, n[2] / l))
+    # orientation: most normals must point away from the body's own vertical axis
+    cx = sum(p[0] for p in P) / len(P); cz = sum(p[2] for p in P) / len(P)
+    vote = sum(dot(TN[i], (P[t[0]][0] - cx, 0, P[t[0]][2] - cz)) for i, t in enumerate(T[::7]) for i in [i * 7])
+    flip = -1.0 if vote < 0 else 1.0
+    nb = [set() for _ in V]
+    for a, b, c in F:
+        nb[a].update((b, c)); nb[b].update((a, c)); nb[c].update((a, b))
+    V = [list(p) for p in V]
+    for _ in range(rounds):
+        need = {}
+        for i, p in enumerate(V):
+            d2, cp, ti = nearest_ti(skin, p)
+            if cp is None or d2 > (clear * 1.6) ** 2: continue
+            n = tuple(flip * c for c in TN[ti]); sd = dot(sub(p, cp), n)
+            if sd < clear:
+                need[i] = tuple(n[k] * (push_to - sd) for k in range(3))
+        if not need: break
+        D = {i: list(d) for i, d in need.items()}
+        for _ in range(smooth):                               # spread the field into the neighbourhood
+            N = {}
+            for i in set(D) | {j for i in D for j in nb[i]}:
+                acc = [0.0, 0.0, 0.0]; cnt = 0
+                for j in nb[i]:
+                    if j in D: acc = [acc[k] + D[j][k] for k in range(3)]; cnt += 1
+                if not cnt: continue
+                avg = [acc[k] / (len(nb[i]) or 1) for k in range(3)]
+                own = D.get(i, [0.0, 0.0, 0.0])
+                if i in need:                                 # a colliding vertex keeps at least its own push
+                    own = list(need[i])
+                    if dot(avg, avg) > dot(own, own): own = avg
+                    N[i] = own
+                else:
+                    N[i] = [(own[k] + avg[k]) * 0.5 for k in range(3)]
+            D = N
+        for i, d in D.items():
+            V[i] = [V[i][k] + d[k] for k in range(3)]
+        print(f'    отжим от кожи: {len(need)} вершин, поле на {len(D)}')
+    return [tuple(p) for p in V]
+
+
+def rollover(f, poly, sgn, z_mid, neck_w):
     """the torso cylinder leaves the front / back shoulder edges hanging in front of / behind the shoulders, and the
-    sewing springs then pull them straight through the shoulder into the collider (the seams never close and the shirt
-    slides down). Roll the top of each panel over the shoulder instead: along every pattern column the cloth below the
-    top edge follows a quarter circle from the panel's own plane up to the shoulder mid-plane z_mid, arc length kept,
-    so the front and back shoulder edges meet on top of the shoulder before any physics runs."""
+    seams then cut straight through the shoulder. Roll the top of each panel over the shoulder: along every pattern
+    column the cloth below the top edge follows an arc from the panel's own plane toward the shoulder mid-plane z_mid,
+    arc length kept. Shoulder columns (|u| >= neck_w) roll a full quarter turn so front and back shoulder edges meet on
+    top of the shoulder; toward the centre the roll fades to none, so the neckline stays in front of / behind the neck."""
     n = len(poly)
-    def top(u):                                       # the pattern y (down from the nape) of the top edge at column u
+    def top(u):
         ys = []
         for i in range(n):
             (x1, y1), (x2, y2) = poly[i], poly[(i + 1) % n]
@@ -102,21 +171,95 @@ def rollover(f, poly, sgn, z_mid):
     cache = {}
     def g(u, v):
         x, y, z = f(u, v)
-        t = cache.get(u)
-        if t is None:
-            t = cache[u] = top(u)
-        r = abs(z - z_mid)
-        if r < 0.01:
+        if u not in cache:
+            t = top(u); r = abs(f(u, t)[2] - z_mid)
+            k = min(1.0, abs(u) / neck_w); rho = k * k * (3 - 2 * k)
+            cache[u] = (t, r, rho, f(u, t)[1])
+        t, r, rho, y_edge = cache[u]
+        if r < 0.01 or rho < 1e-3:
             return (x, y, z)
-        y_edge = f(u, t)[1]
-        d = (v - t) / 100                             # metres below the top edge along the panel
-        L = math.pi / 2 * r
-        yc = y_edge - r
+        L = rho * math.pi / 2 * r
+        yc = y_edge - r * math.sin(rho * math.pi / 2)
+        d = (v - t) / 100
         if d < L:
-            ph = d / r
-            return (x, yc + r * math.cos(ph), z_mid + sgn * r * math.sin(ph))
+            ph = (L - d) / r
+            return (x, yc + r * math.sin(ph), z_mid + sgn * r * math.cos(ph))
         return (x, yc - (d - L), z)
     return g
+
+
+def torso_bender(name, poly, A):
+    """front / back around a cylinder whose half turn is EXACTLY the panel width (the step-1 cylinder used the chest
+    girth + a gap, so the side seams started ~8 cm apart): the side edges of front and back land on the same line"""
+    xs = [p[0] for p in poly]; cx = (min(xs) + max(xs)) / 2; R = (max(xs) - min(xs)) / 100 / math.pi
+    zc, yn = A['chest']['zc'], A['nape_y']; sg = 1 if name == 'front' else -1
+    def f(u, v):
+        th = (u - cx) / 100 / R
+        return (R * math.sin(th), yn - v / 100, zc + sg * R * math.cos(th))
+    return f
+
+
+def sleeve_bender(name, part, A):
+    """the sleeve as a closed tube around the arm: below the underarm every row wraps a full turn (its width between
+    the two underarm-seam edges = the circumference), so the underarm seam closes by construction; the cap rows keep
+    the underarm row's radius and are pulled to the armhole by the funnel"""
+    s = 1 if name == 'sleeveP' else -1
+    ar = A['arms']['L' if s > 0 else 'R']
+    b0 = (ar['bicep_cx'], ar['bicep_y'], ar['bicep_cz']); e = (ar['elbow_cx'], ar['elbow_y'], ar['elbow_cz'])
+    d = nrm(sub(e, b0))
+    tip = A['sleeve_tip'][s]; Y = (0, 1, 0)
+    e_top = nrm(tuple(Y[k] - dot(Y, d) * d[k] for k in range(3))); e_side = nrm(cross(d, e_top))
+    sP, sM = edge_pts(part, 'seamP'), edge_pts(part, 'seamM')
+    v_ua = max(min(p[1] for p in sP), min(p[1] for p in sM))
+    def xat(line, v):
+        for (x1, y1), (x2, y2) in zip(line, line[1:]):
+            if (y1 <= v <= y2) or (y2 <= v <= y1):
+                return x1 if y1 == y2 else x1 + (x2 - x1) * (v - y1) / (y2 - y1)
+        return line[0][0] if abs(line[0][1] - v) < abs(line[-1][1] - v) else line[-1][0]
+    hcap = A['cap_h']
+    def f(u, v):
+        vv = max(v, v_ua)
+        a_, b_ = xat(sP, vv), xat(sM, vv); lo, hi = min(a_, b_), max(a_, b_); w = hi - lo
+        R = w / 100 / (2 * math.pi) + 0.004
+        th = math.pi * (u - (lo + hi) / 2) / (w / 2) if v >= v_ua else (u - (lo + hi) / 2) / 100 / R
+        s_al = (v + hcap) / 100
+        radial = tuple(e_top[k] * math.cos(th) + e_side[k] * math.sin(th) for k in range(3))
+        return tuple(tip[k] + d[k] * s_al + R * radial[k] for k in range(3))
+    return f
+
+
+def zip_presew(V, seamG, part_of, V2g, fall_cm=7.0):
+    """close every seam geometrically before any physics: each pair moves to its midpoint, and the move spreads into
+    its own panel with a smooth falloff over fall_cm in PATTERN space (no Laplacian: it left slivers). Then the pairs
+    coincide and are welded — the cloth starts as one closed shell whose rest shape is the panels' own shape."""
+    D = {}
+    for _, pr in seamG:
+        for a, b in pr:
+            m = tuple((V[a][k] + V[b][k]) / 2 for k in range(3))
+            for i in (a, b):
+                d = sub(m, V[i])
+                if i in D: D[i] = tuple((D[i][k] + d[k]) / 2 for k in range(3))
+                else: D[i] = d
+    by_part = defaultdict(list)
+    for i in D: by_part[part_of[i]].append(i)
+    out = [list(p) for p in V]
+    for i in range(len(V)):
+        src = by_part.get(part_of[i])
+        if not src: continue
+        if i in D:
+            out[i] = [V[i][k] + D[i][k] for k in range(3)]; continue
+        wsum, acc, dmin = 0.0, [0.0, 0.0, 0.0], 1e9
+        u, v = V2g[i]
+        for j in src:
+            dd = math.hypot(V2g[j][0] - u, V2g[j][1] - v)
+            if dd > fall_cm: continue
+            dmin = min(dmin, dd); w = 1.0 / (dd * dd + 0.25)
+            wsum += w
+            for k in range(3): acc[k] += w * D[j][k]
+        if not wsum: continue
+        t = 1 - dmin / fall_cm; t = t * t * (3 - 2 * t)
+        out[i] = [V[i][k] + acc[k] / wsum * t for k in range(3)]
+    return out
 
 
 def build_parts(garment, pat, skin, bodyP, bodyT):
@@ -133,11 +276,14 @@ def build_parts(garment, pat, skin, bodyP, bodyT):
         zs = [p[2] for p in bodyP if A['nape_y'] - 0.09 < p[1] < A['nape_y'] - 0.01 and 0.07 < abs(p[0]) < 0.17]
         z_mid = sum(zs) / len(zs)
         for name in pat['parts']:
-            f = bender(name, A)
-            if f is None:                                   # the collar strip, along the neckline
-                f = band_bender(A, pat, bender('front', A), bender('back', A))
-            elif name in ('front', 'back'):
-                f = rollover(f, [tuple(p) for p in pat['parts'][name]['pts']], 1 if name == 'front' else -1, z_mid)
+            poly = [tuple(p) for p in pat['parts'][name]['pts']]
+            if name in ('front', 'back'):
+                nk = edge_pts(pat['parts'][name], 'neck'); neck_w = max(abs(q[0]) for q in nk)
+                f = rollover(torso_bender(name, poly, A), poly, 1 if name == 'front' else -1, z_mid, neck_w)
+            elif name in ('sleeveP', 'sleeveM'):
+                f = sleeve_bender(name, pat['parts'][name], A)
+            else:
+                f = bender(name, A) or band_bender(A, pat, bender('front', A), bender('back', A))
             benders[name] = f
         # funnel each sleeve toward its armhole: the cap ring sat ~15 cm from the armhole loop, and the sewing springs then
         # dragged the shoulders apart and crumpled the caps. Every sleeve vertex moves by the cap→armhole offset of its
@@ -168,10 +314,21 @@ def build_parts(garment, pat, skin, bodyP, bodyT):
             D = [sub(benders[hn](*hq), benders[sl](*cq)) for (_, cq), (hn, hq) in zip(cap, hole)]
             f0 = benders[sl]
             def funnel(u, v, f0=f0, caps2=caps2, D=D):
-                k = min(range(len(caps2)), key=lambda m: (caps2[m][0] - u) ** 2 + (caps2[m][1] - v) ** 2)
-                dp = math.dist(caps2[k], (u, v)); w = max(0.0, 1 - dp / FUNNEL_CM) ** 2 * SLEEVE_SLIDE
+                # closest point on the cap polyline (continuous), the cap→armhole offset interpolated along it:
+                # the nearest-sample version moved the cloth in steps and creased the rest shape at the armhole
+                best = (1e18, 0, 0.0)
+                for m in range(len(caps2) - 1):
+                    (x1, y1), (x2, y2) = caps2[m], caps2[m + 1]
+                    dx, dy = x2 - x1, y2 - y1; L2 = dx * dx + dy * dy or 1e-9
+                    t = max(0.0, min(1.0, ((u - x1) * dx + (v - y1) * dy) / L2))
+                    d2 = (x1 + dx * t - u) ** 2 + (y1 + dy * t - v) ** 2
+                    if d2 < best[0]: best = (d2, m, t)
+                d2, m, t = best
+                w = max(0.0, 1 - math.sqrt(d2) / FUNNEL_CM) ** 2 * SLEEVE_SLIDE
+                w = w * w * (3 - 2 * w) if w < 1 else w
+                Dk = tuple(D[m][i] + (D[m + 1][i] - D[m][i]) * t for i in range(3))
                 p0 = f0(u, v)
-                return tuple(p0[i] + D[k][i] * w for i in range(3))
+                return tuple(p0[i] + Dk[i] * w for i in range(3))
             benders[sl] = funnel
             print(f'    {sl}: окат подтянут к пройме (средний зазор был {sum(math.sqrt(dot(d, d)) for d in D) / len(D) * 100:.1f} см)')
     else:                                                    # pants: step-1 bender needs its measures
@@ -187,7 +344,7 @@ def build_parts(garment, pat, skin, bodyP, bodyT):
         V, F, idxmap, cols, nrows = build_grid(poly, STEP_SIM)
         f = benders[name]
         V3 = [f(u, v) for u, v in V]
-        pushclear(V3, skin, 30 if garment == 'pants' else 12)
+        if not SHELL: pushclear(V3, skin, 30 if garment == 'pants' else 12)   # the shell is cleared after zipping (smooth_push)
         parts[name] = dict(verts3=V3, V2=V, faces=F)
         print(f'    {name:9}: {len(V3)} вершин, {len(F)} граней')
     return parts
@@ -330,7 +487,8 @@ def cfg(st, cs, mass, sewing, shrink, self_coll, quality):
     S(st, ['use_sewing_springs'], bool(sewing))
     if sewing:
         S(st, ['sewing_force_max', 'sewing_spring_max', 'max_sewing_force'], FABRIC['sew_force'])
-    S(st, ['max_velocity'], 50.0)                       # clamp a diverging frame
+    S(st, ['max_velocity'], 5.0)                        # m/s — 50 clamped nothing
+    S(cs, ['collision_quality'], 4)
     S(cs, ['use_collision'], True)
     S(cs, ['distance_min'], FABRIC['self_dist'])
     S(cs, ['use_self_collision'], bool(self_coll))
@@ -344,6 +502,12 @@ def make_body_collider(sc, bodyP, bodyT):
     me = bpy.data.meshes.new('body')
     me.from_pydata([list(p) for p in bodyP], [], [list(t) for t in bodyT])
     me.validate(); me.update()
+    import bmesh                                          # close the cut neck / pelvis rings and the UV-seam splits
+    bm = bmesh.new(); bm.from_mesh(me)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
+    if os.environ.get('SIM_FILL', '0') == '1':
+        bmesh.ops.holes_fill(bm, edges=bm.edges, sides=0)
+    bm.to_mesh(me); bm.free(); me.update()
     ob = bpy.data.objects.new('body', me)
     sc.collection.objects.link(ob)
     cm = ob.modifiers.new('Collision', 'COLLISION')
@@ -356,7 +520,7 @@ def make_body_collider(sc, bodyP, bodyT):
 
 
 def run_phase(tag, V, F, E_sew, bodyP, bodyT, mass, frames, gravity, sewing, shrink,
-              self_coll, quality, blend=None):
+              self_coll, quality, blend=None, pin=None):
     """one cloth bake in a fresh scene. blend=(path, WV, WF, loop_uv) saves the final .blend."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
@@ -374,6 +538,10 @@ def run_phase(tag, V, F, E_sew, bodyP, bodyT, mass, frames, gravity, sewing, shr
     md = cob.modifiers.new('Cloth', 'CLOTH')
     st, cs = md.settings, md.collision_settings
     log, miss = cfg(st, cs, mass, sewing, shrink, self_coll, quality)
+    if pin:                                   # {vertex: weight} — the yoke rides on the shoulders (a hanger, as in CLO)
+        vg = cob.vertex_groups.new(name='pin')
+        for i, w in pin.items(): vg.add([i], w, 'REPLACE')
+        st.vertex_group_mass = 'pin'; st.pin_stiffness = PIN_STIFF
     print(f'  [{tag}] гравитация {gravity}, кадров {frames}, quality {quality}, '
           f'рёбер-швов {len(E_sew)} (loose={nloose}), вершин {len(V)}')
     print(f'  [{tag}] ткань: ' + ', '.join(log) + (f'  (нет RNA: {sorted(set(miss))})' if miss else ''))
@@ -640,6 +808,9 @@ def main():
         return 0 if sew_ok else 1
     bodyP, bodyT = place.load_obj(objp)
     pat = json.load(open(patp))
+    if SHELL and garment == 'tee':        # the neckband strip is a separate ring that never sat on the neckline — later
+        pat['parts'] = {k: v for k, v in pat['parts'].items() if k != 'band'}
+        pat['seams'] = [sm for sm in pat['seams'] if all(sp[0] != 'band' for sp in sm['a'] + sm['b'])]
     cached = load_rest(garment)
     if cached:
         V0, F0, UV0, seamG, E = cached
@@ -648,7 +819,15 @@ def main():
         parts = build_parts(garment, pat, skin, bodyP, bodyT)
         seams = seam_pairs(pat, parts)
         V0, F0, UV0, seamG, E, off = join(parts, seams, sheet_uv(parts))
+        if SHELL:
+            part_of, V2g = [], []
+            for name, pt in parts.items():
+                part_of += [name] * len(pt['verts3']); V2g += pt['V2']
+            V0 = zip_presew(V0, seamG, part_of, V2g)
+            V0 = smooth_push(V0, F0, skin)
         save_rest(garment, V0, F0, UV0, seamG, E)
+    if os.environ.get('SIM_REST_ONLY'):
+        print('— только покой (SIM_REST_ONLY)'); return 0
     print('— швы до пошива (рёбра-пружины, зазоры как из раскладки):')
     for nm, pr in seamG:
         g = [math.dist(V0[a], V0[b]) for a, b in pr]
@@ -664,23 +843,36 @@ def main():
     bad = 0 if 20000 <= len(F0) <= 120000 else 1
     print(f'    {"✓" if not bad else "✗"} число треугольников')
 
-    # ── PHASE 1: sew (gravity 0, no self-collision, slight shrink) ──
-    Vs_A, t1 = run_phase('пошив', V0, F0, E, bodyP, bodyT, mass, FRAMES_SEW,
-                         gravity=(0, 0, 0), sewing=True, shrink=SHRINK_SEW,
-                         self_coll=False, quality=QUALITY)
-    seam_bad, mean_gap = check_seams(Vs_A, seamG)
-
-    # ── WELD after sewing ──
-    WV, faces_w, remap = weld(Vs_A, V0, F0, UV0, seamG)
-    WF = [wf for wf, f0 in faces_w]
-    luv = loop_uv(faces_w, UV0)
-
-    # ── PHASE 2: settle (gravity on, self-collision on) ──
     blendp = os.path.join(OUT, f'{garment}_high.blend')
-    Vs_B, t2 = run_phase('усадка', WV, WF, [], bodyP, bodyT, mass, FRAMES_SETTLE,
-                         gravity=(0, -9.81, 0), sewing=False, shrink=0.0,
-                         self_coll=True, quality=QUALITY,
-                         blend=(blendp, WV, WF, luv))
+    if SHELL:
+        # ── the shell is already sewn: weld the (now coincident) pairs, then ONE settle with gravity ──
+        WV, faces_w, remap = weld(V0, V0, F0, UV0, seamG)
+        WF = [wf for wf, f0 in faces_w]
+        luv = loop_uv(faces_w, UV0)
+        t1 = 0.0
+        pin = None
+        if garment == 'tee':                  # pin the yoke: everything above the shoulder line minus PIN_DROP, ramped
+            y0 = pat['anchors']['nape_y'] - PIN_DROP
+            pin = {i: min(1.0, (p[1] - y0) / 0.03) for i, p in enumerate(WV) if p[1] > y0}
+            print(f'    пин кокетки: {len(pin)} вершин выше y={y0:.3f}')
+        Vs_B, t2 = run_phase('усадка', WV, WF, [], bodyP, bodyT, mass, FRAMES_SETTLE,
+                             gravity=(0, -9.81, 0), sewing=False, shrink=0.0,
+                             self_coll=True, quality=QUALITY, blend=(blendp, WV, WF, luv), pin=pin)
+        seam_bad = 0
+    else:
+        # ── PHASE 1: sew (gravity 0, no self-collision, slight shrink) ──
+        Vs_A, t1 = run_phase('пошив', V0, F0, E, bodyP, bodyT, mass, FRAMES_SEW,
+                             gravity=(0, 0, 0), sewing=True, shrink=SHRINK_SEW,
+                             self_coll=False, quality=QUALITY)
+        seam_bad, mean_gap = check_seams(Vs_A, seamG)
+        WV, faces_w, remap = weld(Vs_A, V0, F0, UV0, seamG)
+        WF = [wf for wf, f0 in faces_w]
+        luv = loop_uv(faces_w, UV0)
+        # ── PHASE 2: settle (gravity on, self-collision on) ──
+        Vs_B, t2 = run_phase('усадка', WV, WF, [], bodyP, bodyT, mass, FRAMES_SETTLE,
+                             gravity=(0, -9.81, 0), sewing=False, shrink=0.0,
+                             self_coll=True, quality=QUALITY,
+                             blend=(blendp, WV, WF, luv))
 
     # ── checks on the FINAL (settle) result ──
     Vs_final_orig = [Vs_B[remap[i]] for i in range(len(V0))]   # un-weld for the edge check
