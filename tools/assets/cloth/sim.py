@@ -56,9 +56,11 @@ QUALITY = int(os.environ.get('SIM_QUALITY', '5'))       # CPU-bound default; SIM
 FABRIC = dict(area_mass=0.15, tension=15.0, compression=15.0, shear=5.0, bending=0.5,
               self_dist=0.003, coll_thick=0.005, friction=5.0,
               sew_force=float(os.environ.get('SIM_SEW_FORCE', '25')))   # reviewer: 10–30
-SHRINK_SEW = float(os.environ.get('SIM_SHRINK', '0.08'))  # reviewer: 0.05–0.1
+SHRINK_SEW = float(os.environ.get('SIM_SHRINK', '0.02'))  # reviewer: 0.05–0.1
+SLEEVE_SLIDE = float(os.environ.get('SIM_SLIDE', '0.85'))   # share of the cap→armhole distance closed by placement
+FUNNEL_CM = 14.0                                          # the funnel fades out this far down the sleeve (pattern cm)
 WELD_GAP = 0.003                                          # weld seam pairs closer than 3 mm
-REST_VER = 3                                              # bump to invalidate the cached rest mesh
+REST_VER = 'roll3'   # bump when the placement changes
 COTTON = (0.78, 0.74, 0.68)
 
 
@@ -83,6 +85,40 @@ def pushclear(V3, skin, iters=12):
             break
 
 
+def rollover(f, poly, sgn, z_mid):
+    """the torso cylinder leaves the front / back shoulder edges hanging in front of / behind the shoulders, and the
+    sewing springs then pull them straight through the shoulder into the collider (the seams never close and the shirt
+    slides down). Roll the top of each panel over the shoulder instead: along every pattern column the cloth below the
+    top edge follows a quarter circle from the panel's own plane up to the shoulder mid-plane z_mid, arc length kept,
+    so the front and back shoulder edges meet on top of the shoulder before any physics runs."""
+    n = len(poly)
+    def top(u):                                       # the pattern y (down from the nape) of the top edge at column u
+        ys = []
+        for i in range(n):
+            (x1, y1), (x2, y2) = poly[i], poly[(i + 1) % n]
+            if (x1 <= u <= x2 or x2 <= u <= x1) and x1 != x2:
+                ys.append(y1 + (y2 - y1) * (u - x1) / (x2 - x1))
+        return min(ys) if ys else 0.0
+    cache = {}
+    def g(u, v):
+        x, y, z = f(u, v)
+        t = cache.get(u)
+        if t is None:
+            t = cache[u] = top(u)
+        r = abs(z - z_mid)
+        if r < 0.01:
+            return (x, y, z)
+        y_edge = f(u, t)[1]
+        d = (v - t) / 100                             # metres below the top edge along the panel
+        L = math.pi / 2 * r
+        yc = y_edge - r
+        if d < L:
+            ph = d / r
+            return (x, yc + r * math.cos(ph), z_mid + sgn * r * math.sin(ph))
+        return (x, yc - (d - L), z)
+    return g
+
+
 def build_parts(garment, pat, skin, bodyP, bodyT):
     """returns {name: {verts3, V2 (pattern cm), faces}}. Uses the SAME benders as step 1."""
     if garment == 'tee':
@@ -93,11 +129,51 @@ def build_parts(garment, pat, skin, bodyP, bodyT):
         A['sleeve_tip'] = {1: (prm['tipx'] / 100, ytip, A['arms']['L']['bicep_cz']),
                            -1: (-prm['tipx'] / 100, ytip, A['arms']['R']['bicep_cz'])}
         benders = {}
+        # shoulder mid-plane: the mean z of the skin on top of the shoulders
+        zs = [p[2] for p in bodyP if A['nape_y'] - 0.09 < p[1] < A['nape_y'] - 0.01 and 0.07 < abs(p[0]) < 0.17]
+        z_mid = sum(zs) / len(zs)
         for name in pat['parts']:
             f = bender(name, A)
             if f is None:                                   # the collar strip, along the neckline
                 f = band_bender(A, pat, bender('front', A), bender('back', A))
+            elif name in ('front', 'back'):
+                f = rollover(f, [tuple(p) for p in pat['parts'][name]['pts']], 1 if name == 'front' else -1, z_mid)
             benders[name] = f
+        # funnel each sleeve toward its armhole: the cap ring sat ~15 cm from the armhole loop, and the sewing springs then
+        # dragged the shoulders apart and crumpled the caps. Every sleeve vertex moves by the cap→armhole offset of its
+        # nearest cap point (pairs at the same arc fraction, exactly as the seam spec pairs them), fading out 14 cm down
+        # the sleeve in the pattern, so the cap starts a few cm from the armhole and the tube keeps its shape below.
+        def chain(specs):
+            out = []
+            for sp in specs:
+                pts = edge_pts(pat['parts'][sp[0]], sp[1])
+                if len(sp) > 2 and sp[2]: pts = pts[::-1]
+                out += [(sp[0], q) for q in pts]
+            return out
+        def resample(ch, n):
+            L = [0.0]
+            for a_, b_ in zip(ch, ch[1:]): L.append(L[-1] + math.dist(a_[1], b_[1]) if a_[0] == b_[0] else L[-1])
+            out = []
+            for k in range(n):
+                t = L[-1] * k / (n - 1); i_ = max(0, min(len(L) - 2, next((m for m in range(len(L) - 1) if L[m + 1] >= t), len(L) - 2)))
+                a_, b_ = ch[i_], ch[i_ + 1]; w = 0 if L[i_ + 1] == L[i_] else (t - L[i_]) / (L[i_ + 1] - L[i_])
+                pn = a_[0] if w < 0.5 else b_[0]
+                out.append((pn, (a_[1][0] + (b_[1][0] - a_[1][0]) * w, a_[1][1] + (b_[1][1] - a_[1][1]) * w)))
+            return out
+        for sm in pat['seams']:
+            if not sm['a'][0][1] == 'cap': continue
+            sl = sm['a'][0][0]
+            cap = resample(chain(sm['a']), 48); hole = resample(chain(sm['b']), 48)
+            caps2 = [q for _, q in cap]
+            D = [sub(benders[hn](*hq), benders[sl](*cq)) for (_, cq), (hn, hq) in zip(cap, hole)]
+            f0 = benders[sl]
+            def funnel(u, v, f0=f0, caps2=caps2, D=D):
+                k = min(range(len(caps2)), key=lambda m: (caps2[m][0] - u) ** 2 + (caps2[m][1] - v) ** 2)
+                dp = math.dist(caps2[k], (u, v)); w = max(0.0, 1 - dp / FUNNEL_CM) ** 2 * SLEEVE_SLIDE
+                p0 = f0(u, v)
+                return tuple(p0[i] + D[k][i] * w for i in range(3))
+            benders[sl] = funnel
+            print(f'    {sl}: окат подтянут к пройме (средний зазор был {sum(math.sqrt(dot(d, d)) for d in D) / len(D) * 100:.1f} см)')
     else:                                                    # pants: step-1 bender needs its measures
         import pants as PN
         sk = json.load(open(os.path.join(OUT, 'body_skin.json')))
