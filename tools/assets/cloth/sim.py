@@ -47,11 +47,11 @@ from place import sub, dot, cross, nrm, build_grid, bender, band_bender, Body, \
     edge_pts, sample_polyline, COLORS
 
 # ── tunables (metres, seconds; the reviewer's Marvelous/CLO recipe) ────────────────────────────
-STEP_SIM = float(os.environ.get('SIM_STEP', '1.2'))     # cm, warp grid of the high-poly cloth
+STEP_SIM = float(os.environ.get('SIM_STEP', '0.8'))     # cm, warp grid of the high-poly cloth
 MIN_CLEAR, PUSH_TO = 0.020, 0.032                       # push-out band, same as place.py
 FPS = 24
 FRAMES_SEW = int(os.environ.get('SIM_SEW', '55'))       # phase 1: seams close by sewing springs
-FRAMES_SETTLE = int(os.environ.get('SIM_SETTLE', '50')) # phase 2: gravity + self-collision settle
+FRAMES_SETTLE = int(os.environ.get('SIM_SETTLE', '60')) # phase 2: gravity + self-collision settle
 QUALITY = int(os.environ.get('SIM_QUALITY', '6'))       # CPU-bound default; SIM_QUALITY=8 on [gpu]
 FABRIC = dict(area_mass=0.15, tension=15.0, compression=15.0, shear=5.0, bending=0.5,
               self_dist=0.003, coll_thick=0.009, friction=5.0,
@@ -152,6 +152,34 @@ def smooth_push(V, F, skin, rounds=5, smooth=8, clear=0.012, push_to=0.018):
             V[i] = [V[i][k] + d[k] for k in range(3)]
         print(f'    отжим от кожи: {len(need)} вершин, поле на {len(D)}')
     return [tuple(p) for p in V]
+
+
+def pattern_rest(WV, faces_w, V2g, iters=300):
+    """a rest shape for the welded shell whose every edge has its PATTERN length (cm → m): start from the placed
+    shell and relax edge lengths toward the pattern (Jacobi position-based projection, numpy). The placement had to
+    compress / stretch the cloth to close the seams and clear the shoulders; with this as rest_shape_key the cloth
+    pulls back to its cut instead of keeping those dents as its natural shape."""
+    import numpy as np
+    L = {}
+    for wf, f0 in faces_w:
+        for k in range(3):
+            a, b = wf[k], wf[(k + 1) % 3]; a0, b0 = f0[k], f0[(k + 1) % 3]
+            key = (a, b) if a < b else (b, a)
+            l0 = math.hypot(V2g[a0][0] - V2g[b0][0], V2g[a0][1] - V2g[b0][1]) / 100
+            L.setdefault(key, []).append(l0)
+    E = np.array(list(L.keys()), dtype=np.int64); L0 = np.array([sum(v) / len(v) for v in L.values()])
+    X = np.array(WV, dtype=np.float64); cnt = np.bincount(E.ravel(), minlength=len(X)).astype(np.float64)[:, None]
+    l_init = np.linalg.norm(X[E[:, 1]] - X[E[:, 0]], axis=1)
+    for _ in range(iters):
+        d = X[E[:, 1]] - X[E[:, 0]]; l = np.linalg.norm(d, axis=1) + 1e-12
+        c = (0.5 * (l - L0) / l)[:, None] * d
+        acc = np.zeros_like(X); np.add.at(acc, E[:, 0], c); np.add.at(acc, E[:, 1], -c)
+        X += 0.6 * acc / np.maximum(cnt, 1)
+    l = np.linalg.norm(X[E[:, 1]] - X[E[:, 0]], axis=1)
+    r0, r1 = l_init / L0, l / L0
+    print(f'    покой по выкройке: рёбра раскладки / выкройки p5–p95 {np.percentile(r0, 5):.2f}–{np.percentile(r0, 95):.2f}'
+          f' → после {np.percentile(r1, 5):.2f}–{np.percentile(r1, 95):.2f}')
+    return [tuple(p) for p in X]
 
 
 def rollover(f, poly, sgn, z_mid, neck_w):
@@ -355,7 +383,7 @@ def edge_idx_list(part, pt, ename):
     """grid vertices along a pattern edge, ordered along it (same sampling as place.py)"""
     poly = edge_pts(part, ename)
     out, last = [], -1
-    for sp in sample_polyline([(x, y, 0) for x, y in poly], every=STEP_SIM * 1.2):
+    for sp in sample_polyline([(x, y, 0) for x, y in poly], every=STEP_SIM * (0.35 if SHELL else 1.2)):   # shell: EVERY boundary vertex, or the unpaired ones leave slits
         u, v = sp[0], sp[1]
         best, bi = 1e18, None
         for i, (vu, vv) in enumerate(pt['V2']):
@@ -382,7 +410,22 @@ def seam_pairs(pat, parts):
             a += [(spec[0], i) for i in side(spec)]
         for spec in s['b']:
             b += [(spec[0], i) for i in side(spec)]
-        seams.append((s['name'], list(zip(a, b))))
+        if SHELL:                                       # pair by arc fraction both ways: no boundary vertex left over
+            def frac(ch):
+                t = [0.0]
+                for (p1, i1), (p2, i2) in zip(ch, ch[1:]):
+                    q1, q2 = parts[p1]['V2'][i1], parts[p2]['V2'][i2]
+                    t.append(t[-1] + (math.hypot(q1[0] - q2[0], q1[1] - q2[1]) if p1 == p2 else 0.0))
+                return [x / (t[-1] or 1) for x in t]
+            ta, tb = frac(a), frac(b)
+            import bisect
+            def near(ts, x):
+                k = bisect.bisect_left(ts, x)
+                return min((j for j in (k - 1, k) if 0 <= j < len(ts)), key=lambda j: abs(ts[j] - x))
+            pr = {(i, near(tb, x)) for i, x in enumerate(ta)} | {(near(ta, x), j) for j, x in enumerate(tb)}
+            seams.append((s['name'], [(a[i], b[j]) for i, j in sorted(pr)]))
+        else:
+            seams.append((s['name'], list(zip(a, b))))
     return seams
 
 
@@ -520,7 +563,7 @@ def make_body_collider(sc, bodyP, bodyT):
 
 
 def run_phase(tag, V, F, E_sew, bodyP, bodyT, mass, frames, gravity, sewing, shrink,
-              self_coll, quality, blend=None, pin=None):
+              self_coll, quality, blend=None, pin=None, rest=None):
     """one cloth bake in a fresh scene. blend=(path, WV, WF, loop_uv) saves the final .blend."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
@@ -538,6 +581,11 @@ def run_phase(tag, V, F, E_sew, bodyP, bodyT, mass, frames, gravity, sewing, shr
     md = cob.modifiers.new('Cloth', 'CLOTH')
     st, cs = md.settings, md.collision_settings
     log, miss = cfg(st, cs, mass, sewing, shrink, self_coll, quality)
+    if rest is not None:                      # the cloth's own rest lengths / angles = the PATTERN, not the placement
+        cob.shape_key_add(name='Basis')
+        kr = cob.shape_key_add(name='rest')
+        for i, p in enumerate(rest): kr.data[i].co = p
+        st.rest_shape_key = kr
     if pin:                                   # {vertex: weight} — the yoke rides on the shoulders (a hanger, as in CLO)
         vg = cob.vertex_groups.new(name='pin')
         for i, w in pin.items(): vg.add([i], w, 'REPLACE')
@@ -614,7 +662,7 @@ def probe():
 
 
 # ───────────────────────── 6. weld AFTER sewing ─────────────────────────
-def weld(Vs, V0, F0, UV0, seamG):
+def weld(Vs, V0, F0, UV0, seamG, gap=WELD_GAP):
     """merge converged seam pairs into one vertex (a single manifold shell). Returns
     WV (positions), faces_w=[(welded_tri, orig_tri)], remap (orig→welded)."""
     par = list(range(len(V0)))
@@ -626,7 +674,7 @@ def weld(Vs, V0, F0, UV0, seamG):
     for _, pr in seamG:
         for a, b in pr:
             g = math.dist(Vs[a], Vs[b])
-            if g >= WELD_GAP:
+            if g >= gap:
                 nfar += 1; continue          # an open pair stays open: averaging points 10-40 cm apart made the huge shards
             nclose += 1
             ra, rb = find(a), find(b)
@@ -811,7 +859,7 @@ def main():
     if SHELL and garment == 'tee':        # the neckband strip is a separate ring that never sat on the neckline — later
         pat['parts'] = {k: v for k, v in pat['parts'].items() if k != 'band'}
         pat['seams'] = [sm for sm in pat['seams'] if all(sp[0] != 'band' for sp in sm['a'] + sm['b'])]
-    cached = load_rest(garment)
+    cached = None if SHELL else load_rest(garment)
     if cached:
         V0, F0, UV0, seamG, E = cached
     else:
@@ -819,12 +867,12 @@ def main():
         parts = build_parts(garment, pat, skin, bodyP, bodyT)
         seams = seam_pairs(pat, parts)
         V0, F0, UV0, seamG, E, off = join(parts, seams, sheet_uv(parts))
+        V2g = None
         if SHELL:
             part_of, V2g = [], []
             for name, pt in parts.items():
                 part_of += [name] * len(pt['verts3']); V2g += pt['V2']
-            V0 = zip_presew(V0, seamG, part_of, V2g)
-            V0 = smooth_push(V0, F0, skin)
+            V0 = [tuple(p) for p in zip_presew(V0, seamG, part_of, V2g)]   # cleared from the skin AFTER the weld
         save_rest(garment, V0, F0, UV0, seamG, E)
     if os.environ.get('SIM_REST_ONLY'):
         print('— только покой (SIM_REST_ONLY)'); return 0
@@ -846,9 +894,11 @@ def main():
     blendp = os.path.join(OUT, f'{garment}_high.blend')
     if SHELL:
         # ── the shell is already sewn: weld the (now coincident) pairs, then ONE settle with gravity ──
-        WV, faces_w, remap = weld(V0, V0, F0, UV0, seamG)
+        WV, faces_w, remap = weld(V0, V0, F0, UV0, seamG, gap=0.08)   # zipped: pairs are near; a group is averaged
         WF = [wf for wf, f0 in faces_w]
+        WV = smooth_push(WV, WF, Body(bodyP, bodyT))       # one shell: both sides of a seam move together
         luv = loop_uv(faces_w, UV0)
+        rest = pattern_rest(WV, faces_w, V2g) if V2g and os.environ.get('SIM_REST') == '1' else None   # off: the cylinder is too narrow over the shoulders, so the pattern rest pulled the yoke down
         t1 = 0.0
         pin = None
         if garment == 'tee':                  # pin the yoke: everything above the shoulder line minus PIN_DROP, ramped
@@ -857,7 +907,7 @@ def main():
             print(f'    пин кокетки: {len(pin)} вершин выше y={y0:.3f}')
         Vs_B, t2 = run_phase('усадка', WV, WF, [], bodyP, bodyT, mass, FRAMES_SETTLE,
                              gravity=(0, -9.81, 0), sewing=False, shrink=0.0,
-                             self_coll=True, quality=QUALITY, blend=(blendp, WV, WF, luv), pin=pin)
+                             self_coll=True, quality=QUALITY, blend=(blendp, WV, WF, luv), pin=pin, rest=rest)
         seam_bad = 0
     else:
         # ── PHASE 1: sew (gravity 0, no self-collision, slight shrink) ──
