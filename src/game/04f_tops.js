@@ -27,6 +27,36 @@ const TOP_CUTS = {
   // rig: no shell of its own, only the pieces laid over the surface (plate bags, cummerbund, straps); the surface is the tee's + 3 mm
   vest: { hem: 93, cl: 1.5, fit: 0.93, neck: [8.4, 6.5, -0.5, 2], rib: 2, sl: 0, rig: 1, fab: 'cordura', under: 'tee' },
 };
+/* hand-made tops: modelled in Blender; low poly + normal map baked from the high one by tools/assets/cloth/bake_tee.py -> assets/tee_hand_n.png,
+   weights + bind pose by user_tee.py -> assets/tee_hand.json (body geometry frame: cm, z up; bones by name). Until the file has arrived the cut is the procedural one it is based on (`hand`). */
+const HAND_TOP = {};
+TOP_CUTS.teeHand = { ...TOP_CUTS.tee, hand: 'tee' };
+const HAND_N = { tee: new THREE.TextureLoader().load('assets/tee_hand_n.png', undefined, undefined, e => console.warn('tee_hand_n.png', e)) };   // loaded with the mesh, not when first worn
+HAND_N.tee.anisotropy = 4;
+fetch('assets/tee_hand.json').then(r => { if (!r.ok) throw new Error('tee_hand.json ' + r.status); return r.json(); }).then(d => { HAND_TOP.tee = d; }).catch(e => console.warn(e));
+function handGeo(F, cut) {
+  const key = 'tg_' + cut, base = TOP_CUTS[cut].hand, d = HAND_TOP[base]; if (GEAR[key]) return GEAR[key]; if (!d) return topGeo(F, base);
+  const names = GEAR.names, bi = d.bones.map(nm => { const b = names.indexOf(nm); if (b < 0) throw new Error('hand top: no bone ' + nm); return b; });
+  const n = d.pos.length / 3, z0 = topEnv(F).z0, P = d.pos; let hem = 1e9;
+  for (let i = 0; i < n; i++) hem = Math.min(hem, P[i * 3 + 2]);
+  const asw = new Float32Array(n * 2), acut = new Float32Array(n).fill(2);   // aCut 2: nothing cut away, no binding
+  for (let i = 0; i < n; i++) asw[i * 2] = clamp((hem + 12 - P[i * 3 + 2]) / 12, 0, 1);   // the hem swings, the chest does not
+  // normals and MikkTSpace tangents from Blender: the normal map was baked against exactly these (three's own would put dents on every uv seam)
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setIndex(d.idx);
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(d.nrm, 3)); geo.setAttribute('tangent', new THREE.Float32BufferAttribute(d.tan, 4));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(d.uv, 2)); geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(d.si.map(i => bi[i]), 4)); geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(d.sw, 4));
+  geo.setAttribute('aSw', new THREE.Float32BufferAttribute(asw, 2)); geo.setAttribute('aCut', new THREE.Float32BufferAttribute(acut, 1));
+  geo.userData = { ...topGeo(F, base).userData, hand: base, skinLo: hem - z0 + 2 };   // the skin and the trunks are hidden as under the procedural cut, down to this hem
+  return GEAR[key] = geo;
+}
+// a hand-made top's own uv islands know nothing of the procedural atlas: plain dyed cotton; the folds are in its baked normal map
+function handTex(v, base) {
+  const W = 512, map = GEAR['tt_' + v.key] || (GEAR['tt_' + v.key] = canvasTex(W, W, g => {
+    g.fillStyle = v.c; g.fillRect(0, 0, W, W);
+    for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(${rr() < 0.5 ? '0,0,0' : '255,255,255'},${rr() * 0.05})`; g.fillRect(rr() * W, rr() * W, 1.2, 1.2); } }));
+  const nmap = HAND_N[base];
+  return { map, nmap };
+}
 // the whole body but the head and the hands, in the bind pose: [x, y, z, region, vertex] (cm, z up from the soles, front = -y, +x = his left)
 function topEnv(F) {
   if (GEAR.tenv) return GEAR.tenv;
@@ -36,6 +66,7 @@ function topEnv(F) {
   return GEAR.tenv = { P, z0 };
 }
 function topGeo(F, cut) {
+  if (TOP_CUTS[cut].hand) return handGeo(F, cut);
   const key = 'tg_' + cut; if (GEAR[key]) return GEAR[key];
   const C = TOP_CUTS[cut], { P, z0 } = topEnv(F), TAU = Math.PI * 2, N = 28, KD = 9, zC = 138, LD = 16, names = GEAR.names, gh = GEAR.gh;
   const si0 = F.body.geometry.attributes.skinIndex, sw0 = F.body.geometry.attributes.skinWeight;
@@ -198,7 +229,7 @@ function topGeo(F, cut) {
    v 0.62 … 0.98 around (0.71 = the crook of the elbow, 0.8 = the seam under the arm); hood (bag → rim → inside): u, v 0.64 … 0.98; cords: the
    strip at u > 0.98; a jacket has its lapel (u 0.64 … 0.8) and collar (u 0.81 … 0.97) where the hood is */
 function topTex(v, geo) {
-  const C = TOP_CUTS[v.cut]; if (C.rig) return vestTex(v);
+  const C = TOP_CUTS[v.cut]; if (C.rig) return vestTex(v); if (geo.userData.hand) return handTex(v, geo.userData.hand);
   const D = geo.userData, W = 1024, H = 1024, X = u => u * W, Y = t => (1 - t) * H, TV = z => 0.6 * (z <= D.zC ? z - C.hem : D.zC - C.hem + (z - D.zC) * D.fk) / D.VS, XS = s => 0.6 * (s - D.s0) / D.sT * W;
   const path = (g, pts) => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); }, fleece = C.fab === 'fleece', leather = C.fab === 'leather', yR = Y(D.vRib), y6 = Y(0.6), ySl = Y(0.98), ySh = Y(0.62);
   const ribs = (g, x0, y0, x1, y1, a) => { g.strokeStyle = `rgba(0,0,0,${a})`; g.lineWidth = 1.5; for (let x = x0; x < x1; x += 5) { g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y1); g.stroke(); } };
@@ -317,7 +348,7 @@ function vestTex(v) {
   return { map, nmap };
 }
 function topMesh(F, v, host, U0) {
-  const geo = topGeo(F, v.cut), { map, nmap } = topTex(v, geo), C = TOP_CUTS[v.cut], fl = C.fab === 'fleece', le = C.fab === 'leather', ns = fl ? 1.1 : le ? 1 : 0.85;
+  const geo = topGeo(F, v.cut), { map, nmap } = topTex(v, geo), C = TOP_CUTS[v.cut], fl = C.fab === 'fleece', le = C.fab === 'leather', ns = geo.userData.hand || le ? 1 : fl ? 1.1 : 0.85;   // a baked map is drawn at its own strength
   const mat = new THREE.MeshPhysicalMaterial({ map, normalMap: nmap, normalScale: new THREE.Vector2(ns, ns), roughness: le ? 0.5 : fl ? 0.96 : 0.9, sheen: le ? 0 : fl ? 0.45 : C.rig ? 0.1 : 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color(v.c).multiplyScalar(1.3),
     clearcoat: le ? 0.3 : 0, clearcoatRoughness: 0.42, side: THREE.DoubleSide, envMapIntensity: le ? 0.9 : 0.5, alphaTest: C.fab === 'mesh' ? 0.5 : 0 });   // leather: a waxed, slightly glossy hide (a clear coat over a rougher base)
   const U = U0 || { uSwA: { value: new V3() }, uSwB: { value: new V3() } }, zip = C.open ? 1 : 0;
@@ -351,6 +382,7 @@ function topTick(F, m, dt) {
 Object.assign(ITEMS, {
   tank: { cat: 'top', label: 'майка-алкоголичка', model: { cut: 'tank' }, colors: ['white', 'black', 'grey'], price: 0, tags: ['street', 'basic'] },
   tee: { cat: 'top', label: 'футболка', model: { cut: 'tee' }, colors: ['white', 'black', 'grey'], nat: wNat({ white: '#e9e6df', grey: '#9a9ca2' }), price: 150, tags: ['street', 'basic'] },
+  teeHand: { cat: 'top', label: 'футболка (ручная)', model: { cut: 'teeHand' }, colors: ['white', 'black', 'grey'], nat: wNat({ white: '#e9e6df', grey: '#9a9ca2' }), price: 0, tags: ['street', 'basic'] },
   teeSD: { cat: 'top', label: 'футболка', model: { cut: 'tee', decal: { f: [0, 17, 21] } }, colors: ['black', 'white', 'wine'], price: 350, tags: ['street'], brand: 'STRAY DOGS' },
   teeOv: { cat: 'top', label: 'футболка oversize', model: { cut: 'teeOv', decal: { b: [0, 20, 26] } }, colors: ['black', 'sand', 'olive'], price: 400, tags: ['street'], brand: 'GUTTERWAVE' },
   long: { cat: 'top', label: 'лонгслив', model: { cut: 'long' }, colors: ['black', 'white', 'navy'], price: 300, tags: ['street', 'basic'] },
