@@ -401,7 +401,7 @@ class Fighter {
       this.group.position.x = this.mark.x + fwd * this.adv; this.group.updateMatrixWorld(true); return;
     }
     const dist = Math.abs(o.group.position.x - this.group.position.x), tiredK = 0.65 + 0.35 * clamp(this.stamina / 40, 0, 1);
-    let a = this.adv || 0;
+    let a = this.adv || 0, cw = null;
     if ((this === P1 || (NET.host && this === P2)) && fight && (this.moveDir || 0) !== 0) {   // issue 49: the guest's feet drive P2 as well
       // the player walks: ~1.5 m/s in and out (a step takes you out of his reach), slower punching or tired
       const v = this.moveDir * 1.5 * tiredK * (this.cur ? 0.45 : 1) * (this.blocking ? 0.55 : 1);
@@ -414,9 +414,10 @@ class Fighter {
         tgt = a + (dist - want);
       } else { if (this.hold == null) this.hold = a; tgt = this.hold + (this.cur && !this.release ? 0.09 : 0); }
       if (G.state === 'kd' && G.kd && G.kd.att === this) tgt = a + (dist - 1.6);   // the referee sends him away while the other man is counted
+      cw = celWalk(this, a, fwd); if (cw != null) tgt = cw;   // R-13: the winner walks off the man on the floor (09b_cine.js; was: back to his mark, often onto him)
       if (followOK(this)) tgt = a + Math.max(0, Math.abs(o.headNow.x - this.group.position.x) - 0.62);   // he goes after the falling man
       if (fight && this.daze > 0.5 && this === P1) tgt -= 0.1 * this.daze;
-      const vmax = (this === P2 && !NET.host ? 1.15 : 1.5) * tiredK;
+      const vmax = cw != null ? CEL.v : (this === P2 && !NET.host ? 1.15 : 1.5) * tiredK;
       this.advV += (clamp((tgt - a) * 6, -vmax, vmax) - this.advV) * Math.min(1, dt * 8);
     }
     if (this.knock) { this.advV -= this.knock * 0.9; this.knock = 0; }
@@ -424,7 +425,7 @@ class Fighter {
     // how far in the two may come together past their marks: 0.1 m vs the AI (it keeps its range anyway); in a P2P bout both are
     // people and one standing still must not freeze the other at ~1.05 m — down to 0.9 m apart, the body spheres below do the rest
     const sumMax = NET.role && o.mark ? Math.abs(o.mark.x - this.mark.x) - 0.9 : 0.1;
-    const sum = a + (o.adv || 0); if (sum > sumMax && !(o.rag.on && o.rag.mode === 'ko')) { a -= sum - sumMax; this.advV = Math.min(this.advV, 0); }   // can't walk through him
+    const sum = a + (o.adv || 0); if (sum > sumMax && !(o.rag.on && o.rag.mode === 'ko') && cw == null) { a -= sum - sumMax; this.advV = Math.min(this.advV, 0); }   // can't walk through him
     // bodies never share space: torso, head, knees and elbows of both men as spheres (from the posed skeleton, so the lunge
     // of a punch animation counts); the overlap along the fight line is taken out — half each, all of it if he can't move
     if (!(window.__tw || {}).noSep && !o.ko && !o.gu && o.jp[15].y > 1.2) { const pen = BAG.on ? bagBodyPen(this, fwd) : bodyOverlap(this, o, fwd); if (pen > 0) { const share = o.rag.on || o.slide ? 1 : 0.5; a -= Math.min(0.08, pen * share); this.advV = Math.min(this.advV, 0); } }
@@ -790,7 +791,8 @@ class Fighter {
   plantFeet(dt) {
     const B = this.bones;
     if ((window.__tw || {}).noPlant || !this.ftOff || this.rag.on || this.gu || this.ko || this.slide || dt <= 0 || G.state === 'menu' || G.state === 'replay' || (BAG.on && this === P2)) { const F0 = this.ftOff; if (F0) F0.L = F0.R = F0.sL = F0.sR = null; else this.ftOff = { L: null, R: null, sL: null, sR: null }; return; }
-    const F = this.ftOff, step = 0.18, reach = this === P1 && (this.moveDir || this.moveLat) ? 0.07 : 0.09, LB = this.limbs();
+    const cel = G.cel && G.cel.W === this && G.cel.walking;   // R-13: the winner backs off in a few long steps, not the fight shuffle
+    const F = this.ftOff, step = cel ? CEL.step : 0.18, reach = cel ? CEL.reach : this === P1 && (this.moveDir || this.moveLat) ? 0.07 : 0.09, LB = this.limbs();
     for (let i = 0; i < 2; i++) {   // scratch vectors only: this runs for four feet every frame (a step itself still allocates its start point)
       const S = i ? 'R' : 'L', sK = i ? 'sR' : 'sL', L = LB[S], foot = L.foot, w = this.mpos(foot, _pf1); this.group.localToWorld(w);
       const natural = ringPt(w, _pf2);   // where the animation puts the foot, in the ring frame
