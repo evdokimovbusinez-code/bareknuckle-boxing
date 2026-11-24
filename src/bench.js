@@ -461,3 +461,5 @@ window.__bot = {
     return out;
   },
 };
+// R-05 (docs/audit/scenarios/popups.js): seed the game's random stream (rr) so a before / after pair of shots replays the same AI / hit rolls (0 = unseeded again)
+window.__rrSeed = s => { rr = s ? botRng(s) : Math.random; };
