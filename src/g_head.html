@@ -346,6 +346,13 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .sa-b{position:absolute;left:0;bottom:0;width:1px;height:var(--pb);visibility:hidden;pointer-events:none}
 #stage.desk .pz,#stage.desk .fs{display:none}
 #stage.desk.nokeys .pad > .kbar{display:none}
+/* R-16: in the first three bouts — one hint about what is happening right now (ctxHintTick, 12_ui.js) instead of the 12-key bar */
+.pad > .ctxh{position:absolute;left:50%;bottom:calc(var(--pb) + 10px);transform:translate(-50%,8px);pointer-events:none;opacity:0;transition:opacity .25s,transform .25s;
+  font-size:clamp(14px,2.6vmin,19px);font-weight:600;letter-spacing:.01em;color:var(--text);white-space:nowrap;background:rgba(10,12,17,.8);border:1px solid rgba(226,177,74,.5);
+  border-left:3px solid var(--gold);border-radius:6px;padding:7px 16px;text-shadow:0 1px 3px rgba(0,0,0,.8);box-shadow:0 8px 26px -8px rgba(0,0,0,.8)}
+.pad > .ctxh.show{opacity:1;transform:translate(-50%,0)}
+.ctxh b{color:var(--gold);font-family:var(--mono);font-weight:700}
+#stage.touch .pad > .ctxh{bottom:calc(var(--pb) + 2px);font-size:13px;padding:5px 11px;max-width:40%;white-space:normal;text-align:center;line-height:1.25}
 #stage:not(.desk) .khint{display:none}
 #stage.short .logo h1{flex-direction:row;font-size:40px}
 #stage.short .ladder i{font-size:9px;padding:2px 5px}
@@ -432,13 +439,17 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   background:linear-gradient(180deg,rgba(13,16,23,.95),rgba(13,16,23,.84));border:1px solid var(--line);border-top:3px solid var(--gold);border-radius:8px;
   padding:clamp(8px,1.8vmin,12px) 18px clamp(10px,2vmin,14px);box-shadow:0 12px 40px -10px rgba(0,0,0,.85);text-shadow:0 1px 3px rgba(0,0,0,.85);transition:border-top-color .2s}
 .tut.done{border-top-color:#8fd49a}
-.tut-n{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
-.tut-h{font-family:var(--display);font-weight:900;font-size:clamp(20px,4.4vmin,34px);line-height:1.05;text-transform:uppercase;letter-spacing:.02em;margin:2px 0 6px}
-.tut-how{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+/* R-16: the step counter is a row of 11 dots (done = filled, current = a gold dash); the way to do it, the progress and the buttons share one row */
+.tut-n{display:flex;gap:5px;justify-content:center;align-items:center;height:8px}
+.tut-n i{width:7px;height:7px;border-radius:50%;box-sizing:border-box;border:1px solid rgba(226,177,74,.55);transition:width .25s,background .25s}
+.tut-n i.on{background:rgba(226,177,74,.7);border-color:transparent}
+.tut-n i.cur{width:20px;border-radius:4px;background:var(--gold);border-color:var(--gold)}
+.tut-h{font-family:var(--display);font-weight:900;font-size:clamp(20px,4.2vmin,30px);line-height:1.05;text-transform:uppercase;letter-spacing:.02em;margin:3px 0 5px}
 .tut-chip{font-size:clamp(11px,2.3vmin,14px);border:1px solid rgba(255,255,255,.16);border-radius:5px;padding:3px 10px;background:rgba(255,255,255,.04);color:var(--muted);white-space:nowrap}
+.tut-chip.off{display:none}
 .tut-chip.prim{border-color:rgba(226,177,74,.65);background:rgba(226,177,74,.12);color:var(--text)}
 .tut-chip b{color:var(--gold);font-family:var(--mono);font-weight:600}
-.tut-foot{display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:7px}
+.tut-foot{display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:2px}
 .tut-p{font:500 12px var(--mono);letter-spacing:.06em;color:var(--muted)}
 .tut-p b{color:var(--text)}
 .tut-btns{display:flex;gap:8px;justify-content:center}
@@ -447,8 +458,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .tut-ok.on{animation:tutok .7s ease-out}
 @keyframes tutok{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}60%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.06)}}
 #stage.short .tut{top:2px;padding:4px 12px 5px;width:min(620px,94%);background:linear-gradient(180deg,rgba(13,16,23,.86),rgba(13,16,23,.68))}
-#stage.short .tut-n{font-size:9px;line-height:1}
-#stage.short .tut-h{font-size:clamp(17px,3.8vmin,24px);margin:1px 0 3px}
+#stage.short .tut-n{height:6px;gap:4px}#stage.short .tut-n i{width:5px;height:5px}#stage.short .tut-n i.cur{width:14px}
+#stage.short .tut-h{font-size:clamp(16px,3.6vmin,22px);margin:2px 0 2px}
 #stage.short .tut-chip{font-size:11px;padding:2px 8px}
 #stage.short .tut-foot{gap:8px;margin-top:3px}
 #stage.short .tut-btns .btn{font-size:11px;padding:3px 9px}
@@ -537,6 +548,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <button class="pb blk" id="block-btn" aria-label="Блок: держи">Блок</button>
     </div>
     <div class="kbar" id="kbar"><span><b>WASD</b> ходьба</span><span><b>U/ЛКМ</b> джеб</span><span><b>I/ПКМ</b> кросс</span><span><b>J K</b> хуки</span><span><b>N M</b> апперы</span><span id="kb-body"><b>+S</b> корпус</span><span id="kb-pow"><b>+W</b> сила</span><span><b>Q E C</b> уклоны</span><span id="kb-blk"><b>пробел</b> блок</span></div>
+    <div class="ctxh" id="ctxh" role="status"></div>
   </div>
 
   <div class="hl" id="hl" hidden><b>Лучшее в раунде</b><span id="hl-s"></span></div>
@@ -760,10 +772,9 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   </div></div>
 
   <div class="tut" id="tut" hidden>
-    <div class="tut-n" id="tut-n"></div>
+    <div class="tut-n" id="tut-n" role="img"></div>
     <div class="tut-h" id="tut-h"></div>
-    <div class="tut-how"><span class="tut-chip" id="tut-k"></span><span class="tut-chip" id="tut-g"></span></div>
-    <div class="tut-foot"><div class="tut-p" id="tut-p"></div>
+    <div class="tut-foot"><span class="tut-chip" id="tut-k"></span><span class="tut-chip" id="tut-g"></span><div class="tut-p" id="tut-p"></div>
       <div class="tut-btns"><button class="btn sm" id="tut-skip">Пропустить шаг</button><button class="btn sm" id="tut-exit">Выйти ✕</button></div></div>
     <div class="tut-ok" id="tut-ok">✓</div>
   </div>

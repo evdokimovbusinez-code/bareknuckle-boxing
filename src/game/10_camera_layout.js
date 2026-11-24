@@ -210,6 +210,7 @@ function camUpdate(dt) {
     const mx = (P1.headNow.x + P2.headNow.x) * 0.5, sep = Math.abs(P1.headNow.x - P2.headNow.x), hurt = Math.max(P1.daze || 0, P2.daze || 0);
     const z = far + 0.2 - clamp((1.0 - sep) * 0.6, 0, 0.35) - 0.2 * hurt + Math.max(0, sep - 1.0) * 1.1, drift = 0.18 * Math.sin(camClock * 0.13);
     _cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), z); _cl.set(mx + drift * 0.3, 0.93, 0); k = G.state === 'intro' ? 2.4 : 3.5;
+    if (window.__tutOn) tutCam(_cp, _cl);   // R-16: the lesson frames both heads under its hint panel (09c_tutorial.js)
     /* the fly-round before a street fight (G.introT < 0, see startFight): an arc about the centre of the floor — from behind the crowd,
        above its heads, at the angle G.flyA — that comes down into the fight camera; while the opponent's card is up it only creeps */
     if (G.state === 'intro' && G.stareT && G.introT >= 0 && G.introT < G.stareT - 0.6) k = stareCam(k);   // the stare-down: profile push-in, the eyes of both

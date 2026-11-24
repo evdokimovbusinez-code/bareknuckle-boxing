@@ -24,17 +24,66 @@ function fightsSeen() { try { return +localStorage.getItem(HINT_KEY) || 0; } cat
 function bumpFights() { try { localStorage.setItem(HINT_KEY, String(fightsSeen() + 1)); } catch (_) {} hintTick(); }
 let lastAct = -1e9;
 function noteAct() { lastAct = G.real; }
-function hintFightStart() { noteAct(); if (G.mode !== 'bag') bumpFights(); }
+function hintFightStart() { noteAct(); if (G.mode !== 'bag') bumpFights(); ctxReset(); }
+/* the bout counter is bumped as a bout starts, so during bouts 1…3 it reads 1…3: «the first three» = ≤ 3 */
+const learning = () => fightsSeen() <= 3;
 function hintTick() {
-  const on = OPT.keys, first3 = fightsSeen() < 3;
+  const on = OPT.keys, first3 = learning();
   const kb = $('kbar'), desk = stage.classList.contains('desk');
-  const live = G.state === 'fight' || G.state === 'ko' || G.state === 'kd';
-  kb && kb.classList.toggle('show', !!(on && desk && live && (first3 || G.real - lastAct > 8)));
+  const live = (G.state === 'fight' || G.state === 'ko' || G.state === 'kd') && !window.__tutOn;
+  // R-16: the 12-key bar is no longer up for the first three bouts (one contextual hint instead, ctxHintTick); later it
+  // still comes back after 8 s without input, and never during the lesson (its own panel says what to press)
+  kb && kb.classList.toggle('show', !!(on && desk && live && !first3 && G.real - lastAct > 8));
   const pz = $('pzone');
   if (pz) { pz.classList.toggle('bright', !!(on && first3)); pz.classList.toggle('nohint', !on); }
 }
 setInterval(hintTick, 400);   // the desktop bar fades in after 8 s without input
 for (const ev of ['pointerdown', 'pointerup', 'pointermove', 'keydown', 'keyup', 'wheel']) document.addEventListener(ev, () => noteAct(), { passive: true });
+/* R-16: contextual hints. In the first three bouts (learning()) ONE short line at a time, picked from what is happening
+   right now — he winds up → block, he covers his head → to the body, … — in place of the 12-key bar. k = keyboard text,
+   t = touch text, when(c) = the trigger (c: the per-frame context below), hold = how long it must stay true (s).
+   Order = priority among hints not yet shown this bout; a shown one rests CTX.cool s and is shown at most CTX.max times.
+   Driven from stateTick (09_bag.js) on G.real, so __tick() runs it the same as the real loop. Log: window.__ctxh.log. */
+const CTX_HINTS = [
+  { id: 'block', k: 'Блок — <b>ПРОБЕЛ</b>', t: 'Блок — держи <b>БЛОК</b>', when: c => c.wind && c.dist < 1.5 && !P1.blocking },
+  { id: 'body', k: 'В корпус — <b>S</b> + удар', t: 'В корпус — стик <b>вниз</b> + удар', when: c => P2.blockW > 0.6 && !P2.cur && c.dist < 1.5, hold: 0.15 },   // his gloves are up at his head (block or shell)
+  { id: 'close', k: 'Ближе — <b>D</b> / <b>→</b>', t: 'Ближе — стик <b>вперёд</b>', when: c => c.dist > 1.45, hold: 1.2 },
+  { id: 'jab', k: 'Джеб — <b>U</b> или <b>ЛКМ</b>', t: 'Джеб — <b>тап</b> по зоне ударов', when: c => c.dist < 1.25 && G.real - c.lastPunch > 2.5, hold: 0.5 },
+  { id: 'dodge', k: 'Уклон — <b>Q</b> / <b>E</b>, нырок — <b>C</b>', t: 'Уклон — <b>рывок</b> стика', when: c => c.hits >= 2 },
+  { id: 'tired', k: 'Выдохся — отойди: <b>A</b> / <b>←</b>', t: 'Выдохся — стик <b>назад</b>', when: c => P1.stamina < 25, hold: 0.5 },
+  { id: 'power', k: 'Он поплыл — сильный: <b>W</b> + удар', t: 'Он поплыл — стик <b>вверх</b> + удар', when: c => P2.daze > 0.4 && P1.stamina > 30 },   // dazed (not the short stagger every hit gives: stunUntil)
+];
+const CTX = { show: 1.9, gap: 2.0, cool: 14, max: 3, cur: null, until: 0, next: 0, n: {}, last: {}, on: {}, hp: 100, hitT: [], lastPunch: 0, t0: 0 };
+window.__ctxh = { log: [], CTX, HINTS: CTX_HINTS };
+function ctxReset() {
+  Object.assign(CTX, { cur: null, until: 0, next: G.real + 1.5, n: {}, last: {}, on: {}, hp: P1 ? P1.hp : 100, hitT: [], lastPunch: G.real, t0: G.real, bout: fightsSeen() });
+  ctxShow(null);
+}
+function ctxShow(H) {
+  const el = $('ctxh'); if (!el) return;
+  if (H) el.innerHTML = TOUCH ? H.t : H.k;
+  el.classList.toggle('show', !!H);
+}
+function ctxHintTick(dt) {
+  const live = G.state === 'fight' && !G.paused && !window.__tutOn && !NET.guest && G.mode !== 'bag' && !BAG.on;
+  if (!(OPT.keys && learning() && live)) { if (CTX.cur) { CTX.cur = null; ctxShow(null); } return; }
+  // the context: his wind-up, the distance, my recent hits taken, my last punch
+  if (P1.cur) CTX.lastPunch = G.real;
+  if (P1.hp < CTX.hp - 0.5) CTX.hitT.push(G.real); CTX.hp = P1.hp;
+  while (CTX.hitT.length && G.real - CTX.hitT[0] > 3) CTX.hitT.shift();
+  const c = { dist: Math.abs(P1.group.position.x - P2.group.position.x), wind: !!(P2.cur && !P2.resolved), hits: CTX.hitT.length, lastPunch: CTX.lastPunch };
+  let best = null;
+  for (const H of CTX_HINTS) {   // how long each trigger has been true (the hold), whether or not it can be shown now
+    const ok = !!H.when(c); CTX.on[H.id] = ok ? (CTX.on[H.id] || 0) + dt : 0;
+    if (!ok || CTX.on[H.id] < (H.hold || 0) || (CTX.n[H.id] || 0) >= CTX.max || G.real - (CTX.last[H.id] ?? -1e9) < CTX.cool) continue;
+    if (!best || (CTX.n[H.id] || 0) < (CTX.n[best.id] || 0)) best = H;   // a hint not shown yet beats one already seen
+  }
+  if (CTX.cur) { if (G.real < CTX.until) return; CTX.cur = null; ctxShow(null); CTX.next = G.real + CTX.gap; }
+  if (!best || G.real < CTX.next) return;
+  CTX.cur = best.id; CTX.until = G.real + CTX.show; CTX.n[best.id] = (CTX.n[best.id] || 0) + 1; CTX.last[best.id] = G.real;
+  ctxShow(best);
+  window.__ctxh.log.push({ id: best.id, t: +(G.real - CTX.t0).toFixed(2), at: G.real, bout: CTX.bout });
+}
 /* body / power are a direction held at the very moment of the punch: S / ↓ (or the stick pushed down) = to the body,
    W / ↑ (or the stick pushed up) = power. W / S still walk him round the ring; the stick's flick-and-release still dodges. */
 const punchMod = () => {

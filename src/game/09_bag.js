@@ -173,6 +173,7 @@ function cutCheck() {
 }
 function stateTick(dtReal) {
   if (window.__tutOn) tutTick(dtReal);   // (issue 45) the lesson's own clock, fresh stamina and step checks
+  ctxHintTick(dtReal);   // R-16: one contextual control hint at a time in the first three bouts (12_ui.js)
   if (G.mode === 'story') storyTick(dtReal);   // issue 51: the drunk sway and the chapter's live checks (19_story.js)
   hlTick();
   if (G.state === 'intro') introTick(dtReal);
