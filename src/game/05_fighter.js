@@ -392,7 +392,7 @@ class Fighter {
   }
 
   /* —— actions —— */
-  canAct() { return !this.ko && !this.doomed && !(this.wind > G.t) && G.t >= this.stunUntil && !this.cur && (!this.dodge || this.dodge.t > 0.46); }
+  canAct() { return !this.ko && !this.doomed && !breakOn() &&!(this.wind > G.t) && G.t >= this.stunUntil && !this.cur && (!this.dodge || this.dodge.t > 0.46); }
   // a combo: the next punch may start as soon as the current one has landed (switching hands is quicker)
   canChain(next) { if (!this.cur || this.ko || G.t < this.stunUntil || !this.resolved) return false; const P = PUNCH[this.cur]; return this.act[this.cur].time >= P.impact + (next && PUNCH[next] && PUNCH[next].arm === P.arm ? 0.07 : 0); }
   /* range: a few tens of centimetres of in-and-out on the line between the two (no walking cycle — the idle bounce carries it):
@@ -408,7 +408,8 @@ class Fighter {
     }
     const dist = Math.abs(o.group.position.x - this.group.position.x), tiredK = 0.65 + 0.35 * clamp(this.stamina / 40, 0, 1);
     let a = this.adv || 0, cw = null;
-    if ((this === P1 || (NET.host && this === P2)) && fight && (this.moveDir || 0) !== 0) {   // issue 49: the guest's feet drive P2 as well
+    const brk = breakOn();   // R-14: a clinch is being broken (10b_close.js) — both back off, whatever the stick says
+    if ((this === P1 || (NET.host && this === P2)) && fight && (this.moveDir || 0) !== 0 && !brk) {   // issue 49: the guest's feet drive P2 as well
       // the player walks: ~1.5 m/s in and out (a step takes you out of his reach), slower punching or tired
       const v = this.moveDir * 1.5 * tiredK * (this.cur ? 0.45 : 1) * (this.blocking ? 0.55 : 1);
       this.advV += (v - this.advV) * Math.min(1, dt * 12); this.hold = null;
@@ -423,8 +424,9 @@ class Fighter {
       if (G.state === 'kd' && G.kd && G.kd.att === this) tgt = a + (dist - 1.6);   // the referee sends him away while the other man is counted
       cw = celWalk(this, a, fwd); if (cw != null) tgt = cw;   // R-13: the winner walks off the man on the floor (09b_cine.js; was: back to his mark, often onto him)
       if (followOK(this)) tgt = a + Math.max(0, Math.abs(o.headNow.x - this.group.position.x) - 0.62);   // he goes after the falling man
+      if (brk) { tgt = breakAdv(this, a); this.hold = null; }
       if (fight && this.daze > 0.5 && this === P1) tgt -= 0.1 * this.daze;
-      const vmax = cw != null ? CEL.v : (this === P2 && !NET.host ? 1.15 : 1.5) * tiredK;
+      const vmax = cw != null ? CEL.v : brk ? 1.2 : (this === P2 && !NET.host ? 1.15 : 1.5) * tiredK;
       this.advV += (clamp((tgt - a) * 6, -vmax, vmax) - this.advV) * Math.min(1, dt * 8);
     }
     if (this.knock) { this.advV -= this.knock * 0.9; this.knock = 0; }
@@ -868,6 +870,9 @@ class Fighter {
       const punching = this.cur && this.aimArm === S, push = _v4.set(0, 0, 0);
       clearPt(o, kn, 0.035, punching ? 0.86 : 1, push, punching && !o.blocking);   // a punch that gets through the guard is not stopped by his forearms
       clearPt(o, _v5.lerpVectors(el, hw, 0.45), 0.045, 1, push); clearPt(o, _v5.lerpVectors(el, hw, 0.75), 0.045, 1, push);
+      // R-14: the whole fist (wrist → knuckles) and the forearm as capsules against his spine / shoulder / hip capsules (10b_close.js)
+      clearPt(o, hw, 0.035, 1, push, true); clearSeg(o, hw, kn, 0.035, punching ? 0.02 : 0, push); clearSeg(o, el, hw, 0.04, 0, push);
+      clearUpper(o, _v5.setFromMatrixPosition(L.upper.matrixWorld), el, hw, push); clearHead(o, hw, kn, 0.035, punching ? 0.02 : 0, push);
       if (push.lengthSq() < 1e-6) continue;
       if (window.__acN) window.__acN.push(+push.length().toFixed(3));
       const t = this.group.worldToLocal(_pf4.copy(hw).add(push)); this.ik(L.upper, L.fore, H, t);
@@ -937,6 +942,7 @@ class Fighter {
     // stare-down lean / heavy breathing / the winner's short gesture after a KO (09b_cine.js)
     if ((G.stare > 0.001 && G.state === 'intro') || (this.pant > 0.001 && G.state === 'rend')
       || ((G.state === 'ko' || G.state === 'result') && G.winner === this && !this.rag.on)) this.cineLayer();
+    if (breakOn()) breakLayer(this);   // R-14: the forearms push off the other man's chest
     if (this.rag.hitOn) this.rag.hitStep(dt);
     this.spreadTwist(); this.cc.updateMatrixWorld(true);
     this.afterPose(dt);

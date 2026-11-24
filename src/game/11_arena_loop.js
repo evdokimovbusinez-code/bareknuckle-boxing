@@ -55,7 +55,7 @@ const FRAME = { on: false, errs: 0 }, GLX = { lost: false, n: 0, failT: 0 };
 window.__onErr = () => { if (!FRAME.on) return; FRAME.on = false; FRAME.errs++; if (!window.__manual) requestAnimationFrame(frame); };
 // the ragdoll steps run inside Fighter.update: timed separately so the overlay can show them as physics
 for (const k of ['step', 'hitStep']) { const fn = Ragdoll.prototype[k]; Ragdoll.prototype[k] = function (dt) { const t = performance.now(), r = fn.call(this, dt); PERF.rag += performance.now() - t; return r; }; }
-function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
+function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); bodyCaps(F); }
 function frame(now) {
   // R-24: a cold set is being prepared in steps (17_loc_load.js); while the fight waits for it the game stands still under
   // «Готовим площадку…» — no simulation, no 3D frame (the clock restarts from the end of this frame's loading work)
@@ -76,10 +76,11 @@ function frame(now) {
     let dt = dtReal * G.slow; if (G.hitstop > 0) { if (G.hitstop > dtReal * 0.5) { G.hitstop -= dtReal; dt = 0; } else G.hitstop = 0; }
     G.t += dt; simDt = dt;
     if (G.paused) {}
-    else if (G.state === 'fight') { playerInput(); ai(dt); }
+    else if (G.state === 'fight') { closeTick(dt); playerInput(); ai(dt); }   // closeTick: R-14, the break of a clinch (10b_close.js)
     else if (G.state === 'ko' || G.state === 'kd') { if (followOK(P1)) playerInput(); aiFollow(); }
     P1.aimTarget = aimFor(P1, P2); P2.aimTarget = aimFor(P2, P1);
     P1.update(dt); P2.update(dt);
+    closeSep(dt);   // R-14: this frame's poses overlap (a lunge) → the roots part now, not a frame late
     // both men are posed: now keep each one's arms out of the other's head and torso (against this frame's head, not last frame's)
     headFrames(P1); headFrames(P2);
     P1.armClear(); P2.armClear(); P1.armClear(); P2.armClear();   // twice: the second pass catches what the first IK left
