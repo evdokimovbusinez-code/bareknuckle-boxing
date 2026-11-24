@@ -173,7 +173,14 @@ function camUpdate(dt) {
   else if (G.state === 'replay') {
     const s = RP.segs[RP.seg], h = G.loser.headNow, side = Math.sign(G.loser.group.position.x) || 1;
     const p = clamp((RP.tau - s.from) / Math.max(0.01, s.to - s.from), 0, 1), c = G.loser.jp[0], w = G.winner.headNow;
-    if (s.cam === 'close') { _cp.set(h.x - side * 0.55, Math.max(0.55, h.y + 0.12), h.z + 1.45); _cl.set(h.x, Math.max(0.25, h.y - 0.05), h.z); k = 6; }
+    if (s.cam === 'impact' && s.ic) {   // R-15: the knockout punch from the camera rpImpactCam picked at the contact (07_state_replay_hits.js)
+      // a slow push in up to the contact; after it the look point follows his head down and the lens backs off, so the fall stays in
+      // the shot. A scripted move (k = 1e3): camClear's swing would turn the face away again (the posts were weighed in the pick)
+      const I = s.ic, pre = sstep(s.from, s.hit, RP.tau), post = sstep(s.hit, s.to, RP.tau);
+      _cl.copy(I.l).lerp(_ccE.set(h.x, Math.max(0.3, h.y - 0.05), h.z), 0.7 * post);
+      _cp.copy(I.p).addScaledVector(I.back, 0.18 * (1 - pre) + 0.9 * post); _cp.y += 0.25 * post; k = 1e3;
+    }
+    else if (s.cam === 'close') { _cp.set(h.x - side * 0.55, Math.max(0.55, h.y + 0.12), h.z + 1.45); _cl.set(h.x, Math.max(0.25, h.y - 0.05), h.z); k = 6; }
     else if (s.cam === 'low') {   // from the canvas, looking up past the falling man — slow push in
       const a = 0.9 + 0.35 * p; _cp.set(c.x + side * 0.9 * Math.cos(a), 0.18, c.z + 1.6 * Math.sin(a) + 0.3); _cl.set((c.x + h.x) / 2, Math.max(0.35, h.y * 0.6 + 0.15), c.z); k = 5;
     } else if (s.cam === 'top') {   // straight down from the rig, slowly turning

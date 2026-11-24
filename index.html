@@ -183,6 +183,11 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .hl span{display:block;margin-top:2px;font-size:min(3vw,20px);font-weight:700;letter-spacing:.14em;color:#f1e3c2;text-shadow:0 2px 0 rgba(0,0,0,.7)}
 @keyframes hlin{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
 .rec button{margin-left:8px;font-size:13px;padding:6px 12px}
+/* R-15: the knockout replay's second plate, in the top letterbox bar on the right: what ended it (rpCaption, 07_state_replay_hits.js) */
+.rpcap{position:absolute;right:var(--pr);top:0;height:9%;max-width:58%;display:flex;align-items:center;gap:10px;pointer-events:none;font-family:var(--display);text-transform:uppercase;white-space:nowrap;overflow:hidden}
+.rpcap b{font-size:min(2.6vw,19px);font-weight:900;letter-spacing:.1em;color:var(--gold)}
+.rpcap span{font-size:min(2.1vw,15px);font-weight:700;letter-spacing:.12em;color:#f1e3c2;opacity:.92}
+.rpcap:empty,#rec[hidden]~.rpcap{display:none}
 .rec button:hover,.rb button:hover{border-color:var(--gold)} .rec button:active,.rb button:active,.go:active{transform:scale(.94)}
 .bars{position:absolute;left:0;right:0;height:9%;background:#000;pointer-events:none}
 .bars.t{top:0}.bars.b{bottom:0}
@@ -572,7 +577,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   </div>
 
   <div class="hl" id="hl" hidden><b>Лучшее в раунде</b><span id="hl-s"></span></div>
-  <div class="rec" id="rec" hidden><i></i>ПОВТОР<button id="skip">Пропустить</button></div>
+  <div class="rec" id="rec" hidden><i></i>ПОВТОР<button id="skip">Пропустить</button></div><div class="rpcap" id="rp-cap"></div>
 
   <div class="result" id="result" hidden>
     <div class="rt" id="r-title">Победа</div>
@@ -6869,7 +6874,7 @@ class Fighter {
     // between exchanges a fighter recovers part of what he took (breath, legs, head clears) — but the damage that stays (swelling,
     // cuts, the brain's accumulated shake) lowers the ceiling he can come back to
     if (G.state === 'fight' && !this.ko && G.t - this.hitT > 1.6 && this.hp < this.hpCap) this.hp = Math.min(this.hpCap, this.hp + dt * (this.stamina > 40 ? 2 : 1));
-    if (this.liver && G.t >= this.liver.t && G.state === 'fight') { const L = this.liver; this.liver = null; knockdown(L.att, this, L.dir, 0.5, L.name, L.fwd, 1.2, 'liver'); }
+    if (this.liver && G.t >= this.liver.t && G.state === 'fight') { const L = this.liver; this.liver = null; knockdown(L.att, this, L.dir, 0.5, L.name, L.fwd, 1.2, 'liver'); if (G.kdHit && G.kdHit.def === this && L.t0 != null) G.kdHit.t = L.t0; }   // R-15: a count-out replays the liver punch, not the fold
     if (this.liver) { this.wobble = Math.max(this.wobble, 0.6); }
     if (this.doomed && G.t >= this.doomed.t && G.state === 'fight') { const D = this.doomed; this.lastContact = this.headNow.clone(); knockout(D.att, this, D.dir, 0.4, D.name, D.fwd, true); }
     if (this.doomed && !this.ko) { this.knock = (this.knock || 0) + dt * 0.25; this.wobble = Math.max(this.wobble, 2); }   // backing up on rubber legs
@@ -7691,27 +7696,108 @@ function startReplay() {
   const S = (a, b, rate, cam) => ({ from: Math.max(t0, G.koT + a), to: Math.min(t1, G.koT + b), rate, cam });
   // was 4 shots at 0.27–0.6× (~19 s, mostly a body lying still in slow motion — it read as a frozen screen); now 3 shots, ~10 s
   const mid = [S(-0.35, 1.3, 0.55, 'low'), S(-0.2, 1.6, 0.65, 'top'), S(-0.5, 1.4, 0.5, 'shoulder')].sort(() => rr() - 0.5);
-  RP.segs = [S(-0.6, 0.9, 0.35, 'close'), mid[0], S(-0.3, 2.0, 0.8, 'wide')].filter(g => g.to > g.from + 0.15);
+  // R-15: the first shot is the punch itself — from the side its fist did not come from, the loser's face and the fist in frame,
+  // a stop on the contact, then 0.2× → 1× (RPK). Without a known punch (an old save / a story cut) the old close-up on the head.
+  const H = G.koHit && G.koHit.def === G.loser && G.koHit.t > t0 + 0.05 && G.koHit.t < t1 ? G.koHit : null;
+  const first = H ? { from: Math.max(t0, H.t - RPK.pre), to: Math.min(t1, H.t + RPK.post), rate: RPK.rate, cam: 'impact', hit: H.t, H } : S(-0.6, 0.9, 0.35, 'close');
+  RP.segs = [first, mid[0], S(-0.3, 2.0, 0.8, 'wide')].filter(g => g.to > g.from + 0.15);
   if (!RP.segs.length) return endReplay();   // e.g. a count-out: the knockdown is older than the buffer
+  if (RP.segs[0].H) rpImpactCam(RP.segs[0]);   // poses them at the contact and picks the camera there (rpImpactCam, below)
   RP.seg = -1; RP.wd = 0; nextSeg();
   $('rec').hidden = false; $('bar-t').hidden = $('bar-b').hidden = false; $('hud').hidden = true; $('pad').hidden = true; $('result').hidden = true;
+  rpCaption(H);
 }
 function nextSeg() {
   RP.seg++; if (RP.seg >= RP.segs.length) return endReplay();
   if (RP.segs[RP.seg].enter) RP.segs[RP.seg].enter();   // a segment may announce itself (the highlights' plate)
   P1.simReset = P2.simReset = true;   // a cut back in time: hair and shorts start from the pose, not from where they were
-  RP.tau = RP.segs[RP.seg].from; RP.i = 0; RP.hold = 0; FX.clearAir(); wearSeek(RP.tau); P1.simReset = P2.simReset = true; RP.cut = true;
+  RP.tau = RP.segs[RP.seg].from; RP.i = 0; RP.hold = 0; RP.ramp = -1; FX.clearAir(); wearSeek(RP.tau); P1.simReset = P2.simReset = true; RP.cut = true;
   stepReplay(0);   // pose the fighters before the camera cuts to them
 }
-function stepReplay(dtReal) {
-  if (RP.hold > 0 && dtReal > 0) { RP.hold -= dtReal; dtReal = 0; }   // R-04: a recorded hit-stop freezes the replay too (dtReal = 0 also keeps the watchdog quiet)
-  const s = RP.segs[RP.seg], F = s.F || REC.frames, prev = RP.tau; RP.tau = Math.min(s.to, RP.tau + dtReal * (s.rf ? s.rf(RP.tau) : s.rate));   // s.F: a clip of its own (highlights); s.rf: a rate that follows the replay time (slow motion at the impact)
-  while (RP.i < F.length - 2 && F[RP.i + 1].t <= RP.tau) RP.i++;
-  const a = F[RP.i], b = F[RP.i + 1], k = clamp((RP.tau - a.t) / Math.max(1e-5, b.t - a.t), 0, 1), sdt = RP.tau - prev;
+/* R-15: the knockout punch in the replay. RPK: the shot runs from `pre` s before the contact to `post` after it; up to the contact at
+   `rate`; on the contact frame the clock stops for `freeze` s (real time; a longer recorded hit-stop wins), then the rate eases from
+   `r0` to 1 over `ramp` s of real time. */
+const RPK = { pre: 0.6, post: 1.0, rate: 0.5, freeze: 0.25, r0: 0.2, ramp: 1.0 };
+// the punch that ended it (knockout / knockdown → countOut): who hit whom, with what, when (sim time — a REC frame time)
+function koMark(att, def, name, body, t) { return { att, def, name, arm: PUNCH[name] ? PUNCH[name].arm : 'R', body: !!body, t, round: G.round }; }
+// the top plate of the replay (#rp-cap in the top letterbox bar): «НОКАУТ · Хук правой · раунд 2 · твой удар»
+function rpCaption(H) {
+  const el = $('rp-cap'); if (!H) { el.textContent = ''; return; }
+  const P = PUNCH[H.name], what = (P ? P.label : 'Удар') + (H.body ? ' в корпус' : '');
+  el.innerHTML = `<b>Нокаут</b><span>${what}${H.round && G.mode !== 'story' ? ' · раунд ' + H.round : ''} · ${H.att === P1 ? 'твой удар' : 'удар соперника'}</span>`;
+}
+// both men (and the ring, the ropes) as they were at replay time tau of the frames F; RP.i = the frame index found (a hint for the next call)
+function rpPose(F, tau, sdt) {
+  if (F[RP.i] && F[RP.i].t > tau) RP.i = 0;
+  while (RP.i < F.length - 2 && F[RP.i + 1].t <= tau) RP.i++;
+  const a = F[RP.i], b = F[RP.i + 1] || a, k = clamp((tau - a.t) / Math.max(1e-5, b.t - a.t), 0, 1);
   if (a.gx && b.gx) { P1.group.position.x = a.gx[0] + (b.gx[0] - a.gx[0]) * k; P2.group.position.x = a.gx[1] + (b.gx[1] - a.gx[1]) * k; P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true); }   // a highlight is from earlier in the round: they stood somewhere else then
   P1.restore(a.d[0], b.d[0], k); P2.restore(a.d[1], b.d[1], k); P1.afterPose(sdt); P2.afterPose(sdt);
   if (a.ar && b.ar) { ARENA.position.set(a.ar[0] + (b.ar[0] - a.ar[0]) * k, 0, a.ar[1] + (b.ar[1] - a.ar[1]) * k); ARENA.rotation.y = a.ar[2] + (b.ar[2] - a.ar[2]) * k; }
   if (a.r && b.r) ROPES.forEach((R, i) => { const j = i * 4; R.hit = (R.hit || new V3()).set(a.r[j] + (b.r[j] - a.r[j]) * k, a.r[j + 1] + (b.r[j + 1] - a.r[j + 1]) * k, a.r[j + 2] + (b.r[j + 2] - a.r[j + 2]) * k); R.s = a.r[j + 3] + (b.r[j + 3] - a.r[j + 3]) * k; });
+}
+/* where the camera of the punch stands (s.ic = { p: camera, l: look point, back: unit vector look → camera }). Posed at the contact,
+   the search tries a ring of camera yaws about the point between the loser's head and the fist (RPC.yaw steps × RPC.d × RPC.h)
+   and takes the cheapest:
+   - the loser's face towards the lens: f = his head's forward · direction head → camera; f < RPC.fMin costs a lot (the test wants
+     > 0.2), and f away from RPC.fWant (≈ 57° off his face line: three-quarter face, the fist beside it) a little;
+   - the side opposite the punching arm (its shoulder's side across the fight line): the other side costs RPC.side — the punch then
+     turns his face towards the lens, not away;
+   - head and fist inside ±RPC.ndc of the frame (the test: 10 % margins = ±0.8; letterbox bars are 9 %);
+   - R-03's cover test on the winner: his head, neck, shoulders, chest and the guard arm (not the punching forearm / fist) nearer
+     the lens than the loser's head / the fist and within RPC.r metres of it on screen (RPC.cov per unit of cover);
+   - the 4 corner posts across the sight lines (ccGap < CC_R), the camera height inside RPC.y;
+   - f past RPC.fMax (straight down his face line = over the winner's shoulder, whose back then hides the fall) costs extra. */
+const RPC = { yaw: 48, d: [1.7, 2.05, 2.45], h: [0.12, 0.28, -0.04], fMin: 0.32, fWant: 0.55, fMax: 0.78, side: 1.2, ndc: 0.58, r: 0.13, cov: 9, y: [0.7, 2.1],
+  after: [[0.35, 0.7], [0.7, 0.5]] };   // after: [s past the contact, weight] of the cover test as he goes down
+const _rpM = new M4(), _rpA = new V3(), _rpB = new V3(), _rpC = new V3();
+function rpFist(A, arm, out) { return out.setFromMatrixPosition(A.bones[`CC_Base_${arm}_Mid1`].matrixWorld); }
+function rpHeadFwd(D, out) { return out.setFromMatrixColumn(_rpM.multiplyMatrices(D.head.matrixWorld, HEAD.restInvT), 2).normalize(); }
+function rpImpactCam(s) {
+  const H = s.H, A = H.att, D = H.def, F = REC.frames, L = H.arm === 'L', tEnd = F[F.length - 1].t;
+  // R-03's cover test, over the shot: at the contact (the head and the fist) and as he goes (RPC.after: his head, then his chest).
+  // The winner's points that may hide it: head, neck, both shoulders, chest, pelvis, the guard arm's forearm and hand (at the
+  // contact the punching forearm / fist is the subject, not a cover; later all of him counts)
+  const occOf = all => [A.jp[15], A.jp[4], A.jp[2], A.jp[3], new V3().addVectors(A.jp[2], A.jp[3]).multiplyScalar(0.5), new V3().addVectors(A.jp[0], A.jp[1]).multiplyScalar(0.5),
+    A.jp[L ? 7 : 5], A.jp[L ? 8 : 6], ...(all ? [A.jp[L ? 5 : 7], A.jp[L ? 6 : 8]] : [])].map(v => v.clone());
+  const smp = []; let head, fist, fwd, look, away;
+  for (const [dt, w] of [[0, 1], ...RPC.after]) {
+    RP.i = 0; rpPose(F, Math.min(tEnd, H.t + dt), 0);
+    if (!dt) {
+      head = D.headNow.clone(); fist = rpFist(A, H.arm, new V3()); fwd = rpHeadFwd(D, new V3());
+      look = head.clone().lerp(fist, 0.5); look.y -= 0.03;   // the middle of head and fist (a body shot: half a metre apart)
+      const sh = A.jp[L ? 2 : 3], so = A.jp[L ? 3 : 2]; away = -(Math.sign(sh.z - so.z) || 1);   // z side opposite the punching arm
+      smp.push({ tg: [[head, 1], [fist, 0.6]], occ: occOf(false), frame: true });
+    } else smp.push({ tg: [[D.headNow.clone(), w], [new V3().addVectors(D.jp[2], D.jp[3]).multiplyScalar(0.5), w * 0.5]], occ: occOf(true) });
+  }
+  const posts = RINGSET.visible ? ccPostsWorld() : [], ty = Math.tan(camera.fov * Math.PI / 360);
+  let best = null, bc = Infinity;
+  for (let i = 0; i < RPC.yaw; i++) for (const d of RPC.d) for (const h of RPC.h) {
+    const a = i / RPC.yaw * Math.PI * 2, cp = _rpA.set(look.x + Math.sin(a) * d, look.y + h, look.z + Math.cos(a) * d);
+    const f = fwd.dot(_rpB.subVectors(cp, head).normalize());
+    let c = (f < RPC.fMin ? 30 + (RPC.fMin - f) * 40 : 0) + 2 * Math.abs(f - RPC.fWant) + (f > RPC.fMax ? 4 * (f - RPC.fMax) : 0)
+      + (Math.sign(cp.z - look.z) !== away ? RPC.side : 0) + 0.25 * (d - RPC.d[0]);
+    if (cp.y < RPC.y[0] || cp.y > RPC.y[1]) c += 5;
+    for (const S of smp) for (const [t, w] of S.tg) {
+      const n = ccNdc(t, cp, look, _rpC), tx = n.x, tyN = n.y, tz = n.z, o = Math.max(Math.abs(n.x), Math.abs(n.y));
+      if (S.frame && o > RPC.ndc) c += 40 * (o - RPC.ndc);
+      for (const q of S.occ) { const m = ccNdc(q, cp, look, _rpC); if (m.z >= tz - 0.04) continue;
+        const rN = RPC.r / (Math.max(0.05, m.z) * ty), cov = 1 - Math.hypot((m.x - tx) * camera.aspect, m.y - tyN) / rN; if (cov > 0) c += RPC.cov * w * cov; }
+      for (const p of posts) { const g = ccGap(p.w, cp, t); if (g < CC_R) c += 10 * w * (1 - g / CC_R); }
+    }
+    if (c < bc) { bc = c; best = cp.clone(); }
+  }
+  s.ic = { p: best, l: look, back: best.clone().sub(look).normalize(), cost: bc };
+}
+function stepReplay(dtReal) {
+  if (RP.hold > 0 && dtReal > 0) { RP.hold -= dtReal; dtReal = 0; }   // R-04: a recorded hit-stop freezes the replay too (dtReal = 0 also keeps the watchdog quiet)
+  const s = RP.segs[RP.seg], F = s.F || REC.frames, prev = RP.tau;
+  // s.F: a clip of its own (highlights); s.rf: a rate that follows the replay time (slow motion at the impact); s.hit: R-15's stop + ease-in
+  let rate = s.rf ? s.rf(RP.tau) : s.rate;
+  if (s.hit != null && RP.ramp >= 0) { rate = RPK.r0 + (1 - RPK.r0) * sstep(0, RPK.ramp, RP.ramp); RP.ramp += dtReal; }
+  RP.tau = Math.min(s.to, RP.tau + dtReal * rate);
+  if (s.hit != null && RP.ramp < 0 && prev < s.hit && RP.tau >= s.hit) { RP.tau = s.hit; RP.hold = Math.max(RP.hold || 0, RPK.freeze); RP.ramp = 0; }   // the contact frame: stop there
+  const sdt = RP.tau - prev; rpPose(F, RP.tau, sdt);
   for (const e of REC.events) if (e.t > prev && e.t <= RP.tau) {
     if (e.wear) { wearEvent(e); continue; }   // a hat flies off / glasses break again (04e_wardrobe.js)
     const F = e.who ? P2 : P1; FX.spawn(e.pos, e.dir, e.power); if (e.dent) F.flesh.dent(...e.dent); if (e.mist) FX.mist(e.pos, e.dir, e.power, e.mist);
@@ -7727,7 +7813,7 @@ function stepReplay(dtReal) {
 }
 function endReplay() {
   if (RP.hl) return endHighlights();
-  const F = REC.frames; if (F.length) { const l = F[F.length - 1]; P1.restore(l.d[0], l.d[0], 0); P2.restore(l.d[1], l.d[1], 0); if (l.gx) { P1.group.position.x = l.gx[0]; P2.group.position.x = l.gx[1]; P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true); } }
+  rpCaption(null); const F = REC.frames; if (F.length) { const l = F[F.length - 1]; P1.restore(l.d[0], l.d[0], 0); P2.restore(l.d[1], l.d[1], 0); if (l.gx) { P1.group.position.x = l.gx[0]; P2.group.position.x = l.gx[1]; P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true); } }
   G.loser.frozen = true; G.loser.rag.on = false; G.winner.simReset = true; G.loser.simReset = true;
   if (NET.role) { $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true; return netResult(); }   // P2P: the host played the replay (streamed to the guest), then the shared result
   G.state = 'result'; $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true;
@@ -7961,7 +8047,7 @@ function resolveHit(att, name, contact) {
   // and can't get his breath; a straight shot into the solar plexus knocks the wind out of him (bent over a second or two)
   if (body && !blocked && G.state === 'fight' && !window.__noKD) {
     const liverSide = name === 'hookL' || (name === 'jab' && rr() < 0.3);
-    if (liverSide && rr() < clamp((power - 0.55) * 0.6 + (1 - def.hp / 100) * 0.25 + (counter ? 0.15 : 0), 0, 0.45)) { def.liver = { t: G.t + 0.5 + rr() * 0.7, att, dir: dir.clone(), name, fwd }; def.cancelPunch(); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'печень', 'crit'); }
+    if (liverSide && rr() < clamp((power - 0.55) * 0.6 + (1 - def.hp / 100) * 0.25 + (counter ? 0.15 : 0), 0, 0.45)) { def.liver = { t: G.t + 0.5 + rr() * 0.7, t0: G.t, att, dir: dir.clone(), name, fwd }; def.cancelPunch(); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'печень', 'crit'); }
     else if (P.type === 'straight' && rr() < 0.3 * power) { def.wind = G.t + 1.0 + rr() * 1.2; def.cancelPunch(); }
   }
   // knockdowns and "his legs went": a clean shot to an already shaken, tiring man can put him down without putting him out
@@ -8001,6 +8087,7 @@ function knockdown(att, def, dir, power, name, fwd, sev, kind, bodyArg) {
   let up = 2 + (sev - 1) * 3 + (def.kdCount - 1) * 1.5 + (1 - def.hp / 100) * 3.2 + rr() * 1.5;
   if (type === 'knee') up = Math.min(up, 7.5);
   if (type === 'liver') up = 5 + (1 - def.hp / 100) * 4 + rr() * 3.5;   // a liver shot often keeps a man down past ten
+  G.kdHit = koMark(att, def, name, body, G.t);   // R-15: a count-out replays this punch
   AI.fol = 0; G.kd = { def, att, t0: G.t, type, n: 0, nT: 0, down: false, fallSnd: false, up: clamp(up, 2, 11.5), mash: 0, done: false };
   def.cur = null; def.dodge = null; def.blocking = false; Q.length = 0; def.daze = Math.max(def.daze, 0.8);
   if (type === 'fall') {
@@ -8029,6 +8116,7 @@ function kdTick(dt) {
 }
 function countOut(K) {
   const D = K.def, A = K.att; D.ko = true; G.state = 'ko'; G.koT = K.t0; G.koCine = G.t; G.koTitle = false;
+  G.koHit = G.kdHit && G.kdHit.def === D ? G.kdHit : null;   // R-15: the knockdown punch, ten seconds ago (koT is its time too)
   G.winner = A; G.loser = D; G.fallSnd = true; G.kd = null; celStart(A, 0.3);   // R-13: the man has been down ten seconds — no follow-up window to wait for
   if (D.rag.on) D.rag.prof.conscious = false;   // he stops trying
   else D.collapse();
@@ -8039,11 +8127,12 @@ function knockout(att, def, dir, power, name, fwd, forced, bodyArg) {
   // the delayed knockout (rare, but it happens — Barboza–Burgos): still on his feet, he backs up on rubber legs for a second or three and
   // then goes. Another clean shot meanwhile finishes it at once.
   if (!forced && !def.doomed && PUNCH[name].type !== 'upper' && power < 1.15 && rr() < (window.__koVar === 'stagger' ? 1 : window.__koVar ? 0 : 0.14)) {
-    def.doomed = { t: G.t + 1.1 + rr() * 1.8, att, dir: dir.clone(), name, fwd }; def.wobble = 4; def.daze = 1; def.cancelPunch(); def.dodge = null; def.blocking = false;
+    def.doomed = { t: G.t + 1.1 + rr() * 1.8, t0: G.t, att, dir: dir.clone(), name, fwd }; def.wobble = 4; def.daze = 1; def.cancelPunch(); def.dodge = null; def.blocking = false;
     popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'поплыл', 'crit'); return;
   }
-  def.doomed = null;
   const body = !!bodyArg;
+  G.koHit = koMark(att, def, name, body, forced && def.doomed ? def.doomed.t0 : G.t);   // R-15: a delayed knockout replays the punch, not the fall
+  def.doomed = null;
   def.ko = true; G.state = 'ko'; G.koT = G.t; G.koCine = G.t; G.koTitle = false;
   AI.fol = 0; G.winner = att; G.loser = def; G.fallSnd = false; celStart(att);   // R-13: he backs off and celebrates (09b_cine.js)
   // keep the fall in the side-on plane: mostly away from the attacker, a little toward/away from camera
@@ -8197,6 +8286,49 @@ window.__kd = {
     knockout(P1, P2, new V3(1, 0.2, 0).normalize(), 1.3, name, 1, false, body);
     delete window.__fall;
     return { kind, name, fall, state: G.state, koT: +G.koT.toFixed(2) };
+  },
+};
+
+/* ── debug hook (R-15): a knockout by a real punch, then its replay up to the contact frame (docs/audit/scenarios/replay.js).
+   ko(kind, who): kind = jab | cross | hookL | hookR | upperL | upperR | bodyL | bodyR (a hook to the body), who = 1 → P1 knocks
+   out P2, 2 → P2 knocks out P1; the loser is at 0.5 hp, the punch is thrown and the sim runs until it lands.
+   contact(): plays the KO cine out, starts the replay and steps it to the stop on the contact frame. metrics(): the test's numbers
+   from the real camera — f = the loser's head forward · direction head → camera, NDC of his head and the fist, ok = f > 0.2 and
+   both inside ±0.8 (10 % margins). */
+window.__rp = {
+  RPK, RPC,
+  ko(kind = 'cross', who = 1, tries = 3) {
+    if (P1 && G.state !== 'fight' && G.state !== 'menu') { rpCaption(null); startFight(true); }   // a fresh bout after the last replay
+    if (!window.__kd._setup()) return null;
+    const A = who === 2 ? P2 : P1, D = A.other, body = /^body/.test(kind), name = body ? (kind === 'bodyL' ? 'hookL' : 'hookR') : PUNCH[kind] ? kind : 'cross';
+    if (A === P2 && !P1._kdQuiet) { P1._kdQuiet = true; P1.startDodge = () => {}; }
+    // 1.0 m apart (a fresh bout may start at 1.08 m, where a short hook to the body whiffs)
+    { const sx = Math.sign(D.group.position.x - A.group.position.x) || 1, dx = (Math.abs(D.group.position.x - A.group.position.x) - 1.0) * sx;
+      if (A.mark) A.mark.x += dx; A.group.position.x += dx; A.group.updateMatrixWorld(true); window.__tick(4, 1 / 60); }
+    D.hp = 0.5; D.hpCap = 100; A.cur = null; A.powerNext = true; A.wantBody = body; A.startPunch(name); G.koHit = null;
+    for (let i = 0; i < 90 && G.state === 'fight'; i++) window.__tick(1, 1 / 60);
+    // the first bout of a fresh page may still be settling in (the location loading), or the punch fell short: a fresh bout, once more
+    if (G.state !== 'ko' && tries > 1) { startFight(true); return this.ko(kind, who, tries - 1); }
+    return { kind, name, who, state: G.state, hit: G.koHit ? { name: G.koHit.name, arm: G.koHit.arm, body: G.koHit.body } : null,
+      hp: +D.hp.toFixed(2), gap: +Math.abs(D.group.position.x - A.group.position.x).toFixed(2), whiff: !!A.whiff, cur: A.cur };
+  },
+  contact() {
+    if (G.state !== 'ko' && G.state !== 'replay') return null;
+    for (let i = 0; i < 400 && G.state === 'ko'; i++) window.__tick(1, 1 / 60);   // the KO cine (KO_CINE.hold) starts the replay itself
+    if (G.state !== 'replay') startReplay();
+    const s = RP.segs[0]; if (!s || s.hit == null) return { state: G.state, impact: false };
+    for (let i = 0; i < 400 && G.state === 'replay' && !(RP.seg === 0 && RP.ramp === 0 && RP.hold > 0); i++) window.__tick(1, 1 / 60);
+    return this.metrics();
+  },
+  metrics() {
+    const s = RP.segs[RP.seg]; if (!s || !s.H) return null;
+    camera.updateMatrixWorld(true);
+    const H = s.H, D = H.def, head = D.headNow.clone(), fist = rpFist(H.att, H.arm, new V3()), fwd = rpHeadFwd(D, new V3());
+    const f = fwd.dot(new V3().subVectors(camera.position, head).normalize());
+    const nh = head.clone().project(camera), nf = fist.clone().project(camera), m = v => Math.max(Math.abs(v.x), Math.abs(v.y));
+    const r = x => +x.toFixed(3);
+    return { name: H.name, arm: H.arm, body: H.body, who: H.att === P1 ? 1 : 2, f: r(f), head: [r(nh.x), r(nh.y)], fist: [r(nf.x), r(nf.y)], gap: r(head.distanceTo(fist)),
+      cam: camera.position.toArray().map(r), cost: r(s.ic.cost), tau: r(RP.tau - s.hit), hold: r(RP.hold), ok: f > 0.2 && m(nh) <= 0.8 && m(nf) <= 0.8 && nh.z < 1 && nf.z < 1 };
   },
 };
 
@@ -9179,7 +9311,7 @@ function startHighlights() {
     RP.segs.push(seg(cams[0], -0.5, 0.12, 0.9, () => hlPlate(`${i + 1}/${picks.length} · ${tag} · ${c.who ? 'твой удар' : 'удар соперника'}`)), seg(cams[1], -0.28, c.kd ? 1.0 : 0.45, 0.7));
   });
   G.state = 'replay'; RP.seg = -1; nextSeg();
-  $('rec').hidden = false; $('hud').hidden = true; $('pad').hidden = true; $('result').hidden = true;
+  $('rec').hidden = false; $('rp-cap').textContent = ''; $('hud').hidden = true; $('pad').hidden = true; $('result').hidden = true;
 }
 function hlPlate(text) { const el = $('hl'); $('hl-s').textContent = text; el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
 function endHighlights() {
@@ -9584,7 +9716,14 @@ function camUpdate(dt) {
   else if (G.state === 'replay') {
     const s = RP.segs[RP.seg], h = G.loser.headNow, side = Math.sign(G.loser.group.position.x) || 1;
     const p = clamp((RP.tau - s.from) / Math.max(0.01, s.to - s.from), 0, 1), c = G.loser.jp[0], w = G.winner.headNow;
-    if (s.cam === 'close') { _cp.set(h.x - side * 0.55, Math.max(0.55, h.y + 0.12), h.z + 1.45); _cl.set(h.x, Math.max(0.25, h.y - 0.05), h.z); k = 6; }
+    if (s.cam === 'impact' && s.ic) {   // R-15: the knockout punch from the camera rpImpactCam picked at the contact (07_state_replay_hits.js)
+      // a slow push in up to the contact; after it the look point follows his head down and the lens backs off, so the fall stays in
+      // the shot. A scripted move (k = 1e3): camClear's swing would turn the face away again (the posts were weighed in the pick)
+      const I = s.ic, pre = sstep(s.from, s.hit, RP.tau), post = sstep(s.hit, s.to, RP.tau);
+      _cl.copy(I.l).lerp(_ccE.set(h.x, Math.max(0.3, h.y - 0.05), h.z), 0.7 * post);
+      _cp.copy(I.p).addScaledVector(I.back, 0.18 * (1 - pre) + 0.9 * post); _cp.y += 0.25 * post; k = 1e3;
+    }
+    else if (s.cam === 'close') { _cp.set(h.x - side * 0.55, Math.max(0.55, h.y + 0.12), h.z + 1.45); _cl.set(h.x, Math.max(0.25, h.y - 0.05), h.z); k = 6; }
     else if (s.cam === 'low') {   // from the canvas, looking up past the falling man — slow push in
       const a = 0.9 + 0.35 * p; _cp.set(c.x + side * 0.9 * Math.cos(a), 0.18, c.z + 1.6 * Math.sin(a) + 0.3); _cl.set((c.x + h.x) / 2, Math.max(0.35, h.y * 0.6 + 0.15), c.z); k = 5;
     } else if (s.cam === 'top') {   // straight down from the rig, slowly turning

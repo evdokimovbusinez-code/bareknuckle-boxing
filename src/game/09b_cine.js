@@ -211,7 +211,7 @@ function startHighlights() {
     RP.segs.push(seg(cams[0], -0.5, 0.12, 0.9, () => hlPlate(`${i + 1}/${picks.length} · ${tag} · ${c.who ? 'твой удар' : 'удар соперника'}`)), seg(cams[1], -0.28, c.kd ? 1.0 : 0.45, 0.7));
   });
   G.state = 'replay'; RP.seg = -1; nextSeg();
-  $('rec').hidden = false; $('hud').hidden = true; $('pad').hidden = true; $('result').hidden = true;
+  $('rec').hidden = false; $('rp-cap').textContent = ''; $('hud').hidden = true; $('pad').hidden = true; $('result').hidden = true;
 }
 function hlPlate(text) { const el = $('hl'); $('hl-s').textContent = text; el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
 function endHighlights() {
