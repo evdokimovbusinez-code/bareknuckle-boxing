@@ -103,11 +103,12 @@ function topGeo(F, cut) {
   const T1 = T0.filter(i => { const z = P[i + 2] - zC; return z < 0 || Math.atan2(z, Math.hypot(P[i], P[i + 1] - cyC)) < eC(azOf(P[i], P[i + 1])) + 0.03; });   // (nothing above the collar: the neck stays out of the outline)
   // —— torso rows: [{ p, w } × N], v, hem sway ——
   const dirs = []; for (let j = 0; j < N; j++) { const a = TAU * j / N; dirs.push([-Math.cos(a), -Math.sin(a), a]); }   // column 0 = his right side, N/4 = front, N/2 = left, 3N/4 = back
-  const n = Math.ceil((zC - C.hem) / 3), VS = zC - C.hem + LD, rows = [], cw1 = Math.cos(0.16), cw2 = Math.cos(0.12);
+  const n = Math.ceil((zC - C.hem) / (C.quilt ? 1.5 : 3)), VS = zC - C.hem + LD, rows = [], cw1 = Math.cos(0.16), cw2 = Math.cos(0.12);
   const cyl = []; for (let k = 0; k <= n; k++) { const h = C.hem + (zC - C.hem) * k / n, cy = lerp(cyAt(h), cyC, sstep(zC - 14, zC, h)), W = [], env = dirs.map(d => { const m = new Map(); W.push(m); return cone(T1, 0, cy, h, d[0], d[1], 0, cw1, m); }); cyl.push({ h, cy, env, W }); }
   const Rch = dirs.map((d, j) => Math.max(...cyl.filter(r => r.h > 114 && r.h < 128.5).map(r => r.env[j])));   // the chest proper, below the armpits (with the shoulders in it the trunk was a barrel)
   for (const r of cyl) { const clh = lerp(lerp(C.cl, Math.max(C.cl, 2.8), sstep(GEAR.top + 7, GEAR.top + 1, r.h)), 4.4, sstep(GEAR.top - 3, GEAR.top - 9, r.h)) * (C.slim || 1),   /* (over the trunks: their cloth is baggy below the waistband) */ band = C.band && r.h < C.hem + C.band + 0.5;
-    r.rad = sm(sm(r.env.map((e, j) => (band ? e + clh : Math.max(e + clh, (Rch[j] + C.cl) * lerp(C.fit, 1, sstep(C.hem, zC - 6, r.h))))))); }
+    r.rad = sm(sm(r.env.map((e, j) => (band ? e + clh : Math.max(e + clh, (Rch[j] + C.cl) * lerp(C.fit, 1, sstep(C.hem, zC - 6, r.h)))))));
+    if (C.quilt) { const f = ((r.h - C.hem) / C.quilt) % 1; r.rad = r.rad.map(x => x + 1.3 * Math.pow(Math.sin(Math.PI * f), 0.7) - 0.6); } }   // a puffer's baffles (04l_wardrobe3.js)
   cyl.forEach((r, k) => { const mk = dr => dirs.map((d, j) => ({ p: [d[0] * (r.rad[j] - dr), r.cy + d[1] * (r.rad[j] - dr), r.h + dr * 0.7], w: top4(r.W[j]) })), sw = Math.pow(sstep(C.hem + 18, C.hem, r.h), 1.5) * (C.band ? 0.5 : 1);
     if (!k) rows.push({ pts: mk(1), v: 0, sw }); rows.push({ pts: mk(0), v: 0.6 * (r.h - C.hem) / VS, sw }); });
   const topR = cyl[n], ecj = dirs.map(d => eC(d[2])), ray = (d, e) => [d[0] * Math.cos(e), d[1] * Math.cos(e), Math.sin(e)];
@@ -188,12 +189,12 @@ function topGeo(F, cut) {
       const wob = 0.4 * Math.sin(u * 5.3 + v * 7) * Math.sin(v * 11 + u * 2) * g * (1 - rim);
       return { a: B + u * cr(Ks, v), k: cr(Kk, v), off: lerp(-0.5, cr(Ko, v) + wob, gg), oh: cr(Kh, v) * fr * rim, oz: cr(Kz, v) * fr - 1.2 * g * sstep(0.5, 0.1, v) * sstep(0, 0.1, v), s2: gg * lerp(1, 0.3, sstep(0.3, 0.9, v)) }; }, [0.64, 0.64, 0.97, 0.98]);
     // the cords: thin tubes from the eyelets down the chest, with a metal tip
-    for (const sg of [-1, 1]) { const a = HP + sg * 0.3, NC = 12, rad = 0.33, base = pos.length / 3;
+    if (C.cords !== 0) for (const sg of [-1, 1]) { const a = HP + sg * 0.3, NC = 12, rad = 0.33, base = pos.length / 3;
       for (let i = 0; i <= NC; i++) { const t = i / NC, q = surf(a + sg * 0.05 * t, drop(a, Kc - 1.2, (sg > 0 ? 21 : 18.5) * t), 0.8 * sstep(0, 0.15, t) + rad), tx = [-q.n[1], q.n[0]], tl = Math.hypot(tx[0], tx[1]) || 1, r2 = rad * (t > 0.86 ? 1.3 : 1); let f = 0;
         for (let j = 0; j <= 5; j++) { const ph = TAU * j / 5, c = Math.cos(ph) * r2, sn = Math.sin(ph) * r2 / tl, vi = add([q.p[0] + q.n[0] * c + tx[0] * sn, q.p[1] + q.n[1] * c + tx[1] * sn, q.p[2] + q.n[2] * c], 0.979 + 0.016 * j / 5, lerp(0.98, 0.64, t), q.w, 0, 0.85 * Math.pow(t, 1.5), 50); if (!j) f = vi; else if (j === 5) seams.push([f, vi]); } }
       quads(base, NC + 1, 6); }
     // the kangaroo pocket: a second layer over the belly (it takes the torso's own part of the texture), tucked under at its border
-    patch(18, 9, (u, v) => { const W = v < 0.476 ? 0.85 : lerp(0.85, 0.63, (v - 0.476) / 0.524), e = edge(u, v, 0.14, 0.12);
+    if (C.pocket !== 0) patch(18, 9, (u, v) => { const W = v < 0.476 ? 0.85 : lerp(0.85, 0.63, (v - 0.476) / 0.524), e = edge(u, v, 0.14, 0.12);
       return { a: HP + u * W, k: kOf(lerp(98, 119, v)), off: lerp(-0.3, 0.55 + 0.55 * (1 - u * u) * Math.pow(Math.sin(Math.PI * v), 0.7), e) }; });
   }
   if (C.open) {
@@ -246,7 +247,7 @@ function topTex(v, geo) {
   const map = GEAR['tt_' + v.key] || (GEAR['tt_' + v.key] = canvasTex(W, H, g => {
     const dark = wLum(v.c) < 0.3, thr = dark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.3)', ink = wInk(v.c);
     const line = (pts, c, w) => { g.strokeStyle = c; g.lineWidth = w; path(g, pts); g.stroke(); }, stitch = pts => { g.setLineDash([5, 3.5]); line(pts, thr, 1.6); g.setLineDash([]); };
-    g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) camoPaint(g, W, H, 1.5);
+    g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) patPaint(v, g, W, H, 1.5);
     for (let i = 0; i < 26000; i++) { g.fillStyle = `rgba(${rr() < 0.5 ? '0,0,0' : '255,255,255'},${rr() * (fleece ? 0.12 : 0.05)})`; g.fillRect(rr() * W, rr() * H, 1.6, 1.6); }
     if (leather) for (let i = 0; i < 260; i++) { const x = rr() * W, y = rr() * H, r = 14 + rr() * 60, gr = g.createRadialGradient(x, y, 0, x, y, r), c = rr() < 0.5 ? '255,255,255' : '0,0,0'; gr.addColorStop(0, `rgba(${c},${0.02 + rr() * 0.04})`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }   // the hide is uneven
     if (C.fab === 'rib') ribs(g, 0, y6, W, H, 0.1);
@@ -273,6 +274,7 @@ function topTex(v, geo) {
       stitch([[X(0.787), Y(0.64)], [X(0.787), Y(0.98)]]); stitch([[X(0.775), Y(0.64)], [X(0.775), Y(0.98)]]);   // the lapel's free edge
       g.fillStyle = '#b9bcc4'; g.beginPath(); g.arc(X(0.755), Y(0.9), 7, 0, 7); g.fill(); g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.arc(X(0.755), Y(0.9), 3, 0, 7); g.fill();   // its snap
       for (const o of [0, 7]) stitch([[X(0.816) + o, Y(0.66)], [X(0.816) + o, Y(0.955) + o], [X(0.964) - o, Y(0.955) + o], [X(0.964) - o, Y(0.66)]]); }
+    if (C.deco || v.num) topDeco(g, v, C, D, { X, Y, TV, XS, W, H, line, stitch, ySl, ySh, yR, y6, ink, dark });   // 04l_wardrobe3.js: plackets, zips, stripes, numbers, quilting
     if (v.decal && v.brand) { const cmx = W / D.circ; for (const [k, u0] of [['f', 0.25], ['b', 0.75]]) { const d = v.decal[k]; if (d) brandLogo(g, v.brand, X(u0) + d[0] * cmx, Y(TV(GEAR.neck - d[1])), d[2] * cmx, ink, d[2] < 12 ? 'mark' : 'stack'); } }
     if (C.fab === 'mesh') { g.globalCompositeOperation = 'destination-out'; g.fillStyle = '#000'; const y0 = yR + 5, y1 = Y(TV(C.hem + 2.4)); let o = 0; for (let y = y0; y < y1; y += 8.5, o ^= 1) for (let x = o * 5; x < W; x += 10) { g.beginPath(); g.arc(x, y, 3.1, 0, 7); g.fill(); } g.globalCompositeOperation = 'source-over'; }
   }));
@@ -306,6 +308,7 @@ function topTex(v, geo) {
       for (let y = ySl; y < ySh; y += 5) { g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 2; g.beginPath(); g.moveTo(X(0.975), y); g.lineTo(W, y + 4); g.stroke(); } }
     if (leather) { for (const sm of seams) ridge(sm, 6, 0.3, 1); for (const z of zips) { ridge(z, 12, 0.3, 1); ridge(z, 4, 0.5); }
       ridge([[X(0.787), Y(0.64)], [X(0.787), Y(0.98)]], 4, 0.3, 1); ridge([[X(0.816), Y(0.66)], [X(0.816), Y(0.955)], [X(0.964), Y(0.955)], [X(0.964), Y(0.66)]], 4, 0.3, 1); }
+    if (C.deco) topDecoN(g, C, D, { X, Y, TV, XS, W, H, ridge, ySl, ySh, yR });
     return heightToNormal(c, 6);
   })());
   return { map, nmap };
@@ -321,7 +324,7 @@ function vestTex(v) {
   const vel = { x0: PX(RF, 0.19), x1: PX(RF, 0.81), y0: PY(RF, 0.76), y1: PY(RF, 0.56) }, velB = { x0: PX(RB, 0.3), x1: PX(RB, 0.7), y0: PY(RB, 0.74), y1: PY(RB, 0.52) }, drag = { x0: PX(RB, 0.35), x1: PX(RB, 0.65), y0: PY(RB, 0.93), y1: PY(RB, 0.84) };
   const map = GEAR['tt_' + v.key] || (GEAR['tt_' + v.key] = canvasTex(W, H, g => {
     const dk = a => `rgba(0,0,0,${a})`, lt = a => `rgba(255,255,255,${a})`, lite = wLum(v.c) > 0.3, thr = lite ? dk(0.35) : lt(0.14);
-    g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) camoPaint(g, W, H, 1.2);
+    g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) patPaint(v, g, W, H, 1.2);
     for (let i = 0; i < 30000; i++) { g.fillStyle = (rr() < 0.5 ? dk : lt)(rr() * 0.07); g.fillRect(rr() * W, rr() * H, 2, 1.2); }
     g.strokeStyle = dk(0.05); g.lineWidth = 1; for (let x = -H; x < W; x += 4) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + H, H); g.stroke(); }   // the weave
     const rect = (q, c) => { g.fillStyle = c; g.fillRect(q.x0, q.y0, q.x1 - q.x0, q.y1 - q.y0); }, frame = (q, c, w, d = 0) => { g.strokeStyle = c; g.lineWidth = w; g.strokeRect(q.x0 + d, q.y0 + d, q.x1 - q.x0 - 2 * d, q.y1 - q.y0 - 2 * d); };
@@ -354,9 +357,9 @@ function vestTex(v) {
 }
 function topMesh(F, v, host, U0) {
   const geo = topGeo(F, v.cut), { map, nmap, ao } = topTex(v, geo), C = TOP_CUTS[v.cut], fl = C.fab === 'fleece', le = C.fab === 'leather', ns = geo.userData.hand || le ? 1 : fl ? 1.1 : 0.85;   // a baked map is drawn at its own strength
-  const mat = new THREE.MeshPhysicalMaterial({ map, normalMap: nmap, normalScale: new THREE.Vector2(ns, ns), aoMap: ao || null, roughness: le ? 0.5 : fl ? 0.96 : 0.9, sheen: le ? 0 : fl ? 0.45 : C.rig ? 0.1 : 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color(v.c).multiplyScalar(1.3),
-    clearcoat: le ? 0.3 : 0, clearcoatRoughness: 0.42, side: THREE.DoubleSide, envMapIntensity: le ? 0.9 : 0.5, alphaTest: C.fab === 'mesh' ? 0.5 : 0 });   // leather: a waxed, slightly glossy hide (a clear coat over a rougher base)
-  const U = U0 || { uSwA: { value: new V3() }, uSwB: { value: new V3() } }, zip = C.open ? 1 : 0;
+  const sy = FAB_GLOSS[C.fab], mat = new THREE.MeshPhysicalMaterial({ map, normalMap: nmap, normalScale: new THREE.Vector2(ns, ns), aoMap: ao || null, roughness: sy ? sy[0] : le ? 0.5 : fl ? 0.96 : 0.9, sheen: sy ? sy[1] : le ? 0 : fl ? 0.45 : C.rig ? 0.1 : 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color(v.c).multiplyScalar(1.3),
+    clearcoat: sy ? sy[2] : le ? 0.3 : 0, clearcoatRoughness: 0.42, side: THREE.DoubleSide, envMapIntensity: le ? 0.9 : 0.5, alphaTest: C.fab === 'mesh' ? 0.5 : 0 });   // leather: a waxed, slightly glossy hide (a clear coat over a rougher base)
+  const U = U0 || { uSwA: { value: new V3() }, uSwB: { value: new V3() } }, zip = C.open && !C.btn ? 1 : 0;   // (a shirt's open front has buttons, not teeth)
   mat.onBeforeCompile = s => { Object.assign(s.uniforms, U);
     s.vertexShader = 'attribute vec2 aSw; attribute float aCut; varying float vCut; varying float vZc; uniform vec3 uSwA; uniform vec3 uSwB;\n' + s.vertexShader.replace('#include <skinning_vertex>', '#include <skinning_vertex>\n transformed += aSw.x * uSwA + aSw.y * uSwB; vCut = aCut; vZc = position.z;');
     s.fragmentShader = 'varying float vCut; varying float vZc;\n' + s.fragmentShader.replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if ( vCut < 0.0 ) discard;')

@@ -83,7 +83,9 @@ function itemVar(cat, sel) {
   let it = ITEMS[sel.id]; if (!it || it.cat !== cat) { if (cat !== 'bottom') return { mid: 'none', key: null }; it = ITEMS.shorts; }
   const col = wearColor(it, sel.color || it.colors[0]), v = { ...it.model, ...col, mid: it.id, colId: col.id, brand: it.brand, item: it };
   if (it.model.auto && !(it.nat && it.nat[col.id])) v.stripe = wLum(col.c) > 0.3 ? '#55575e' : '#e8e6e0';
-  v.key = v.id = it.id + '_' + col.id; return v;
+  const pt = !col.pat && wearPatOk(it) && sel.pat; if (pt) { if (pt === 'solid') delete v.pat; else v.pat = pt; }   // the pattern chosen for it (04l_wardrobe3.js); a camo colour wins
+  if (!v.c2) v.c2 = wLum(v.c) > 0.3 ? '#1b1c20' : '#ecebe6';   // the second colour: stripes, trims, numbers
+  v.key = v.id = it.id + '_' + col.id + (v.pat && v.pat !== it.model.pat && !col.pat ? '_' + v.pat : pt === 'solid' && it.model.pat ? '_solid' : ''); return v;
 }
 function wearShorts(v) {
   const S = SHORTS_LOOKS.find(x => x.id === v.colId && x.main === v.c); if (S) return S;
@@ -178,10 +180,12 @@ function hatGeo(F, kind) {
   const rot = (P.visor || 0) * D, az = u => (u - 0.5) * 2 * Math.PI + rot;   // u = 0.5: the front of the hat
   const surf = (a, v, o) => { dirAY(a, P.lo(fold(a)), e); o.copy(e).lerp(up, v).normalize(); return o.multiplyScalar(hr.s(o) + P.gap + P.th(fold(a), v)); };
   const uvs = (g, u0, v0, ku, kv) => { const t = g.attributes.uv; for (let i = 0; i < t.count; i++) t.setXY(i, u0 + t.getX(i) * ku, v0 + t.getY(i) * kv); return g; };
-  parts.push(uvs(gridGeo((u, v, o) => surf(az(u), v, o), 56, 14, { c: O }), 0, 0, 1, 0.75));
+  const vm = P.vmax || 1;   // a band (headband) covers only the lower part of the crown
+  parts.push(uvs(gridGeo((u, v, o) => surf(az(u), v * vm, o), 56, P.vmax ? 4 : 14, { c: O }), 0, 0, 1, 0.75));
+  if (P.brim) parts.push(uvs(gridGeo((u, v, o) => { surf(az(u), 0.02, o); const r = Math.hypot(o.x, o.z) || 1; return o.set(o.x * (1 + v * P.brim / r), o.y - v * P.brim * 0.42 - 0.2, o.z * (1 + v * P.brim / r)); }, 56, 4, { c: new V3(0, 30, 0) }), 0, 0.76, 1, 0.24));   // a bucket hat's brim, all round, sloping down
   if (P.visor !== undefined) {   // the peak: the front edge carried forward, rounded, a little bent down at the sides
     const f = new V3(Math.sin(rot), -0.2, Math.cos(rot)).normalize();
-    parts.push(uvs(gridGeo((u, v, o) => { const s = 2 * u - 1; surf(rot + s * 62 * D, 0.03, o); return o.addScaledVector(f, v * 7.4 * Math.sqrt(Math.max(0, 1 - s * s * 0.86)) - 0.3).setY(o.y - v * (0.5 + 0.9 * s * s)); }, 20, 6, { c: new V3(0, -30, 0), inv: true }), 0, 0.76, 1, 0.24));
+    parts.push(uvs(gridGeo((u, v, o) => { const s = 2 * u - 1; surf(rot + s * 62 * D, 0.03, o); return o.addScaledVector(f, v * 7.4 * Math.sqrt(Math.max(0, 1 - s * s * 0.86)) - 0.3).setY(o.y - v * (0.5 + (P.flat ? 0 : 0.9) * s * s)); }, 20, 6, { c: new V3(0, -30, 0), inv: true }), 0, 0.76, 1, 0.24));
     parts.push(uvs(gridGeo((u, v, o) => o.set(Math.sin(u * 6.283) * Math.sin(v * 1.2) * 0.75, hr.s(up) + P.gap + 0.1 + Math.cos(v * 1.2) * 0.35, Math.cos(u * 6.283) * Math.sin(v * 1.2) * 0.75), 8, 3, { c: new V3(0, 5, 0) }), 0.02, 0.6, 0.01, 0.01));   // the button
   }
   if (P.knot) {   // the knot at the back and its two ends
@@ -194,12 +198,13 @@ function hatGeo(F, kind) {
 // the hat's texture, colour baked in: crown in the lower 3/4 (u = 0.5 is its front), the peak in the top quarter
 function hatTex(v) {
   return canvasTex(512, 256, (g, W, H) => {
-    const ink = wInk(v.c), kind = v.hat; g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) camoPaint(g, W, H, 0.6);
+    const ink = wInk(v.c), kind = v.hat; g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) patPaint(v, g, W, H, 0.6);
     for (let i = 0; i < 5000; i++) { g.fillStyle = `rgba(${rr() < 0.5 ? '0,0,0' : '255,255,255'},${rr() * 0.07})`; g.fillRect(rr() * W, rr() * H, 1.5, 1.5); }
     const Y = t => H - t * H * 0.75;   // crown: t = 0 the edge … 1 the top
     if (kind === 'beanie') { for (let x = 0; x < W; x += 6) { g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(x, 0, 2, H); g.fillStyle = 'rgba(255,255,255,0.07)'; g.fillRect(x + 3, 0, 1.5, H); } g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, Y(0.27), W, 3);
       if (v.brand) { g.fillStyle = ink; g.fillRect(W / 2 - 30, Y(0.22), 60, Y(0.05) - Y(0.22)); brandLogo(g, v.brand, W / 2, (Y(0.22) + Y(0.05)) / 2, 30, v.c, 'mark'); } }
     else if (kind === 'bandana') { g.fillStyle = ink; for (let y = 8; y < H; y += 22) for (let x = (y % 44 ? 0 : 11); x < W; x += 22) { g.globalAlpha = 0.75; g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill(); g.globalAlpha = 0.5; g.beginPath(); g.ellipse(x + 9, y + 9, 5, 2, 0.8, 0, 7); g.stroke(); } g.globalAlpha = 1; g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, Y(0.04), W, 3); }
+    else if (HATS[kind].deco) hatDeco(g, v, W, H, Y, ink);   // 04l_wardrobe3.js: balaclava, bucket hat, headband
     else { g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 2; for (let k = 0; k < 6; k++) { const x = (k + 0.5) * W / 6 + (k < 3 ? -1 : 1) * 0; g.beginPath(); g.moveTo(x, Y(0)); g.lineTo(x, Y(1)); g.stroke(); } g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, Y(0.035), W, 2.5);
       g.fillStyle = v.c; g.fillRect(W / 2 - 38, Y(0.5), 76, Y(0.08) - Y(0.5)); if (v.brand) brandLogo(g, v.brand, W / 2, Y(0.3), 70, ink, 'stack');
       g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, 0, W, H * 0.24); g.strokeStyle = 'rgba(255,255,255,0.14)'; g.lineWidth = 1.2; for (const o of [10, 16, 22]) { g.beginPath(); g.moveTo(0, H * 0.24 - o * 2); g.lineTo(W, H * 0.24 - o * 2); g.stroke(); } }
@@ -318,7 +323,7 @@ function wearDress(F, L) {
   const bm = wearSlot(F, 'belt', bl.buckle && bt.belt ? bl.mid + bt.cut : null, () => beltMesh(F, bt.cut, bl)); if (bm) { bm.material.color.set(bl.c); bm.userData = S.bottom.m.userData; }
   // head and eyes: rigid, in the head frame
   const G2 = F.gear, Wr = G2.wear || (G2.wear = {});
-  for (const [cat, v, make] of [['head', W.head, () => new THREE.Mesh(hatGeo(F, W.head.hat), new THREE.MeshPhysicalMaterial({ map: hatTex(W.head), roughness: 0.92, sheen: 0.3, sheenRoughness: 0.8, side: THREE.DoubleSide, envMapIntensity: 0.5 }))],
+  for (const [cat, v, make] of [['head', W.head, () => new THREE.Mesh(hatGeo(F, W.head.hat), new THREE.MeshPhysicalMaterial({ map: hatTex(W.head), roughness: 0.92, sheen: 0.3, sheenRoughness: 0.8, side: THREE.DoubleSide, envMapIntensity: 0.5, alphaTest: HATS[W.head.hat].hole ? 0.5 : 0 }))],   // (a balaclava's eye slit is cut by alpha)
     ['eyes', W.eyes, () => new THREE.Mesh(glassGeo(F, W.eyes).all, glassMat(W.eyes))]]) {
     const cur = Wr[cat]; if (cur && cur.key === v.key) continue;
     if (cur) { wearBack(cur); scene.remove(cur.m); if (cur.m.material.map !== GEAR.t_crack) cur.m.material.map.dispose(); cur.m.material.dispose(); Wr[cat] = null; }
@@ -403,13 +408,16 @@ window.__wear = { ITEMS, WCOL, BRANDS, hit: (who, power = 1) => { const F = who 
 function wearUI() {
   const cat = UI.wcat || (UI.wcat = 'top'), sel = () => wearGet(LOOK, cat), none = WNONE[cat];
   swatches('o-wcat', WCATS.map(c => ({ id: c, label: WCAT_LABEL[c] })), () => cat, v => { UI.wcat = v; wearUI(); if (UI.scr === 'creator') setView(v === 'head' || v === 'eyes' ? VIEW_FACE : VIEW_FULL); }, true, true);
-  const items = wearItems(cat), list = [...(none ? [{ id: 'none', label: none }] : []), ...items.map(i => ({ id: i.id, label: i.label }))];
+  swatches('o-wsort', WSORT, () => UI.wsort || 'all', v => { UI.wsort = v; setTimeout(wearUI, 0); }, true, true);   // order: as listed / new first / cheapest first (04l_wardrobe3.js)
+  const items = wearSort(wearItems(cat), UI.wsort), list = [...(none ? [{ id: 'none', label: none }] : []), ...items.map(i => ({ id: i.id, label: i.label }))];
   swatches('o-wmodel', list, () => sel().id, v => { if (v !== 'none' && !itemOwned(v)) { setTimeout(() => { wearUI(); shopOpen(cat, v); }, 0); return; }   // not owned: the shop opens on it
     LOOK[cat] = v === 'none' ? { id: 'none' } : { id: v, color: ITEMS[v].colors[0] }; setTimeout(wearUI, 0); }, true);
   [...$('o-wmodel').children].forEach((b, i) => { const it = ITEMS[list[i].id]; if (it && !itemOwned(it.id)) { b.classList.add('lock'); b.title = it.reward ? 'награда: ' + it.reward + '-я победа в карьере' : 'купить в магазине'; const s = document.createElement('small'); s.className = 'pr'; s.textContent = it.reward ? '🔒 бой ' + it.reward : '🔒 ' + cash(it.price); b.append(s); }
-    if (it && it.brand) { const im = document.createElement('img'); im.src = brandIcon(it.brand); im.alt = ''; b.prepend(im); const s = document.createElement('small'); s.textContent = it.brand; b.append(s); } });
+    if (it && it.brand) { const im = document.createElement('img'); im.src = brandIcon(it.brand); im.alt = ''; b.prepend(im); const s = document.createElement('small'); s.textContent = it.brand; b.append(s); }
+    if (it && wearFresh(it)) { const n = document.createElement('em'); n.className = 'nw'; n.textContent = 'новое'; b.append(n); } });
   const it = ITEMS[sel().id], cols = it && it.cat === cat ? wearColors(it).map(id => { const c = wearColor(it, id); return { id, c: c.c, label: c.label || id, pat: c.pat }; }) : [];
-  swatches('o-wcolor', cols, () => sel().color || (it && it.colors[0]), v => { LOOK[cat] = { id: it.id, color: v }; });
+  swatches('o-wcolor', cols, () => sel().color || (it && it.colors[0]), v => { LOOK[cat] = { ...sel(), id: it.id, color: v }; });
+  wearPatRow('o-wpat', it && it.cat === cat ? it : null, sel, v => { LOOK[cat] = { ...sel(), pat: v }; });
   [...$('o-wcolor').children].forEach((b, i) => { b.title = cols[i].label; if (cols[i].pat) b.style.backgroundImage = `url(${GEAR.camoUrl || (GEAR.camoUrl = (() => { const c = document.createElement('canvas'); c.width = c.height = 48; camoPaint(c.getContext('2d'), 48, 48, 0.35); return c.toDataURL(); })())})`; if (it && i === it.colors.length - 1) b.style.marginRight = '10px'; });
   $('o-wnote').textContent = !it || it.cat !== cat ? '' : (it.brand ? it.brand + ' · ' : '') + (cat === 'belt' && !itemVar('bottom', wearGet(LOOK, 'bottom')).belt ? 'ремень виден на джинсах и карго' : itemTag(it));
 }
