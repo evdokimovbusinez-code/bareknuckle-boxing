@@ -137,6 +137,29 @@ function camFade(dt) {
   }
 }
 window.__camClear = { CC, ccGap, ccTargets, ccWinCover, ccPostsWorld, endReplay: () => endReplay() };   // debug (docs/audit/scenarios/camera.js)
+/* R-04: the camera's answer to a hit. G.shake = amplitude (m), decays ×e^(−9 t) as before; it used to push the camera at random on
+   x and y every frame — now it swings along the punch (SHK.d, its part across the view: a damped 15 Hz swing that starts at full
+   push), with a quarter of the old random jitter left on top (all of it when the punch runs along the line of sight).
+   SHK.fovT: a big clean hit narrows the lens by HITK.fov = 2° for HITK.fovT = 80 ms (full for 50 ms, eased back over the last 30).
+   OPT.shake off: neither. Called by camUpdate and netGuestCam; fed by shakeHit (resolveHit, followHit, the replay, the guest). */
+const SHK = { d: new V3(1, 0, 0), ph: 0, hz: 15, fov0: 28, fovT: 0, fovA: 0 }, _sk1 = new V3(), _sk2 = new V3();
+function shakeHit(amp, dir, fov) {
+  if (!OPT.shake) return;
+  if (dir && amp >= G.shake * 0.7) { SHK.d.copy(dir).normalize(); SHK.ph = 0; }   // a weaker hit inside a stronger one's shake keeps its direction
+  G.shake = Math.max(G.shake, amp); if (fov) SHK.fovT = HITK.fovT;
+}
+function camKick(dt) {
+  if (!OPT.shake) { G.shake = 0; SHK.fovT = 0; }
+  if (G.shake > 0.0005 && dt > 0) {
+    const v = _sk1.copy(camL).sub(camera.position).normalize(), d = _sk2.copy(SHK.d).addScaledVector(v, -SHK.d.dot(v)), across = Math.min(1, d.length() * 1.5);
+    if (across > 0.01) d.normalize(); const sw = Math.cos(SHK.ph) * 0.6 * G.shake * across, jit = G.shake * (0.25 + 0.75 * (1 - across));
+    camera.position.addScaledVector(d, sw); camera.position.x += (rr() - 0.5) * jit; camera.position.y += (rr() - 0.5) * jit;
+    SHK.ph += dt * SHK.hz * 6.283; G.shake *= Math.exp(-dt * 9);
+  }
+  const fa = SHK.fovT > 0 ? HITK.fov * sstep(0, 0.03, SHK.fovT) : 0; if (SHK.fovT > 0 && dt > 0) SHK.fovT -= dt;
+  if (Math.abs(fa - SHK.fovA) > 1e-4) { SHK.fovA = fa; camera.fov = SHK.fov0 - fa; camera.updateProjectionMatrix(); }
+}
+window.__hitFeel = { HITK, SHK, HS_LOG, hitStop };   // debug (R-04): the constants, the shake state, the recent freezes
 function camUpdate(dt) {
   camClock += dt; let k = 4;
   // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
@@ -206,8 +229,7 @@ function camUpdate(dt) {
   else CC.yaw = CC.want = 0;
   if (camCut) { camP.copy(_cp); camL.copy(_cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * k); camP.lerp(_cp, a); camL.lerp(_cl, a); }
-  camera.position.copy(camP); if (!OPT.shake) G.shake = 0;   // settings: camera shake off
-  if (G.shake > 0.0005 && dt > 0) { camera.position.x += (rr() - 0.5) * G.shake; camera.position.y += (rr() - 0.5) * G.shake; G.shake *= Math.exp(-dt * 9); }
+  camera.position.copy(camP); camKick(dt);   // R-04: the kick along the punch + the lens push (both off with OPT.shake)
   camera.lookAt(camL);
   if (!window.__camOff) camFade(dt);   // R-03 fallback (debug: window.__camOff = true — the old camera, for before / after): a post still in front of a head / torso goes see-through
 }
@@ -280,7 +302,7 @@ function layout() {
   stage.style.width = VW + 'px'; stage.style.height = VH + 'px';
   stage.classList.toggle('short', VH < 520);
   applyRes();
-  camera.aspect = VW / VH; camera.fov = VW / VH < 1.45 ? 34 : 28; camera.updateProjectionMatrix();
+  camera.aspect = VW / VH; camera.fov = SHK.fov0 = VW / VH < 1.45 ? 34 : 28; SHK.fovA = 0; camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', layout); layout(); GFX.ready = true;
 
