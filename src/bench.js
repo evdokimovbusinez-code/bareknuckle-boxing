@@ -323,6 +323,8 @@ const BOT_REACH = 1.15;   // m between the men: the AI's own inReach is 1.13 −
 /* one press of a punch through press(); body / power are what S / W held down would have given (punchMod) */
 function botPunch(b, name, body = false, pow = false) { const n0 = Q.length; press('punch', name); if (Q.length > n0) { const q = Q[Q.length - 1]; q.body = body; q.pow = pow; } }
 const BOT_POL = {
+  // R-14: walks into him behind a high guard and stays there, never punches — the clinch that has to be broken (10b_close.js)
+  crowd(b, c) { P1.moveDir = c.fwd; setBlock(true); },
   // random punches as fast as the keys allow, walks in, never defends
   masher(b, c) {
     P1.moveDir = c.dist > BOT_REACH - 0.05 ? c.fwd : 0;
@@ -389,7 +391,8 @@ function botFight(policy, diff, o, seed) {
   let res = null; const fo = fightOver; fightOver = (win, draw, how = 'dec') => { res = { win, draw, how }; };
   const T0 = performance.now(); let stop = false;
   try {
-    rollOpponent(); startFight(true);
+    rollOpponent(); if (o.style) AI.style = STYLES[o.style];   // R-14: the opponent's style is fixed ('pressure' for the close-quarters test)
+    startFight(true);
     let fightT = 0, guard = 0; const maxF = Math.ceil((ROUNDS * (ROUND_LEN + BREAK_LEN + 40) + 60) / dt);
     const rs = [], rsSnap = () => { rs[Math.max(0, G.round - 1)] = [P1.fs.thr, P1.fs.land, P2.fs.thr, P2.fs.land]; };   // R-10: thrown / landed at the end of each round (cumulative)
     while (!res && guard++ < maxF) {
