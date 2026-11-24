@@ -198,6 +198,36 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .rs{font-family:var(--mono);font-size:13px;color:#cfc8ba;letter-spacing:.06em}
 .rb{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:10px}
 .rb .pri,.go{background:linear-gradient(180deg,rgba(194,34,53,.95),rgba(130,18,32,.95));border-color:rgba(255,130,130,.4)}
+/* R-09: the result card. Desktop: a panel on the right (the camera frames the men in the space left of it), every text ≥ 13 px;
+   .cmp (short / touch stage): narrower panel, the tables folded behind «Подробнее», text ≥ 12 px; buttons ≥ 44 px everywhere */
+.result{display:block;background:linear-gradient(90deg,rgba(5,6,9,0) 35%,rgba(5,6,9,.4));padding:0}
+.rcard{position:absolute;right:calc(var(--pr) + 1vw);top:50%;transform:translateY(-50%);width:min(760px,60%);max-height:calc(100% - var(--pt) - var(--pb));overflow:auto;
+  display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 22px 18px;box-sizing:border-box;text-align:center;
+  background:rgba(9,11,16,.7);border:1px solid rgba(255,255,255,.1);border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.45);
+  animation:rcin .45s cubic-bezier(.2,1.2,.4,1);scrollbar-width:thin}
+@keyframes rcin{from{opacity:0;transform:translate(30px,-50%)}to{opacity:1;transform:translateY(-50%)}}
+.rcard .rt{font-size:clamp(44px,11vmin,92px);line-height:1.02}
+.rcard .rs{font-size:14px;line-height:1.3}.rcard .rs.car{color:var(--gold)}.rcard .rs:empty{display:none}
+.rbig{display:flex;justify-content:center;gap:10px;width:100%;margin:4px 0 2px}.rbig:empty{display:none}
+.rbig .rn{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 6px 7px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+.rbig .rn b{font-family:var(--display);font-weight:900;font-size:clamp(28px,6vmin,44px);line-height:1;color:var(--text);white-space:nowrap;font-variant-numeric:tabular-nums}
+.rbig .rn.cash b{color:var(--gold)}.rbig .rn.fans b{color:#9fdca8}.rbig .rn.pts b{color:#f1e3c2}.rbig .rn.neg b{color:#e58a8a}.rbig .rn.zero b{color:var(--muted)}
+.rbig .rn small{font:500 13px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:#bdb6a8;white-space:nowrap}
+.rmore{display:none;min-height:44px;padding:0 18px;border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:6px;font:600 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#d8d2c6}
+.rmore::after{content:' ▾'}.rmore[aria-expanded="true"]::after{content:' ▴'}
+.rcard .rtabs{flex-wrap:wrap;gap:6px 22px;width:100%}.rcard .rtabs.none{display:none}
+.rcard .fstats,.rcard .fstats td,.rcard .fstats td:nth-child(2),.rcard .fstats.pay td,.rcard .fstats.pay td.l,.rcard .fstats.pay td.h,.rcard .fstats.pay td.new,.rcard .fstats.pay td:nth-child(2){font-size:13px;line-height:1.35}
+.rcard .fstats td{padding:1px 6px}.rcard .fstats:empty{display:none}
+.rcard .rb{margin-top:6px}.rcard .rb button{min-height:44px}
+.rcard.cmp{width:min(436px,60%);gap:6px;padding:10px 12px 12px}
+.rcard.cmp .rt{font-size:clamp(36px,12vmin,64px)}
+.rcard.cmp .rs{font-size:12px}
+.rcard.cmp .rbig .rn{padding:5px 4px}.rcard.cmp .rbig .rn b{font-size:clamp(22px,7vmin,32px)}.rcard.cmp .rbig .rn small{font-size:12px;letter-spacing:.03em}
+.rcard.cmp .rmore{display:block}.rcard.cmp .rmore.none{display:none}.rcard.cmp .rtabs{display:none}
+.rcard.cmp.more{width:min(720px,calc(100% - var(--pl) - var(--pr)))}.rcard.cmp.more .rtabs{display:flex}.rcard.cmp.more .rbig,.rcard.cmp.more .rt,.rcard.cmp.more .rs{display:none}
+.rcard.cmp .fstats,.rcard.cmp .fstats td,.rcard.cmp .fstats td:nth-child(2),.rcard.cmp .fstats.pay td,.rcard.cmp .fstats.pay td.l,.rcard.cmp .fstats.pay td.h,.rcard.cmp .fstats.pay td.new,.rcard.cmp .fstats.pay td:nth-child(2){font-size:12px}
+.rcard.cmp .rb{margin-top:2px;gap:8px}.rcard.cmp .rb button{font-size:15px;padding:0 12px}
+@media (prefers-reduced-motion:reduce){.rcard{animation:none}}
 
 /* menu */
 .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
@@ -579,12 +609,18 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <div class="hl" id="hl" hidden><b>Лучшее в раунде</b><span id="hl-s"></span></div>
   <div class="rec" id="rec" hidden><i></i>ПОВТОР<button id="skip">Пропустить</button></div><div class="rpcap" id="rp-cap"></div>
 
+  <!-- R-09: the result card (07c_result.js) — a dark panel at the side, the men framed beside it (resWin → ccFit);
+       three big numbers that count up (₽, followers, fighter points), the tables under them (folded behind «Подробнее» on a phone) -->
   <div class="result" id="result" hidden>
-    <div class="rt" id="r-title">Победа</div>
-    <div class="rs" id="r-sub"></div>
-    <div class="rs car" id="r-car"></div>
-    <div class="rtabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table><table class="fstats pay" id="r-soc"></table></div>
-    <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
+    <div class="rcard" id="r-card">
+      <div class="rt" id="r-title">Победа</div>
+      <div class="rs" id="r-sub"></div>
+      <div class="rs car" id="r-car"></div>
+      <div class="rbig" id="r-big"></div>
+      <button type="button" class="rmore" id="r-more" aria-expanded="false">Подробнее</button>
+      <div class="rtabs" id="r-tabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table><table class="fstats pay" id="r-soc"></table></div>
+      <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
+    </div>
   </div>
 
   <!-- main menu: logo, the column of modes; the scene (the fighter warming up in the current location) shows through -->
@@ -7614,10 +7650,11 @@ const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1
 // «Склад · аншлаг»: the place of career fight i as the menu, the card and the result screen name it
 const careerPlace = (i = G.career) => { const L = LADDER[Math.min(i, LADDER.length - 1)]; return (LOCS[L.loc] ? LOCS[L.loc].label : LOC.label) + (L.champ ? ' · аншлаг' : ''); };
 function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | 'tko' (the doctor stops it) — the purse depends on it
+  G.res = null;   // R-09: the big numbers of the result card (07c_result.js)
   if (NET.role) { NET.over = { win, draw, how }; return; }   // issue 49: a P2P bout pays nothing and does not touch the career
   fightTable();
   const stage = Math.min(G.career, LADDER.length - 1), before = careerWins();
-  if (draw) { const p = payOut(false, true, how, stage, before); p.soc = socFight(false, true, how, stage); payShow(p); save(); return; }
+  if (draw) { const p = payOut(false, true, how, stage, before); p.soc = socFight(false, true, how, stage); payShow(p); G.res = resOf(p, 0); save(); return; }
   if (win) G.wins++; else G.losses++;
   let t = '', pts = 0;
   if (G.mode === 'story') { const ch = storyCh();   // issue 51: a story chapter — clear it, the purse is in purse(), the outro comes after the replay
@@ -7628,10 +7665,12 @@ function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | '
     else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути — ${careerPlace()}`;
   } else if (win) pts = 1;
   if (pts) { PROF.pts += pts; t += (t ? ' · ' : '') + `+${pts} ${pts === 1 ? 'очко' : 'очка'} бойцу`; }
-  { const p = payOut(win, false, how, stage, before); p.soc = socFight(win, false, how, stage); payShow(p); }   // the purse (07b_economy.js) and the followers (15_social.js) onto the result screen
+  { const p = payOut(win, false, how, stage, before); p.soc = socFight(win, false, how, stage); payShow(p); G.res = resOf(p, pts); }   // the purse (07b_economy.js) and the followers (15_social.js) onto the result screen
   save(); const c = $('r-car'); if (c) c.textContent = t;
   const a = $('r-again'); if (a) a.textContent = G.mode === 'story' ? (win ? 'Дальше' : 'Ещё раз') : G.mode === 'career' && win && G.career < LADDER.length ? 'Следующий бой' : G.mode === 'career' && !win ? 'Ещё раз' : 'Реванш';
 }
+// R-09: what the three big numbers of the result card count up to (07c_result.js); a mode that pays nothing shows no ₽
+const resOf = (p, pts) => ({ cash: ['career', 'quick', 'story'].includes(G.mode) ? p.total : null, fans: p.soc ? p.soc.total : null, pts });
 const D_SEP = 1.15;
 
 const elMsg = $('msg'), elPops = $('pops');
@@ -7819,7 +7858,7 @@ function endReplay() {
   G.state = 'result'; $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true;
   const win = G.winner === P1; $('r-title').textContent = win ? 'Победа' : 'Нокаут'; $('r-title').className = 'rt ' + (win ? 'win' : 'lose');
   $('r-sub').textContent = `${win ? 'соперник на полу' : 'ты на полу'} · счёт ${G.wins} : ${G.losses}`;
-  if (!storyOut(win)) $('result').hidden = false;   // issue 51: a story bout plays its outro dialog first, the result screen after it
+  if (!storyOut(win)) resultOpen();   // issue 51: a story bout plays its outro dialog first, the result screen after it
 }
 
 /* ───────── hits ───────── */
@@ -8391,6 +8430,76 @@ function payShow(p) {
     `<tr class="tot"><td class="l">Итого</td><td>${cash(p.total)}</td></tr><tr><td class="l">В кошельке</td><td>${cash(PROF.cash)}</td></tr>` +
     (p.opened && p.opened.length ? `<tr><td colspan="2" class="new">открыто: ${p.opened.map(esc).join(', ')}</td></tr>` : ''));
 }
+/* ───────── R-09: the result screen ─────────
+   One card (#r-card, g_head.html) on the right: the title, the lines under it, three big numbers that count up (₽ of the purse,
+   followers, fighter points), the tables under them (folded behind «Подробнее» on a short / touch stage — .cmp), three buttons.
+   resultOpen() is the one way the card comes up: it hides whatever could sit over it (#msg «Нокаут» / «Стоп!», the get-up bar,
+   the HUD, the round highlight plate, the touch pad) and starts the count. The numbers come from G.res, filled by fightOver
+   (07_state_replay_hits.js), bagEnd (09_bag.js) or nobody (P2P: G.res = null, no numbers).
+   The camera (camUpdate → resView, camClear → ccFit) frames the men in the part of the screen left of the card: resWin() gives
+   the NDC window [-CC_FX, card's left edge − RES.gap], the projection is skewed so that window's centre is the frame's centre. */
+const RES = { dur: 1.1, lag: 0.18, gap: 0.04, minH: 0.22, s: 0, raf: 0, tm: 0 };
+const resSign = n => (n < 0 ? '−' : '+');
+// what the big numbers say: [{ cls, v, f(v) → text, label }]
+function resItems(r) {
+  if (!r) return [];
+  if (r.bag) return [{ cls: 'cash', v: r.score, f: v => numF(v), label: 'очки' }, { cls: 'fans', v: r.best, f: v => '×' + Math.round(v), label: 'лучшая серия' },
+    { cls: 'pts', v: r.pts, f: v => '+' + Math.round(v), label: 'очки бойца' }];
+  const out = [];
+  if (r.cash != null) out.push({ cls: 'cash', v: r.cash, f: v => '+' + cash(v), label: 'выплата' });
+  if (r.fans != null) out.push({ cls: 'fans', v: r.fans, f: v => resSign(v) + numF(Math.abs(v)), label: 'подписчики' });
+  out.push({ cls: 'pts', v: r.pts || 0, f: v => '+' + Math.round(v), label: 'очки бойца' });
+  return out;
+}
+function resCount(items) {
+  cancelAnimationFrame(RES.raf); clearTimeout(RES.tm);
+  const els = [...$('r-big').querySelectorAll('.rn b')], t0 = performance.now();
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const put = done => {
+    const t = (performance.now() - t0) / 1000;
+    items.forEach((it, i) => { const p = done || reduce ? 1 : clamp((t - i * RES.lag) / RES.dur, 0, 1), e = 1 - Math.pow(1 - p, 3);
+      els[i].textContent = it.f(Math.round(it.v * e)); });
+    return t >= RES.dur + RES.lag * (items.length - 1);
+  };
+  const step = () => { if (!put(false)) RES.raf = requestAnimationFrame(step); };
+  put(false); RES.raf = requestAnimationFrame(step);
+  RES.tm = setTimeout(() => { cancelAnimationFrame(RES.raf); put(true); }, (RES.dur + RES.lag * items.length) * 1000 + 150);   // a hidden tab gets no frames: land on the totals anyway
+}
+// short or touch stage: the narrow card, tables behind «Подробнее»
+function resCompact() { const c = $('r-card'); if (c) c.classList.toggle('cmp', TOUCH || VH < 520); }
+function resMore(on) {
+  const c = $('r-card'), b = $('r-more'); c.classList.toggle('more', on); b.setAttribute('aria-expanded', on ? 'true' : 'false');
+  b.textContent = on ? 'Свернуть' : 'Подробнее';
+}
+function resultOpen() {
+  const R = $('result');
+  elMsg.className = 'msg'; elMsg.textContent = '';   // «Нокаут» / «Стоп! Рассечение» would sit over the card
+  show('kdbar', false); show('hud', false); show('hl', false); show('pad', false); show('rec', false);
+  resCompact(); resMore(false);
+  const items = resItems(G.res), big = $('r-big');
+  big.innerHTML = items.map(it => `<div class="rn ${it.cls}${it.v < 0 ? ' neg' : !it.v ? ' zero' : ''}"><b>${it.f(0)}</b><small>${it.label}</small></div>`).join('');
+  const tabs = $('r-tabs'), any = !!tabs.querySelector('tr');
+  tabs.classList.toggle('none', !any); $('r-more').classList.toggle('none', !any);
+  R.hidden = false; resCount(items);
+}
+$('r-more').addEventListener('click', () => resMore(!$('r-card').classList.contains('more')));
+/* the window the men are framed in while the card is up: { s, h } = shift of the frame centre (NDC) and the half width */
+function resWin() {
+  if (G.state !== 'result' || $('result').hidden || window.__camHold) return null;
+  const c = $('r-card'); if (!c || !c.offsetWidth) return null;
+  const a = -CC_FX, b = 2 * c.offsetLeft / VW - 1 - RES.gap, h = (b - a) / 2;
+  return h < RES.minH ? null : { s: -(a + b) / 2, h };
+}
+// skews the projection so the centre of resWin() is the centre of the camera's frame (eased in, dropped at once when the card goes)
+function resView(dt, cut) {
+  const w = resWin(), t = w ? w.s : 0;
+  RES.s = !w ? 0 : cut ? t : RES.s + (t - RES.s) * (1 - Math.exp(-dt * 4));
+  if (Math.abs(RES.s) > 1e-3) camera.setViewOffset(VW, VH, RES.s * VW / 2, 0, VW, VH);
+  else if (camera.view && camera.view.enabled) camera.clearViewOffset();
+  return w;
+}
+// debug: __res.decision([[9, 10], [9, 10]]) = a loss on the cards now (test docs/audit/scenarios/result.js)
+window.__res = { RES, resWin, resItems, open: resultOpen, more: resMore, decision: cards => { G.cards = cards; decision(); } };
 /* ───────── AI ───────── */
 /* opponent styles, after how bare-knuckle bouts actually go: short range, lots of hooks and overhands, fighters who stand and trade,
    counter-punchers who make you miss and make you pay, and pressure fighters who walk you to the ropes with combinations and body shots */
@@ -8592,7 +8701,7 @@ function bagEnd() {
   $('r-title').textContent = rec ? 'Рекорд!' : 'Время'; $('r-title').className = 'rt win';
   $('r-sub').textContent = `очки ${BAG.score} · попаданий ${BAG.hits} · лучшая серия ×${BAG.best} · рекорд ${G.bagBest}`;
   $('r-car').textContent = (BAG.score >= 900 ? 'Готов к титулу' : BAG.score >= 600 ? 'Боевая форма' : BAG.score >= 350 ? 'Неплохо — добавь серий' : 'Разминка') + (bp ? ` · +${bp} ${bp === 1 ? 'очко' : 'очка'} бойцу` : ' · 400+ очков дают очко бойцу');
-  $('r-again').textContent = 'Ещё раз'; $('r-replay').hidden = true; $('result').hidden = false;
+  $('r-again').textContent = 'Ещё раз'; $('r-replay').hidden = true; G.res = { bag: 1, score: BAG.score, best: BAG.best, pts: bp }; resultOpen();
 }
 function updateMenu() {
   renderStats();
@@ -8715,7 +8824,7 @@ function decision() {
   G.winner = win || draw ? P1 : P2; G.loser = G.winner.other; celStart(draw ? null : G.winner, 0.3);   // R-13: the winner's pose (09b_cine.js)
   fightOver(win, draw);
   $('r-title').textContent = draw ? 'Ничья' : win ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (draw ? '' : win ? 'win' : 'lose');
-  $('r-sub').textContent = `решение судей ${t[0]}–${t[1]} · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false;
+  $('r-sub').textContent = `решение судей ${t[0]}–${t[1]} · счёт ${G.wins} : ${G.losses}`; resultOpen();
 }
 // a cut over the eye that keeps running into it: the referee calls time for the doctor; if it can't be controlled, the fight is stopped
 function cutCheck() {
@@ -8725,7 +8834,7 @@ function cutCheck() {
     if (!F.cutLook) { F.cutLook = true; msg('Врач смотрит рассечение'); G.state = 'break'; G.breakT = 3.5; G.doc = true; corner(F, 0.35); return; }
     if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; celStart(A, 0.3); fightOver(A === P1, false, 'tko'); $('pad').hidden = true; if (NET.role) return netResult();   // P2P: the shared result (the guest was left hanging)
       $('r-title').textContent = A === P1 ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (A === P1 ? 'win' : 'lose');
-      $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false; msg('Стоп! Рассечение', 'ko'); return; }
+      $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; resultOpen(); return; }   // (R-09: no «Стоп!» over the card — the line under the title says it)
   }
 }
 function stateTick(dtReal) {
@@ -9613,28 +9722,28 @@ function ccWinCover(cp, cl, W, L) {
    [CC_FB, CC_FT] (the top keeps clear of the HUD bars). A body past an edge first slides the shot (camera and look point together) by
    the overshoot, then the camera backs off along its view until all fit — both continuous, so the eased camera never jumps */
 const CC_FX = 0.86, CC_FT = 0.72, CC_FB = -0.86, _ccE = new V3(), _ccS = new V3();
-function ccFit(cp, cl, Fs) {
+function ccFit(cp, cl, Fs, FX = CC_FX) {   // FX: the half width of the frame (R-09: narrower beside the result card, resWin)
   const tx = Math.tan(camera.fov * Math.PI / 360) * camera.aspect, ty = tx / camera.aspect;
-  for (let it = 0; it < 2; it++) {
+  for (let it = 0, N = FX < CC_FX ? 3 : 2; it < N; it++) {   // a narrow window (the result card) takes a third pass to settle
     const f = _ccF.subVectors(cl, cp).normalize(), r = _ccR.crossVectors(f, _ccU.set(0, 1, 0)).normalize(), u = _ccU.crossVectors(r, f);
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, zs = 0, n = 0;
     const each = fn => { for (const F of Fs) { for (const p of F.jp) fn(p); _ccE.copy(F.headNow); _ccE.y += 0.14; fn(_ccE); } };   // joints + the crown
     each(p => { const d = _ccD.subVectors(p, cp), z = Math.max(0.3, d.dot(f)), nx = d.dot(r) / (z * tx), ny = d.dot(u) / (z * ty);
       x0 = Math.min(x0, nx); x1 = Math.max(x1, nx); y0 = Math.min(y0, ny); y1 = Math.max(y1, ny); zs += z; n++; });
-    if (x0 >= -CC_FX && x1 <= CC_FX && y0 >= CC_FB && y1 <= CC_FT) return;
+    if (x0 >= -FX && x1 <= FX && y0 >= CC_FB && y1 <= CC_FT) return;
     const zm = zs / n, cy = (CC_FT + CC_FB) / 2;
-    const sx = x0 < -CC_FX && x1 > CC_FX ? (x0 + x1) / 2 : x0 < -CC_FX ? x0 + CC_FX : x1 > CC_FX ? x1 - CC_FX : 0;
+    const sx = x0 < -FX && x1 > FX ? (x0 + x1) / 2 : x0 < -FX ? x0 + FX : x1 > FX ? x1 - FX : 0;
     const sy = y0 < CC_FB && y1 > CC_FT ? (y0 + y1) / 2 - cy : y0 < CC_FB ? y0 - CC_FB : y1 > CC_FT ? y1 - CC_FT : 0;
     _ccS.copy(r).multiplyScalar(sx * zm * tx).addScaledVector(u, sy * zm * ty); cp.add(_ccS); cl.add(_ccS);
     let back = 0;
     each(p => { const d = _ccD.subVectors(p, cp), z = d.dot(f), yr = d.dot(u);
-      back = Math.max(back, Math.max(Math.abs(d.dot(r)) / (CC_FX * tx), yr > 0 ? yr / (CC_FT * ty) : -yr / (-CC_FB * ty)) - z); });
+      back = Math.max(back, Math.max(Math.abs(d.dot(r)) / (FX * tx), yr > 0 ? yr / (CC_FT * ty) : -yr / (-CC_FB * ty)) - z); });
     cp.addScaledVector(f, -Math.min(back, 3)); cp.y = Math.max(0.4, cp.y);
   }
 }
 /* swing the wanted camera _cp about _cl (k ≥ 1e3 = a scripted move: left alone). down = [winner, loser] in kd / ko / result */
-function camClear(dt, down, fit) {
-  if (fit) ccFit(_cp, _cl, fit);
+function camClear(dt, down, fit, FX) {
+  if (fit) ccFit(_cp, _cl, fit, FX);
   const vis = RINGSET.visible;
   if (!vis && !down) CC.want = 0; else {
     const P = vis ? ccPostsWorld() : [], T = ccTargets(), lim = down ? CC_KO : CC_YAW;
@@ -9705,6 +9814,7 @@ function camKick(dt) {
 window.__hitFeel = { HITK, SHK, HS_LOG, hitStop };   // debug (R-04): the constants, the shake state, the recent freezes
 function camUpdate(dt) {
   camClock += dt; let k = 4;
+  const rw = resView(dt, camCut || CC.st !== G.state);   // R-09: the result card covers the right — the frame is skewed and narrowed to the space left of it (07c_result.js)
   // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
   if (window.__camHold) { const h = window.__camHold; camera.position.set(h.p[0], h.p[1], h.p[2]); camera.lookAt(h.l[0], h.l[1], h.l[2]); camP.copy(camera.position); camL.set(h.l[0], h.l[1], h.l[2]); return; }
   if (NET.guest && NET.started) return netGuestCam(dt, _cp, _cl);   // issue 49: the guest sees the fight from behind his own man
@@ -9776,7 +9886,7 @@ function camUpdate(dt) {
   const down = st === 'kd' && G.kd ? [G.kd.att, G.kd.def] : (st === 'ko' || st === 'result') && G.loser && G.winner ? [G.winner, G.loser] : null;
   // whole men in the shot: the standing man joins once the push-in on the fall is over (kd: after 1 s; ko: from the two-shot reveal)
   const fit = !down ? null : st === 'result' || (st === 'kd' ? G.t - G.kd.t0 > 1 : G.t - G.koCine > 1.45) ? down : [down[1]];
-  if (k < 1e3 && !window.__camOff && st !== 'menu' && st !== 'rend' && st !== 'talk' && !(st === 'intro' && G.stareT && G.introT >= 0 && G.introT < G.stareT - 0.6)) camClear(dt, down, fit);
+  if (k < 1e3 && !window.__camOff && st !== 'menu' && st !== 'rend' && st !== 'talk' && !(st === 'intro' && G.stareT && G.introT >= 0 && G.introT < G.stareT - 0.6)) camClear(dt, down, fit, rw ? rw.h : CC_FX);
   else CC.yaw = CC.want = 0;
   if (camCut) { camP.copy(_cp); camL.copy(_cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * k); camP.lerp(_cp, a); camL.lerp(_cl, a); }
@@ -14695,13 +14805,14 @@ function netPing(rtt) {
 }
 function netShowResult(win, draw) {
   show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', false); show('pad', false);
-  show('result', true); show('net-drop', false);
+  show('net-drop', false);
   $('r-car').textContent = ''; $('r-stats').innerHTML = '';
   try { payShow(null); } catch (e) {}
   $('r-replay').hidden = true; $('r-again').textContent = 'Реванш';
   $('r-title').textContent = draw ? 'Ничья' : win ? 'Победа' : 'Нокаут';
   $('r-title').className = 'rt ' + (draw ? '' : win ? 'win' : 'lose');
   $('r-sub').textContent = draw ? 'решение судей' : win ? 'соперник на полу' : 'ты на полу';
+  G.res = null; resultOpen();   // R-09: the card without the big numbers (a P2P bout pays nothing)
 }
 function netResult() {   // host: startReplay() is diverted here (07_state_replay_hits.js)
   if (NET.over && NET.over.sent) return;
@@ -14972,7 +15083,7 @@ function storyOut(win) {
   if (G.storyOut) return false;
   G.storyOut = true;
   const lines = win ? ch.outro : ch.outroLose;
-  storyTalk(lines, () => { G.state = 'result'; camCut = true; show('result', true); });
+  storyTalk(lines, () => { G.state = 'result'; camCut = true; resultOpen(); });
   return true;
 }
 /* «Реванш / Дальше» on the result screen (r-again routes here through startFight's dispatch) */

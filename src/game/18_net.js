@@ -433,13 +433,14 @@ function netPing(rtt) {
 }
 function netShowResult(win, draw) {
   show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', false); show('pad', false);
-  show('result', true); show('net-drop', false);
+  show('net-drop', false);
   $('r-car').textContent = ''; $('r-stats').innerHTML = '';
   try { payShow(null); } catch (e) {}
   $('r-replay').hidden = true; $('r-again').textContent = 'Реванш';
   $('r-title').textContent = draw ? 'Ничья' : win ? 'Победа' : 'Нокаут';
   $('r-title').className = 'rt ' + (draw ? '' : win ? 'win' : 'lose');
   $('r-sub').textContent = draw ? 'решение судей' : win ? 'соперник на полу' : 'ты на полу';
+  G.res = null; resultOpen();   // R-09: the card without the big numbers (a P2P bout pays nothing)
 }
 function netResult() {   // host: startReplay() is diverted here (07_state_replay_hits.js)
   if (NET.over && NET.over.sent) return;

@@ -198,6 +198,36 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .rs{font-family:var(--mono);font-size:13px;color:#cfc8ba;letter-spacing:.06em}
 .rb{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:10px}
 .rb .pri,.go{background:linear-gradient(180deg,rgba(194,34,53,.95),rgba(130,18,32,.95));border-color:rgba(255,130,130,.4)}
+/* R-09: the result card. Desktop: a panel on the right (the camera frames the men in the space left of it), every text ≥ 13 px;
+   .cmp (short / touch stage): narrower panel, the tables folded behind «Подробнее», text ≥ 12 px; buttons ≥ 44 px everywhere */
+.result{display:block;background:linear-gradient(90deg,rgba(5,6,9,0) 35%,rgba(5,6,9,.4));padding:0}
+.rcard{position:absolute;right:calc(var(--pr) + 1vw);top:50%;transform:translateY(-50%);width:min(760px,60%);max-height:calc(100% - var(--pt) - var(--pb));overflow:auto;
+  display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 22px 18px;box-sizing:border-box;text-align:center;
+  background:rgba(9,11,16,.7);border:1px solid rgba(255,255,255,.1);border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.45);
+  animation:rcin .45s cubic-bezier(.2,1.2,.4,1);scrollbar-width:thin}
+@keyframes rcin{from{opacity:0;transform:translate(30px,-50%)}to{opacity:1;transform:translateY(-50%)}}
+.rcard .rt{font-size:clamp(44px,11vmin,92px);line-height:1.02}
+.rcard .rs{font-size:14px;line-height:1.3}.rcard .rs.car{color:var(--gold)}.rcard .rs:empty{display:none}
+.rbig{display:flex;justify-content:center;gap:10px;width:100%;margin:4px 0 2px}.rbig:empty{display:none}
+.rbig .rn{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 6px 7px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+.rbig .rn b{font-family:var(--display);font-weight:900;font-size:clamp(28px,6vmin,44px);line-height:1;color:var(--text);white-space:nowrap;font-variant-numeric:tabular-nums}
+.rbig .rn.cash b{color:var(--gold)}.rbig .rn.fans b{color:#9fdca8}.rbig .rn.pts b{color:#f1e3c2}.rbig .rn.neg b{color:#e58a8a}.rbig .rn.zero b{color:var(--muted)}
+.rbig .rn small{font:500 13px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:#bdb6a8;white-space:nowrap}
+.rmore{display:none;min-height:44px;padding:0 18px;border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:6px;font:600 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#d8d2c6}
+.rmore::after{content:' ▾'}.rmore[aria-expanded="true"]::after{content:' ▴'}
+.rcard .rtabs{flex-wrap:wrap;gap:6px 22px;width:100%}.rcard .rtabs.none{display:none}
+.rcard .fstats,.rcard .fstats td,.rcard .fstats td:nth-child(2),.rcard .fstats.pay td,.rcard .fstats.pay td.l,.rcard .fstats.pay td.h,.rcard .fstats.pay td.new,.rcard .fstats.pay td:nth-child(2){font-size:13px;line-height:1.35}
+.rcard .fstats td{padding:1px 6px}.rcard .fstats:empty{display:none}
+.rcard .rb{margin-top:6px}.rcard .rb button{min-height:44px}
+.rcard.cmp{width:min(436px,60%);gap:6px;padding:10px 12px 12px}
+.rcard.cmp .rt{font-size:clamp(36px,12vmin,64px)}
+.rcard.cmp .rs{font-size:12px}
+.rcard.cmp .rbig .rn{padding:5px 4px}.rcard.cmp .rbig .rn b{font-size:clamp(22px,7vmin,32px)}.rcard.cmp .rbig .rn small{font-size:12px;letter-spacing:.03em}
+.rcard.cmp .rmore{display:block}.rcard.cmp .rmore.none{display:none}.rcard.cmp .rtabs{display:none}
+.rcard.cmp.more{width:min(720px,calc(100% - var(--pl) - var(--pr)))}.rcard.cmp.more .rtabs{display:flex}.rcard.cmp.more .rbig,.rcard.cmp.more .rt,.rcard.cmp.more .rs{display:none}
+.rcard.cmp .fstats,.rcard.cmp .fstats td,.rcard.cmp .fstats td:nth-child(2),.rcard.cmp .fstats.pay td,.rcard.cmp .fstats.pay td.l,.rcard.cmp .fstats.pay td.h,.rcard.cmp .fstats.pay td.new,.rcard.cmp .fstats.pay td:nth-child(2){font-size:12px}
+.rcard.cmp .rb{margin-top:2px;gap:8px}.rcard.cmp .rb button{font-size:15px;padding:0 12px}
+@media (prefers-reduced-motion:reduce){.rcard{animation:none}}
 
 /* menu */
 .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
@@ -579,12 +609,18 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <div class="hl" id="hl" hidden><b>Лучшее в раунде</b><span id="hl-s"></span></div>
   <div class="rec" id="rec" hidden><i></i>ПОВТОР<button id="skip">Пропустить</button></div><div class="rpcap" id="rp-cap"></div>
 
+  <!-- R-09: the result card (07c_result.js) — a dark panel at the side, the men framed beside it (resWin → ccFit);
+       three big numbers that count up (₽, followers, fighter points), the tables under them (folded behind «Подробнее» on a phone) -->
   <div class="result" id="result" hidden>
-    <div class="rt" id="r-title">Победа</div>
-    <div class="rs" id="r-sub"></div>
-    <div class="rs car" id="r-car"></div>
-    <div class="rtabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table><table class="fstats pay" id="r-soc"></table></div>
-    <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
+    <div class="rcard" id="r-card">
+      <div class="rt" id="r-title">Победа</div>
+      <div class="rs" id="r-sub"></div>
+      <div class="rs car" id="r-car"></div>
+      <div class="rbig" id="r-big"></div>
+      <button type="button" class="rmore" id="r-more" aria-expanded="false">Подробнее</button>
+      <div class="rtabs" id="r-tabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table><table class="fstats pay" id="r-soc"></table></div>
+      <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
+    </div>
   </div>
 
   <!-- main menu: logo, the column of modes; the scene (the fighter warming up in the current location) shows through -->
