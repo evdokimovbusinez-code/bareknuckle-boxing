@@ -417,7 +417,7 @@ class Fighter {
       if (!fight) tgt = 0;
       else if (this === P2 && !NET.host) {   // he keeps his range (a P2P guest's man holds where the guest left him — he was pulled back to 1.13 m): closes if you back off (a little slower than you can retreat), steps off if crowded
         // R-10: AI.open — the man never defends: he stays in his face instead of giving ground (08_ai_flow.js, AI_MEM.oIn)
-        const op = AI.open || 0, want = 1.13 - AI.style.adv - (this.cur && !this.release ? 0.08 : 0) + (this.daze > 0.5 ? 0.12 * this.daze : 0) + (AI.backT > G.t ? 0.45 * (1 - op) : 0) - AI_MEM.oIn * op;
+        const op = AI.open || 0, want = 1.13 - aiAdv() - (this.cur && !this.release ? 0.08 : 0) + (this.daze > 0.5 ? 0.12 * this.daze : 0) + (AI.backT > G.t ? 0.45 * (1 - op) : 0) - AI_MEM.oIn * op;
         tgt = a + (dist - want);
       } else { if (this.hold == null) this.hold = a; tgt = this.hold + (this.cur && !this.release ? 0.09 : 0); }
       if (G.state === 'kd' && G.kd && G.kd.att === this) tgt = a + (dist - 1.6);   // the referee sends him away while the other man is counted
@@ -468,7 +468,7 @@ class Fighter {
     this.cur = n; this.release = false; this.resolved = false; this.whiff = false; this.punchId++; this.dodge = null; this.aimArm = P.arm;
     this.bodyShot = (P.type === 'straight' || P.type === 'hook') && this.wantBody; this.wantBody = false;
     if (this.bodyShot) { const kn = this.knuckle(_v1), o = this.other.ribs; this.ribIdx = o[0].w.distanceTo(kn) < o[1].w.distanceTo(kn) ? 0 : 1; }
-    this.stamina = Math.max(0, this.stamina - P.sta * (1 - 0.05 * SK(this, 'sta')) * (this.heavy ? 1.7 : 1)); this.staT = G.t + 0.55 + (this.stamina < 10 ? 0.35 : 0);
+    this.stamina = Math.max(0, this.stamina - P.sta * (1 - 0.05 * SK(this, 'sta')) * (this.heavy ? 1.7 : 1) * aiTraitK(this, 'sta'));   // R-11: a ladder man's trait (the marathon man ×0.55) this.staT = G.t + 0.55 + (this.stamina < 10 ? 0.35 : 0);
   }
   startDodge(type) { this.dodge = { type, t: 0 }; this.stamina = Math.max(0, this.stamina - 4); this.staT = G.t + 0.3; }
   knuckle(v) { return v.setFromMatrixPosition(this.bones[`CC_Base_${this.aimArm}_Mid1`].matrixWorld); }
@@ -669,7 +669,7 @@ class Fighter {
       this.rxFollow = null;
       s.sp.v += (dm.z * 2.4 - dm.y * 1.2) * k * kt; s.sr.v -= dm.x * 2.2 * k * kt; s.hz.v += dm.z * 1.5 * k * kt;
     }
-    if (G.t > this.staT) this.stamina = Math.min(100, this.stamina + 26 * dt * (1 + 0.08 * SK(this, 'sta')));
+    if (G.t > this.staT) this.stamina = Math.min(100, this.stamina + 26 * dt * (1 + 0.08 * SK(this, 'sta')) * aiTraitK(this, 'reg'));
     // holding the guard costs a little breath; keep the regen paused while it is up so the drain is net (issue 41)
     if (G.state === 'fight' && this.blockW > 0.55 && !this.cur && !(this.guardDown > G.t)) {
       this.stamina = Math.max(0, this.stamina - BLK.holdDrain * dt);

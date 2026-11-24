@@ -53,7 +53,7 @@ function tutStart() {
   P1.resetState(); P2.resetState(); P1.speed = 1.5; P2.speed = 1;
   Q.length = 0; HELD.clear(); MV.kx = MV.ky = MV.sx = MV.sy = 0; setMove(); setBlock(false);
   Object.assign(AI, { blockUntil: 0, t: 9, combo: 0, dodgeAt: 0, backT: 0, lat: 0, latT: 0, seen: -1, feintAt: 0, gestT: 5 });
-  AI.style = STYLES.brawler;
+  AI.style = STYLES.brawler; AI.trait = null;
   ARENA.position.set(0, 0, 0); ARENA.rotation.y = 0;
   G.state = 'fight'; G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0;
   G.round = 1; G.roundT = ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0];

@@ -156,7 +156,7 @@ function storyPlay(i) {
     setLocation(ch.fight.loc, 'wait');   // a cold place: the loading screen until it is ready (17_loc_load.js)
     showP2(true); P2.applyLook({ ...ch.fight.look, street: true });
     storyDress(ch);   // R-17: the hero in the chapter's clothes
-    AI.style = STYLES[ch.fight.st] || STYLES.brawler; $('n2').textContent = ch.fight.nm;
+    AI.style = STYLES[ch.fight.st] || STYLES.brawler; AI.trait = TRAITS[ch.fight.trait] || null;$('n2').textContent = ch.fight.nm;
     const sl = $('st2'); if (sl) sl.textContent = AI.style.label;
     P1.resetState(); P2.resetState(); sfx.unlock();
     storyTalk(ch.intro, storyFightGo);

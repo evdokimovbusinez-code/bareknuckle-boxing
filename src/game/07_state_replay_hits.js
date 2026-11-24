@@ -23,7 +23,9 @@ const REACT = {
   kdGassed: 0.45, // R-10: … and when his tank is empty (0 → this as stamina 20 → 0; was 0)
   gas: 0.2,       // R-10: punchK (power) of a punch thrown at 0 stamina, rising to 1 at 45 (Fighter.startPunch; was 0.45)
 };
-const DIFFS = { easy: { label: 'Лёгкий', dodge: 0.18, read: 0.5, gap: 1.9, speed: 1.0, toAI: 1.25, toMe: 0.75 }, normal: { label: 'Норм', dodge: 0.4, read: 0.7, gap: 1.35, speed: 1.15, toAI: 1, toMe: 1 }, hard: { label: 'Жёсткий', dodge: 0.6, read: 0.86, gap: 0.95, speed: 1.3, toAI: 0.9, toMe: 1.15 } };
+/* R-11: toAI / toMe (damage scale of the player's / the AI's punches) were 1.25 / 0.75 on easy and 0.9 / 1.15 on hard — now ≤ ±10 %;
+   the difference between the levels is in reaction (dodge, read), pace (gap, speed) and the fight plan (aiPlanK, 08_ai_flow.js) */
+const DIFFS = { easy: { label: 'Лёгкий', dodge: 0.18, read: 0.5, gap: 1.9, speed: 1.0, toAI: 1.1, toMe: 0.9 }, normal: { label: 'Норм', dodge: 0.4, read: 0.7, gap: 1.35, speed: 1.15, toAI: 1, toMe: 1 }, hard: { label: 'Жёсткий', dodge: 0.6, read: 0.86, gap: 0.95, speed: 1.3, toAI: 0.9, toMe: 1.1 } };
 const G = { state: 'load', t: 0, real: 0, hitstop: 0, slow: 1, slowT: 0, shake: 0, koT: 0, koCine: 0, koTitle: false, introT: 0, winner: null, loser: null, wins: 0, losses: 0, diff: 'normal', fallSnd: false };
 /* issue 46 — the knockout / knockdown cutscene, in seconds and fractions of speed.
    was: KO hitstop 0.09 / 0.3× for 0.75 s, the «Нокаут!» plate at the punch, the replay at koT + 2.3 s;
@@ -46,23 +48,24 @@ const careerWins = () => G.career + PROF.champ * LADDER.length;   // wraps unloc
    The road of a street fighter: the yard (1–2) → tyres and fire (3–4) → the underground parking (5–6) → the warehouse cage (7),
    and the title fight (8) in the same cage with the whole crowd in (crowd = the share of the place's crowd that came, CROWD.fill).
    name / nm: his name and the nickname he fights under; legend: one line for the card before the fight (fightCard, 09_bag.js);
+   trait: his manner, a key of TRAITS (08_ai_flow.js, R-11) — punch weights, range, stamina, the plan he falls back to;
    look: what he always wears — a street outfit of 04d_street.js fixed per man (startCareer), not a random one */
 const LADDER = [
-  { nm: 'Лом', name: 'Гена Рыжов', st: 'brawler', diff: 'easy', loc: 'yard', legend: 'Гроза своего подъезда. Бьёт размашисто и ждёт, что ты испугаешься раньше, чем он устанет.',
+  { nm: 'Лом', name: 'Гена Рыжов', st: 'brawler', trait: 'haymaker', diff: 'easy', loc: 'yard', legend: 'Гроза своего подъезда. Бьёт размашисто и ждёт, что ты испугаешься раньше, чем он устанет.',
     look: { skin: 'light', hair: 'bald', beard: 'stubble', tats: ['neck'], bottom: 'sweatS', top: 'tank', shoes: 'sneak', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'black' } },
-  { nm: 'Кабан', name: 'Толя Брагин', st: 'brawler', diff: 'easy', loc: 'yard', legend: 'Грузчик с овощной базы. Сто десять кило идут вперёд и не знают, как это — назад.',
+  { nm: 'Кабан', name: 'Толя Брагин', st: 'brawler', trait: 'ram', diff: 'easy', loc: 'yard', legend: 'Грузчик с овощной базы. Сто десять кило идут вперёд и не знают, как это — назад.',
     look: { skin: 'olive', hair: 'dbrown', hairStyle: 'crew', beard: 'boxed', tats: ['band'], bottom: 'cargo', top: 'teeG', shoes: 'boots', wraps: 'white', hands: 'wraps', guard: 'black', shorts: 'green' } },
-  { nm: 'Грек', name: 'Костя Маврин', st: 'counter', diff: 'normal', loc: 'tires', legend: 'Недоучился на хирурга. Знает, где у человека печень, и спокойно ждёт твоей ошибки.',
+  { nm: 'Грек', name: 'Костя Маврин', st: 'counter', trait: 'liver', diff: 'normal', loc: 'tires', legend: 'Недоучился на хирурга. Знает, где у человека печень, и спокойно ждёт твоей ошибки.',
     look: { skin: 'tan', hair: 'black', hairStyle: 'slick', beard: 'goatee', tats: ['chest', 'sleeve'], bottom: 'jeansB', top: 'none', shoes: 'keds', wraps: 'black', hands: 'wraps', guard: 'clear', shorts: 'blue' } },
-  { nm: 'Шрам', name: 'Вадим Чернов', st: 'pressure', diff: 'normal', loc: 'tires', legend: 'Шрам через бровь — память о первом бое у бочек. С тех пор огонь видел только его победы.',
+  { nm: 'Шрам', name: 'Вадим Чернов', st: 'pressure', trait: 'dirty', diff: 'normal', loc: 'tires', legend: 'Шрам через бровь — память о первом бое у бочек. С тех пор огонь видел только его победы.',
     look: { skin: 'light', hair: 'bleach', hairStyle: 'mohawk', beard: 'none', tats: ['face', 'knuckles', 'ribs'], bottom: 'jeansL', top: 'tankB', shoes: 'sneakB', wraps: 'red', hands: 'wraps', guard: 'red', shorts: 'red' } },
-  { nm: 'Молот', name: 'Руслан Гатин', st: 'brawler', diff: 'normal', loc: 'parking', legend: 'Днём правит кузова кувалдой, ночью — челюсти правой. На минус втором этаже его ставка всегда первая.',
+  { nm: 'Молот', name: 'Руслан Гатин', st: 'brawler', trait: 'hammer', diff: 'normal', loc: 'parking', legend: 'Днём правит кузова кувалдой, ночью — челюсти правой. На минус втором этаже его ставка всегда первая.',
     look: { skin: 'deep', hair: 'black', hairStyle: 'dreads', beard: 'strap', bottom: 'jeans', top: 'teeB', shoes: 'sneakB', wraps: 'white', hands: 'mma', guard: 'black', shorts: 'black' } },
-  { nm: 'Седой', name: 'Аркадий Вершин', st: 'counter', diff: 'hard', loc: 'parking', legend: 'Двадцать лет в подвалах и гаражах. Быстрых он не боится — он их пересиживает.',
+  { nm: 'Седой', name: 'Аркадий Вершин', st: 'counter', trait: 'marathon', diff: 'hard', loc: 'parking', legend: 'Двадцать лет в подвалах и гаражах. Быстрых он не боится — он их пересиживает.',
     look: { skin: 'light', hair: 'grey', hairStyle: 'classic', beard: 'full', bottom: 'pants', top: 'teeW', shoes: 'keds', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'white' } },
-  { nm: 'Бизон', name: 'Тимур Салаев', st: 'pressure', diff: 'hard', loc: 'warehouse', crowd: 0.55, legend: 'Вернулся с северной вахты злым. В клетке вжимает в сетку и не даёт вдохнуть.',
+  { nm: 'Бизон', name: 'Тимур Салаев', st: 'pressure', trait: 'cage', diff: 'hard', loc: 'warehouse', crowd: 0.55, legend: 'Вернулся с северной вахты злым. В клетке вжимает в сетку и не даёт вдохнуть.',
     look: { skin: 'dark', hair: 'black', hairStyle: 'rows', beard: 'boxed', tats: ['back', 'band'], bottom: 'sweatG', top: 'none', shoes: 'boots', wraps: 'black', hands: 'mma', guard: 'blue', shorts: 'purple' } },
-  { nm: 'Кувалда', name: 'Захар Громов', st: 'brawler', diff: 'hard', loc: 'warehouse', crowd: 1, champ: true, legend: 'Хозяин склада и пояса. Из тех, кто вышел против него, своими ногами не ушёл никто.',
+  { nm: 'Кувалда', name: 'Захар Громов', st: 'brawler', trait: 'southpaw', diff: 'hard', loc: 'warehouse', crowd: 1, champ: true, legend: 'Хозяин склада и пояса. Из тех, кто вышел против него, своими ногами не ушёл никто.',
     look: { skin: 'brown', hair: 'bald', beard: 'full', tats: ['chest', 'back', 'sleeve', 'neck'], bottom: 'jeansB', top: 'none', shoes: 'boots', wraps: 'gold', hands: 'wraps', guard: 'gold', shorts: 'black' } }];
 const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1)].loc; return LOCS[id] ? id : G.loc; };
 // «Склад · аншлаг»: the place of career fight i as the menu, the card and the result screen name it
