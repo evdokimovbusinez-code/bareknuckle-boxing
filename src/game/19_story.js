@@ -161,11 +161,24 @@ function storyTalkKey(e) {
    Was (#51) 0.52 m from the head in near profile: the face was cut and the other man's hand filled the corner (mode-story-dlg2.jpg).
    From (f·0.38, 1.02) — 1.09 m — the other man's lead hand is ~38° off the lens axis, outside the 28° (vertical, 48° wide) lens.
    The aim 0.13 m under the eyes puts the crown at ~10 % and the chin at ~55 % of the frame height (above the box with answers, 64 %). */
-const TALK_CAM = { fwd: 0.38, side: 1.02, eye: 0.07, drop: 0.13 };   // m: forward of the head, out to +z, eyes above the head bone, aim below the eyes
+/* Issue 81: that 1.09 m still cut the face under the box (desk-modes-story-dlg2; on a phone the box is half the frame). Now the shot is
+   fitted to the box: the span crown (head bone + crown) … chest (head bone − chest) goes between NDC top and the box's real top edge
+   (+ gap), which gives the distance (min … max m); the lens looks level (no tilt: the man stays upright), 3/4 from his front side
+   (ang rad off +z towards the other man), and the look point is shifted so his head sits at NDC x = −f·lead — the room on the screen is
+   on the side he talks to */
+const TALK_CAM = { ang: 0.42, crown: 0.17, chest: 0.4, top: 0.84, gap: 0.08, lead: 0.3, min: 1.2, max: 3.4 };
+function talkBoxNdc() {   // NDC y of the top of the dialog box (−0.4 when no box is up)
+  const st = $('stage'), b = document.querySelector('#dlg .dlg-box'), d = $('dlg');
+  if (!st || !b || d.hidden || !st.offsetHeight) return -0.4;
+  return 1 - 2 * (d.offsetTop + b.offsetTop) / st.offsetHeight;
+}
 function talkCam() {
   if (DLG.who === 'p' || DLG.who === 'o') {
-    const F = DLG.who === 'p' ? P1 : P2, h = F.headNow, f = Math.sign(F.other.headNow.x - h.x) || 1, C = TALK_CAM, ey = h.y + C.eye;
-    _cp.set(h.x + f * C.fwd, ey, h.z + C.side); _cl.set(h.x + f * 0.03, ey - C.drop, h.z); return 6;
+    const F = DLG.who === 'p' ? P1 : P2, h = F.headNow, f = Math.sign(F.other.headNow.x - h.x) || 1, C = TALK_CAM;
+    const t = Math.tan(camera.fov * Math.PI / 360), yb = Math.min(0.2, talkBoxNdc() + C.gap);
+    const D = clamp((C.crown + C.chest) / ((C.top - yb) * t), C.min, C.max), s = Math.sin(C.ang), c = Math.cos(C.ang);
+    const y = h.y + C.crown - C.top * D * t, sh = f * C.lead * D * t * camera.aspect;   // lens height; sideways shift of the aim (m)
+    _cp.set(h.x + f * s * D, y, h.z + c * D); _cl.set(h.x + c * sh, y, h.z - f * s * sh); return 6;
   }
   const mx = (P1.headNow.x + P2.headNow.x) * 0.5;
   _cp.set(mx, 1.16, 3.1); _cl.set(mx, 0.94, 0); return 2.6;

@@ -12,7 +12,8 @@
 | `run_all.sh` | всё по порядку |
 | `bake_tee.py` | ручная футболка: лоуполи `tshirt_game` (QuadriFlow 6k квадов, кромки как острые петли, Smart UV) + normal с high (Cycles, 1024 px, ~4 с) → `assets/tee_hand_n.png`, `out/tshirt_baked.blend` (открыть и крутить — Material Preview) |
 | `user_tee.py` | ручная футболка → игра: веса с тела, обратный скиннинг T-поза → bind A-поза, экспорт `assets/tee_hand.json` (запуск — в шапке файла) |
-| `tee_game.py` | **#57, всё в одном:** веса, обратный скиннинг + проверки (Armature-модификатор, ткань в теле, удар плечом 80° для Decimate и QuadriFlow), Smart UV, запекание normal 1024 + AO 512 → `assets/cloth/tee.glb`, `tee_n.webp`, `tee_ao.webp` (запуск — в шапке файла) |
+| `tee_game.py` | **#57, всё в одном:** веса, обратный скиннинг + проверки (Armature-модификатор, ткань в теле, удар плечом 80° для Decimate и QuadriFlow), Smart UV, запекание normal 1024 → `assets/cloth/tee.glb`, `tee_n.webp` (запуск — в шапке файла). AO с #81 не печётся: пятна от двух слоёв ткани, а складки и контакт с телом и так затеняет экранный AO игры |
+| `tee_lo.js` | **#81:** лёгкая футболка для графики «низкая»: `tee.glb` прорежена до ≤ 3000 треугольников схлопыванием рёбер в вершину (uv не меняются → та же `tee_n.webp`) → `assets/cloth/tee_lo.glb`. Запускается в отладочной странице (команда — в шапке файла): `bpy` у бота нет |
 | `user/tshirt_src.blend` | **футболка, сделанная вручную в Blender** (лучшая на сейчас): `tshirt_high` (21,6k тр.), `tshirt_low` (1,9k, Decimate), тело CC3 + скелет `CC3_Base_Plus` |
 
 `out/` в .gitignore — пересоздаётся скриптами.

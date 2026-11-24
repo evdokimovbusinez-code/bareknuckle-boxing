@@ -89,27 +89,61 @@ function ccFit(cp, cl, Fs, FX = CC_FX) {   // FX: the half width of the frame (R
     cp.addScaledVector(f, -Math.min(back, 3)); cp.y = Math.max(0.4, cp.y);
   }
 }
-/* swing the wanted camera _cp about _cl (k ≥ 1e3 = a scripted move: left alone). down = [winner, loser] in kd / ko / result */
+/* issue 81: how much of the frame a corner post takes, seen from cp looking at cl — the screen box of its cylinder (the pad's radius,
+   canvas to CC_TOP) clipped to the frame, as a share of the frame (0 … 1). A post at the camera's side of the pair, under ~2.5 m from
+   the lens, fills a tenth of the shot or more (at 1 m: a fifth — the red smear of desk-fight-f4) */
+const CC_FRAC = 0.03, CC_LIFT = [0, 0.35, 0.7, 1.05], _ccQ = new V3(), _ccK = new V3();
+const CC_PB = [], CC_PD = [];   // screen boxes [x0, y0, x1, y1] of the bare post and of its pad, clipped to the frame
+function ccCyl(w, r, h0, h1, cp, cl, out) {   // → false when the cylinder is wholly behind the lens
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, front = false;
+  for (let i = 0; i < 16; i++) {
+    const a = i * Math.PI / 4, n = ccNdc(_ccK.set(w.x + r * Math.cos(a), i & 8 ? h1 : h0, w.z + r * Math.sin(a)), cp, cl, _ccQ);
+    if (n.z > 0.05) front = true;
+    x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y);
+  }
+  out[0] = Math.max(-1, x0); out[1] = Math.max(-1, y0); out[2] = Math.min(1, x1); out[3] = Math.min(1, y1); return front;
+}
+const ccArea = b => Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+// the post as built (src/boxer.html): r 0.05 from the canvas to 1.45 m, its pad r 0.09 from 0.445 to 1.395 m — union of the two boxes
+function ccPostFrac(w, cp, cl) {
+  const f1 = ccCyl(w, 0.05, 0, CC_TOP, cp, cl, CC_PB), f2 = ccCyl(w, CC_PAD, 0.445, 1.395, cp, cl, CC_PD);
+  if (!f1 && !f2) return 0;
+  const ov = Math.max(0, Math.min(CC_PB[2], CC_PD[2]) - Math.max(CC_PB[0], CC_PD[0])) * Math.max(0, Math.min(CC_PB[3], CC_PD[3]) - Math.max(CC_PB[1], CC_PD[1]));
+  return (ccArea(CC_PB) + ccArea(CC_PD) - ov) / 4;
+}
+const ccPostsFrac = (P, cp, cl) => { let s = 0; for (const p of P) s += ccPostFrac(p.w, cp, cl); return s; };
+/* swing the wanted camera _cp about _cl (k ≥ 1e3 = a scripted move: left alone). down = [winner, loser] in kd / ko / result.
+   Issue 81: a post that would take more than CC_FRAC of the frame weighs heavily — the arc goes round it, and if no swing within the
+   limit clears it the camera also rises (CC_LIFT, m; the post then sits low in the shot under the men) */
 function camClear(dt, down, fit, FX) {
   if (fit) ccFit(_cp, _cl, fit, FX);
   const vis = RINGSET.visible;
-  if (!vis && !down) CC.want = 0; else {
+  if (!vis && !down) CC.want = CC.wantL = 0; else {
     const P = vis ? ccPostsWorld() : [], T = ccTargets(), lim = down ? CC_KO : CC_YAW;
     // the down man's side (+1 = towards +x): the task sends the camera there; the other way is allowed too, at a small price
     const side = down ? Math.sign(ccPt(down[1], -1, _ccD).x - ccPt(down[0], -1, _ccC).x) || 1 : 0;
-    let best = 0, bc = Infinity;
-    for (let i = -16; i <= 16; i++) {
-      const a = i / 16 * lim, cp = ccOrbit(_cp, _cl, a, _ccO);
-      let blk = 0; for (const p of P) for (const t of T) { const g = ccGap(p.w, cp, t); if (g < CC_R) blk += 1 - g / CC_R; }
-      const cov = down ? ccWinCover(cp, _cl, down[0], down[1]) : 0;
-      // the standing man weighs more than a post (a post can still fade in camFade, he can't); then: small swings, and stay put
-      const c = 10 * blk + 15 * cov + 0.6 * Math.abs(a) / CC_YAW + 0.5 * Math.abs(a - CC.yaw) / CC_YAW + (down && a * side < 0 ? 0.3 : 0);
-      if (c < bc) { bc = c; best = a; }
+    let best = 0, bl = 0, bc = Infinity, y0 = _cp.y;
+    for (const lift of CC_LIFT) {
+      if (lift && (bc < 1.5 || CC.noFrac)) break;   // a swing alone did it: stay at the wanted height (debug CC.noFrac: issue 81 off)
+      _cp.y = y0 + lift;
+      for (let i = -22; i <= 22; i++) {   // past ±16 (the R-03 limit): only to clear a post, at a price
+        const a = i / 16 * lim, cp = ccOrbit(_cp, _cl, a, _ccO);
+        if (Math.abs(i) > 16 && (CC.noFrac || !P.length)) continue;
+        let blk = 0; for (const p of P) for (const t of T) { const g = ccGap(p.w, cp, t); if (g < CC_R) blk += 1 - g / CC_R; }
+        const cov = down ? ccWinCover(cp, _cl, down[0], down[1]) : 0, fr = P.length && !CC.noFrac ? Math.max(0, ccPostsFrac(P, cp, _cl) - CC_FRAC) : 0;
+        // the standing man weighs more than a post (a post can still fade in camFade, he can't); then: small swings, and stay put
+        const c = 10 * blk + 15 * cov + 400 * fr + 0.6 * Math.abs(a) / CC_YAW + 3 * Math.max(0, Math.abs(i) - 16) / 16 + 0.5 * Math.abs(a - CC.yaw) / CC_YAW + (down && a * side < 0 ? 0.3 : 0)
+          + 2 * lift + 0.5 * Math.abs(lift - (CC.lift || 0));
+        if (c < bc) { bc = c; best = a; bl = lift; }
+      }
     }
-    CC.want = best;
+    _cp.y = y0; CC.want = best; CC.wantL = bl;
   }
-  CC.yaw = camCut ? CC.want : CC.yaw + (CC.want - CC.yaw) * (1 - Math.exp(-dt * 2.5));
+  const e = 1 - Math.exp(-dt * 2.5);
+  CC.yaw = camCut ? CC.want : CC.yaw + (CC.want - CC.yaw) * e;
+  CC.lift = camCut ? CC.wantL || 0 : (CC.lift || 0) + ((CC.wantL || 0) - (CC.lift || 0)) * e;
   if (Math.abs(CC.yaw) > 1e-4) ccOrbit(_cp, _cl, CC.yaw, _cp);
+  _cp.y += CC.lift;
   if (fit) ccFit(_cp, _cl, fit);   // the swing turned the view: fit again
 }
 /* the fallback on the real camera: a post whose screen box crosses a head / torso box in front of it fades (fast, not a pop) */
@@ -136,7 +170,7 @@ function camFade(dt) {
     for (const m of p.m) { const M = m.material, tr = p.op < 0.999; if (M.transparent !== tr) { M.transparent = tr; M.depthWrite = !tr; M.needsUpdate = true; } M.opacity = p.op; }
   }
 }
-window.__camClear = { CC, ccGap, ccTargets, ccWinCover, ccPostsWorld, endReplay: () => endReplay() };   // debug (docs/audit/scenarios/camera.js)
+window.__camClear = { CC, ccPostFrac, ccPostsFrac, settle: () => { camCut = true; camUpdate(0); }, ccGap, ccTargets, ccWinCover, ccPostsWorld, endReplay: () => endReplay() };   // debug (docs/audit/scenarios/camera.js)
 /* R-04: the camera's answer to a hit. G.shake = amplitude (m), decays ×e^(−9 t) as before; it used to push the camera at random on
    x and y every frame — now it swings along the punch (SHK.d, its part across the view: a damped 15 Hz swing that starts at full
    push), with a quarter of the old random jitter left on top (all of it when the punch runs along the line of sight).
@@ -235,7 +269,7 @@ function camUpdate(dt) {
   // whole men in the shot: the standing man joins once the push-in on the fall is over (kd: after 1 s; ko: from the two-shot reveal)
   const fit = !down ? null : st === 'result' || (st === 'kd' ? G.t - G.kd.t0 > 1 : G.t - G.koCine > 1.45) ? down : [down[1]];
   if (k < 1e3 && !window.__camOff && st !== 'menu' && st !== 'rend' && st !== 'talk' && !(st === 'intro' && G.stareT && G.introT >= 0 && G.introT < G.stareT - 0.6)) camClear(dt, down, fit, rw ? rw.h : CC_FX);
-  else CC.yaw = CC.want = 0;
+  else CC.yaw = CC.want = CC.lift = CC.wantL = 0;
   if (camCut) { camP.copy(_cp); camL.copy(_cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * k); camP.lerp(_cp, a); camL.lerp(_cl, a); }
   camera.position.copy(camP); camKick(dt);   // R-04: the kick along the punch + the lens push (both off with OPT.shake)

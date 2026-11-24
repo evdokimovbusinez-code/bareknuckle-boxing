@@ -30,22 +30,32 @@ function clothFromGLTF(gltf) {
   return { pos, nrm, tan, uv, idx, bones, si, sw, tris: ix.length / 3, verts: n };
 }
 // the GLB bytes + its two maps → CLOTH[base]; dressed fighters are re-dressed
-async function clothParse(base, buf, nmap, ao) {
+async function clothParse(base, buf, nmap) {
   const gltf = await new GLTFLoader().parseAsync(buf, '');
-  const d = clothFromGLTF(gltf); d.n = nmap; d.ao = ao; CLOTH[base] = d;
+  const d = clothFromGLTF(gltf); d.n = nmap; CLOTH[base] = d;
   for (const k in GEAR) if (k.startsWith('tgc_')) { GEAR[k].dispose(); delete GEAR[k]; }
   clothRedress();
   return d;
 }
-const CLOTH_AO = false;
-function clothLoad(base) {
-  const t0 = performance.now(), f = CLOTH_FILES[base], st = CLOTH.st[base] = { s: 'load' }, tl = new THREE.TextureLoader();
+/* issue 81: no baked AO any more — the cloth-alone bake of a two-layer shirt came out in camouflage patches, and the contact shading is
+   the screen-space AO pass's job (GFX ao) anyway; the folds live in the normal map.
+   GFX low loads the light mesh <base>_lo.glb (≤ 3000 triangles: the full mesh thinned by half-edge collapses, every kept vertex with
+   its own uv, so the same <base>_n.webp fits — tools/assets/cloth/tee_lo.js); a missing light file falls back to the full GLB. A level change across 'low' reloads (GFX.onChange). */
+const CLOTH_LO = '_lo';
+function clothLoad(base, lo = GFX.level === 'low') {
+  const t0 = performance.now(), f = CLOTH_FILES[base], st = CLOTH.st[base] = { s: 'load', lo }, tl = new THREE.TextureLoader();
   const tex = file => tl.loadAsync(file).then(t => { t.flipY = false; t.anisotropy = 4; return t; });   // glTF uv: v runs down
-  return Promise.all([fetch(f + '.glb').then(r => { if (!r.ok) throw new Error(f + '.glb ' + r.status); return r.arrayBuffer(); }), tex(f + '_n.webp'), CLOTH_AO ? tex(f + '_ao.webp') : null])   // the first AO bake came out blotchy (camouflage patches) — off until re-baked
-    .then(([buf, n, ao]) => clothParse(base, buf, n, ao).then(d => { Object.assign(st, { s: 'ok', ms: Math.round(performance.now() - t0), bytes: buf.byteLength, verts: d.verts, tris: d.tris }); console.info(`cloth ${base}: ${d.tris} tris, ${(buf.byteLength / 1024).toFixed(0)} KB, ${st.ms} ms`); }))
-    .catch(e => { st.s = 'fail'; st.err = String(e); console.info('cloth ' + base + ': no GLB, the older export / procedural cut', e); handLoad().then(clothRedress); });
+  // the light mesh keeps the full one's uv (tools/assets/cloth/tee_lo.js): one normal map for both
+  const get = g => Promise.all([fetch(g + '.glb').then(r => { if (!r.ok) throw new Error(g + '.glb ' + r.status); return r.arrayBuffer(); }), tex(f + '_n.webp')]);
+  return (lo ? get(f + CLOTH_LO).then(x => [...x, f + CLOTH_LO], e => { console.info(`cloth ${base}: no light mesh (${e.message || e}), the full one`); return get(f).then(x => [...x, f]); }) : get(f).then(x => [...x, f]))
+    .then(([buf, n, file]) => {
+      if (CLOTH.st[base] !== st) { n.dispose(); return; }   // a newer load (the level changed meanwhile) wins
+      return clothParse(base, buf, n).then(d => { Object.assign(st, { s: 'ok', file, ms: Math.round(performance.now() - t0), bytes: buf.byteLength, verts: d.verts, tris: d.tris }); console.info(`cloth ${base}: ${file}.glb, ${d.tris} tris, ${(buf.byteLength / 1024).toFixed(0)} KB, ${st.ms} ms`); });
+    })
+    .catch(e => { if (CLOTH.st[base] !== st) return; st.s = 'fail'; st.err = String(e); console.info('cloth ' + base + ': no GLB, the older export / procedural cut', e); handLoad().then(clothRedress); });
 }
 clothLoad('tee');
+GFX.onChange.push(() => { for (const b in CLOTH_FILES) { const s = CLOTH.st[b]; if (s && s.s !== 'fail' && s.lo !== (GFX.level === 'low')) clothLoad(b); } });
 
 function clothGeo(F, cut) {
   const base = TOP_CUTS[cut].cloth, d = CLOTH[base], key = 'tgc_' + cut;
@@ -55,10 +65,10 @@ function clothGeo(F, cut) {
   geo.userData = { ...geo.userData, cloth: base };
   return geo;
 }
-// plain dyed cotton (the folds are in the baked maps) + the GLB's normal and AO maps
+// plain dyed cotton (the folds are in the baked normal map beside the GLB)
 function clothTex(v, base) {
   const d = CLOTH[base], t = handTex(v, base);
-  return { map: t.map, nmap: d.n, ao: d.ao };
+  return { map: t.map, nmap: d.n };
 }
 // an asset that arrives after the fighters were dressed: drop their cloth top so the next dress builds it from the new mesh
 function clothRedress() {
