@@ -19,7 +19,8 @@ LOCS.boxgym = {
   ringBound: { kind: 'square', half: 2.2 }, bagBound: { kind: 'square', half: 1.5 },
   get bound() { return BAG.on ? this.bagBound : this.ringBound; },
   light: { bg: '#120f0c', fog: ['#33291f', 7, 46], exposure: 0.94, hemi: ['#c3cfe2', '#3b2f24', 0.28], key: ['#ffe8cc', 48], rim: ['#c4d8ff', 2.5], rim2: ['#ffc48c', 1.7], fill: ['#fff3e2', 0.5] },
-  build() {
+  steps: 11,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+  *build() {
     const R = locRng(4107), g = new THREE.Group(), PI = Math.PI, { FL, X0, X1, Z0, Z1, H, SX, SZ } = BG;
     const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
     const speck = (c, w, h, n, a) => { for (let i = 0; i < n; i++) { c.fillStyle = `rgba(${R() < 0.55 ? '0,0,0' : '255,255,255'},${R() * a})`; c.fillRect(R() * w, R() * h, 1 + R() * 2, 1 + R() * 2); } };
@@ -69,6 +70,7 @@ LOCS.boxgym = {
     const matM = staticMesh(geoMerge(mats.map(([x0, z0, x1, z1, col]) => geoTint(geoUvXZ(geoBox(x1 - x0, 0.03, z1 - z0, (x0 + x1) / 2, 0.015, (z0 + z1) / 2), 0.5), col))), new THREE.MeshStandardMaterial({ map: vinylTex, vertexColors: true, roughness: 0.85, envMapIntensity: 0.15 }));
     matM.receiveShadow = true; put(matM);
 
+    yield 'floor';
     /* ── walls (single-sided, so a camera that backs through one still sees the hall): bare brick over a painted block dado ── */
     const wallTex = rep(canvasTex(1024, 1024, (c, w, h) => {   // H × H metres
       const m = h / H, yd = h - 1.45 * m, rows = 52, bh = yd / rows, cols = 21, bw = w / cols;
@@ -96,6 +98,7 @@ LOCS.boxgym = {
     put(staticMesh(geoMerge([wq(X0, Z0, X1, Z0, 0, H), wq(X1, Z0, X1, Z1, 0, H, 0.3), wq(X1, Z1, X0, Z1, 0, H, 0.6)]), wallMat));
     put(staticMesh(geoMerge([wq(X0, Z1, X0, MZ1, 0, H), wq(X0, MZ1, X0, MZ0, 0, MY0, (Z1 - MZ1) / H), wq(X0, MZ1, X0, MZ0, MY1, H, (Z1 - MZ1) / H), wq(X0, MZ0, X0, Z0, 0, H, (Z1 - MZ0) / H)]), wallMat), false);
 
+    yield 'walls';
     /* ── static steel and timber of the hall (two merged meshes): roof trusses, purlins, pipes, the bag beam and its brackets,
        window frames, lockers, the door ── */
     const steel = [], matt = [];
@@ -122,6 +125,7 @@ LOCS.boxgym = {
     for (const s of [-1, 1]) { steel.push(geoTint(geoBox(0.04, 0.3, 0.05, 2.9 + s * 0.12, 1.05, Z1 - 0.1), '#b9b4a6')); matt.push(geoTint(geoBox(0.5, 0.7, 0.02, 2.9 + s * 0.48, 1.55, Z1 - 0.085), '#161b20')); }
     for (let k = 0; k < 12; k++) steel.push(geoTint(geoBox(0.06, 0.55, 0.1, 5.2 + k * 0.085, 0.45, Z1 - 0.1), '#b8b2a2'));
 
+    yield 'steel';
     /* ── the ring platform: canvas-covered top around the fighting floor, a vinyl skirt with lettering, two sets of steps; and
        a plain copy of the ring itself for the mirrors (the real one is RINGSET) ── */
     const plat = this.plat = new THREE.Group(); g.add(plat);
@@ -147,6 +151,7 @@ LOCS.boxgym = {
       const rm = new THREE.Mesh(geoMerge(rc), new THREE.MeshBasicMaterial({ vertexColors: true, color: MIRK })); rm.matrixAutoUpdate = false; rm.frustumCulled = false; mir.add(rm);
     }
 
+    yield 'platform';
     /* ── windows (emissive panes), their glow; the ceiling ── */
     const winTex = canvasTex(512, 256, (c, w, h) => {
       c.fillStyle = '#14171a'; c.fillRect(0, 0, w, h); const nx = 8, ny = 3, pw = w / nx, ph = h / ny;
@@ -162,6 +167,7 @@ LOCS.boxgym = {
     const deckTex = rep(canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#211f1c'; c.fillRect(0, 0, w, h); for (let i = 0; i < 4; i++) { c.fillStyle = '#12110f'; c.fillRect(i * 16, 0, 5, h); c.fillStyle = '#2c2925'; c.fillRect(i * 16 + 8, 0, 3, h); } }));
     put(staticMesh(geoUvXZ(new THREE.PlaneGeometry(X1 - X0, Z1 - Z0).rotateX(PI / 2).translate((X0 + X1) / 2, H, (Z0 + Z1) / 2), 1.2), new THREE.MeshStandardMaterial({ map: deckTex, roughness: 1, envMapIntensity: 0.1 })));
 
+    yield 'windows';
     /* ── wall art: posters (one atlas of eight, invented fighters and shows), the club's name painted on the brick, a banner,
        the chalkboard with today's work ── */
     const sil = (c, x, y, s, flip, col) => { c.save(); c.translate(x, y); c.scale(flip ? -s : s, s); c.strokeStyle = c.fillStyle = col; c.lineCap = c.lineJoin = 'round';
@@ -240,6 +246,7 @@ LOCS.boxgym = {
     for (const s of [-1, 1]) matt.push(geoTint(geoBox(0.06, CBH + 0.12, 0.045, CBX + s * (CBW / 2 + 0.03), CBY, Z0 + 0.03), '#6a4c2c'), geoTint(geoBox(CBW + 0.12, 0.06, 0.045, CBX, CBY + s * (CBH / 2 + 0.03), Z0 + 0.03), '#6a4c2c'));
     matt.push(geoTint(geoBox(CBW, 0.03, 0.09, CBX, CBY - CBH / 2 - 0.07, Z0 + 0.06), '#5b4126'), geoTint(geoBox(0.1, 0.035, 0.05, CBX + 0.5, CBY - CBH / 2 - 0.04, Z0 + 0.06), '#d8d4c8'), geoTint(geoBox(0.07, 0.02, 0.02, CBX - 0.3, CBY - CBH / 2 - 0.045, Z0 + 0.06), '#f0eee6'));
 
+    yield 'wall art';
     /* ── the round timer on the back wall over the chalkboard: a steel box, three lamps (green = work, yellow = last 10 s,
        red = rest) and the clock; its face is a small canvas redrawn when the second or the lamp changes (sync) ── */
     const TMX = 0.75, TMY = 2.78;
@@ -250,6 +257,7 @@ LOCS.boxgym = {
       g.add(staticMesh(new THREE.PlaneGeometry(0.36, 0.54).translate(TMX, TMY - 0.02, Z0 + 0.123), new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(1.5, 1.5, 1.5), fog: false })));
       ['#3cff78', '#ffd23c', '#ff3a2c'].forEach((col, k) => { const m = noAO(staticMesh(new THREE.PlaneGeometry(0.62, 0.62).translate(TMX, TMY + 0.165 - k * 0.118, Z0 + 0.14), new THREE.MeshBasicMaterial({ map: softTex, color: col, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }))); m.renderOrder = 3; m.visible = false; g.add(m); tm.glow.push(m); }); }
 
+    yield 'timer';
     /* ── props. Far ones go into the two merged meshes; the ones a camera can get behind are clusters (a mesh each, hidden while
        between the camera and the fighters) ── */
     const blobs = [], blob = (x, z, w, d, ry = 0) => blobs.push(new THREE.PlaneGeometry(w, d).rotateX(-PI / 2).rotateY(ry).translate(x, 0.034, z));
@@ -322,6 +330,7 @@ LOCS.boxgym = {
       kl.forEach(([x, z, s, c], i) => { km.setMatrixAt(i, _bgM.compose(_bgS.set(x, 0.03 * (x < X0 + 2 && z < 2.4 ? 1 : 0), z), q.setFromEuler(_bgE.set(0, R() * 6, 0)), new V3(s, s, s))); km.setColorAt(i, col.set(c)); blob(x, z, 0.4 * s, 0.4 * s); });
       km.matrixAutoUpdate = false; km.frustumCulled = false; put(km); }
 
+    yield 'props';
     /* ── the heavy bags of the back wall: body (a canvas of leather, tape and print, tinted per bag) + chains and straps; both
        InstancedMeshes share one matrix buffer, rewritten each frame as the bags sway about their hooks (sync) ── */
     { const bagTex = canvasTex(512, 512, (c, w, h) => {
@@ -354,6 +363,7 @@ LOCS.boxgym = {
         geoTint(limb([0, 0.17, -1.3], [0, H - BG.HOOK - BG.MAT, -1.3], 0.016, 0.016, 5), '#2a2d30'), geoTint(limb([0, 0.17, 1.3], [0, H - BG.HOOK - BG.MAT, 1.3], 0.016, 0.016, 5), '#2a2d30'), geoTint(new THREE.CylinderGeometry(0.03, 0.02, 0.05, 8).translate(0, 0.005, 0), '#9a9da2')]), steelMat);
       rig.matrixAutoUpdate = true; rig.visible = false; g.add(rig); }
 
+    yield 'bags';
     /* ── mirrors: three panels in the opening of the left wall — frames, a faint dirty glass over the mirrored copy, and a flat
        grey fallback when the copy is off ── */
     { const fr = [], zc = (MZ0 + MZ1) / 2, yc = (MY0 + MY1) / 2, W = MZ1 - MZ0, Hh = MY1 - MY0;
@@ -370,6 +380,7 @@ LOCS.boxgym = {
       const flatTex = canvasTex(64, 64, (c, w, h) => { const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#59544b'); gr.addColorStop(0.55, '#3c3731'); gr.addColorStop(1, '#17171a'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
       this.flat = staticMesh(new THREE.PlaneGeometry(W, Hh).rotateY(PI / 2).translate(X0 - 0.01, yc, zc), new THREE.MeshBasicMaterial({ map: flatTex })); g.add(this.flat); }
 
+    yield 'mirrors';
     /* ── light. Enamel dish lamps on rods under the trusses (warm): four over the ring (`rig`: the ring's own light, hidden when
        the top-down replay camera rises to them), nine about the hall; their pools on the floor are additive decals, the real
        lights are one spot over the ring and four shadowless points. Daylight: shafts from the back windows, dust in them ── */

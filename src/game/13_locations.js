@@ -43,7 +43,8 @@ const LOCS = {
 
       top(x, z) { const i = ((Math.round(Math.atan2(z, x) / (2 * Math.PI / BALE_N)) % BALE_N) + BALE_N) % BALE_N; return BALE_LOW.includes(i) ? this.h / 2 : this.h; } },   // top of the bales at a point of the circle (ARENA frame)
     light: { bg: '#0b0e11', fog: ['#0b0e11', 9, 38], exposure: 0.95, hemi: ['#b4c6d6', '#26282a', 0.34], key: ['#d8f0ff', 48], rim: ['#9cc4ff', 1.9], rim2: ['#cfe4ff', 1.1], fill: ['#eaf4ff', 0.45] },
-    build() {
+    steps: 10,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+    *build() {
       const R = locRng(77), g = new THREE.Group(), PI = Math.PI;
       const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
       const speck = (c, w, h, n, a) => { for (let i = 0; i < n; i++) { c.fillStyle = `rgba(${R() < 0.5 ? '0,0,0' : '255,255,255'},${R() * a})`; c.fillRect(R() * w, R() * h, 1 + R() * 2, 1 + R() * 2); } };
@@ -61,6 +62,7 @@ const LOCS = {
       }));
       const floor = staticMesh(geoUvMul(new THREE.PlaneGeometry(64, 26).rotateX(-PI / 2), 16, 6.5), new THREE.MeshStandardMaterial({ map: concTex, roughness: 0.78, envMapIntensity: 0.5 }));
       floor.receiveShadow = true; g.add(floor);
+      yield 'floor';
       /* painted markings as geometry (crisp at any distance): faded yellow bay lines and aisle arrows, worn through by a tiled alpha */
       const wearTex = rep(canvasTex(256, 256, (c, w, h) => {
         c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); c.globalCompositeOperation = 'destination-out';
@@ -81,6 +83,7 @@ const LOCS = {
       const grateTex = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#3a3d40'; c.fillRect(0, 0, w, h); c.fillStyle = '#0b0c0d'; for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) c.fillRect(12 + j * 54, 12 + i * 18, 48, 10); c.strokeStyle = '#5b5f63'; c.lineWidth = 5; c.strokeRect(3, 3, w - 6, h - 6); });
       const grate = staticMesh(geoMerge([[-1.3, 1.15], [6.2, -1.4], [-9, 1.2]].map(([x, z]) => new THREE.PlaneGeometry(0.5, 0.5).rotateX(-PI / 2).translate(x, 0.0016, z))), new THREE.MeshStandardMaterial({ map: grateTex, roughness: 0.5, metalness: 0.6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
       grate.receiveShadow = true; g.add(grate);
+      yield 'marks';
       /* walls (single-sided, so a camera that backs through one sees the scene): bare concrete above, a painted dado below */
       const wallTex = rep(canvasTex(512, 512, (c, w, h) => {
         c.fillStyle = '#727574'; c.fillRect(0, 0, w, h); c.fillStyle = '#3d4549'; c.fillRect(0, h * 0.6, w, h * 0.4); c.fillStyle = '#b98f22'; c.fillRect(0, h * 0.6 - 9, w, 9);
@@ -90,6 +93,7 @@ const LOCS = {
       }));
       const wallG = (len, ry, x, z) => geoUvMul(new THREE.PlaneGeometry(len, 3), len / 4, 1).rotateY(ry).translate(x, 1.5, z);
       g.add(staticMesh(geoMerge([wallG(64, 0, 0, -9.6), wallG(64, PI, 0, 9.6), wallG(19.2, PI / 2, -32, 0), wallG(19.2, -PI / 2, 32, 0)]), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9, envMapIntensity: 0.4 })));
+      yield 'walls';
       /* ceiling with beams (hidden when the camera goes above it — the top-down replay shot), pipes, a duct, the lamps */
       const ceil = this.ceil = new THREE.Group(); g.add(ceil);
       const colX = [-26.25, -18.75, -11.25, -3.75, 3.75, 11.25, 18.75, 26.25], colZ = [-4.05, 4.05];
@@ -105,6 +109,7 @@ const LOCS = {
       const tubeM = new THREE.InstancedMesh(new THREE.BoxGeometry(1.5, 0.05, 0.1), new THREE.MeshBasicMaterial({ color: '#ffffff' }), tubes.length), m4 = new M4();
       tubes.forEach(([x, z], i) => { tubeM.setMatrixAt(i, m4.makeTranslation(x, 2.95, z)); const dead = Math.abs(x) > 6 && R() < 0.16; tubeM.setColorAt(i, dead ? tubeCol.setRGB(0.1, 0.11, 0.12) : tubeCol.setRGB(2.1, 2.6, 2.9)); });
       tubeM.matrixAutoUpdate = false; tubeM.frustumCulled = false; ceil.add(tubeM);
+      yield 'ceiling';
       /* columns: concrete, a yellow-black band at the bottom, the level badge at eye height (one texture on all four faces) */
       const colTex = canvasTex(256, 1024, (c, w, h) => {
         const py = m => h - m * h / 3;   // metres above the floor → pixel row
@@ -119,6 +124,7 @@ const LOCS = {
       this.cols = []; for (const x of colX) for (const z of colZ) this.cols.push({ p: new V3(x, 1.5, z), mat: new M4().makeTranslation(x, 1.5, z), h: false });
       const colM = this.colMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 3, 0.6), new THREE.MeshStandardMaterial({ map: colTex, roughness: 0.9, envMapIntensity: 0.4 }), this.cols.length);
       this.cols.forEach((c, i) => colM.setMatrixAt(i, c.mat)); colM.matrixAutoUpdate = false; colM.frustumCulled = false; this.zero = new M4().makeScale(0, 0, 0); g.add(colM);
+      yield 'columns';
       /* signs on the back wall: the level number painted big, a fire door with a glowing green «ВЫХОД» over it; wheel stops in the bays */
       const lvlTex = canvasTex(512, 384, (c, w, h) => { c.fillStyle = 'rgba(226,190,60,.9)'; c.font = font(330); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('-2', w / 2, h / 2 + 14);
         c.globalCompositeOperation = 'destination-out'; for (let i = 0; i < 1500; i++) { c.fillStyle = `rgba(0,0,0,${0.2 + R() * 0.6})`; c.fillRect(R() * w, R() * h, 1 + R() * 8, 1 + R() * 3); } });
@@ -131,6 +137,7 @@ const LOCS = {
       const props = [geoTint(geoBox(0.95, 2.05, 0.06, 2.0, 1.025, -9.58), '#39424a'), geoTint(geoBox(1.11, 2.13, 0.04, 2.0, 1.065, -9.59), '#23282d'), geoTint(geoBox(0.04, 0.16, 0.05, 2.36, 1.02, -9.53), '#9aa0a5'), geoTint(geoBox(0.56, 0.2, 0.06, 2.0, 2.33, -9.56), '#101412')];
       for (const sz of [-1, 1]) for (let k = -5; k <= 5; k++) props.push(geoTint(geoBox(1.7, 0.1, 0.15, 2.5 * k, 0.05, sz * 8.9), k % 2 ? '#c29d24' : '#1c1d20'));
       g.add(staticMesh(geoMerge(props), propMat));
+      yield 'signs';
       /* parked cars: a side profile extruded across the width (bevelled), a glass band a hair outside the cabin, wheels, lights */
       const carMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.34, metalness: 0.45 });
       const KIND = {
@@ -155,6 +162,7 @@ const LOCS = {
       };
       car('sedan', '#d9dcde', -2.5, -6.95, 0); car('suv', '#101114', 2.5, -6.95, 0); car('hatch', '#8e1418', 7.5, -6.7, 0);
       car('hatch', '#1f4f9c', 2.5, 6.7, PI); car('sedan', '#8f959b', -5.0, 6.95, PI);
+      yield 'cars';
       /* the circle: 21 hay bales (0.9 × 0.45 × 0.45) on a 3 m radius, slightly askew, a second tier on most; one mesh per stack so
          the stacks between the camera and the fighters can be hidden; loose straw around them */
       const strawTex = canvasTex(256, 128, (c, w, h) => {
@@ -171,12 +179,14 @@ const LOCS = {
         for (let t = 0; t < (BALE_LOW.includes(i) ? 1 : 2); t++) { const rj = BALE_R + (R() - 0.5) * (t ? 0.09 : 0.04), tj = (R() - 0.5) * (t ? 0.12 : 0.03); gs.push(geoBox(0.9, 0.45, 0.45, rj * ca - tj * sa, 0.225 + 0.45 * t, rj * sa + tj * ca, PI / 2 - a + (R() - 0.5) * (t ? 0.2 : 0.07))); }
         const m = staticMesh(geoMerge(gs), baleMat); m.receiveShadow = true; g.add(m); this.stacks.push({ m, p: new V3(BALE_R * ca, 0.45, BALE_R * sa), o: new V3(ca, 0, sa) });
       }
+      yield 'bales';
       const looseTex = canvasTex(1024, 1024, (c, w, h) => {   // 8 × 8 m: straw trampled around the bales, a little inside the circle
         for (let i = 0; i < 4200; i++) { const a = R() * 2 * PI, u = R(), r = (u < 0.86 ? 2.5 + R() * 1.1 + (R() - 0.5) * 0.5 : R() * 2.6) * w / 8, x = w / 2 + Math.cos(a) * r, y = h / 2 + Math.sin(a) * r, l = 4 + R() * 13, b = R() * 2 * PI;
           c.strokeStyle = `hsla(${38 + R() * 14},${45 + R() * 30}%,${26 + R() * 30}%,${0.35 + R() * 0.5})`; c.lineWidth = 0.7 + R() * 0.8; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(b) * l, y + Math.sin(b) * l); c.stroke(); }
       });
       const loose = staticMesh(new THREE.PlaneGeometry(8, 8).rotateX(-PI / 2).translate(0, 0.002, 0), new THREE.MeshStandardMaterial({ map: looseTex, transparent: true, roughness: 1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
       loose.receiveShadow = true; loose.renderOrder = -1; g.add(loose);
+      yield 'straw';
       /* light: a cold pool over the circle from the lamps above it (the shared `key` gives the fighters' shadows), three shadowless
          point lights where the tubes are so the cars, the wall and the far aisle read; everything else falls off into the dark fog */
       const top = new THREE.SpotLight('#d8f0ff', 24, 10, 1.15, 0.9, 1.4); top.position.set(0, 2.92, 0); top.target.position.set(0, 0, 0); g.add(top, top.target);
@@ -209,21 +219,31 @@ let LOC = LOCS.gym;
    while the report forces rebuilds. */
 const LOCPROF = { last: null, active: false, tex: 0, texN: 0, noTrim: false };
 let LOCSTAMP = 0;   // last-used stamp for the low-preset LRU cache
-/* switch the location: build its set on first use, show it (and the ring props if it has a ring), retune the shared lights.
-   The set is built once and then only hidden/shown (LOC.group is the cache); on low at most 2 stay resident (locTrim, 17). */
-function setLocation(id) {
-  const L = LOCS[id] || LOCS.gym, was = LOC; LOC = L;
-  if (!L.group) {
-    const b0 = performance.now(); LOCPROF.tex = 0; LOCPROF.texN = 0; LOCPROF.active = true;
-    let g; try { g = L.build(); } finally { LOCPROF.active = false; }
-    L.group = g; ARENA.add(g);
-    LOCPROF.last = { id: L.id, build: +(performance.now() - b0).toFixed(1), tex: +LOCPROF.tex.toFixed(1), texN: LOCPROF.texN };
-    locBusyFlash();   // a cold build is a brief wait: «Готовим площадку…» (17_loc_load.js)
+/* R-24: a cold set is prepared in steps (17_loc_load.js). LOC names the location the game is in (its static fields — bound,
+   ring, wall, label — are valid at once); LOC_ON is the one whose set and light are actually applied; LOC_WANT is the one
+   being waited for (its job is pumped first); LOC_WAIT = a fight / lesson / story needs it: frame() stands still under
+   «Готовим площадку…» until it is ready. */
+let LOC_ON = null, LOC_WANT = null, LOC_WAIT = false;
+/* switch the location. A ready set is shown at once. A cold one:
+     mode 'wait' — a fight starts there: LOC = it now, the loading screen with a bar until it is built (frame() → locPumpFrame);
+     mode 'now'  — built right here, synchronously (debug, reports, the very first set at boot);
+     default     — the menu: the old set stays on screen (a small pill) and the new one is applied when its job is done. */
+function setLocation(id, mode) {
+  const L = LOCS[id] || LOCS.gym;
+  if (!locReady(L)) {
+    if (mode === 'now' || !LOC_ON) locFinish(L);
+    else { LOC_WANT = L; locJob(L); LOC_WAIT = mode === 'wait'; LOC = LOC_WAIT ? L : LOC_ON; locLoadUI(); return; }
   }
+  LOC_WANT = null; LOC_WAIT = false; LOC = L; locApply(L); locLoadUI();
+}
+/* show a ready set (and the ring props if it has a ring), retune the shared lights. The set is built once and then only
+   hidden/shown (L.group is the cache); on low at most 2 stay resident (locTrim, 17). */
+function locApply(L) {
+  const was = LOC_ON; LOC_ON = L;
   L.stamp = ++LOCSTAMP;
   for (const o of Object.values(LOCS)) { if (o.group) o.group.visible = o === L; for (const w of o.world || []) w.visible = o === L; }
   RINGSET.visible = L.ring;
-  if (was !== L && was.leave) was.leave(); if (L.enter) L.enter();   // a location that moves or hides shared things puts them back (13e_loc_boxgym.js)
+  if (was && was !== L && was.leave) was.leave(); if (L.enter) L.enter();   // a location that moves or hides shared things puts them back (13e_loc_boxgym.js)
   const li = L.light; scene.background.set(li.bg); scene.fog.color.set(li.fog[0]); scene.fog.near = li.fog[1]; scene.fog.far = li.fog[2]; renderer.toneMappingExposure = li.exposure;
   hemi.color.set(li.hemi[0]); hemi.groundColor.set(li.hemi[1]); hemi.intensity = li.hemi[2];
   for (const [l, v] of [[key, li.key], [rim, li.rim], [rim2, li.rim2], [fill, li.fill]]) { l.color.set(v[0]); l.intensity = v[1]; }
@@ -233,4 +253,4 @@ function setLocation(id) {
   ARENA.updateMatrixWorld(true);
   locTrim();   // #47: on low keep at most 2 built sets (evict the least-recently-used, never the current one)
 }
-function locSync() { if (LOC.sync && LOC.group) LOC.sync(); }
+function locSync() { if (LOC.sync && LOC === LOC_ON && LOC.group) LOC.sync(); }

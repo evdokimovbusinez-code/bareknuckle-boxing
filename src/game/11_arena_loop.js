@@ -52,6 +52,9 @@ let last = performance.now();
 for (const k of ['step', 'hitStep']) { const fn = Ragdoll.prototype[k]; Ragdoll.prototype[k] = function (dt) { const t = performance.now(), r = fn.call(this, dt); PERF.rag += performance.now() - t; return r; }; }
 function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
 function frame(now) {
+  // R-24: a cold set is being prepared in steps (17_loc_load.js); while the fight waits for it the game stands still under
+  // «Готовим площадку…» — no simulation, no 3D frame (the clock restarts from the end of this frame's loading work)
+  if (locPumpFrame()) { if (NET.role) netTick(Math.min(0.1, (now - last) / 1000)); last = performance.now(); if (!window.__manual) requestAnimationFrame(frame); return; }
   const rawDt = (now - last) / 1000, dtReal = G.paused ? 0 : Math.min(0.05, rawDt); last = now; G.real += dtReal;   // pause: everything below runs with dt = 0 (as in a hit-stop frame)
   if (NET.role) netTick(rawDt);   // issue 49: snapshots / input / ping / the disconnect clock
   const pm = PERF.m; let tp = performance.now(), tq; PERF.rag = 0;   // CPU split for the F3 overlay

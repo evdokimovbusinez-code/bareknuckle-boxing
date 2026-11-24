@@ -183,14 +183,12 @@ function buildQuick() {
   if (!locOpen(G.loc)) G.loc = 'gym';
   for (const L of Object.values(LOCS)) { if (L.train) continue;   // the training gym is not a place for fights; a place can wait for followers (LOC_FANS, 15_social.js)
     const open = locOpen(L.id), b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${open ? L.desc || '' : L.lockLbl || '🔒 от ' + numF(LOC_FANS[L.id]) + ' подписчиков'}</small>`; b.setAttribute('aria-pressed', String(G.loc === L.id)); b.disabled = !open;   // lockLbl: a non-follower gate (LOC_LOCK, the story bar — #51)
-    // #47: hover prebuilds the place while the player is still reading the list; a cold click first paints the
-    // «Готовим площадку…» pill, then builds on the next macrotask so the frozen frame is never silent.
+    // #47: hover prebuilds the place while the player is still reading the list. R-24: a cold click builds it in steps
+    // over the next frames — the old set stays on screen with the «Готовим площадку…» pill (17_loc_load.js)
     if (open) b.addEventListener('pointerenter', () => locPrefetchOne(L.id));
     b.onclick = () => {
       G.loc = L.id; save(); for (const o of box.children) o.setAttribute('aria-pressed', String(o === b));
-      const cold = !LOCS[L.id].group;
-      if (cold) locBusy(true);
-      setTimeout(() => { try { setLocation(L.id); } catch (e) { console.error(e); } finally { if (cold) locBusy(false); } }, 0);
+      try { setLocation(L.id); } catch (e) { console.error(e); }
     };
     box.appendChild(b);
   }

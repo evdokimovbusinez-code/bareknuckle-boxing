@@ -12,9 +12,11 @@ const TIRE_N = 29, TIRE_R = 3.08, TIRE_W = 0.225, TIRE_RO = 0.33;   // 29 stacks
 const TIRE_TIERS = (() => { const R = locRng(412); return Array.from({ length: TIRE_N }, () => R() < 0.3 ? 2 : 3); })();
 const TIRE_FOG = '#15110f';
 
-/* a height drawing (white = high) → tangent-space normal map, tiling */
-function tireHeightToNormal(w, h, draw, k) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); draw(x, w, h);
+/* a height drawing (white = high) → tangent-space normal map, tiling. R-24: a CPU canvas (getImageData on an accelerated one
+   waited ~1.5 s for its GPU raster under software GL); half size on low (locTexK) — the drawing is scaled, the slope k with it */
+function tireHeightToNormal(w0, h0, draw, k) {
+  const s = locTexK(w0, h0), w = Math.round(w0 * s), h = Math.round(h0 * s); k *= s;
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); if (s !== 1) x.scale(s, s); draw(x, w0, h0);
   const d = x.getImageData(0, 0, w, h).data, o = x.createImageData(w, h), q = o.data, H = (i, j) => d[(((j + h) % h) * w + (i + w) % w) * 4];
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
     const dx = (H(i - 1, j) - H(i + 1, j)) * k / 255, dy = (H(i, j - 1) - H(i, j + 1)) * k / 255, l = Math.hypot(dx, dy, 1), p = (j * w + i) * 4;
@@ -128,7 +130,8 @@ LOCS.tires = {
   // the shared lights: `key` (it casts the fighters' shadows) is a cold lamp high above, `rim` / `rim2` are the glow of the fires
   // behind the fighters (they flicker with them, see sync); the real fire and headlight lamps live in the set
   light: { bg: '#07080c', fog: [TIRE_FOG, 9, 36], exposure: 1.0, hemi: ['#46527a', '#2a1a10', 0.3], key: ['#c9d6ff', 22], rim: ['#ff8a3c', 1.5], rim2: ['#ff7a2a', 1.7], fill: ['#ffb27a', 0.3] },
-  build() {
+  steps: 11,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+  *build() {
     const R = locRng(901), g = new THREE.Group(), PI = Math.PI, m4 = new M4(), q1 = new Quat(), q2 = new Quat(), v1 = new V3(), one = new V3(1, 1, 1), UP = new V3(0, 1, 0);
     const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
     const lin = t => { t.colorSpace = THREE.NoColorSpace; return t; };
@@ -166,6 +169,7 @@ LOCS.tires = {
     const sheet = (len, w0, w1, up) => { const s = new THREE.PlaneGeometry(1, 1, 1, 8), p = s.attributes.position; for (let i = 0; i < p.count; i++) { const v = p.getY(i) + 0.5, x = p.getX(i) * (w0 + (w1 - w0) * v); p.setXYZ(i, up ? 0 : x, up ? x : 0, v * len); } return s; };   // a widening strip along +z
     const beamMat = o => new THREE.MeshBasicMaterial({ map: beamTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide, ...o });
     const search = this.search = new THREE.Mesh(sheet(26, 0.3, 2.6, false).rotateX(-PI / 2), beamMat({ color: '#8ea4d8', opacity: 0.16 })); search.position.set(9, 0.4, -28.5); search.renderOrder = -8; search.frustumCulled = false; sky.add(search);
+    yield 'sky';
 
     /* ── ground: gravelly dirt (4 m tile, 2 m normal tile), puddles / trampled floor / soot through the mask ── */
     const dirtTex = rep(canvasTex(1024, 1024, (c, w, h) => {
@@ -176,9 +180,11 @@ LOCS.tires = {
       for (let i = 0; i < 2600; i++) { const x = R() * w, y = R() * h, r = 1.2 + R() * R() * 5, l = 70 + R() * 90; c.fillStyle = `rgb(${l},${l - 4},${l - 10})`; c.beginPath(); c.ellipse(x, y, r, r * (0.6 + R() * 0.4), R() * 3, 0, 7); c.fill();   // gravel: a stone, its shaded side
         c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x + r * 0.3, y + r * 0.35, r, r * 0.5, 0, 0, 7); c.fill(); c.fillStyle = `rgb(${l + 14},${l + 10},${l})`; c.beginPath(); c.ellipse(x, y, r * 0.8, r * 0.5, R() * 3, 0, 7); c.fill(); }
     }));
+    yield 'dirt';
     const dirtN = tireHeightToNormal(512, 512, (c, w, h) => { c.fillStyle = '#808080'; c.fillRect(0, 0, w, h); for (let i = 0; i < 70; i++) { c.fillStyle = `rgba(${R() < 0.5 ? '0,0,0' : '255,255,255'},${0.05 + R() * 0.08})`; c.beginPath(); c.ellipse(R() * w, R() * h, 20 + R() * 70, 12 + R() * 40, R() * 3, 0, 7); c.fill(); }
       for (let i = 0; i < 2600; i++) { const l = 120 + R() * 135; c.fillStyle = `rgb(${l},${l},${l})`; c.beginPath(); c.arc(R() * w, R() * h, 1 + R() * R() * 5, 0, 7); c.fill(); } speck(c, w, h, 16000, 0.2); }, 2.2);
     dirtN.repeat.set(2, 2);
+    yield 'dirt normals';
     const MS = 28, maskTex = lin(canvasTex(512, 512, (c, w, h) => {   // MS metres across; canvas x = +x, canvas y = −z
       c.fillStyle = '#000'; c.fillRect(0, 0, w, h); c.globalCompositeOperation = 'lighter';
       const px = (x, z) => [(0.5 + x / MS) * w, (0.5 - z / MS) * h], dot = (x, z, r, col, a) => { const [cx, cy] = px(x, z), rp = r / MS * w, gr = c.createRadialGradient(cx, cy, 0, cx, cy, rp); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(0.5, `rgba(${col},${a * 0.6})`); gr.addColorStop(1, `rgba(${col},0)`); c.fillStyle = gr; c.fillRect(cx - rp, cy - rp, 2 * rp, 2 * rp); };
@@ -201,6 +207,7 @@ LOCS.tires = {
         .replace('#include <aomap_fragment>', 'reflectedLight.directSpecular *= mix(1.0, 0.08, tPud);\n#include <aomap_fragment>');
     };
     const ground = staticMesh(geoUvMul(new THREE.PlaneGeometry(76, 76).rotateX(-PI / 2), 19, 19), groundMat); ground.receiveShadow = true; g.add(ground);
+    yield 'ground';
 
     /* ── the circle: tyres (a lathed section, tread and sidewall lettering from a height drawing) as ONE InstancedMesh; a stack that
        gets between the camera and the fighters is collapsed to zero scale (sync), as the car park does with its columns ── */
@@ -217,6 +224,7 @@ LOCS.tires = {
       if (col) { speck(c, w, h, 9000, 0.07); for (let i = 0; i < 70; i++) { c.fillStyle = `rgba(${R() < 0.6 ? '128,108,84' : '150,146,138'},${0.04 + R() * 0.1})`; c.beginPath(); c.ellipse(R() * w, R() * h, 12 + R() * 60, 5 + R() * 22, R() * 0.6, 0, 7); c.fill(); } }
     };
     const tireCol = rep(canvasTex(512, 256, tireDraw(true))), tireN = tireHeightToNormal(512, 256, tireDraw(false), 2.6);
+    yield 'tyre maps';
     const hw = TIRE_W / 2, prof = [[0.2, -0.085], [0.235, -0.105], [0.29, -hw], [0.318, -0.1], [TIRE_RO, -0.075], [TIRE_RO, 0.075], [0.318, 0.1], [0.29, hw], [0.235, 0.105], [0.2, 0.085], [0.2, -0.085]];
     const profV = [0.02, 0.08, 0.22, 0.29, 0.34, 0.66, 0.71, 0.78, 0.92, 0.98, 1];
     const tireG = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 20);
@@ -238,6 +246,7 @@ LOCS.tires = {
     const tireM = this.tireMesh = new THREE.InstancedMesh(tireG, new THREE.MeshStandardMaterial({ map: tireCol, normalMap: tireN, normalScale: new THREE.Vector2(1.3, 1.3), roughness: 0.8, envMapIntensity: 0.3 }), tires.length), tc = new THREE.Color();
     tires.forEach((t, i) => { tireM.setMatrixAt(i, t.m); tireM.setColorAt(i, tc.setRGB(t.tint * 1.05, t.tint, t.tint * 0.93)); if (t.s >= 0) stacks[t.s].ids.push(i); });
     this.tires = tires; this.zero = new M4().makeScale(0, 0, 0); tireM.matrixAutoUpdate = false; tireM.frustumCulled = false; tireM.receiveShadow = true; g.add(tireM);
+    yield 'tyres';
 
     /* ── oil drums: rusty, soot at the mouth, embers inside, punched air holes glowing near the bottom ── */
     const drumProf = [[0, 0], [0.285, 0], [0.285, 0.28], [0.298, 0.295], [0.285, 0.31], [0.285, 0.57], [0.298, 0.585], [0.285, 0.6], [0.285, 0.86], [0.296, 0.88], [0.272, 0.88], [0.268, 0.52], [0, 0.52]], dn = drumProf.length - 1;
@@ -257,6 +266,7 @@ LOCS.tires = {
     const drumM = this.drumMesh = new THREE.InstancedMesh(drumG, drumMat, 4);
     this.drums = BAR.map((b, i) => { const m = new M4().makeRotationY(R() * 6).setPosition(b.x, 0, b.z); drumM.setMatrixAt(i, m); return { p: new V3(b.x, 0.7, b.z), m, h: false, on: 1 }; });
     drumM.matrixAutoUpdate = false; drumM.frustumCulled = false; g.add(drumM);
+    yield 'drums';
 
     /* ── static props: one merged mesh, vertex colours over a grit texture; lit windows and lamps in a second, unlit one ── */
     const grit = rep(canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#d6d6d6'; c.fillRect(0, 0, w, h); speck(c, w, h, 5000, 0.2, 3); for (let i = 0; i < 12; i++) { c.fillStyle = `rgba(0,0,0,${0.04 + R() * 0.1})`; c.fillRect(R() * w, 0, 2 + R() * 9, h); } }));
@@ -296,6 +306,7 @@ LOCS.tires = {
       q1.setFromAxisAngle(UP, R() * 6); if (lie && !on) q1.multiply(q2.setFromAxisAngle(v1.set(1, 0, 0), PI / 2));
       bot.setMatrixAt(i, m4.compose(on ? v1.set(on[0] + (R() - 0.5) * 0.6, on[1], on[2] + (R() - 0.5) * 0.2) : v1.set(Math.cos(a) * r, lie ? 0.035 : 0, Math.sin(a) * r), q1, one)); bot.setColorAt(i, tc.set(['#1d4a25', '#4a2a10', '#6f7c78', '#16361c'][(R() * 4) | 0])); }
     bot.matrixAutoUpdate = false; bot.frustumCulled = false; g.add(bot);
+    yield 'props';
 
     /* ── the car (a boxy little off-roader): profile extruded across the width as in the car park; lamps, beams and flares apart
        from the body so that they can be hidden together when the car gets between the camera and the fighters ── */
@@ -316,6 +327,7 @@ LOCS.tires = {
       const lm = staticMesh(tf(geoMerge(lamps)), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 5.4, 6), fog: false })); carG.add(lm);
       const bm = staticMesh(tf(geoMerge(beams)), beamMat({ color: '#cfdcff', opacity: 0.13 })); bm.renderOrder = 1; carG.add(bm);
       this.carP = new V3(CAR.x, 0.8, CAR.z); }
+    yield 'car';
 
     /* ── fire, glows, flares (additive) and smoke (blended): instanced cards, see the shaders above ── */
     const cards = list => { const n = list.length, geo = new THREE.InstancedBufferGeometry(), A = new Float32Array(n * 4), B = new Float32Array(n * 4), C = new Float32Array(n * 3);
@@ -336,9 +348,11 @@ LOCS.tires = {
     for (let i = 0; i < NS; i++) { const b = BAR[i % 4]; sp.set([b.x, 1.0, b.z], i * 3); sa.set([R(), 1.3 + R() * 1.5, 1.6 + R() * 2.2, i % 4], i * 4); }
     const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3)); sg.setAttribute('aS', new THREE.BufferAttribute(sa, 4));
     const sparks = this.sparks = new THREE.Points(sg, new THREE.ShaderMaterial({ uniforms: U, vertexShader: TIRE_SPARK_VS, fragmentShader: TIRE_SPARK_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); sparks.frustumCulled = false; sparks.renderOrder = 4; g.add(sparks);
+    yield 'fire';
 
     /* ── lamps: a flickering point light over every drum (shadowless; two of them on «low»), the headlights as one spot ── */
-    this.lights = BAR.map(b => { const p = new THREE.PointLight('#ff8a3a', 10, 11, 1.5); p.position.set(b.x * 0.97, 1.3, b.z * 0.97); g.add(p); return p; });
+    // visible as sync() will set them (two on «low»): the programs compiled while loading are keyed on the light count
+    this.lights = BAR.map((b, i) => { const p = new THREE.PointLight('#ff8a3a', 10, 11, 1.5); p.position.set(b.x * 0.97, 1.3, b.z * 0.97); p.visible = GFX.level !== 'low' || i < 2; g.add(p); return p; });
     const hl = new THREE.SpotLight('#dfe8ff', 34, 22, 0.4, 0.75, 1.3); hl.position.copy(CAR).addScaledVector(carDir, 1.9).setY(0.82); hl.target.position.set(0, 0.95, 0); g.add(hl, hl.target);
 
     /* ── the crowd: three rows behind the tyres, nobody at the drums or in the lane of the headlights; more phones than usual ── */

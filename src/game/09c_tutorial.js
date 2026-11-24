@@ -47,7 +47,7 @@ function tutStart() {
   uiShow(null);
   P1.sparGear(true); P2.sparGear(true); showP2(true); BAG.on = false; BAG.g.visible = false;
   CROWD.fill = 1;
-  setLocation('boxgym'); sfx.unlock();
+  setLocation('boxgym', 'wait'); sfx.unlock();
   P1.stat = PROF.stats; P2.stat = lvlStats(0); P1.sig = PROF.sig; P2.sig = null;
   $('n1').textContent = myName(); $('n2').textContent = 'Партнёр'; const sl = $('st2'); if (sl) sl.textContent = 'стоит и ждёт';
   P1.resetState(); P2.resetState(); P1.speed = 1.5; P2.speed = 1;

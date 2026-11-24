@@ -35,7 +35,8 @@ LOCS.metro = {
     t -= T.tDwell; if (t < T.tOut) return { x: T.stop + 0.5 * T.acc * t * t, v: T.acc * t, door: 0, ph: 3 };
     return { x: 1e3, v: 0, door: 0, ph: 0 };
   },
-  build() {
+  steps: 8,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+  *build() {
     const R = locRng(4711), g = new THREE.Group(), PI = Math.PI, lite = lowEnd || GFX.level === 'low', TS = lite ? 0.5 : 1;
     const { L, EZ, CZ, CW, WZ, PIT, SPRING, RISE, BAY, TZ } = MT, VA = CZ - CW / 2;   // VA: half-width of the vault
     const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
@@ -109,6 +110,7 @@ LOCS.metro = {
       sh.fragmentShader = 'uniform float uRefl;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', '#include <opaque_fragment>\n  gl_FragColor.a = 1.0 - uRefl * mix(0.03, 0.5, pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0));'); }; }
     const floor = staticMesh(geoUvMul(new THREE.PlaneGeometry(2 * L, 2 * EZ).rotateX(-PI / 2), 2 * L / 4, 1), floorMat); floor.receiveShadow = true; floor.renderOrder = -30; g.add(floor);
 
+    yield 'floor';
     /* ── materials shared by the set ── */
     const stoneTex = rep(canvasTex(512 * TS, 512 * TS, (c, w, h) => { marble(c, w, h, '#d8cdb9', '#7b6452', 26); speck(c, w, h, 9000 * TS, 0.06); c.fillStyle = 'rgba(40,30,24,.55)'; c.fillRect(0, 0, w, 2); c.fillRect(0, 0, 2, h); c.fillRect(w / 2, 0, 1, h); }));
     const stoneMat = new THREE.MeshStandardMaterial({ map: stoneTex, vertexColors: true, roughness: 0.5, envMapIntensity: 0.3, emissive: '#fff1dc', emissiveMap: stoneTex, emissiveIntensity: 0.05 });
@@ -146,6 +148,7 @@ LOCS.metro = {
     this.cols.forEach((c, i) => colM.setMatrixAt(i, c.mat)); colM.matrixAutoUpdate = false; colM.frustumCulled = false; colM.receiveShadow = true; this.zero = new M4().makeScale(0, 0, 0); add(colM, true);
     const colX = this.cols.filter(c => c.p.z > 0).map(c => c.p.x);
 
+    yield 'columns';
     /* ── the beams on the columns, the vault with its coves, the ceilings of the side naves (all hidden when the camera rises above them) ── */
     const ceil = this.ceil = new THREE.Group(); g.add(ceil); const ceilM = this.ceilM = new THREE.Group(); mir.add(ceilM);
     const addC = (o, refl) => { ceil.add(o); if (refl) twin(o, ceilM); return o; };
@@ -180,6 +183,7 @@ LOCS.metro = {
     CHX.forEach((x, i) => { m4.makeTranslation(x, 0, 0); chBm.setMatrixAt(i, m4); chGm.setMatrixAt(i, m4); });
     for (const o of [chBm, chGm]) { o.matrixAutoUpdate = false; o.frustumCulled = false; } addC(chBm); addC(chGm, true);
 
+    yield 'vault';
     /* ── track walls: below the platform bare concrete, a black dado, cream tiles, a red frieze; one bay of 5.5 m per repeat ── */
     const WH = SPRING + PIT, wallDraw = em => (c, w, h) => {
       const py = y => h * (1 - (y + PIT) / WH), band = (col, y0, y1) => { c.fillStyle = col; c.fillRect(0, py(y1), w, py(y0) - py(y1)); };
@@ -201,6 +205,7 @@ LOCS.metro = {
     const nameGs = []; for (const sz of [-1, 1]) for (const x of [-16.5, 0, 16.5]) nameGs.push(new THREE.PlaneGeometry(5.4, 0.84).rotateY(sz > 0 ? PI : 0).translate(x, 3.05, sz * (WZ - 0.03)));
     add(staticMesh(geoMerge(nameGs), new THREE.MeshStandardMaterial({ map: nameTex, alphaTest: 0.5, roughness: 0.38, metalness: 0.6, envMapIntensity: 1.2, emissive: '#ffffff', emissiveMap: nameTex, emissiveIntensity: 0.32 })), true);
 
+    yield 'track walls';
     /* ── light boxes: one atlas — the exit sign, the clocks, four posters (all invented) ── */
     const AT = 1024, atlas = canvasTex(AT, AT, (c, w) => {
       const tx = (s, x, y, f, col, al = 'center') => { c.font = f; c.fillStyle = col; c.textAlign = al; c.textBaseline = 'middle'; c.fillText(s, x, y); };
@@ -263,6 +268,7 @@ LOCS.metro = {
       }
     }
 
+    yield 'light boxes';
     /* ── the −x end: a mosaic wall (sunburst, two boxers, a ribbon); the +x end: an arch, three escalators going up, the booth ── */
     const outline = hole => { const s = new THREE.Shape(); s.moveTo(-VA, 0); s.lineTo(VA, 0); s.lineTo(VA, SPRING); for (let i = 1; i <= 18; i++) { const a = PI * i / 18; s.lineTo(VA * Math.cos(a), SPRING + RISE * Math.sin(a)); } s.lineTo(-VA, 0);
       if (hole) { const p = new THREE.Path(); p.moveTo(-3.7, 0); p.lineTo(-3.7, 2.6); for (let i = 1; i <= 12; i++) { const a = PI - PI * i / 12; p.lineTo(3.7 * Math.cos(a), 2.6 + 1.5 * Math.sin(a)); } p.lineTo(3.7, 0); p.lineTo(-3.7, 0); s.holes.push(p); } return s; };
@@ -307,6 +313,7 @@ LOCS.metro = {
     add(staticMesh(geoMerge(brass), brassMat)); add(staticMesh(geoMerge(lamps), litMat), true);
     addC(staticMesh(geoMerge(signs), new THREE.MeshBasicMaterial({ map: atlas, color: new THREE.Color(1.25, 1.2, 1.1) })), true);
 
+    yield 'ends';
     /* ── the train: five wagons = instances of one body (panels around the door and window openings, roof, underframe) and one lit
        interior seen through them; 40 door leaves (one InstancedMesh, moved only while the doors work); lights at both ends ── */
     const T = MT_TRAIN, train = this.train = new THREE.Group(), trainM = this.trainM = new THREE.Group(); train.position.set(1e3, 0, -TZ); g.add(train); mir.add(trainM);
@@ -344,10 +351,11 @@ LOCS.metro = {
       this.tail = tail;
     }
     // the glare of the headlights (out of the AO pass with the crowd's blobs), the cold light that rides with the train
-    const glowTex = canvasTex(128, 128, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.12, 'rgba(255,255,255,.6)'); gr.addColorStop(0.4, 'rgba(255,255,255,.13)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
+    const glowTex = glowSprite([[0, 1], [0.12, 0.6], [0.4, 0.14], [1, 0]]);   // R-24: the bar's sprite (was .13 at 0.4), shared (17_loc_load.js)
     const glare = this.glare = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(1.6, 1.8, 2.2), blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glare.position.set(0.3, 0.5, 0); glare.scale.set(5, 5, 1); train.add(glare); CROWD.blobs.push(glare, mir);
     const tl = this.tLight = new THREE.PointLight('#d6e4f8', 0, 14, 1.5); tl.position.set(0, 1.9, -(EZ - 2.2)); g.add(tl);
 
+    yield 'train';
     /* ── light: a warm pool over the circle under the middle chandelier, warm points along the hall ── */
     const top = new THREE.SpotLight('#ffd9a6', 27, 12, 1.05, 0.9, 1.4); top.position.set(0, 4.55, 0); top.target.position.set(0, 0, 0); g.add(top, top.target);
     for (const x of lite ? [0] : [-11, 11]) { const p = new THREE.PointLight('#ffc888', lite ? 18 : 15, 24, 1.6); p.position.set(x, 4.3, 0); g.add(p); }

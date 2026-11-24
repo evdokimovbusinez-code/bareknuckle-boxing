@@ -32,7 +32,7 @@
       G.state = 'fight'; G.paused = false; CROWD.fill = 1;
       window.__camHold = CAM; camUpdate(dt);   // pins camera.position / camP / camL via the documented debug hook
       for (const loc of locs) {
-        G.loc = loc; setLocation(loc);
+        G.loc = loc; setLocation(loc, 'now');
         for (const level of levels) {
           applyGfx(level); setMeasurePR();   // applyGfx → applyRes sets the preset's pixel ratio; override it for the timed frames
           // let the location's sync() apply particle budgets and the crowd's update() apply the density budget, and let any
@@ -57,7 +57,7 @@
       // put the game back exactly as we found it
       G.state = save.state; CROWD.fill = save.fill; window.__camHold = save.hold;
       GFX.set = save.set; applyGfx(save.level); qH = save.qH; applyRes();
-      G.loc = save.loc; setLocation(save.loc);
+      G.loc = save.loc; setLocation(save.loc, 'now');
     }
     const head = 'локация      пресет   треугольники  вызовы  геометрии  текстуры   кадр, мс';
     const line = '───────────  ───────  ────────────  ──────  ──────────  ─────────  ─────────';
