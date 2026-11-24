@@ -32,6 +32,13 @@ body = rep(body, "    g.setAttribute('aScalp', new THREE.BufferAttribute(scalp, 
 import glob
 # the game is split into src/game/NN_*.js, concatenated in name order into one module (they share one scope)
 gb = rep(''.join(open(f).read() for f in sorted(glob.glob('game/*.js'))), "/*BODYBLOCK*/", body)
+# issue 86: the registry of the Blender garments (tools/assets/cloth/garment.py writes it) goes into the module as a literal
+import json, os
+_reg = '../assets/cloth/items.json'
+if os.path.exists(_reg):
+    _r = json.load(open(_reg)); _keep = ('id', 'item', 'cat', 'name', 'price', 'colors', 'nat', 'tags', 'base', 'files', 'tris', 'tris_lo')
+    _r = {'v': _r.get('v', 1), 'items': [{k: e[k] for k in _keep if k in e} for e in _r.get('items', [])]}
+    gb = rep(gb, "/*CLOTH_ITEMS*/{ v: 1, items: [] }", json.dumps(_r, ensure_ascii=False, separators=(',', ':')))
 files = ln(210, 241)
 files = rep(files, "upper: 'assets/Punch_Rear_Uppercut_Head.fbx.txt', hook: 'assets/Punch_Lead_Hook_Head.fbx.txt',", "upperR: 'assets/Punch_Rear_Uppercut_Head.fbx.txt', hookL: 'assets/Punch_Lead_Hook_Head.fbx.txt', hookR: 'assets/Punch_Rear_Hook_Head.fbx.txt', upperL: 'assets/Punch_Lead_Uppercut_Head.fbx.txt',")
 files = rep(files, "upper: 439344, hook: 423136 };", "upperR: 439344, hookL: 423136, hookR: 436640, upperL: 439344 };")

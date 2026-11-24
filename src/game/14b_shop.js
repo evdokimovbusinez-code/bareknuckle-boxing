@@ -17,7 +17,7 @@ function shopTry(cat, id) {   // put it on (nothing is paid)
   P1.applyLook(LOOK);
 }
 function shopEnter() {
-  SHOP.snap = JSON.parse(JSON.stringify(LOOK)); shopSeenStart(); thOpen();
+  SHOP.snap = JSON.parse(JSON.stringify(LOOK)); shopSeenStart(); thOpen(); clothShop();   // (issue 86: the Blender garments are fetched for their pictures)
   if (SHOP.pick) { shopTry(SHOP.cat, SHOP.pick); SHOP.pick = null; }
   setView(SHOP.cat === 'head' || SHOP.cat === 'eyes' ? VIEW_FACE : SHOP.cat === 'hands' ? SHOP_HANDS : VIEW_FULL);
   shopRender();
@@ -110,8 +110,8 @@ function thItemHash(id) {
   try { h = thStr(JSON.stringify(ITEMS[id] || id, (k, v) => typeof v === 'function' ? String(v) : v)); } catch (e) { h = '0'; }
   TH.hash.set(id, h); return h;
 }
-function thCloth(it) {   // the hand-made cloth asset behind a cut (04j_cloth_asset.js): '' = none, '~' = not settled yet
-  const cut = it && it.model && it.model.cut, cl = cut && TOP_CUTS[cut] && TOP_CUTS[cut].cloth; if (!cl) return '';
+function thCloth(it) {   // the Blender garment behind an item (04j_cloth_asset.js): '' = none, '~' = not settled yet
+  const cl = clothOf(it); if (!cl) return '';
   const s = CLOTH.st[cl] && CLOTH.st[cl].s; return s === 'ok' || s === 'fail' ? s : '~';
 }
 function thKey(cat, id) {

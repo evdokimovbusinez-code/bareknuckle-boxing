@@ -6,6 +6,8 @@ resolve — the permission rule needs a space after the directory).
     python3 tools/assets/            — every step of the tee pipeline, in order (#55 + #56)
     python3 tools/assets/ --from sim — start at sim.py (out/ already has tee_placed.blend)
     python3 tools/assets/ --only sim — run only sim.py
+    python3 tools/assets/ cloth/garment.py user/x.blend ...  — any script of tools/assets/ with its own args (#86)
+                                       (= python3 tools/assets/cloth/garment.py tools/assets/cloth/user/x.blend ...)
 
 Steps live in cloth/ and run in their own module namespace (runpy), each honouring its exit code.
 """
@@ -26,7 +28,23 @@ EXTRA = ['preview.py']          # helper views, not part of the default pipeline
                                 # overwrite sim.py's previews with the rest-mesh ones)
 
 
+def script(argv):
+    """#86: `cloth/garment.py ARGS` -> that script (only inside tools/assets/), argv as if run directly."""
+    path = os.path.abspath(os.path.join(HERE, argv[0]))
+    if not path.startswith(HERE + os.sep) or not os.path.isfile(path):
+        print(f'not a script of tools/assets/: {argv[0]}'); return 2
+    sys.argv = [path] + argv[1:]
+    sys.path.insert(0, os.path.dirname(path))
+    try:
+        runpy.run_path(path, run_name='__main__')
+    except SystemExit as e:
+        return e.code if isinstance(e.code, int) else (0 if e.code is None else (print(e.code) or 1))
+    return 0
+
+
 def main(argv):
+    if argv and argv[0].endswith('.py'):
+        return script(argv)
     all_steps = STEPS + EXTRA
     steps = STEPS
     if argv and argv[0] == '--only':

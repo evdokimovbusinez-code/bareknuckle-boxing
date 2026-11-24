@@ -1,0 +1,54 @@
+{
+ "v": 1,
+ "items": [
+  {
+   "cat": "top",
+   "name": "футболка (ткань)",
+   "price": 150,
+   "colors": [
+    "white",
+    "black",
+    "grey"
+   ],
+   "item": "teeCloth",
+   "base": "tee",
+   "tags": [
+    "street",
+    "basic"
+   ],
+   "nat": {
+    "white": "#e9e6df",
+    "grey": "#9a9ca2"
+   },
+   "id": "tee",
+   "src": "tools/assets/cloth/user/tshirt_src.blend",
+   "files": {
+    "glb": "assets/cloth/tee.glb",
+    "n": "assets/cloth/tee_n.webp",
+    "lo": "assets/cloth/tee_lo.glb"
+   },
+   "tris": 11430,
+   "tris_lo": 2940,
+   "kb": 261,
+   "kb_lo": 75,
+   "low": "quad",
+   "uv": {
+    "p50": 0.0275,
+    "p95": 0.1072,
+    "max": 0.6125,
+    "side50": 0.0139,
+    "side95": 0.0535,
+    "sidemax": 0.8725,
+    "how": "angle based / 66 deg",
+    "flip": 0
+   },
+   "inside": {
+    "made": 0.0,
+    "apose": 0.0
+   },
+   "bend": {
+    "shoulder": 17
+   }
+  }
+ ]
+}
