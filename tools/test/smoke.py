@@ -3,7 +3,7 @@
   python3 tools/test/smoke.py [OUT.jpg] [--only menu,fight] [--vp desk,phone]
   bash tools/shot.sh /tmp/shots/s.jpg smoke          (the same, after rebuilding gtest.html)
 
-Runs menu.js, fight.js, modes.js, phone.js, result.js (R-09), resil.js (R-26: hidden tab → pause, lost WebGL context, error toast) at 1280×720 (desk) and 740×360 touch (phone), each in a fresh browser context
+Runs menu.js, fight.js, modes.js, phone.js, result.js (R-09), resil.js (R-26: hidden tab → pause, lost WebGL context, error toast), patrol.js (R-18: story chapter 2) at 1280×720 (desk) and 740×360 touch (phone), each in a fresh browser context
 (clean localStorage, so the first-visit offer and the default profile are what a new player gets). Fails (exit code 1) on:
   · any `pageerror` (an uncaught exception, also one thrown inside a click handler) or `console.error`;
   · the game not loading (the `.err` box) or a scenario that throws / times out;
@@ -23,11 +23,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 from shot import settle  # noqa: E402  (the CSS-transition wait of tools/shot.py)
 
-SCEN = ['menu', 'fight', 'modes', 'phone', 'result', 'resil']
+SCEN = ['menu', 'fight', 'modes', 'phone', 'result', 'resil', 'patrol']
 VPS = {'desk': (1280, 720, False), 'phone': (740, 360, True)}
 # states each scenario must pass through (G.state); the union covers fight, kd, ko, replay, result, talk
 NEED = {'menu': [], 'fight': ['fight', 'kd', 'ko', 'replay', 'result'], 'modes': ['fight', 'talk', 'result'],
-        'phone': ['fight', 'ko', 'result'], 'result': ['fight', 'ko', 'replay', 'result'], 'resil': ['fight']}
+        'phone': ['fight', 'ko', 'result'], 'result': ['fight', 'ko', 'replay', 'result'], 'resil': ['fight'],
+        'patrol': ['talk', 'fight', 'ko', 'replay', 'result']}   # R-18: story chapter 2 «Патруль»: dialog, baton fight, KO → result, 60 s on the feet → result
 # R-26: resil.js throws on purpose inside frame() to see the error toast; that one error (and only it) is not a failure
 OWN_ERR = 'R-26 test'
 # console lines that are not errors of the game: Chrome/SwiftShader chatter (+ the browser's own /favicon.ico 404, by URL)

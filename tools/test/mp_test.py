@@ -9,6 +9,10 @@ computes the fight and streams snapshots back. The test checks that:
   · B's punches land on the host's own fighter (P1.hp drops on A);
   · the hp/stamina shown on both pages agree (±1, the ~100 ms interpolation buffer);
   · snapshots arrive on the guest (NET.stat.snaps on A, NET.snaps on B);
+  · R-25, with 150 ms of artificial delay each way (__mp.lag): the guest's own punch / dodge / guard is on screen on the
+    first frame after the press (≤ 50 ms; without prediction ~400 ms), a press the host refuses rolls back in ~80 ms,
+    after 60 s of fight the men stand within 5 cm on both pages, hp agrees (±1), the buffer stays in 60–160 ms,
+    the trunks of host and guest differ (OUT-pred-guest.jpg / OUT-pred-host.jpg: the same instant on both pages);
   · a closed connection shows «Соперник отключился» with the 10 s countdown.
 Screenshots: OUT-room.jpg (the code), OUT-host.jpg, OUT-guest.jpg, OUT-drop.jpg, OUT.jpg (drop).
 Needs internet (unpkg.com/peerjs@1.5.4 + PeerJS Cloud signalling) and gtest.html (tools/check.sh).
@@ -150,6 +154,118 @@ async def run():
             print('  ✗ боец гостя отходит назад сам'); bad += 1
         else:
             print('  ✓ боец гостя стоит, где его оставили')
+
+        # ── R-25: 150 ms of artificial delay each way (NET.lag, on the pages' own clocks); the guest predicts his own man ──
+        print('  — R-25: задержка 150 мс в каждую сторону —')
+        bt = "(() => { const b = F => { const L = F.gear.look || {}, x = L.bottom; return typeof x === 'string' ? x : x && x.id ? x.id + ':' + (x.color || '') : 'shorts:' + (L.shorts || 'red'); }; return [b(__g.P1), b(__g.P2)]; })()"
+        ba, bb = await A.evaluate(bt), await B.evaluate(bt)
+        print('  низ бойцов [хост, гость]: у хоста', ba, 'у гостя', bb)
+        if ba != bb or ba[0] == ba[1]:
+            print('  ✗ трусы хоста и гостя одного цвета (или разные на двух страницах)'); bad += 1
+        else:
+            print('  ✓ трусы хоста и гостя разного цвета, на обеих страницах одинаково')
+        await A.evaluate('__mp.lag(150)'); await B.evaluate('__mp.lag(150)')
+        # the host's man only stands there: keep both alive and the round going for the minute below
+        keep = "(() => { const g = __g; g.G.roundT = Math.max(g.G.roundT, 40); for (const F of [g.P1, g.P2]) F.hp = F.hpCap = 100; })()"
+        KEY = "k => { for (const t of ['keydown', 'keyup']) window.dispatchEvent(new KeyboardEvent(t, { code: k, key: k.slice(-1).toLowerCase(), bubbles: true })); }"
+
+        async def fine(n, chunk=2):   # the two pages take turns every `chunk` frames, so the delay between them is what NET.lag says
+            for _ in range(0, n, chunk):
+                await A.evaluate(f'__tick({chunk}, 1/60)'); await asyncio.sleep(0.004)
+                await B.evaluate(f'__tick({chunk}, 1/60)'); await asyncio.sleep(0.004)
+
+        async def first_frame(act, expr, limit=90):   # frames (1/60 s) from the press to the first guest frame where `expr` holds
+            await fine(50); await A.evaluate(keep)
+            await act()
+            for f in range(1, limit + 1):
+                await B.evaluate('__tick(1, 1/60)'); await asyncio.sleep(0.003)
+                if await B.evaluate(expr):
+                    return f
+                await A.evaluate('__tick(1, 1/60)'); await asyncio.sleep(0.003)
+            return limit + 1
+
+        await A.evaluate(keep); await fine(60)
+        ms = lambda f: round(f * 1000 / 60)
+        # before: prediction off — the punch is first seen when the host's stream gets to it
+        await B.evaluate('__mp.predOff(true)')
+        old = [await first_frame(lambda: B.evaluate(KEY, 'KeyI'), "(p => p.sCur === p.seq)(__mp.pred())") for _ in range(3)]
+        await B.evaluate('__mp.predOff(false)')
+        shown = "__mp.pred().shown > 0.02"
+        new = {}
+        for name, act in [('удар', lambda: B.evaluate(KEY, 'KeyI')), ('удар 2', lambda: B.evaluate(KEY, 'KeyJ')), ('удар 3', lambda: B.evaluate(KEY, 'KeyU')),
+                          ('уклон', lambda: B.evaluate("__mp.dodge('duck')")), ('блок', lambda: B.evaluate('__mp.block(true)'))]:
+            new[name] = await first_frame(act, shown)
+            if name == 'удар':   # the host has not even got the press yet
+                print('    в этот кадр у хоста:', await A.evaluate('__mp.hostAct()'), 'у гостя:', await B.evaluate("(p => ({ cur: p.cur, seq: p.seq, w: +p.w.toFixed(2) }))(__mp.pred())"))
+        await B.evaluate('__mp.block(false)')
+        print('  нажатие → первый кадр анимации, без предсказания (было):', [ms(f) for f in old], 'мс')
+        print('  нажатие → первый кадр анимации, с предсказанием:', {k: ms(v) for k, v in new.items()}, 'мс')
+        if max(new.values()) * 1000 / 60 > 50:
+            print('  ✗ анимация своего действия стартует позже 50 мс'); bad += 1
+        else:
+            print('  ✓ своё действие видно на первом же кадре (≤ 50 мс при задержке 150 мс)')
+
+        # a punch the host refuses (his copy of the man is stunned): the guest starts it, then rolls back to the stream in ~80 ms
+        await fine(60)
+        await A.evaluate('__g.P2.stunUntil = __g.G.t + 1.2')
+        await B.evaluate(KEY, 'KeyI')
+        tr = []
+        for _ in range(70):
+            await B.evaluate('__tick(1, 1/60)'); tr.append(round(await B.evaluate('__mp.pred().w'), 2)); await asyncio.sleep(0.003)
+            await A.evaluate('__tick(1, 1/60)'); await asyncio.sleep(0.003)
+        top = max(range(len(tr)), key=lambda i: (tr[i], i)) if tr else 0
+        fall = next((i for i in range(top, len(tr)) if tr[i] == 0), len(tr)) - top
+        print('  отказ хоста: вес локальной позы по кадрам', tr[:top + fall + 2], f'→ откат {ms(fall)} мс; откатов всего:', await B.evaluate('__mp.pred().back'))
+        if max(tr) < 1 or fall > 6:
+            print('  ✗ откат при расхождении дольше ~80 мс (или предсказание не стартовало)'); bad += 1
+        else:
+            print('  ✓ расхождение: плавный откат к снимкам хоста за ~80 мс')
+
+        # 60 s of fight: walk in / out, three punches, a dodge or a block, a second of standing — then compare where the men stand
+        thr0, pr0 = await A.evaluate('__g.P2.fs.thr'), await B.evaluate('__mp.pred()')
+        dev, PUN, bufs = [], ['KeyI', 'KeyJ', 'KeyU'], []
+        for cyc in range(20):
+            await A.evaluate(keep)
+            await B.evaluate(f'__mp.move({1 if cyc % 2 == 0 else -1}, 0)'); await fine(24)
+            await B.evaluate('__mp.move(0, 0)')
+            for j in range(3):
+                await B.evaluate(KEY, PUN[(cyc + j) % 3]); await fine(22)
+            if cyc % 4 == 1:
+                await B.evaluate("__mp.dodge('duck')")
+            if cyc % 4 == 3:
+                await B.evaluate('__mp.block(true)')
+            await fine(30); await B.evaluate('__mp.block(false)')
+            await fine(60)
+            pa, pb = await A.evaluate('__mp.pos()'), await B.evaluate('__mp.pos()')
+            dev.append(round(100 * max(abs(pa[0] - pb[0]), abs(pa[1] - pb[1]), abs(pa[2] - pb[2]), abs(pa[3] - pb[3])), 1))
+            bufs.append(round(1000 * await B.evaluate('__mp.pred().buf')))
+        pr1, thr1 = await B.evaluate('__mp.pred()'), await A.evaluate('__g.P2.fs.thr')
+        hpA, hpB = await A.evaluate('__mp.hp()'), await B.evaluate('__mp.hp()')
+        print('  60 с боя: расхождение позиций по циклам, см:', dev)
+        print(f'  ударов нажато 60, хост выбросил {thr1 - thr0}, гость предсказал {pr1["n"] - pr0["n"]} действий (с уклонами), откатов {pr1["back"] - pr0["back"]}, поздних стартов {pr1["late"] - pr0["late"]}')
+        print('  буфер гостя, мс:', min(bufs), '…', max(bufs), ' джиттер, мс:', round(1000 * pr1['jit'], 1), ' отставание проигрывания, мс:', round(1000 * pr1['behind']))
+        print('  HP хост / гость после 60 с:', [round(v, 2) for v in hpA], [round(v, 2) for v in hpB])
+        if max(dev) > 5 or dev[-1] > 5:
+            print('  ✗ позиции разошлись больше чем на 5 см'); bad += 1
+        else:
+            print(f'  ✓ после 60 с позиции совпадают (макс. {max(dev)} см, в конце {dev[-1]} см)')
+        if abs(hpA[0] - hpB[0]) > 1 or abs(hpA[1] - hpB[1]) > 1:
+            print('  ✗ HP расходятся больше чем на 1 (задержка 150 мс)'); bad += 1
+        else:
+            print('  ✓ HP совпадают (±1) при задержке 150 мс')
+        if min(bufs) < 60 or max(bufs) > 160:
+            print('  ✗ буфер вышел за 60–160 мс'); bad += 1
+        # the picture: 7 frames (117 ms) after the press — the guest's man is already punching, the host has not got the press yet
+        await A.evaluate(keep); await fine(60)
+        await B.evaluate(KEY, 'KeyI')
+        for _ in range(7):
+            await B.evaluate('__tick(1, 1/60)'); await A.evaluate('__tick(1, 1/60)'); await asyncio.sleep(0.003)
+        await B.evaluate('__step(1, 1/60)'); await B.screenshot(path=path('pred-guest'), **FMT)
+        await A.evaluate('__step(1, 1/60)'); await A.screenshot(path=path('pred-host'), **FMT)
+        print('  снимки:', path('pred-guest'), path('pred-host'), ' хост в этот момент:', await A.evaluate('__mp.hostAct().cur'), ' гость:', await B.evaluate('__mp.pred().cur'))
+        await A.evaluate('__mp.lag(0)'); await B.evaluate('__mp.lag(0)')
+        for _ in range(3):
+            await step(20)
 
         # ── a KO: the host plays the replay, the guest sees it too («ПОВТОР»), then both get the result ──
         await A.evaluate("(() => { const g = __g; g.P1.hp = 1; g.knockout(g.P2, g.P1, new g.THREE.Vector3(1, 0, 0), 1.4, 'cross', 1, true); })()")

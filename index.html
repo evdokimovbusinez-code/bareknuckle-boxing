@@ -6497,7 +6497,7 @@ class Fighter {
     this.cur = n; this.release = false; this.resolved = false; this.whiff = false; this.punchId++; this.dodge = null; this.aimArm = P.arm;
     this.bodyShot = (P.type === 'straight' || P.type === 'hook') && this.wantBody; this.wantBody = false;
     if (this.bodyShot) { const kn = this.knuckle(_v1), o = this.other.ribs; this.ribIdx = o[0].w.distanceTo(kn) < o[1].w.distanceTo(kn) ? 0 : 1; }
-    this.stamina = Math.max(0, this.stamina - P.sta * (1 - 0.05 * SK(this, 'sta')) * (this.heavy ? 1.7 : 1) * aiTraitK(this, 'sta'));   // R-11: a ladder man's trait (the marathon man ×0.55) this.staT = G.t + 0.55 + (this.stamina < 10 ? 0.35 : 0);
+    this.stamina = Math.max(0, this.stamina - P.sta * (1 - 0.05 * SK(this, 'sta')) * (this.heavy ? 1.7 : 1) * aiTraitK(this, 'sta')); this.staT = G.t + 0.55 + (this.stamina < 10 ? 0.35 : 0);   // R-11: aiTraitK = a ladder man's trait (the marathon man ×0.55)
   }
   startDodge(type) { this.dodge = { type, t: 0 }; this.stamina = Math.max(0, this.stamina - 4); this.staT = G.t + 0.3; }
   knuckle(v) { return v.setFromMatrixPosition(this.bones[`CC_Base_${this.aimArm}_Mid1`].matrixWorld); }
@@ -8582,9 +8582,12 @@ const aiRead = () => clamp((DIFFS[G.diff].read - 0.4) / 0.46, 0, 1);
    its strength is aiPlanK() = AI_PLAN.k0 + (1 − k0) · aiRead() of the way from the base style to the plan.
    AI.trait — the ladder man's manner (LADDER[].trait → TRAITS): punch weights ×w, body share +body, power odds ×pow, combo +combo,
    pauses ×gap, range +adv, circling ×lat, uppercuts ×close at short range, stamina cost ×sta and regen ×reg (Fighter), follow-ups
-   on a falling man fol (aiFollow), the plan it falls back to (plan) and plans it never takes (ban). A quick fight / a challenge
-   gets the trait of the ladder man with the same nickname (rollOpponent); story and lesson men have none. */
-const AI_PLAN = { every: 5, hp: 30, daze: 0.4, lead: 1, sta: 22, hpGap: 25, lastGap: 0.5, lastSta: 8, shoveR: 0.9, shoveT: 2.2, shove: 1.8, k0: 0.6 };
+   on a falling man fol (aiFollow), the plan it falls back to (plan) and plans it never takes (ban). A career fight
+   (startCareer) and a challenge (socAccept) get the man's trait; a random quick-fight man (rollOpponent), story and lesson men have none. */
+const AI_PLAN = { every: 5, hp: 30, daze: 0.4, lead: 1, sta: 22, hpGap: 25, lastGap: 0.5, lastSta: 8, shoveR: 0.9, shoveT: 2.2, shove: 1.8, k0: 0.4 };
+/* k0 was 0.6, now 0.4 (bench R-02, masher · normal, 30 fights a run): 0.6 → 27 % wins (below the R-10 corridor 35–55 %), 0.3 → 63 %
+   (above), 0.45 → 40 % and 27 % in two runs (33 % of 60). Hard keeps k = 1 (aiRead() = 1); AI_PLAN.daze 0.4 → 0.7 tried: 23 %, left at 0.4.
+   The R-10 jabspam ratio (round 2 / round 1 accuracy, normal) stays ×0.62–0.63 with any k0 and with AI_MEM.corner 0.7 → 0.8 */
 const PLANS = {
   base: { label: 'своя манера', gap: 1, adv: 0, combo: 0, trade: 1, dodge: 1, block: 1, lat: 1, pow: 1, ctr: 0 },
   press: { label: 'давит', gap: 0.7, adv: 0.08, combo: 0.2, trade: 1.4, dodge: 0.85, block: 0.8, lat: 0.5, pow: 1.1, ctr: 0 },
@@ -8603,8 +8606,6 @@ const TRAITS = {
   southpaw: { nm: 'левша-панчер', label: 'хук и апперкот слева ×2, силовые ×1.5', w: { hookL: 2, upperL: 2, hookR: 0.6, cross: 0.7 }, pow: 1.5 },
 };
 const NO_TRAIT = {};
-/* the trait of the ladder man with this nickname (quick fights and challenges roll the same eight names), or null */
-const aiTraitOf = nm => { const L = LADDER.find(l => l.nm === nm); return L && TRAITS[L.trait] || null; };
 const aiTrait = () => AI.trait || NO_TRAIT;
 /* a ladder man's number of the trait for the fighter F (1 = none): P2 under the AI only */
 const aiTraitK = (F, k) => F === P2 && AI.trait && !NET.role && !BAG.on ? AI.trait[k] ?? 1 : 1;
@@ -8638,7 +8639,7 @@ function aiPlanNow(pl) {
 /* the AI's range offset (Fighter.footwork, ai: inReach): style + trait + plan */
 const aiAdv = () => AI.style.adv + (aiTrait().adv || 0) + (AI.pk ? AI.pk.adv : 0);
 function aiPlanReset() { AI.plan = AI.trait && AI.trait.plan || 'base'; AI.planT = 0; AI.planR = 0; AI.urgent = false; AI.pk = null; AI.shoveT = 0; AI.log = []; }
-function aiMemReset() { AI.open = 0; AI.mem ={ a: [], fam: {}, guard: 0, blkRow: 0, ctrT: 0, pid: -1, dObj: null, blk: false, lastP: -9, round: 1, ctrN: 0 }; }
+function aiMemReset() { AI.open = 0; AI.mem = { a: [], fam: {}, guard: 0, blkRow: 0, ctrT: 0, pid: -1, dObj: null, blk: false, lastP: -9, round: 1, ctrN: 0 }; }
 function aiMemPush(e) { const a = AI.mem.a; a.push(e); if (a.length > AI_MEM.win) a.shift(); }
 function aiRep(n) { const a = AI.mem.a; let c = 0, k = 0; for (let i = a.length - 1; i >= 0 && k < AI_MEM.rep; i--) if (a[i].k === 'p') { k++; if (a[i].n === n) c++; } return c; }
 /* 1 = he never defends (no guard, no slips in the window), 0 = he does it all the time */
@@ -8779,7 +8780,7 @@ function rollOpponent() {
   const skin = pick(SKIN_LOOKS).id, tats = rr() < 0.45 ? TATS.filter(() => rr() < 0.3).map(t => t.id) : [];
   P2.applyLook({ shorts: pick(sh).id, hair: pick(hl).id, hairStyle: randomCut(skin, rr), skin, beard: rr() < 0.6 ? pick(BEARD_STYLES).id : 'none', tats, wraps: rr() < 0.6 ? 'white' : pick(WRAPS_LOOKS).id, guard: pick(GUARDS).id, hands: rr() < 0.3 ? 'mma' : 'wraps', ...(isStreet() ? streetLook() : {}) });   // street locations: a random street outfit (04d_street.js)
   const nm = pick(NAMES), st = { 'Грек': 'counter', 'Молот': 'brawler', 'Кабан': 'brawler', 'Шрам': 'pressure', 'Лом': 'brawler', 'Бизон': 'pressure', 'Кувалда': 'brawler', 'Седой': 'counter' }[nm];
-  AI.style = STYLES[st]; AI.trait = null; $('n2').textContent = nm;   // R-11: a random man has no trait (tried aiTraitOf(nm): masher · normal 63 → 17–27 %) const sl = $('st2'); if (sl) sl.textContent = STYLES[st].label;
+  AI.style = STYLES[st]; AI.trait = null; $('n2').textContent = nm; const sl = $('st2'); if (sl) sl.textContent = STYLES[st].label;   // R-11: a random man has no trait (tried the trait of the ladder man with the same nickname: masher · normal 63 → 17–27 %)
 }
 /* ───────── training: the heavy bag. A 40 kg leather bag on a chain: punches swing it, rock it and twist it (09a_bag_rig.js:
    bagImpact, bagStep); a 45-second drill — every landed shot scores its damage, punches thrown in quick succession build a combo ───────── */

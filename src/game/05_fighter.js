@@ -468,7 +468,7 @@ class Fighter {
     this.cur = n; this.release = false; this.resolved = false; this.whiff = false; this.punchId++; this.dodge = null; this.aimArm = P.arm;
     this.bodyShot = (P.type === 'straight' || P.type === 'hook') && this.wantBody; this.wantBody = false;
     if (this.bodyShot) { const kn = this.knuckle(_v1), o = this.other.ribs; this.ribIdx = o[0].w.distanceTo(kn) < o[1].w.distanceTo(kn) ? 0 : 1; }
-    this.stamina = Math.max(0, this.stamina - P.sta * (1 - 0.05 * SK(this, 'sta')) * (this.heavy ? 1.7 : 1) * aiTraitK(this, 'sta'));   // R-11: a ladder man's trait (the marathon man ×0.55) this.staT = G.t + 0.55 + (this.stamina < 10 ? 0.35 : 0);
+    this.stamina = Math.max(0, this.stamina - P.sta * (1 - 0.05 * SK(this, 'sta')) * (this.heavy ? 1.7 : 1) * aiTraitK(this, 'sta')); this.staT = G.t + 0.55 + (this.stamina < 10 ? 0.35 : 0);   // R-11: aiTraitK = a ladder man's trait (the marathon man ×0.55)
   }
   startDodge(type) { this.dodge = { type, t: 0 }; this.stamina = Math.max(0, this.stamina - 4); this.staT = G.t + 0.3; }
   knuckle(v) { return v.setFromMatrixPosition(this.bones[`CC_Base_${this.aimArm}_Mid1`].matrixWorld); }
