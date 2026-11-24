@@ -358,6 +358,12 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .locbusy{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:9px 16px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(12,14,18,.86);font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);z-index:60;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.45)}
 .locbusy i{width:9px;height:9px;border-radius:50%;background:var(--gold);animation:locpulse 1s ease-in-out infinite}
 .locbusy[hidden]{display:none}
+/* R-24: a fight waits for a cold place — the set is built in steps under this screen (17_loc_load.js, locLoadUI) */
+.locload{z-index:8;background:radial-gradient(ellipse at 50% 42%,#171a22 0%,var(--ink) 70%)}
+.locload .box{align-items:stretch;text-align:left}
+.locload small{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+.locload b{font:900 clamp(26px,5vmin,44px)/1 'Big Shoulders Display',Impact,'Arial Black',sans-serif;letter-spacing:.02em;color:#f1ece2;text-transform:uppercase}
+.locload .bar span{transition:width .12s linear}
 @keyframes locpulse{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
 .err{color:#ff9b8a}
 #stage.short .rules,#stage.short .keys{display:none}
@@ -735,6 +741,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   </div></div>
 
   <div class="loading" id="loading"><div class="box"><span id="ld-text">Загружаю бойцов…</span><div class="bar"><span id="ld-bar"></span></div></div></div>
+  <div class="loading locload" id="loc-load" hidden><div class="box"><small>площадка</small><b id="ll-n"></b><span>Готовим площадку…</span><div class="bar"><span id="ll-bar"></span></div></div></div>
   <div class="locbusy" id="loc-busy" hidden><i></i><span>Готовим площадку…</span></div>
 </div>
 
@@ -8198,7 +8205,7 @@ function startFight(fromMode) {
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
   if (G.mode !== 'career' && G.mode !== 'net' && G.mode !== 'story') { const st = isStreet(), L = P2.gear.look || {}; if (!!L.street !== st) P2.applyLook({ ...L, ...(st ? streetLook() : { street: false, bottom: 'shorts', top: 'none', shoes: 'none', head: 'none', eyes: 'none', belt: 'none' }) }); }   // a story bout dresses P2 with the chapter's fixed look (19_story.js)
   CROWD.fill = G.mode === 'career' ? LADDER[Math.min(G.career, LADDER.length - 1)].crowd ?? 1 : 1;   // the semi-final in the warehouse: a half-empty hall; the title fight: everybody came
-  setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'boxgym' : G.mode === 'career' ? careerLoc() : G.loc);   // sparring and the heavy bag are always in the training gym (13e_loc_boxgym.js); a career fight is where the ladder says
+  setLocation(G.mode === 'spar' || G.mode === 'bag' ? 'boxgym' : G.mode === 'career' ? careerLoc() : G.loc, 'wait');   // a cold set: the loading screen until it is ready (17_loc_load.js) · sparring and the heavy bag are always in the training gym (13e_loc_boxgym.js); a career fight is where the ladder says
   G.paused = false; UI.from = null; uiShow(null);
   BAG.on = false; showP2(true); BAG.g.visible = false; { const r = $('r-replay'); if (r) r.hidden = false; const c = $('r-car'); if (c) c.textContent = ''; payShow(null); }
   sfx.unlock(); socStart();   // the hype cools down (15_social.js)
@@ -8872,7 +8879,7 @@ function tutStart() {
   uiShow(null);
   P1.sparGear(true); P2.sparGear(true); showP2(true); BAG.on = false; BAG.g.visible = false;
   CROWD.fill = 1;
-  setLocation('boxgym'); sfx.unlock();
+  setLocation('boxgym', 'wait'); sfx.unlock();
   P1.stat = PROF.stats; P2.stat = lvlStats(0); P1.sig = PROF.sig; P2.sig = null;
   $('n1').textContent = myName(); $('n2').textContent = 'Партнёр'; const sl = $('st2'); if (sl) sl.textContent = 'стоит и ждёт';
   P1.resetState(); P2.resetState(); P1.speed = 1.5; P2.speed = 1;
@@ -9387,6 +9394,9 @@ let last = performance.now();
 for (const k of ['step', 'hitStep']) { const fn = Ragdoll.prototype[k]; Ragdoll.prototype[k] = function (dt) { const t = performance.now(), r = fn.call(this, dt); PERF.rag += performance.now() - t; return r; }; }
 function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
 function frame(now) {
+  // R-24: a cold set is being prepared in steps (17_loc_load.js); while the fight waits for it the game stands still under
+  // «Готовим площадку…» — no simulation, no 3D frame (the clock restarts from the end of this frame's loading work)
+  if (locPumpFrame()) { if (NET.role) netTick(Math.min(0.1, (now - last) / 1000)); last = performance.now(); if (!window.__manual) requestAnimationFrame(frame); return; }
   const rawDt = (now - last) / 1000, dtReal = G.paused ? 0 : Math.min(0.05, rawDt); last = now; G.real += dtReal;   // pause: everything below runs with dt = 0 (as in a hit-stop frame)
   if (NET.role) netTick(rawDt);   // issue 49: snapshots / input / ping / the disconnect clock
   const pm = PERF.m; let tp = performance.now(), tq; PERF.rag = 0;   // CPU split for the F3 overlay
@@ -9696,7 +9706,8 @@ const LOCS = {
 
       top(x, z) { const i = ((Math.round(Math.atan2(z, x) / (2 * Math.PI / BALE_N)) % BALE_N) + BALE_N) % BALE_N; return BALE_LOW.includes(i) ? this.h / 2 : this.h; } },   // top of the bales at a point of the circle (ARENA frame)
     light: { bg: '#0b0e11', fog: ['#0b0e11', 9, 38], exposure: 0.95, hemi: ['#b4c6d6', '#26282a', 0.34], key: ['#d8f0ff', 48], rim: ['#9cc4ff', 1.9], rim2: ['#cfe4ff', 1.1], fill: ['#eaf4ff', 0.45] },
-    build() {
+    steps: 10,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+    *build() {
       const R = locRng(77), g = new THREE.Group(), PI = Math.PI;
       const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
       const speck = (c, w, h, n, a) => { for (let i = 0; i < n; i++) { c.fillStyle = `rgba(${R() < 0.5 ? '0,0,0' : '255,255,255'},${R() * a})`; c.fillRect(R() * w, R() * h, 1 + R() * 2, 1 + R() * 2); } };
@@ -9714,6 +9725,7 @@ const LOCS = {
       }));
       const floor = staticMesh(geoUvMul(new THREE.PlaneGeometry(64, 26).rotateX(-PI / 2), 16, 6.5), new THREE.MeshStandardMaterial({ map: concTex, roughness: 0.78, envMapIntensity: 0.5 }));
       floor.receiveShadow = true; g.add(floor);
+      yield 'floor';
       /* painted markings as geometry (crisp at any distance): faded yellow bay lines and aisle arrows, worn through by a tiled alpha */
       const wearTex = rep(canvasTex(256, 256, (c, w, h) => {
         c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); c.globalCompositeOperation = 'destination-out';
@@ -9734,6 +9746,7 @@ const LOCS = {
       const grateTex = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#3a3d40'; c.fillRect(0, 0, w, h); c.fillStyle = '#0b0c0d'; for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) c.fillRect(12 + j * 54, 12 + i * 18, 48, 10); c.strokeStyle = '#5b5f63'; c.lineWidth = 5; c.strokeRect(3, 3, w - 6, h - 6); });
       const grate = staticMesh(geoMerge([[-1.3, 1.15], [6.2, -1.4], [-9, 1.2]].map(([x, z]) => new THREE.PlaneGeometry(0.5, 0.5).rotateX(-PI / 2).translate(x, 0.0016, z))), new THREE.MeshStandardMaterial({ map: grateTex, roughness: 0.5, metalness: 0.6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
       grate.receiveShadow = true; g.add(grate);
+      yield 'marks';
       /* walls (single-sided, so a camera that backs through one sees the scene): bare concrete above, a painted dado below */
       const wallTex = rep(canvasTex(512, 512, (c, w, h) => {
         c.fillStyle = '#727574'; c.fillRect(0, 0, w, h); c.fillStyle = '#3d4549'; c.fillRect(0, h * 0.6, w, h * 0.4); c.fillStyle = '#b98f22'; c.fillRect(0, h * 0.6 - 9, w, 9);
@@ -9743,6 +9756,7 @@ const LOCS = {
       }));
       const wallG = (len, ry, x, z) => geoUvMul(new THREE.PlaneGeometry(len, 3), len / 4, 1).rotateY(ry).translate(x, 1.5, z);
       g.add(staticMesh(geoMerge([wallG(64, 0, 0, -9.6), wallG(64, PI, 0, 9.6), wallG(19.2, PI / 2, -32, 0), wallG(19.2, -PI / 2, 32, 0)]), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9, envMapIntensity: 0.4 })));
+      yield 'walls';
       /* ceiling with beams (hidden when the camera goes above it — the top-down replay shot), pipes, a duct, the lamps */
       const ceil = this.ceil = new THREE.Group(); g.add(ceil);
       const colX = [-26.25, -18.75, -11.25, -3.75, 3.75, 11.25, 18.75, 26.25], colZ = [-4.05, 4.05];
@@ -9758,6 +9772,7 @@ const LOCS = {
       const tubeM = new THREE.InstancedMesh(new THREE.BoxGeometry(1.5, 0.05, 0.1), new THREE.MeshBasicMaterial({ color: '#ffffff' }), tubes.length), m4 = new M4();
       tubes.forEach(([x, z], i) => { tubeM.setMatrixAt(i, m4.makeTranslation(x, 2.95, z)); const dead = Math.abs(x) > 6 && R() < 0.16; tubeM.setColorAt(i, dead ? tubeCol.setRGB(0.1, 0.11, 0.12) : tubeCol.setRGB(2.1, 2.6, 2.9)); });
       tubeM.matrixAutoUpdate = false; tubeM.frustumCulled = false; ceil.add(tubeM);
+      yield 'ceiling';
       /* columns: concrete, a yellow-black band at the bottom, the level badge at eye height (one texture on all four faces) */
       const colTex = canvasTex(256, 1024, (c, w, h) => {
         const py = m => h - m * h / 3;   // metres above the floor → pixel row
@@ -9772,6 +9787,7 @@ const LOCS = {
       this.cols = []; for (const x of colX) for (const z of colZ) this.cols.push({ p: new V3(x, 1.5, z), mat: new M4().makeTranslation(x, 1.5, z), h: false });
       const colM = this.colMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 3, 0.6), new THREE.MeshStandardMaterial({ map: colTex, roughness: 0.9, envMapIntensity: 0.4 }), this.cols.length);
       this.cols.forEach((c, i) => colM.setMatrixAt(i, c.mat)); colM.matrixAutoUpdate = false; colM.frustumCulled = false; this.zero = new M4().makeScale(0, 0, 0); g.add(colM);
+      yield 'columns';
       /* signs on the back wall: the level number painted big, a fire door with a glowing green «ВЫХОД» over it; wheel stops in the bays */
       const lvlTex = canvasTex(512, 384, (c, w, h) => { c.fillStyle = 'rgba(226,190,60,.9)'; c.font = font(330); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('-2', w / 2, h / 2 + 14);
         c.globalCompositeOperation = 'destination-out'; for (let i = 0; i < 1500; i++) { c.fillStyle = `rgba(0,0,0,${0.2 + R() * 0.6})`; c.fillRect(R() * w, R() * h, 1 + R() * 8, 1 + R() * 3); } });
@@ -9784,6 +9800,7 @@ const LOCS = {
       const props = [geoTint(geoBox(0.95, 2.05, 0.06, 2.0, 1.025, -9.58), '#39424a'), geoTint(geoBox(1.11, 2.13, 0.04, 2.0, 1.065, -9.59), '#23282d'), geoTint(geoBox(0.04, 0.16, 0.05, 2.36, 1.02, -9.53), '#9aa0a5'), geoTint(geoBox(0.56, 0.2, 0.06, 2.0, 2.33, -9.56), '#101412')];
       for (const sz of [-1, 1]) for (let k = -5; k <= 5; k++) props.push(geoTint(geoBox(1.7, 0.1, 0.15, 2.5 * k, 0.05, sz * 8.9), k % 2 ? '#c29d24' : '#1c1d20'));
       g.add(staticMesh(geoMerge(props), propMat));
+      yield 'signs';
       /* parked cars: a side profile extruded across the width (bevelled), a glass band a hair outside the cabin, wheels, lights */
       const carMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.34, metalness: 0.45 });
       const KIND = {
@@ -9808,6 +9825,7 @@ const LOCS = {
       };
       car('sedan', '#d9dcde', -2.5, -6.95, 0); car('suv', '#101114', 2.5, -6.95, 0); car('hatch', '#8e1418', 7.5, -6.7, 0);
       car('hatch', '#1f4f9c', 2.5, 6.7, PI); car('sedan', '#8f959b', -5.0, 6.95, PI);
+      yield 'cars';
       /* the circle: 21 hay bales (0.9 × 0.45 × 0.45) on a 3 m radius, slightly askew, a second tier on most; one mesh per stack so
          the stacks between the camera and the fighters can be hidden; loose straw around them */
       const strawTex = canvasTex(256, 128, (c, w, h) => {
@@ -9824,12 +9842,14 @@ const LOCS = {
         for (let t = 0; t < (BALE_LOW.includes(i) ? 1 : 2); t++) { const rj = BALE_R + (R() - 0.5) * (t ? 0.09 : 0.04), tj = (R() - 0.5) * (t ? 0.12 : 0.03); gs.push(geoBox(0.9, 0.45, 0.45, rj * ca - tj * sa, 0.225 + 0.45 * t, rj * sa + tj * ca, PI / 2 - a + (R() - 0.5) * (t ? 0.2 : 0.07))); }
         const m = staticMesh(geoMerge(gs), baleMat); m.receiveShadow = true; g.add(m); this.stacks.push({ m, p: new V3(BALE_R * ca, 0.45, BALE_R * sa), o: new V3(ca, 0, sa) });
       }
+      yield 'bales';
       const looseTex = canvasTex(1024, 1024, (c, w, h) => {   // 8 × 8 m: straw trampled around the bales, a little inside the circle
         for (let i = 0; i < 4200; i++) { const a = R() * 2 * PI, u = R(), r = (u < 0.86 ? 2.5 + R() * 1.1 + (R() - 0.5) * 0.5 : R() * 2.6) * w / 8, x = w / 2 + Math.cos(a) * r, y = h / 2 + Math.sin(a) * r, l = 4 + R() * 13, b = R() * 2 * PI;
           c.strokeStyle = `hsla(${38 + R() * 14},${45 + R() * 30}%,${26 + R() * 30}%,${0.35 + R() * 0.5})`; c.lineWidth = 0.7 + R() * 0.8; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(b) * l, y + Math.sin(b) * l); c.stroke(); }
       });
       const loose = staticMesh(new THREE.PlaneGeometry(8, 8).rotateX(-PI / 2).translate(0, 0.002, 0), new THREE.MeshStandardMaterial({ map: looseTex, transparent: true, roughness: 1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
       loose.receiveShadow = true; loose.renderOrder = -1; g.add(loose);
+      yield 'straw';
       /* light: a cold pool over the circle from the lamps above it (the shared `key` gives the fighters' shadows), three shadowless
          point lights where the tubes are so the cars, the wall and the far aisle read; everything else falls off into the dark fog */
       const top = new THREE.SpotLight('#d8f0ff', 24, 10, 1.15, 0.9, 1.4); top.position.set(0, 2.92, 0); top.target.position.set(0, 0, 0); g.add(top, top.target);
@@ -9862,21 +9882,31 @@ let LOC = LOCS.gym;
    while the report forces rebuilds. */
 const LOCPROF = { last: null, active: false, tex: 0, texN: 0, noTrim: false };
 let LOCSTAMP = 0;   // last-used stamp for the low-preset LRU cache
-/* switch the location: build its set on first use, show it (and the ring props if it has a ring), retune the shared lights.
-   The set is built once and then only hidden/shown (LOC.group is the cache); on low at most 2 stay resident (locTrim, 17). */
-function setLocation(id) {
-  const L = LOCS[id] || LOCS.gym, was = LOC; LOC = L;
-  if (!L.group) {
-    const b0 = performance.now(); LOCPROF.tex = 0; LOCPROF.texN = 0; LOCPROF.active = true;
-    let g; try { g = L.build(); } finally { LOCPROF.active = false; }
-    L.group = g; ARENA.add(g);
-    LOCPROF.last = { id: L.id, build: +(performance.now() - b0).toFixed(1), tex: +LOCPROF.tex.toFixed(1), texN: LOCPROF.texN };
-    locBusyFlash();   // a cold build is a brief wait: «Готовим площадку…» (17_loc_load.js)
+/* R-24: a cold set is prepared in steps (17_loc_load.js). LOC names the location the game is in (its static fields — bound,
+   ring, wall, label — are valid at once); LOC_ON is the one whose set and light are actually applied; LOC_WANT is the one
+   being waited for (its job is pumped first); LOC_WAIT = a fight / lesson / story needs it: frame() stands still under
+   «Готовим площадку…» until it is ready. */
+let LOC_ON = null, LOC_WANT = null, LOC_WAIT = false;
+/* switch the location. A ready set is shown at once. A cold one:
+     mode 'wait' — a fight starts there: LOC = it now, the loading screen with a bar until it is built (frame() → locPumpFrame);
+     mode 'now'  — built right here, synchronously (debug, reports, the very first set at boot);
+     default     — the menu: the old set stays on screen (a small pill) and the new one is applied when its job is done. */
+function setLocation(id, mode) {
+  const L = LOCS[id] || LOCS.gym;
+  if (!locReady(L)) {
+    if (mode === 'now' || !LOC_ON) locFinish(L);
+    else { LOC_WANT = L; locJob(L); LOC_WAIT = mode === 'wait'; LOC = LOC_WAIT ? L : LOC_ON; locLoadUI(); return; }
   }
+  LOC_WANT = null; LOC_WAIT = false; LOC = L; locApply(L); locLoadUI();
+}
+/* show a ready set (and the ring props if it has a ring), retune the shared lights. The set is built once and then only
+   hidden/shown (L.group is the cache); on low at most 2 stay resident (locTrim, 17). */
+function locApply(L) {
+  const was = LOC_ON; LOC_ON = L;
   L.stamp = ++LOCSTAMP;
   for (const o of Object.values(LOCS)) { if (o.group) o.group.visible = o === L; for (const w of o.world || []) w.visible = o === L; }
   RINGSET.visible = L.ring;
-  if (was !== L && was.leave) was.leave(); if (L.enter) L.enter();   // a location that moves or hides shared things puts them back (13e_loc_boxgym.js)
+  if (was && was !== L && was.leave) was.leave(); if (L.enter) L.enter();   // a location that moves or hides shared things puts them back (13e_loc_boxgym.js)
   const li = L.light; scene.background.set(li.bg); scene.fog.color.set(li.fog[0]); scene.fog.near = li.fog[1]; scene.fog.far = li.fog[2]; renderer.toneMappingExposure = li.exposure;
   hemi.color.set(li.hemi[0]); hemi.groundColor.set(li.hemi[1]); hemi.intensity = li.hemi[2];
   for (const [l, v] of [[key, li.key], [rim, li.rim], [rim2, li.rim2], [fill, li.fill]]) { l.color.set(v[0]); l.intensity = v[1]; }
@@ -9886,7 +9916,7 @@ function setLocation(id) {
   ARENA.updateMatrixWorld(true);
   locTrim();   // #47: on low keep at most 2 built sets (evict the least-recently-used, never the current one)
 }
-function locSync() { if (LOC.sync && LOC.group) LOC.sync(); }
+function locSync() { if (LOC.sync && LOC === LOC_ON && LOC.group) LOC.sync(); }
 /* ───────── location «Шины и огонь»: a night yard in an industrial zone ─────────
    A 6 m circle of tyre stacks on trampled dirt with puddles, four burning oil drums behind the tyres, a car with its headlights on
    the circle, the crowd with phones, a chain-link fence, garages, a workshop and a site cabin in the haze, the glow of a city.
@@ -9901,9 +9931,11 @@ const TIRE_N = 29, TIRE_R = 3.08, TIRE_W = 0.225, TIRE_RO = 0.33;   // 29 stacks
 const TIRE_TIERS = (() => { const R = locRng(412); return Array.from({ length: TIRE_N }, () => R() < 0.3 ? 2 : 3); })();
 const TIRE_FOG = '#15110f';
 
-/* a height drawing (white = high) → tangent-space normal map, tiling */
-function tireHeightToNormal(w, h, draw, k) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); draw(x, w, h);
+/* a height drawing (white = high) → tangent-space normal map, tiling. R-24: a CPU canvas (getImageData on an accelerated one
+   waited ~1.5 s for its GPU raster under software GL); half size on low (locTexK) — the drawing is scaled, the slope k with it */
+function tireHeightToNormal(w0, h0, draw, k) {
+  const s = locTexK(w0, h0), w = Math.round(w0 * s), h = Math.round(h0 * s); k *= s;
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); if (s !== 1) x.scale(s, s); draw(x, w0, h0);
   const d = x.getImageData(0, 0, w, h).data, o = x.createImageData(w, h), q = o.data, H = (i, j) => d[(((j + h) % h) * w + (i + w) % w) * 4];
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
     const dx = (H(i - 1, j) - H(i + 1, j)) * k / 255, dy = (H(i, j - 1) - H(i, j + 1)) * k / 255, l = Math.hypot(dx, dy, 1), p = (j * w + i) * 4;
@@ -10017,7 +10049,8 @@ LOCS.tires = {
   // the shared lights: `key` (it casts the fighters' shadows) is a cold lamp high above, `rim` / `rim2` are the glow of the fires
   // behind the fighters (they flicker with them, see sync); the real fire and headlight lamps live in the set
   light: { bg: '#07080c', fog: [TIRE_FOG, 9, 36], exposure: 1.0, hemi: ['#46527a', '#2a1a10', 0.3], key: ['#c9d6ff', 22], rim: ['#ff8a3c', 1.5], rim2: ['#ff7a2a', 1.7], fill: ['#ffb27a', 0.3] },
-  build() {
+  steps: 11,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+  *build() {
     const R = locRng(901), g = new THREE.Group(), PI = Math.PI, m4 = new M4(), q1 = new Quat(), q2 = new Quat(), v1 = new V3(), one = new V3(1, 1, 1), UP = new V3(0, 1, 0);
     const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
     const lin = t => { t.colorSpace = THREE.NoColorSpace; return t; };
@@ -10055,6 +10088,7 @@ LOCS.tires = {
     const sheet = (len, w0, w1, up) => { const s = new THREE.PlaneGeometry(1, 1, 1, 8), p = s.attributes.position; for (let i = 0; i < p.count; i++) { const v = p.getY(i) + 0.5, x = p.getX(i) * (w0 + (w1 - w0) * v); p.setXYZ(i, up ? 0 : x, up ? x : 0, v * len); } return s; };   // a widening strip along +z
     const beamMat = o => new THREE.MeshBasicMaterial({ map: beamTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide, ...o });
     const search = this.search = new THREE.Mesh(sheet(26, 0.3, 2.6, false).rotateX(-PI / 2), beamMat({ color: '#8ea4d8', opacity: 0.16 })); search.position.set(9, 0.4, -28.5); search.renderOrder = -8; search.frustumCulled = false; sky.add(search);
+    yield 'sky';
 
     /* ── ground: gravelly dirt (4 m tile, 2 m normal tile), puddles / trampled floor / soot through the mask ── */
     const dirtTex = rep(canvasTex(1024, 1024, (c, w, h) => {
@@ -10065,9 +10099,11 @@ LOCS.tires = {
       for (let i = 0; i < 2600; i++) { const x = R() * w, y = R() * h, r = 1.2 + R() * R() * 5, l = 70 + R() * 90; c.fillStyle = `rgb(${l},${l - 4},${l - 10})`; c.beginPath(); c.ellipse(x, y, r, r * (0.6 + R() * 0.4), R() * 3, 0, 7); c.fill();   // gravel: a stone, its shaded side
         c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x + r * 0.3, y + r * 0.35, r, r * 0.5, 0, 0, 7); c.fill(); c.fillStyle = `rgb(${l + 14},${l + 10},${l})`; c.beginPath(); c.ellipse(x, y, r * 0.8, r * 0.5, R() * 3, 0, 7); c.fill(); }
     }));
+    yield 'dirt';
     const dirtN = tireHeightToNormal(512, 512, (c, w, h) => { c.fillStyle = '#808080'; c.fillRect(0, 0, w, h); for (let i = 0; i < 70; i++) { c.fillStyle = `rgba(${R() < 0.5 ? '0,0,0' : '255,255,255'},${0.05 + R() * 0.08})`; c.beginPath(); c.ellipse(R() * w, R() * h, 20 + R() * 70, 12 + R() * 40, R() * 3, 0, 7); c.fill(); }
       for (let i = 0; i < 2600; i++) { const l = 120 + R() * 135; c.fillStyle = `rgb(${l},${l},${l})`; c.beginPath(); c.arc(R() * w, R() * h, 1 + R() * R() * 5, 0, 7); c.fill(); } speck(c, w, h, 16000, 0.2); }, 2.2);
     dirtN.repeat.set(2, 2);
+    yield 'dirt normals';
     const MS = 28, maskTex = lin(canvasTex(512, 512, (c, w, h) => {   // MS metres across; canvas x = +x, canvas y = −z
       c.fillStyle = '#000'; c.fillRect(0, 0, w, h); c.globalCompositeOperation = 'lighter';
       const px = (x, z) => [(0.5 + x / MS) * w, (0.5 - z / MS) * h], dot = (x, z, r, col, a) => { const [cx, cy] = px(x, z), rp = r / MS * w, gr = c.createRadialGradient(cx, cy, 0, cx, cy, rp); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(0.5, `rgba(${col},${a * 0.6})`); gr.addColorStop(1, `rgba(${col},0)`); c.fillStyle = gr; c.fillRect(cx - rp, cy - rp, 2 * rp, 2 * rp); };
@@ -10090,6 +10126,7 @@ LOCS.tires = {
         .replace('#include <aomap_fragment>', 'reflectedLight.directSpecular *= mix(1.0, 0.08, tPud);\n#include <aomap_fragment>');
     };
     const ground = staticMesh(geoUvMul(new THREE.PlaneGeometry(76, 76).rotateX(-PI / 2), 19, 19), groundMat); ground.receiveShadow = true; g.add(ground);
+    yield 'ground';
 
     /* ── the circle: tyres (a lathed section, tread and sidewall lettering from a height drawing) as ONE InstancedMesh; a stack that
        gets between the camera and the fighters is collapsed to zero scale (sync), as the car park does with its columns ── */
@@ -10106,6 +10143,7 @@ LOCS.tires = {
       if (col) { speck(c, w, h, 9000, 0.07); for (let i = 0; i < 70; i++) { c.fillStyle = `rgba(${R() < 0.6 ? '128,108,84' : '150,146,138'},${0.04 + R() * 0.1})`; c.beginPath(); c.ellipse(R() * w, R() * h, 12 + R() * 60, 5 + R() * 22, R() * 0.6, 0, 7); c.fill(); } }
     };
     const tireCol = rep(canvasTex(512, 256, tireDraw(true))), tireN = tireHeightToNormal(512, 256, tireDraw(false), 2.6);
+    yield 'tyre maps';
     const hw = TIRE_W / 2, prof = [[0.2, -0.085], [0.235, -0.105], [0.29, -hw], [0.318, -0.1], [TIRE_RO, -0.075], [TIRE_RO, 0.075], [0.318, 0.1], [0.29, hw], [0.235, 0.105], [0.2, 0.085], [0.2, -0.085]];
     const profV = [0.02, 0.08, 0.22, 0.29, 0.34, 0.66, 0.71, 0.78, 0.92, 0.98, 1];
     const tireG = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 20);
@@ -10127,6 +10165,7 @@ LOCS.tires = {
     const tireM = this.tireMesh = new THREE.InstancedMesh(tireG, new THREE.MeshStandardMaterial({ map: tireCol, normalMap: tireN, normalScale: new THREE.Vector2(1.3, 1.3), roughness: 0.8, envMapIntensity: 0.3 }), tires.length), tc = new THREE.Color();
     tires.forEach((t, i) => { tireM.setMatrixAt(i, t.m); tireM.setColorAt(i, tc.setRGB(t.tint * 1.05, t.tint, t.tint * 0.93)); if (t.s >= 0) stacks[t.s].ids.push(i); });
     this.tires = tires; this.zero = new M4().makeScale(0, 0, 0); tireM.matrixAutoUpdate = false; tireM.frustumCulled = false; tireM.receiveShadow = true; g.add(tireM);
+    yield 'tyres';
 
     /* ── oil drums: rusty, soot at the mouth, embers inside, punched air holes glowing near the bottom ── */
     const drumProf = [[0, 0], [0.285, 0], [0.285, 0.28], [0.298, 0.295], [0.285, 0.31], [0.285, 0.57], [0.298, 0.585], [0.285, 0.6], [0.285, 0.86], [0.296, 0.88], [0.272, 0.88], [0.268, 0.52], [0, 0.52]], dn = drumProf.length - 1;
@@ -10146,6 +10185,7 @@ LOCS.tires = {
     const drumM = this.drumMesh = new THREE.InstancedMesh(drumG, drumMat, 4);
     this.drums = BAR.map((b, i) => { const m = new M4().makeRotationY(R() * 6).setPosition(b.x, 0, b.z); drumM.setMatrixAt(i, m); return { p: new V3(b.x, 0.7, b.z), m, h: false, on: 1 }; });
     drumM.matrixAutoUpdate = false; drumM.frustumCulled = false; g.add(drumM);
+    yield 'drums';
 
     /* ── static props: one merged mesh, vertex colours over a grit texture; lit windows and lamps in a second, unlit one ── */
     const grit = rep(canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#d6d6d6'; c.fillRect(0, 0, w, h); speck(c, w, h, 5000, 0.2, 3); for (let i = 0; i < 12; i++) { c.fillStyle = `rgba(0,0,0,${0.04 + R() * 0.1})`; c.fillRect(R() * w, 0, 2 + R() * 9, h); } }));
@@ -10185,6 +10225,7 @@ LOCS.tires = {
       q1.setFromAxisAngle(UP, R() * 6); if (lie && !on) q1.multiply(q2.setFromAxisAngle(v1.set(1, 0, 0), PI / 2));
       bot.setMatrixAt(i, m4.compose(on ? v1.set(on[0] + (R() - 0.5) * 0.6, on[1], on[2] + (R() - 0.5) * 0.2) : v1.set(Math.cos(a) * r, lie ? 0.035 : 0, Math.sin(a) * r), q1, one)); bot.setColorAt(i, tc.set(['#1d4a25', '#4a2a10', '#6f7c78', '#16361c'][(R() * 4) | 0])); }
     bot.matrixAutoUpdate = false; bot.frustumCulled = false; g.add(bot);
+    yield 'props';
 
     /* ── the car (a boxy little off-roader): profile extruded across the width as in the car park; lamps, beams and flares apart
        from the body so that they can be hidden together when the car gets between the camera and the fighters ── */
@@ -10205,6 +10246,7 @@ LOCS.tires = {
       const lm = staticMesh(tf(geoMerge(lamps)), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 5.4, 6), fog: false })); carG.add(lm);
       const bm = staticMesh(tf(geoMerge(beams)), beamMat({ color: '#cfdcff', opacity: 0.13 })); bm.renderOrder = 1; carG.add(bm);
       this.carP = new V3(CAR.x, 0.8, CAR.z); }
+    yield 'car';
 
     /* ── fire, glows, flares (additive) and smoke (blended): instanced cards, see the shaders above ── */
     const cards = list => { const n = list.length, geo = new THREE.InstancedBufferGeometry(), A = new Float32Array(n * 4), B = new Float32Array(n * 4), C = new Float32Array(n * 3);
@@ -10225,9 +10267,11 @@ LOCS.tires = {
     for (let i = 0; i < NS; i++) { const b = BAR[i % 4]; sp.set([b.x, 1.0, b.z], i * 3); sa.set([R(), 1.3 + R() * 1.5, 1.6 + R() * 2.2, i % 4], i * 4); }
     const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3)); sg.setAttribute('aS', new THREE.BufferAttribute(sa, 4));
     const sparks = this.sparks = new THREE.Points(sg, new THREE.ShaderMaterial({ uniforms: U, vertexShader: TIRE_SPARK_VS, fragmentShader: TIRE_SPARK_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); sparks.frustumCulled = false; sparks.renderOrder = 4; g.add(sparks);
+    yield 'fire';
 
     /* ── lamps: a flickering point light over every drum (shadowless; two of them on «low»), the headlights as one spot ── */
-    this.lights = BAR.map(b => { const p = new THREE.PointLight('#ff8a3a', 10, 11, 1.5); p.position.set(b.x * 0.97, 1.3, b.z * 0.97); g.add(p); return p; });
+    // visible as sync() will set them (two on «low»): the programs compiled while loading are keyed on the light count
+    this.lights = BAR.map((b, i) => { const p = new THREE.PointLight('#ff8a3a', 10, 11, 1.5); p.position.set(b.x * 0.97, 1.3, b.z * 0.97); p.visible = GFX.level !== 'low' || i < 2; g.add(p); return p; });
     const hl = new THREE.SpotLight('#dfe8ff', 34, 22, 0.4, 0.75, 1.3); hl.position.copy(CAR).addScaledVector(carDir, 1.9).setY(0.82); hl.target.position.set(0, 0.95, 0); g.add(hl, hl.target);
 
     /* ── the crowd: three rows behind the tyres, nobody at the drums or in the lane of the headlights; more phones than usual ── */
@@ -10292,7 +10336,8 @@ LOCS.yard = {
   wall: { r: 2.85, k: 1.0e4, mu: 0.75, h: 2.1, d: 1.2, give: 0.45, damp: 9, top() { return this.h; } },
   // dusk: the sodium lamp is the key (the shared shadow light) and the warm rim, the sky fills cold
   light: { bg: '#232338', fog: ['#2c2a42', 16, 64], exposure: 1.0, hemi: ['#6f86cc', '#33261c', 0.62], key: ['#ffae62', 44], rim: ['#ff9a48', 1.5], rim2: ['#7f9dff', 2.0], fill: ['#93a9ee', 0.5] },
-  build() {
+  steps: 6,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+  *build() {
     const R = locRng(1313), g = new THREE.Group(), PI = Math.PI, lite = lowEnd || GFX.level === 'low';
     const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
     const pick = a => a[(R() * a.length) | 0];
@@ -10345,6 +10390,7 @@ LOCS.yard = {
       line.renderOrder = -55; line.frustumCulled = false; far.add(line);
     }
 
+    yield 'sky';
     /* ── ground: one 5 m asphalt tile (aggregate, blotches, cracks, a patch) over the whole yard; over the middle a layer of things that
        do not repeat (repairs, long cracks, a manhole, chalk hopscotch, stains, leaves); puddles; dead lawns behind kerbs ── */
     const asTex = rep(canvasTex(lite ? 512 : 1024, lite ? 512 : 1024, (c, w, h) => {
@@ -10359,6 +10405,7 @@ LOCS.yard = {
     }));
     const floor = staticMesh(geoUvMul(new THREE.PlaneGeometry(84, 84).rotateX(-PI / 2), 16.8, 16.8), new THREE.MeshStandardMaterial({ map: asTex, roughness: 0.8, envMapIntensity: 0.35 }));
     floor.receiveShadow = true; g.add(floor);
+    yield 'asphalt';
     const markTex = canvasTex(lite ? 512 : 1024, lite ? 512 : 1024, (c, w, h) => {
       const s = w / 14; c.setTransform(s, 0, 0, s, w / 2, h / 2);   // metres: a top-down map of the middle 14 × 14 m, x to the right, z down
       for (const [x, z, ww, hh, a] of [[-3.4, -1.3, 2.6, 1.7, 0.2], [1.7, 1.9, 3.2, 1.3, -0.1], [3.3, -4.4, 1.8, 2.4, 0.5], [-4.6, 4.6, 2.2, 2.0, -0.3]]) {
@@ -10398,6 +10445,7 @@ LOCS.yard = {
     }
     const lawn = staticMesh(geoMerge(lawnGs), new THREE.MeshStandardMaterial({ map: dirtTex, roughness: 1, envMapIntensity: 0.2 })); lawn.receiveShadow = true; g.add(lawn);
 
+    yield 'ground';
     /* ── the houses. Every cell (bay × floor) of the façade gets its own random look once (`spec`), then the same picture is drawn
        twice: the colour map and the emissive map (lit windows only: warm lamps, cold TVs, the odd violet grow lamp) ── */
     const LIT = ['#ffc66e', '#ffb04e', '#ffd9a0', '#ffe9c4', '#a9c8ff', '#e6efff', '#ff9a52'], FRAME = ['#d9d8d0', '#d9d8d0', '#6a4a34', '#8f9499', '#c7c2b0'], PARA = ['#5f7f96', '#7b8f7a', '#9a8f78', '#8c5a48', '#7a7f86', '#b3ab98', '#4f6a80'];
@@ -10474,6 +10522,7 @@ LOCS.yard = {
     g.add(staticMesh(wallGeo(F), new THREE.MeshStandardMaterial({ map: facTex, emissiveMap: emTex, emissive: '#ffffff', emissiveIntensity: 1.5, roughness: 0.92, envMapIntensity: 0.25 })));
     g.add(staticMesh(wallGeo(Bk), new THREE.MeshStandardMaterial({ map: panelTex, roughness: 0.95, envMapIntensity: 0.2 })));
 
+    yield 'houses';
     /* ── props (each built around its own origin, front = +z, then put in place) ── */
     const bench = col => [...[-0.13, 0, 0.13].map(z => tb(col, 1.8, 0.04, 0.11, 0, 0.45, z)), tb(col, 1.8, 0.11, 0.035, 0, 0.66, -0.23), tb(col, 1.8, 0.11, 0.035, 0, 0.82, -0.25),
       ...[-0.72, 0.72].flatMap(x => [tb('#6f6d68', 0.09, 0.43, 0.42, x, 0.215, 0), tb('#6f6d68', 0.09, 0.5, 0.07, x, 0.65, -0.27)])];
@@ -10539,7 +10588,7 @@ LOCS.yard = {
     /* ── placing ── */
     const propMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.1, envMapIntensity: 0.3 }), carMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.36, metalness: 0.45, envMapIntensity: 0.6 });
     const lampMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(3.2, 3.2, 3.2), fog: false });
-    const glowTex = canvasTex(128, 128, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.1, 'rgba(255,255,255,.7)'); gr.addColorStop(0.35, 'rgba(255,255,255,.16)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
+    const glowTex = glowSprite([[0, 1], [0.1, 0.7], [0.35, 0.16], [1, 0]]);   // R-24: shared between places (17_loc_load.js)
     // a halo around a lamp. Sprites must stay out of the AO normal pass (they would be drawn there as solid quads): the crowd keeps
     // such a list for its floor blobs (CROWD.blobs, hidden for the time of that pass) — the halos join it
     const glow = (p, s, col) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); sp.position.copy(p); sp.scale.set(s, s, 1); g.add(sp); CROWD.blobs.push(sp); };
@@ -10634,7 +10683,8 @@ LOCS.warehouse = {
   // height of a panel, its depth, how far a body pushes the mesh out before the frame stops it, normal damping (1/s; steel mesh rattles, it does not swallow)
   wall: { kind: 'rect', hx: WH_HALF - 0.03, hz: WH_HALF - 0.03, k: 1.2e4, mu: 0.5, h: 2.0, d: 0.1, give: 0.24, damp: 12, top() { return this.h; } },
   light: { bg: '#06070a', fog: ['#06070a', 8, 30], exposure: 0.92, hemi: ['#6f86ac', '#14110e', 0.2], key: ['#ffd9a6', 22], rim: ['#8fb4ff', 1.9], rim2: ['#b8ceff', 0.7], fill: ['#dfe8ff', 0.1] },
-  build() {
+  steps: 9,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+  *build() {
     const R = locRng(1313), g = new THREE.Group(), PI = Math.PI, HX = 17, HZ = 12, HH = 7, H = WH_HALF;
     const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
     const speck = (c, w, h, n, a) => { for (let i = 0; i < n; i++) { c.fillStyle = `rgba(${R() < 0.55 ? '0,0,0' : '255,255,255'},${R() * a})`; c.fillRect(R() * w, R() * h, 1 + R() * 2, 1 + R() * 2); } };
@@ -10655,6 +10705,7 @@ LOCS.warehouse = {
     }));
     const floor = staticMesh(geoUvMul(new THREE.PlaneGeometry(2 * HX, 2 * HZ).rotateX(-PI / 2), HX / 2, HZ / 2), new THREE.MeshStandardMaterial({ map: concTex, roughness: 0.84, envMapIntensity: 0.35 }));
     floor.receiveShadow = true; g.add(floor);
+    yield 'floor';
     /* old blood (most of it inside the cage: dried brown-red blotches with their spatter, a few drag smears, bloody shoe prints
        walking out) and grime, one 10 × 10 m decal over the cage */
     const bloodTex = canvasTex(1024, 1024, (c, w, h) => {
@@ -10677,6 +10728,7 @@ LOCS.warehouse = {
       new THREE.MeshStandardMaterial({ color: '#050607', alphaMap: pudTex, transparent: true, opacity: 0.8, roughness: 0.05, envMapIntensity: 0.3, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
     pud.receiveShadow = true; pud.renderOrder = -2; g.add(pud);
 
+    yield 'blood';
     /* walls (single-sided): brick up to 3 m, stained concrete above; one 7 × 7 m tile */
     const wallTex = rep(canvasTex(1024, 1024, (c, w, h) => {
       const m = h / HH, yb = h - 3 * m;
@@ -10691,6 +10743,7 @@ LOCS.warehouse = {
     }));
     const wallG = (len, ry, x, z) => geoUvMul(new THREE.PlaneGeometry(len, HH), len / 7, 1).rotateY(ry).translate(x, HH / 2, z);
     g.add(staticMesh(geoMerge([wallG(2 * HX, 0, 0, -HZ), wallG(2 * HX, PI, 0, HZ), wallG(2 * HZ, PI / 2, -HX, 0), wallG(2 * HZ, -PI / 2, HX, 0)]), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.92, envMapIntensity: 0.3 })));
+    yield 'walls';
     /* graffiti: four pieces on one atlas (made-up tags, no real names), worn; planes a hair off the walls */
     const grafTex = canvasTex(2048, 1024, (c, W, Hh) => {
       c.lineCap = c.lineJoin = 'round';
@@ -10719,6 +10772,7 @@ LOCS.warehouse = {
     const graf = (q, w, ry, x, y, z) => { const p = new THREE.PlaneGeometry(w, w / 2), u = p.attributes.uv; for (let i = 0; i < u.count; i++) u.setXY(i, ((q & 1) + u.getX(i)) / 2, (1 - (q >> 1) + u.getY(i)) / 2); return p.rotateY(ry).translate(x, y, z); };
     g.add(staticMesh(geoMerge([graf(0, 5.6, 0, -6.6, 1.75, -HZ + 0.02), graf(1, 5.0, 0, 5.6, 1.6, -HZ + 0.02), graf(2, 5.4, -PI / 2, HX - 0.02, 1.7, -2.5), graf(3, 5.0, PI / 2, -HX + 0.02, 1.65, 2.5), graf(2, 5.2, PI, -4.5, 1.7, HZ - 0.02), graf(3, 4.6, PI, 7, 1.6, HZ - 0.02), graf(3, 4.4, 0, -13.4, 1.55, -HZ + 0.02)]), decalMat(grafTex, { roughness: 0.9, envMapIntensity: 0.3 })));
 
+    yield 'graffiti';
     /* windows under the roof on the long walls: small panes, dirty, some knocked out; they glow with the moonlight / a street lamp */
     const winTex = canvasTex(256, 192, (c, w, h) => {
       c.fillStyle = '#0e1013'; c.fillRect(0, 0, w, h); const pw = w / 6, ph = h / 4;
@@ -10731,6 +10785,7 @@ LOCS.warehouse = {
     for (const x of winX) wins.push(new THREE.PlaneGeometry(2.4, 1.7).translate(x, WY, -HZ + 0.03), new THREE.PlaneGeometry(2.4, 1.7).rotateY(PI).translate(x, WY, HZ - 0.03));
     g.add(staticMesh(geoMerge(wins), new THREE.MeshBasicMaterial({ map: winTex, color: new THREE.Color(1.35, 1.45, 1.7) })));
 
+    yield 'windows';
     /* steel: roof trusses with purlins, wall columns, pallet racks along the short walls and in the far corners (never between the
        camera and the fighters: one mesh) */
     const propMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.2, envMapIntensity: 0.4 });
@@ -10767,6 +10822,7 @@ LOCS.warehouse = {
     prop(0.8, -8.4, 1.4, gs => { load(gs, 0.2, 0, -8.6, 0.1); load(gs, 1.7, 0, -8.3, -0.2); });
     prop(-1.5, 8.2, 1.4, gs => { stack(gs, -1.8, 8.4, 5); drum(gs, -0.6, 7.9, '#1f3a56'); });
 
+    yield 'steel';
     /* the cage: per side three 2 m panels (tube frame, a mid rail, welded mesh), concrete feet under the joints, clamps. Built in
        the ARENA frame so the dent shader can work in it; a side = a mesh of tubes and feet + a mesh of the net */
     const netTex = rep(canvasTex(256, 256, (c, w, h) => { c.fillStyle = '#000'; c.fillRect(0, 0, w, h); c.fillStyle = '#fff'; for (let k = 0; k < 8; k++) c.fillRect(14 + 32 * k, 0, 4, h); for (let k = 0; k < 4; k++) c.fillRect(0, 30 + 64 * k, w, 4); }));
@@ -10792,6 +10848,7 @@ LOCS.warehouse = {
       g.add(tm, nm); this.sides.push({ tm, nm, ox: Math.sin(a), oz: Math.cos(a) });
     }
 
+    yield 'cage';
     /* light. Two enamel dish lamps on cables over the cage: hard warm pools straight down (the shared `key` only adds the fighters'
        shadows); a cold LED work light on a tripod outside one corner; moonlight from the window walls for the depth of the hall */
     const rig = this.rig = new THREE.Group(); g.add(rig);
@@ -10847,6 +10904,7 @@ LOCS.warehouse = {
     const poolTex = canvasTex(64, 64, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(150,180,235,.5)'); gr.addColorStop(0.6, 'rgba(120,150,210,.2)'); gr.addColorStop(1, 'rgba(100,130,200,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
     shaft.add(noAO(staticMesh(geoMerge(pools), new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.55 }))));
 
+    yield 'light';
     /* the crowd: three rows right against the mesh on all four sides, the back rows on crates */
     this.crowd = makeCrowd({ shape: 'rect', w: 2 * H, h: 2 * H, r: 0.42, rows: 3, look: 'masked', seed: 41, max: 120, squat: 0.1 });
     g.add(this.crowd.group);
@@ -10898,7 +10956,8 @@ LOCS.boxgym = {
   ringBound: { kind: 'square', half: 2.2 }, bagBound: { kind: 'square', half: 1.5 },
   get bound() { return BAG.on ? this.bagBound : this.ringBound; },
   light: { bg: '#120f0c', fog: ['#33291f', 7, 46], exposure: 0.94, hemi: ['#c3cfe2', '#3b2f24', 0.28], key: ['#ffe8cc', 48], rim: ['#c4d8ff', 2.5], rim2: ['#ffc48c', 1.7], fill: ['#fff3e2', 0.5] },
-  build() {
+  steps: 11,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+  *build() {
     const R = locRng(4107), g = new THREE.Group(), PI = Math.PI, { FL, X0, X1, Z0, Z1, H, SX, SZ } = BG;
     const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
     const speck = (c, w, h, n, a) => { for (let i = 0; i < n; i++) { c.fillStyle = `rgba(${R() < 0.55 ? '0,0,0' : '255,255,255'},${R() * a})`; c.fillRect(R() * w, R() * h, 1 + R() * 2, 1 + R() * 2); } };
@@ -10948,6 +11007,7 @@ LOCS.boxgym = {
     const matM = staticMesh(geoMerge(mats.map(([x0, z0, x1, z1, col]) => geoTint(geoUvXZ(geoBox(x1 - x0, 0.03, z1 - z0, (x0 + x1) / 2, 0.015, (z0 + z1) / 2), 0.5), col))), new THREE.MeshStandardMaterial({ map: vinylTex, vertexColors: true, roughness: 0.85, envMapIntensity: 0.15 }));
     matM.receiveShadow = true; put(matM);
 
+    yield 'floor';
     /* ── walls (single-sided, so a camera that backs through one still sees the hall): bare brick over a painted block dado ── */
     const wallTex = rep(canvasTex(1024, 1024, (c, w, h) => {   // H × H metres
       const m = h / H, yd = h - 1.45 * m, rows = 52, bh = yd / rows, cols = 21, bw = w / cols;
@@ -10975,6 +11035,7 @@ LOCS.boxgym = {
     put(staticMesh(geoMerge([wq(X0, Z0, X1, Z0, 0, H), wq(X1, Z0, X1, Z1, 0, H, 0.3), wq(X1, Z1, X0, Z1, 0, H, 0.6)]), wallMat));
     put(staticMesh(geoMerge([wq(X0, Z1, X0, MZ1, 0, H), wq(X0, MZ1, X0, MZ0, 0, MY0, (Z1 - MZ1) / H), wq(X0, MZ1, X0, MZ0, MY1, H, (Z1 - MZ1) / H), wq(X0, MZ0, X0, Z0, 0, H, (Z1 - MZ0) / H)]), wallMat), false);
 
+    yield 'walls';
     /* ── static steel and timber of the hall (two merged meshes): roof trusses, purlins, pipes, the bag beam and its brackets,
        window frames, lockers, the door ── */
     const steel = [], matt = [];
@@ -11001,6 +11062,7 @@ LOCS.boxgym = {
     for (const s of [-1, 1]) { steel.push(geoTint(geoBox(0.04, 0.3, 0.05, 2.9 + s * 0.12, 1.05, Z1 - 0.1), '#b9b4a6')); matt.push(geoTint(geoBox(0.5, 0.7, 0.02, 2.9 + s * 0.48, 1.55, Z1 - 0.085), '#161b20')); }
     for (let k = 0; k < 12; k++) steel.push(geoTint(geoBox(0.06, 0.55, 0.1, 5.2 + k * 0.085, 0.45, Z1 - 0.1), '#b8b2a2'));
 
+    yield 'steel';
     /* ── the ring platform: canvas-covered top around the fighting floor, a vinyl skirt with lettering, two sets of steps; and
        a plain copy of the ring itself for the mirrors (the real one is RINGSET) ── */
     const plat = this.plat = new THREE.Group(); g.add(plat);
@@ -11026,6 +11088,7 @@ LOCS.boxgym = {
       const rm = new THREE.Mesh(geoMerge(rc), new THREE.MeshBasicMaterial({ vertexColors: true, color: MIRK })); rm.matrixAutoUpdate = false; rm.frustumCulled = false; mir.add(rm);
     }
 
+    yield 'platform';
     /* ── windows (emissive panes), their glow; the ceiling ── */
     const winTex = canvasTex(512, 256, (c, w, h) => {
       c.fillStyle = '#14171a'; c.fillRect(0, 0, w, h); const nx = 8, ny = 3, pw = w / nx, ph = h / ny;
@@ -11041,6 +11104,7 @@ LOCS.boxgym = {
     const deckTex = rep(canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#211f1c'; c.fillRect(0, 0, w, h); for (let i = 0; i < 4; i++) { c.fillStyle = '#12110f'; c.fillRect(i * 16, 0, 5, h); c.fillStyle = '#2c2925'; c.fillRect(i * 16 + 8, 0, 3, h); } }));
     put(staticMesh(geoUvXZ(new THREE.PlaneGeometry(X1 - X0, Z1 - Z0).rotateX(PI / 2).translate((X0 + X1) / 2, H, (Z0 + Z1) / 2), 1.2), new THREE.MeshStandardMaterial({ map: deckTex, roughness: 1, envMapIntensity: 0.1 })));
 
+    yield 'windows';
     /* ── wall art: posters (one atlas of eight, invented fighters and shows), the club's name painted on the brick, a banner,
        the chalkboard with today's work ── */
     const sil = (c, x, y, s, flip, col) => { c.save(); c.translate(x, y); c.scale(flip ? -s : s, s); c.strokeStyle = c.fillStyle = col; c.lineCap = c.lineJoin = 'round';
@@ -11119,6 +11183,7 @@ LOCS.boxgym = {
     for (const s of [-1, 1]) matt.push(geoTint(geoBox(0.06, CBH + 0.12, 0.045, CBX + s * (CBW / 2 + 0.03), CBY, Z0 + 0.03), '#6a4c2c'), geoTint(geoBox(CBW + 0.12, 0.06, 0.045, CBX, CBY + s * (CBH / 2 + 0.03), Z0 + 0.03), '#6a4c2c'));
     matt.push(geoTint(geoBox(CBW, 0.03, 0.09, CBX, CBY - CBH / 2 - 0.07, Z0 + 0.06), '#5b4126'), geoTint(geoBox(0.1, 0.035, 0.05, CBX + 0.5, CBY - CBH / 2 - 0.04, Z0 + 0.06), '#d8d4c8'), geoTint(geoBox(0.07, 0.02, 0.02, CBX - 0.3, CBY - CBH / 2 - 0.045, Z0 + 0.06), '#f0eee6'));
 
+    yield 'wall art';
     /* ── the round timer on the back wall over the chalkboard: a steel box, three lamps (green = work, yellow = last 10 s,
        red = rest) and the clock; its face is a small canvas redrawn when the second or the lamp changes (sync) ── */
     const TMX = 0.75, TMY = 2.78;
@@ -11129,6 +11194,7 @@ LOCS.boxgym = {
       g.add(staticMesh(new THREE.PlaneGeometry(0.36, 0.54).translate(TMX, TMY - 0.02, Z0 + 0.123), new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(1.5, 1.5, 1.5), fog: false })));
       ['#3cff78', '#ffd23c', '#ff3a2c'].forEach((col, k) => { const m = noAO(staticMesh(new THREE.PlaneGeometry(0.62, 0.62).translate(TMX, TMY + 0.165 - k * 0.118, Z0 + 0.14), new THREE.MeshBasicMaterial({ map: softTex, color: col, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }))); m.renderOrder = 3; m.visible = false; g.add(m); tm.glow.push(m); }); }
 
+    yield 'timer';
     /* ── props. Far ones go into the two merged meshes; the ones a camera can get behind are clusters (a mesh each, hidden while
        between the camera and the fighters) ── */
     const blobs = [], blob = (x, z, w, d, ry = 0) => blobs.push(new THREE.PlaneGeometry(w, d).rotateX(-PI / 2).rotateY(ry).translate(x, 0.034, z));
@@ -11201,6 +11267,7 @@ LOCS.boxgym = {
       kl.forEach(([x, z, s, c], i) => { km.setMatrixAt(i, _bgM.compose(_bgS.set(x, 0.03 * (x < X0 + 2 && z < 2.4 ? 1 : 0), z), q.setFromEuler(_bgE.set(0, R() * 6, 0)), new V3(s, s, s))); km.setColorAt(i, col.set(c)); blob(x, z, 0.4 * s, 0.4 * s); });
       km.matrixAutoUpdate = false; km.frustumCulled = false; put(km); }
 
+    yield 'props';
     /* ── the heavy bags of the back wall: body (a canvas of leather, tape and print, tinted per bag) + chains and straps; both
        InstancedMeshes share one matrix buffer, rewritten each frame as the bags sway about their hooks (sync) ── */
     { const bagTex = canvasTex(512, 512, (c, w, h) => {
@@ -11233,6 +11300,7 @@ LOCS.boxgym = {
         geoTint(limb([0, 0.17, -1.3], [0, H - BG.HOOK - BG.MAT, -1.3], 0.016, 0.016, 5), '#2a2d30'), geoTint(limb([0, 0.17, 1.3], [0, H - BG.HOOK - BG.MAT, 1.3], 0.016, 0.016, 5), '#2a2d30'), geoTint(new THREE.CylinderGeometry(0.03, 0.02, 0.05, 8).translate(0, 0.005, 0), '#9a9da2')]), steelMat);
       rig.matrixAutoUpdate = true; rig.visible = false; g.add(rig); }
 
+    yield 'bags';
     /* ── mirrors: three panels in the opening of the left wall — frames, a faint dirty glass over the mirrored copy, and a flat
        grey fallback when the copy is off ── */
     { const fr = [], zc = (MZ0 + MZ1) / 2, yc = (MY0 + MY1) / 2, W = MZ1 - MZ0, Hh = MY1 - MY0;
@@ -11249,6 +11317,7 @@ LOCS.boxgym = {
       const flatTex = canvasTex(64, 64, (c, w, h) => { const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#59544b'); gr.addColorStop(0.55, '#3c3731'); gr.addColorStop(1, '#17171a'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
       this.flat = staticMesh(new THREE.PlaneGeometry(W, Hh).rotateY(PI / 2).translate(X0 - 0.01, yc, zc), new THREE.MeshBasicMaterial({ map: flatTex })); g.add(this.flat); }
 
+    yield 'mirrors';
     /* ── light. Enamel dish lamps on rods under the trusses (warm): four over the ring (`rig`: the ring's own light, hidden when
        the top-down replay camera rises to them), nine about the hall; their pools on the floor are additive decals, the real
        lights are one spot over the ring and four shadowless points. Daylight: shafts from the back windows, dust in them ── */
@@ -11386,7 +11455,8 @@ LOCS.metro = {
     t -= T.tDwell; if (t < T.tOut) return { x: T.stop + 0.5 * T.acc * t * t, v: T.acc * t, door: 0, ph: 3 };
     return { x: 1e3, v: 0, door: 0, ph: 0 };
   },
-  build() {
+  steps: 8,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+  *build() {
     const R = locRng(4711), g = new THREE.Group(), PI = Math.PI, lite = lowEnd || GFX.level === 'low', TS = lite ? 0.5 : 1;
     const { L, EZ, CZ, CW, WZ, PIT, SPRING, RISE, BAY, TZ } = MT, VA = CZ - CW / 2;   // VA: half-width of the vault
     const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
@@ -11460,6 +11530,7 @@ LOCS.metro = {
       sh.fragmentShader = 'uniform float uRefl;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', '#include <opaque_fragment>\n  gl_FragColor.a = 1.0 - uRefl * mix(0.03, 0.5, pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0));'); }; }
     const floor = staticMesh(geoUvMul(new THREE.PlaneGeometry(2 * L, 2 * EZ).rotateX(-PI / 2), 2 * L / 4, 1), floorMat); floor.receiveShadow = true; floor.renderOrder = -30; g.add(floor);
 
+    yield 'floor';
     /* ── materials shared by the set ── */
     const stoneTex = rep(canvasTex(512 * TS, 512 * TS, (c, w, h) => { marble(c, w, h, '#d8cdb9', '#7b6452', 26); speck(c, w, h, 9000 * TS, 0.06); c.fillStyle = 'rgba(40,30,24,.55)'; c.fillRect(0, 0, w, 2); c.fillRect(0, 0, 2, h); c.fillRect(w / 2, 0, 1, h); }));
     const stoneMat = new THREE.MeshStandardMaterial({ map: stoneTex, vertexColors: true, roughness: 0.5, envMapIntensity: 0.3, emissive: '#fff1dc', emissiveMap: stoneTex, emissiveIntensity: 0.05 });
@@ -11497,6 +11568,7 @@ LOCS.metro = {
     this.cols.forEach((c, i) => colM.setMatrixAt(i, c.mat)); colM.matrixAutoUpdate = false; colM.frustumCulled = false; colM.receiveShadow = true; this.zero = new M4().makeScale(0, 0, 0); add(colM, true);
     const colX = this.cols.filter(c => c.p.z > 0).map(c => c.p.x);
 
+    yield 'columns';
     /* ── the beams on the columns, the vault with its coves, the ceilings of the side naves (all hidden when the camera rises above them) ── */
     const ceil = this.ceil = new THREE.Group(); g.add(ceil); const ceilM = this.ceilM = new THREE.Group(); mir.add(ceilM);
     const addC = (o, refl) => { ceil.add(o); if (refl) twin(o, ceilM); return o; };
@@ -11531,6 +11603,7 @@ LOCS.metro = {
     CHX.forEach((x, i) => { m4.makeTranslation(x, 0, 0); chBm.setMatrixAt(i, m4); chGm.setMatrixAt(i, m4); });
     for (const o of [chBm, chGm]) { o.matrixAutoUpdate = false; o.frustumCulled = false; } addC(chBm); addC(chGm, true);
 
+    yield 'vault';
     /* ── track walls: below the platform bare concrete, a black dado, cream tiles, a red frieze; one bay of 5.5 m per repeat ── */
     const WH = SPRING + PIT, wallDraw = em => (c, w, h) => {
       const py = y => h * (1 - (y + PIT) / WH), band = (col, y0, y1) => { c.fillStyle = col; c.fillRect(0, py(y1), w, py(y0) - py(y1)); };
@@ -11552,6 +11625,7 @@ LOCS.metro = {
     const nameGs = []; for (const sz of [-1, 1]) for (const x of [-16.5, 0, 16.5]) nameGs.push(new THREE.PlaneGeometry(5.4, 0.84).rotateY(sz > 0 ? PI : 0).translate(x, 3.05, sz * (WZ - 0.03)));
     add(staticMesh(geoMerge(nameGs), new THREE.MeshStandardMaterial({ map: nameTex, alphaTest: 0.5, roughness: 0.38, metalness: 0.6, envMapIntensity: 1.2, emissive: '#ffffff', emissiveMap: nameTex, emissiveIntensity: 0.32 })), true);
 
+    yield 'track walls';
     /* ── light boxes: one atlas — the exit sign, the clocks, four posters (all invented) ── */
     const AT = 1024, atlas = canvasTex(AT, AT, (c, w) => {
       const tx = (s, x, y, f, col, al = 'center') => { c.font = f; c.fillStyle = col; c.textAlign = al; c.textBaseline = 'middle'; c.fillText(s, x, y); };
@@ -11614,6 +11688,7 @@ LOCS.metro = {
       }
     }
 
+    yield 'light boxes';
     /* ── the −x end: a mosaic wall (sunburst, two boxers, a ribbon); the +x end: an arch, three escalators going up, the booth ── */
     const outline = hole => { const s = new THREE.Shape(); s.moveTo(-VA, 0); s.lineTo(VA, 0); s.lineTo(VA, SPRING); for (let i = 1; i <= 18; i++) { const a = PI * i / 18; s.lineTo(VA * Math.cos(a), SPRING + RISE * Math.sin(a)); } s.lineTo(-VA, 0);
       if (hole) { const p = new THREE.Path(); p.moveTo(-3.7, 0); p.lineTo(-3.7, 2.6); for (let i = 1; i <= 12; i++) { const a = PI - PI * i / 12; p.lineTo(3.7 * Math.cos(a), 2.6 + 1.5 * Math.sin(a)); } p.lineTo(3.7, 0); p.lineTo(-3.7, 0); s.holes.push(p); } return s; };
@@ -11658,6 +11733,7 @@ LOCS.metro = {
     add(staticMesh(geoMerge(brass), brassMat)); add(staticMesh(geoMerge(lamps), litMat), true);
     addC(staticMesh(geoMerge(signs), new THREE.MeshBasicMaterial({ map: atlas, color: new THREE.Color(1.25, 1.2, 1.1) })), true);
 
+    yield 'ends';
     /* ── the train: five wagons = instances of one body (panels around the door and window openings, roof, underframe) and one lit
        interior seen through them; 40 door leaves (one InstancedMesh, moved only while the doors work); lights at both ends ── */
     const T = MT_TRAIN, train = this.train = new THREE.Group(), trainM = this.trainM = new THREE.Group(); train.position.set(1e3, 0, -TZ); g.add(train); mir.add(trainM);
@@ -11695,10 +11771,11 @@ LOCS.metro = {
       this.tail = tail;
     }
     // the glare of the headlights (out of the AO pass with the crowd's blobs), the cold light that rides with the train
-    const glowTex = canvasTex(128, 128, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.12, 'rgba(255,255,255,.6)'); gr.addColorStop(0.4, 'rgba(255,255,255,.13)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
+    const glowTex = glowSprite([[0, 1], [0.12, 0.6], [0.4, 0.14], [1, 0]]);   // R-24: the bar's sprite (was .13 at 0.4), shared (17_loc_load.js)
     const glare = this.glare = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color(1.6, 1.8, 2.2), blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); glare.position.set(0.3, 0.5, 0); glare.scale.set(5, 5, 1); train.add(glare); CROWD.blobs.push(glare, mir);
     const tl = this.tLight = new THREE.PointLight('#d6e4f8', 0, 14, 1.5); tl.position.set(0, 1.9, -(EZ - 2.2)); g.add(tl);
 
+    yield 'train';
     /* ── light: a warm pool over the circle under the middle chandelier, warm points along the hall ── */
     const top = new THREE.SpotLight('#ffd9a6', 27, 12, 1.05, 0.9, 1.4); top.position.set(0, 4.55, 0); top.target.position.set(0, 0, 0); g.add(top, top.target);
     for (const x of lite ? [0] : [-11, 11]) { const p = new THREE.PointLight('#ffc888', lite ? 18 : 15, 24, 1.6); p.position.set(x, 4.3, 0); g.add(p); }
@@ -11790,7 +11867,7 @@ LOCS.bar = {
     const noAO = o => { CROWD.blobs.push(o); return o; };
     const near = this.near = [];
     const propMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.12, envMapIntensity: 0.4 });
-    const glowTex = canvasTex(128, 128, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.12, 'rgba(255,255,255,.6)'); gr.addColorStop(0.4, 'rgba(255,255,255,.14)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
+    const glowTex = glowSprite([[0, 1], [0.12, 0.6], [0.4, 0.14], [1, 0]]);   // R-24: shared with the metro (17_loc_load.js)
     const glow = (p, s, col) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); sp.position.copy(p); sp.scale.set(s, s, 1); g.add(noAO(sp)); };
 
     /* floor: a 1.5 m plank tile of dark varnished wood, scuffed; over the middle — non-repeating spills, beer rings and footpaths */
@@ -12636,14 +12713,12 @@ function buildQuick() {
   if (!locOpen(G.loc)) G.loc = 'gym';
   for (const L of Object.values(LOCS)) { if (L.train) continue;   // the training gym is not a place for fights; a place can wait for followers (LOC_FANS, 15_social.js)
     const open = locOpen(L.id), b = document.createElement('button'); b.type = 'button'; b.innerHTML = `<b>${L.label}</b><small>${open ? L.desc || '' : L.lockLbl || '🔒 от ' + numF(LOC_FANS[L.id]) + ' подписчиков'}</small>`; b.setAttribute('aria-pressed', String(G.loc === L.id)); b.disabled = !open;   // lockLbl: a non-follower gate (LOC_LOCK, the story bar — #51)
-    // #47: hover prebuilds the place while the player is still reading the list; a cold click first paints the
-    // «Готовим площадку…» pill, then builds on the next macrotask so the frozen frame is never silent.
+    // #47: hover prebuilds the place while the player is still reading the list. R-24: a cold click builds it in steps
+    // over the next frames — the old set stays on screen with the «Готовим площадку…» pill (17_loc_load.js)
     if (open) b.addEventListener('pointerenter', () => locPrefetchOne(L.id));
     b.onclick = () => {
       G.loc = L.id; save(); for (const o of box.children) o.setAttribute('aria-pressed', String(o === b));
-      const cold = !LOCS[L.id].group;
-      if (cold) locBusy(true);
-      setTimeout(() => { try { setLocation(L.id); } catch (e) { console.error(e); } finally { if (cold) locBusy(false); } }, 0);
+      try { setLocation(L.id); } catch (e) { console.error(e); }
     };
     box.appendChild(b);
   }
@@ -12900,7 +12975,7 @@ function socAccept(id) {
   const S = PROF.soc, d = S.dm.find(x => x.id === id); if (!d || G.state !== 'menu') return;
   S.dm = S.dm.filter(x => x !== d); const L = LADDER[d.i];
   if (G.mode === 'career') { G.diff = G.userDiff; }
-  G.prev = { diff: G.userDiff, loc: G.loc }; G.mode = 'quick'; G.diff = L.diff; G.loc = d.loc; setLocation(d.loc);   // the fight is on his ground; the quick-fight settings come back at the menu (socLeave)
+  G.prev = { diff: G.userDiff, loc: G.loc }; G.mode = 'quick'; G.diff = L.diff; G.loc = d.loc; setLocation(d.loc, 'wait');   // the fight is on his ground; the quick-fight settings come back at the menu (socLeave)
   P2.applyLook({ ...L.look, street: true }); AI.style = STYLES[L.st]; $('n2').textContent = L.nm; const sl = $('st2'); if (sl) sl.textContent = STYLES[L.st].label;
   G.chal = { id, i: d.i, nm: L.nm }; save(); startFight(true);
 }
@@ -13010,7 +13085,7 @@ window.__soc = { get S() { return PROF.soc; }, SOC, SPONSORS, LOC_FANS, socGain,
       G.state = 'fight'; G.paused = false; CROWD.fill = 1;
       window.__camHold = CAM; camUpdate(dt);   // pins camera.position / camP / camL via the documented debug hook
       for (const loc of locs) {
-        G.loc = loc; setLocation(loc);
+        G.loc = loc; setLocation(loc, 'now');
         for (const level of levels) {
           applyGfx(level); setMeasurePR();   // applyGfx → applyRes sets the preset's pixel ratio; override it for the timed frames
           // let the location's sync() apply particle budgets and the crowd's update() apply the density budget, and let any
@@ -13035,7 +13110,7 @@ window.__soc = { get S() { return PROF.soc; }, SOC, SPONSORS, LOC_FANS, socGain,
       // put the game back exactly as we found it
       G.state = save.state; CROWD.fill = save.fill; window.__camHold = save.hold;
       GFX.set = save.set; applyGfx(save.level); qH = save.qH; applyRes();
-      G.loc = save.loc; setLocation(save.loc);
+      G.loc = save.loc; setLocation(save.loc, 'now');
     }
     const head = 'локация      пресет   треугольники  вызовы  геометрии  текстуры   кадр, мс';
     const line = '───────────  ───────  ────────────  ──────  ──────────  ─────────  ─────────';
@@ -13048,51 +13123,93 @@ window.__soc = { get S() { return PROF.soc; }, SOC, SPONSORS, LOC_FANS, socGain,
   }
   window.__perf = { report: perfReport, CAM };
 })();
-/* ───────── Stage 2 (#47), discussion: fast, hitch-free location switching ─────────
-   The complaint was that entering a fight / picking a new place froze for a moment. A location set is expensive to make
-   (procedural geometry + many canvas textures) and used to be built on the very frame the player pressed «Бой». Here:
-     1. the built set was already cached (13_locations.js); on low it is now capped at 2 resident sets (locTrim, LRU,
-        eviction frees only the resources that the set owns — crowd geometry/materials/attributes are shared and kept);
-     2. after the menu settles we prebuild in the background, one location per idle macrotask, the place of the NEXT
-        fight (careerLoc() for a career, G.loc for a quick fight, the gym for sparring / the bag) and warm its shaders
-        with renderer.compileAsync; hovering a place in the quick-fight list prebuilds that one on demand;
-     3. a cold build that still has to happen shows «Готовим площадку…» instead of a silent frozen frame.
-   Debug: window.__loc = { prefetch, kick, next, dispose, warm, busy, cold, report }; __perf.locReport() prints the table. */
-const LOC_IDS = ['gym', 'parking', 'tires', 'yard', 'warehouse', 'boxgym', 'metro'];
+/* ───────── Stage 2 (#47) + R-24: hitch-free location switching ─────────
+   A location set is expensive to make (procedural geometry, canvas textures, shader programs). #47 cached the built sets,
+   prebuilt the next fight's place in idle and showed a pill; but a build was still one atomic call (the tyres: 9 s on the
+   audit runner) and the first frame after it compiled every new shader program at once. R-24:
+     1. a job prepares a set in STEPS: `build()` may be a generator (`*build() { …; yield 'label'; … return g; }`) — each
+        chunk is a step; then one step per texture upload (renderer.initTexture) and one per material (compile + link right
+        there, against the scene render target and the location's own lights, so the first frame compiles nothing);
+     2. frame() pumps the job for LOC_BUDGET ms per frame (a step is atomic: a frame runs at least one). A fight that needs
+        a cold place waits under «Готовим площадку…» with a bar (LOC_WAIT, setLocation(id, 'wait')); in the menu the old set
+        stays on screen and a small pill shows instead; idle menu frames prebuild the next fight's place (LOCBG);
+     3. location canvases are drawn on the CPU (willReadFrequently): an accelerated 2D canvas defers its raster to the
+        upload / getImageData, which then blocked for seconds under software GL and could not be split; on low they are
+        drawn at half size; small sprites that repeat between places are cached (locTex) and never evicted;
+     4. on low at most 2 sets stay resident (locTrim, LRU; eviction frees only what the set owns).
+   Debug: window.__loc = { prefetch, kick, next, dispose, warm, busy, cold, report, pump }; __perf.locReport() prints the table. */
+const LOC_IDS = ['gym', 'parking', 'tires', 'yard', 'warehouse', 'boxgym', 'metro', 'bar'];
+const LOC_BUDGET = 8, LOC_BG_BUDGET = 4;   // ms of loading work per frame: waiting for the set / prebuilding in the menu
 
-/* instrument canvasTex once (a hoisted function declaration in boxer.html, → a mutable module binding). LOCPROF.active
-   is true only while a set is being built, so outside a build this costs one boolean check. The numbers go into
-   LOCPROF.last, which both setLocation() and __perf.locReport() expose. */
+/* instrument canvasTex once (a hoisted function declaration in boxer.html, → a mutable module binding). Outside a location
+   build it is the original. Inside one (LOCPROF.active): a CPU canvas, half size on low for anything ≥ 128 × 128 (the draw
+   still gets the full w, h — the context is scaled, so every hand-placed pixel coordinate keeps working); the time and count
+   go into LOCPROF for __perf.locReport(). */
 const _canvasTex0 = canvasTex;
 canvasTex = function (w, h, draw) {
   if (!LOCPROF.active) return _canvasTex0(w, h, draw);
-  const t = performance.now(), r = _canvasTex0(w, h, draw);
+  const t = performance.now(), k = locTexK(w, h), c = document.createElement('canvas');
+  c.width = Math.round(w * k); c.height = Math.round(h * k);
+  const x = c.getContext('2d', { willReadFrequently: true }); if (k !== 1) x.scale(k, k); draw(x, w, h);
+  const r = new THREE.CanvasTexture(c); r.colorSpace = THREE.SRGBColorSpace; r.anisotropy = 8;
   LOCPROF.tex += performance.now() - t; LOCPROF.texN++; return r;
 };
+function locTexK(w, h) { return GFX.level === 'low' && w * h >= 128 * 128 ? 0.5 : 1; }
+/* a canvas that several places draw the same way (soft glow sprites): made once, shared, never disposed by an eviction */
+const LOCTEX = new Map();
+function locTex(key, w, h, draw) {
+  let t = LOCTEX.get(key);
+  if (!t) { t = canvasTex(w, h, draw); t.userData.locShared = true; LOCTEX.set(key, t); }
+  return t;
+}
+function glowSprite(stops, size = 128) {   // a white radial falloff: stops = [[offset, alpha], …]
+  return locTex('glow:' + size + ':' + stops.join(';'), size, size, (c, w, h) => {
+    const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    for (const [o, a] of stops) gr.addColorStop(o, `rgba(255,255,255,${a})`);
+    c.fillStyle = gr; c.fillRect(0, 0, w, h);
+  });
+}
 
 function locBusy(on) {
   const el = $('loc-busy'); if (!el) return;
   el.hidden = !on || !$('loading').hidden;   // never cover the boot loading screen
 }
-let locBusyT = 0;
-function locBusyFlash() {   // one shared timer, so several cold builds in a row do not fight over the toast (13_locations.js)
-  locBusy(true); clearTimeout(locBusyT); locBusyT = setTimeout(() => locBusy(false), 500);
+/* the loading screen (a fight waits for its place) or the pill (the menu keeps the old set on screen) */
+function locLoadUI() {
+  const J = LOC_WANT && LOC_WANT.job, scr = $('loc-load'), on = !!(J && LOC_WAIT) && $('loading').hidden;
+  if (scr) {
+    if (scr.hidden === on) scr.hidden = !on;
+    if (on) { const n = $('ll-n'); if (n.textContent !== LOC_WANT.label) n.textContent = LOC_WANT.label; $('ll-bar').style.width = (locProgress(J) * 100).toFixed(1) + '%'; }
+  }
+  locBusy(!!J && !LOC_WAIT);
 }
 
 /* GPU objects shared by EVERY location: the crowd figure (CROWD.geo + its attributes), the reduced index, the two
-   crowd materials and their blob texture. Freeing any of them on an eviction would blank the other locations. */
+   crowd materials and their blob texture, the cached sprites (locTex). Freeing any of them on an eviction would blank the
+   other locations. */
 function locShared() {
-  const s = new Set([CROWD.mat, CROWD.blobMat, CROWD.geo, CROWD.lowIdx]);
+  const s = new Set([CROWD.mat, CROWD.blobMat, CROWD.geo, CROWD.lowIdx, ...LOCTEX.values()]);
   if (CROWD.geo) { if (CROWD.geo.index) s.add(CROWD.geo.index); for (const k in CROWD.geo.attributes) s.add(CROWD.geo.attributes[k]); }
   if (CROWD.blobMat && CROWD.blobMat.map) s.add(CROWD.blobMat.map);
   return s;
 }
+/* textures a material uses, its own fields and ShaderMaterial uniforms → { value: tex } */
+function matTextures(m, out) {
+  for (const v of Object.values(m)) {
+    if (v && v.isTexture) out.add(v);
+    else if (v && typeof v === 'object' && !Array.isArray(v) && !v.isColor && !v.isVector2 && !v.isVector3)
+      for (const u of Object.values(v)) if (u && u.value && u.value.isTexture) out.add(u.value);
+  }
+  return out;
+}
 /* Free ONE built set: detach its group, remove its scene-level lights / puffs, and dispose what it owns. three's
    geometry.dispose() removes the GL buffer of EACH attribute — a crowd geometry borrows its attributes from
    CROWD.geo, so any geometry that references a shared attribute is deliberately left alone (small CPU leak, no
-   broken crowds). Owned canvas textures are found on the owned materials and in their ShaderMaterial uniforms. */
+   broken crowds). Owned canvas textures are found on the owned materials and in their ShaderMaterial uniforms.
+   A half-built set (a parked job) is dropped with it. */
 function locDispose(L) {
-  const g = L.group; if (!g) return;
+  const g = L.group; L.job = null; LOCBG.splice(0, LOCBG.length, ...LOCBG.filter(o => o !== L));
+  if (!g) return;
   const shared = locShared(), own = new Set(), dead = new Set();
   const collect = o => {
     dead.add(o);
@@ -13102,11 +13219,7 @@ function locDispose(L) {
     for (const m of mats) {
       if (!m || shared.has(m)) continue;
       own.add(m);
-      for (const v of Object.values(m)) {
-        if (v && v.isCanvasTexture && !shared.has(v)) own.add(v);
-        else if (v && typeof v === 'object' && !Array.isArray(v))   // ShaderMaterial.uniforms → { value: tex }
-          for (const u of Object.values(v)) if (u && u.value && u.value.isCanvasTexture && !shared.has(u.value)) own.add(u.value);
-      }
+      for (const t of matTextures(m, new Set())) if (t.isCanvasTexture && !shared.has(t)) own.add(t);
     }
   };
   try {
@@ -13118,53 +13231,136 @@ function locDispose(L) {
   } catch (e) { /* an eviction must never break the scene it is freeing */ }
   L.group = null;
 }
-/* low: keep the current set + one spare (≤ 2). Never evict the set the player is looking at. */
+/* low: keep the current set + one spare (≤ 2). Never evict the set the player is looking at or the one being waited for. */
 function locTrim() {
   if (GFX.level !== 'low' || LOCPROF.noTrim) return;
-  const spare = Object.values(LOCS).filter(o => o.group && o !== LOC).sort((a, b) => (a.stamp || 0) - (b.stamp || 0));
+  const spare = Object.values(LOCS).filter(o => o.group && o !== LOC_ON && o !== LOC_WANT).sort((a, b) => (a.stamp || 0) - (b.stamp || 0));
   while (spare.length > 1) locDispose(spare.shift());
 }
 
-/* build a set in the background (without switching LOC): hide the group and its scene-level lights. */
-function locBuildIdle(L) {
-  if (L.group) return;
-  const b0 = performance.now(); LOCPROF.tex = 0; LOCPROF.texN = 0; LOCPROF.active = true;
-  let g; try { g = L.build(); } catch (e) { console.error('locPrefetch', L.id, e); return; } finally { LOCPROF.active = false; }
-  L.group = g; ARENA.add(g); g.visible = false;
-  for (const w of L.world || []) w.visible = false;
-  LOCPROF.last = { id: L.id, build: +(performance.now() - b0).toFixed(1), tex: +LOCPROF.tex.toFixed(1), texN: LOCPROF.texN };
-  locTrim();
+/* ── the job: build chunks → texture uploads → shader programs ── */
+function locReady(L) { return !!(L && L.group && !L.job); }
+function locJob(L) {
+  if (L.job || locReady(L)) return L.job;
+  return (L.job = { L, phase: 'build', it: null, k: 0, list: null, i: 0, seen: null, p0: locPrograms(),
+    st: { build: 0, tex: 0, texN: 0, up: 0, gl: 0, n: 0, max: 0, maxL: '', top: [] } });
 }
-/* warm the shader programs for a set's own light rig. compile() gathers lights from scene.traverseVisible but prepares
-   materials from scene.traverse, so temporarily show only this location's lights (three r160). */
-function locWarm(L) {
-  if (!renderer.compileAsync) return;
-  const saved = [];
+/* 0..1 for the bar: the build chunks (L.steps is the count of a generator build, measured) weigh 75 %, uploads 10 %, programs 15 % */
+function locProgress(J) {
+  if (J.phase === 'build') return 0.75 * Math.min(1, J.k / (J.L.steps || 1));
+  const f = J.list && J.list.length ? J.i / J.list.length : 1;
+  return J.phase === 'tex' ? 0.75 + 0.1 * f : 0.85 + 0.15 * f;
+}
+/* show only this location's lights (and the ring if it has one) while fn runs: compile() takes the light rig from what is
+   visible (three r160 gathers lights with traverseVisible) */
+function locLightsAs(L, fn) {
+  if (LOC_ON === L) return fn();
+  const saved = [[RINGSET, RINGSET.visible]];
+  for (const o of Object.values(LOCS)) {
+    if (o.group) { saved.push([o.group, o.group.visible]); o.group.visible = o === L; }
+    for (const w of o.world || []) { saved.push([w, w.visible]); w.visible = o === L; }
+  }
+  RINGSET.visible = L.ring;
+  try { return fn(); } finally { for (const [o, v] of saved) o.visible = v; }
+}
+/* the programs one object needs: compiled against sceneRT (a render target → linear output, no tone mapping — what the
+   RenderPass draws with; compiled for the canvas they would be compiled again in the first frame), then linked at once
+   (getUniforms is the first synchronous query) so that the wait falls into this step */
+function locCompile(o) {
+  const ps = renderer.info.programs, p0 = ps.length, prev = renderer.getRenderTarget(), one = { traverse: cb => cb(o), traverseVisible() {} };
+  renderer.setRenderTarget(sceneRT);
   try {
-    if (L) for (const o of Object.values(LOCS)) {
-      if (o.group) { saved.push([o.group, o.group.visible]); o.group.visible = (o === L); }
-      for (const w of o.world || []) { saved.push([w, w.visible]); w.visible = (o === L); }
+    renderer.compile(one, camera, scene);
+    // the AO pass redraws the scene with its MeshNormalMaterial (scene.overrideMaterial): that program also depends on the
+    // object kind and the light rig — compile it for this object too
+    if (gtao && gtao.enabled && !o.isPoints && !o.isLine) { const m = o.material; o.material = gtao.normalMaterial; try { renderer.compile(one, camera, scene); } finally { o.material = m; } }
+  } finally { renderer.setRenderTarget(prev); }
+  for (let i = p0; i < ps.length; i++) { ps[i].getUniforms(); ps[i].getAttributes(); }
+}
+/* the last step: one real render of the scene into a 4 × 4 target with this location's lights — whatever the per-material
+   compile could not reach (the shadow pass's depth materials of the fighters) is compiled here, not in the first frame */
+let locWarmRT = null;
+function locWarmRender(L) {
+  if (!locWarmRT) locWarmRT = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType });
+  locLightsAs(L, () => {
+    const prev = renderer.getRenderTarget(), ps = renderer.info.programs, p0 = ps.length;
+    L.group.visible = true;   // (locLightsAs restores it)
+    renderer.setRenderTarget(locWarmRT);
+    try { renderer.render(scene, camera); } finally { renderer.setRenderTarget(prev); }
+    for (let i = p0; i < ps.length; i++) { ps[i].getUniforms(); ps[i].getAttributes(); }
+  });
+}
+/* what the gl phase walks: the set's own meshes (hidden ones too — they show up later) and the visible shared ones (fighters,
+   ring props) whose programs depend on the light rig; one entry per material × object kind */
+function locGLList(L) {
+  const out = [], seen = new Set(), groups = new Set(Object.values(LOCS).map(o => o.group).filter(Boolean));
+  const add = o => {
+    if (!o.material || (!o.isMesh && !o.isPoints && !o.isLine && !o.isSprite)) return;
+    const k = [].concat(o.material).map(m => m.id).join(',') + '|' + (o.isInstancedMesh ? 1 : 0) + (o.isSkinnedMesh ? 2 : 0) + (o.instanceColor ? 4 : 0) + (o.morphTargetInfluences ? 8 : 0) + (o.isPoints ? 16 : 0) + (o.geometry && o.geometry.attributes.color ? 32 : 0);
+    if (!seen.has(k)) { seen.add(k); out.push(o); }
+  };
+  L.group.traverse(add);
+  for (const w of L.world || []) w.traverse && w.traverse(add);
+  locLightsAs(L, () => { const walk = o => { if (!o.visible || groups.has(o)) return; add(o); for (const c of o.children) walk(c); }; walk(scene); });
+  return out;
+}
+/* ONE atomic step of a job. Returns true when the set is ready. */
+function locStep(J) {
+  const L = J.L, st = J.st, t0 = performance.now(); let label = J.phase, slot = 'gl';
+  if (J.phase === 'build') {
+    slot = 'build'; const c0 = LOCPROF.tex; LOCPROF.active = true;
+    try {
+      if (!J.it) { const r = L.build(); if (r && typeof r.next === 'function') J.it = r; else J.g = r; }
+      if (J.it) { const s = J.it.next(); if (s.done) J.g = s.value; else label = 'build:' + (s.value || J.k); }
+      J.k++;
+    } catch (e) { console.error('locBuild', L.id, e); J.g = J.g || new THREE.Group(); }
+    finally { LOCPROF.active = false; st.tex += LOCPROF.tex - c0; st.texN = LOCPROF.texN; }
+    if (J.g) {   // built: park it hidden in ARENA, list its textures
+      if (J.it) { label = 'build:end'; L.steps = J.k; }
+      const g = J.g; ARENA.add(g); g.visible = false; for (const w of L.world || []) w.visible = false;
+      L.group = g; J.phase = 'tex'; J.i = 0;
+      const ts = new Set(); g.traverse(o => { if (o.material) for (const m of [].concat(o.material)) matTextures(m, ts); });
+      J.list = [...ts].filter(t => !(t.userData.locShared && renderer.properties.get(t).__webglTexture));
     }
-    const p = renderer.compileAsync(scene, camera);
-    if (p && p.catch) p.catch(() => {});   // fire and forget (KHR_parallel_shader_compile keeps it off the frame where supported)
-  } catch (_) {} finally { for (const [o, v] of saved) o.visible = v; }
+  } else if (J.phase === 'tex') {
+    slot = 'up';
+    if (J.i < J.list.length) { const t = J.list[J.i++]; label = 'tex ' + (t.image ? t.image.width + '×' + t.image.height : ''); renderer.initTexture(t); }
+    if (J.i >= J.list.length) { J.phase = 'gl'; J.list = null; J.i = 0; }
+  } else if (J.phase === 'gl') {
+    if (!J.list) { J.list = locGLList(L); label = 'gl list'; }
+    else if (J.i < J.list.length) { const o = J.list[J.i++]; label = 'gl ' + ([].concat(o.material)[0].type || '').replace('Material', ''); locLightsAs(L, () => locCompile(o)); }
+    if (J.list && J.i >= J.list.length) J.phase = 'warm';
+  } else if (J.phase === 'warm') { label = 'gl warm render'; locWarmRender(L); J.phase = 'done'; }
+  const ms = performance.now() - t0; st[slot] += ms; st.n++; if (ms > st.max) { st.max = ms; st.maxL = label; }
+  st.top.push([ms, label]); st.top.sort((a, b) => b[0] - a[0]); st.top.length = Math.min(st.top.length, 3);
+  if (J.phase !== 'done') return false;
+  L.job = null;
+  const r1 = v => +v.toFixed(1);
+  LOCPROF.last = { id: L.id, build: r1(st.build), tex: r1(st.tex), texN: st.texN, up: r1(st.up), gl: r1(st.gl), steps: st.n,
+    maxStep: r1(st.max), maxLabel: st.maxL, progs: locPrograms() - J.p0, top: st.top.map(([m, l]) => `${l} ${m.toFixed(0)}`).join(', ') };
+  if (LOC_WANT === L) { LOC_WANT = null; LOC_WAIT = false; LOC = L; locApply(L); locLoadUI(); }
+  else locTrim();
+  return true;
+}
+/* run a job to the end right now (setLocation(id, 'now'): debug, reports, the first set at boot) */
+function locFinish(L) { const J = locJob(L); if (J) while (!locStep(J)) {} }
+/* called first thing in frame(): spend the frame budget on the wanted set (or, in an idle menu, on the prefetch list).
+   true = the game waits for its place — frame() skips the simulation and the render; the loading screen is up. */
+const LOCBG = [];
+function locPumpFrame() {
+  const t0 = performance.now(), W = LOC_WANT;
+  if (W && W.job) { const J = W.job; while (!locStep(J) && performance.now() - t0 < LOC_BUDGET) {} }
+  else if (LOCBG.length && G.state === 'menu' && !G.paused) {
+    while (LOCBG.length && performance.now() - t0 < LOC_BG_BUDGET) {
+      const L = LOCBG[0]; if (locReady(L) || !locJob(L)) { LOCBG.shift(); continue; }
+      if (locStep(L.job)) LOCBG.shift();
+    }
+  }
+  if (W) locLoadUI();
+  return LOC_WAIT;
 }
 
-/* ── idle scheduler: one job per macrotask, so a heavy build never shares a frame with menu input ── */
-const LOCQ = []; let locIdleOn = false;
-/* only start a job in an ≥ 8 ms idle window (a build() is atomic and cannot be paused mid-way, so the chunk is one
-   location per idle macrotask); the timeout guarantees didTimeout so a busy menu never starves the queue. */
-function locYield(fn) {
-  if (!window.requestIdleCallback) { setTimeout(fn, 16); return; }
-  requestIdleCallback(d => { if (d.timeRemaining() < 8 && !d.didTimeout) locYield(fn); else fn(); }, { timeout: 1200 });
-}
-function locPump() {
-  locIdleOn = false;
-  if (!LOCQ.length) return;
-  const job = LOCQ.shift(); try { job(); } catch (e) { console.error('locJob', e); }
-  if (LOCQ.length) { locIdleOn = true; locYield(locPump); }
-}
-function locQueue(job) { LOCQ.push(job); if (!locIdleOn) { locIdleOn = true; locYield(locPump); } }
+/* ── what to prebuild while the player is in the menu ── */
 function locNext() {
   try {
     if (G.mode === 'career') return careerLoc();
@@ -13172,59 +13368,71 @@ function locNext() {
     return G.loc || 'gym';                             // quick fight: the place picked / hovered in the list
   } catch (_) { return G.loc || 'gym'; }
 }
-function locPrefetchOne(id) { const L = LOCS[id]; if (L && !L.group) locQueue(() => locBuildIdle(L)); }
+function locPrefetchOne(id) { const L = LOCS[id]; if (L && !locReady(L) && !LOCBG.includes(L)) LOCBG.push(L); }
 function locPrefetch() {
-  LOCQ.length = 0;                                   // a re-entry into the menu supersedes the old queue
-  const want = [], add = id => { if (LOCS[id] && !LOCS[id].group && !want.includes(id)) want.push(id); };
+  LOCBG.length = 0;                                  // a re-entry into the menu supersedes the old list
+  const want = [], add = id => { if (LOCS[id] && !locReady(LOCS[id]) && !want.includes(id)) want.push(id); };
   let car = null; try { car = careerLoc(); } catch (_) {}
   add(car); add(locNext()); add(G.loc); add('boxgym');   // the career place, the last mode's place, the picked place, the gym
-  const order = want.slice(0, GFX.level === 'low' ? 1 : 2);   // low holds current + one spare
-  for (const id of order) locPrefetchOne(id);
-  locQueue(() => locWarm(null));                    // the menu's own first frame
-  locQueue(() => locWarm(LOCS[order[0] || locNext()]));   // the intro's first frame, with the next fight's lights
+  for (const id of want.slice(0, GFX.level === 'low' ? 1 : 2)) locPrefetchOne(id);   // low holds current + one spare
 }
 let locKickT = 0;
 function locPrefetchKick() { clearTimeout(locKickT); locKickT = setTimeout(locPrefetch, 900); }   // after the menu settles
+/* compile everything in the scene for one location's light rig (debug; the gl phase of a job does this per material) */
+function locWarm(L) {
+  const run = () => { const prev = renderer.getRenderTarget(); renderer.setRenderTarget(sceneRT); try { renderer.compile(scene, camera); } finally { renderer.setRenderTarget(prev); } };
+  try { L ? locLightsAs(L, run) : run(); } catch (_) {}
+}
 
-/* ── measurement: cold (build + first frame) vs warm (cached) entry, per location ── */
+/* ── measurement: a cold entry per location, pumped exactly as the game does it (frames of LOC_BUDGET ms) ── */
 function locPrograms() { return renderer.info && renderer.info.programs ? renderer.info.programs.length : 0; }
+/* a headless run renders frames back to back, so the GPU can be seconds behind: wait for it before timing the next set
+   (in the game the loading screen draws no 3D frames, the queue drains during the first chunks) */
+function locDrain() { const t = performance.now(); try { const gl = renderer.getContext(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4)); } catch (_) {} return performance.now() - t; }
 function locReport(opts) {
   opts = opts || {};
-  const ids = opts.locs || LOC_IDS, save = { loc: G.loc, state: G.state, hold: window.__camHold, place: sfx.place };
+  const ids = opts.locs || LOC_IDS, save = { loc: LOC_ON ? LOC_ON.id : G.loc, state: G.state, hold: window.__camHold, place: sfx.place };
   sfx.place = () => {};                            // ambience / convolver is not part of the set's build cost
   LOCPROF.noTrim = true; G.state = 'fight'; window.__camHold = { p: [0, 1.15, 4.7], l: [0, 0.93, 0] };
-  camUpdate(1 / 60);
+  camUpdate(1 / 60); renderFrame(); locDrain();   // a level just switched (applyGfx) recompiles the fighters: not a location's cost
   const p0 = locPrograms(), rows = [], warm = {};
   try {
     for (const id of ids) {
       const L = LOCS[id]; if (!L) continue;
-      if (L.group) locDispose(L);                 // force a cold build even for an already cached / prefetched set
-      const t0 = performance.now(); setLocation(id); const cold = performance.now() - t0;
-      const f0 = performance.now(); renderFrame(); const first = performance.now() - f0;
+      if (L.group || L.job) locDispose(L);        // force a cold build even for an already cached / prefetched set
+      const drain = locDrain();
+      LOC_WANT = L; LOC_WAIT = true; LOC = L; locJob(L);
+      const fr = [], t0 = performance.now();
+      while (L.job) { const f = performance.now(); locPumpFrame(); fr.push(performance.now() - f); }
+      const load = performance.now() - t0, pf = locPrograms();
+      const f0 = performance.now(); camUpdate(1 / 60); locSync(); renderFrame(); const first = performance.now() - f0;
       const b = LOCPROF.last || {};
-      rows.push({ id, cold: +cold.toFixed(1), build: b.build || 0, tex: b.tex || 0, texN: b.texN || 0,
-        first: +first.toFixed(1), progs: locPrograms() });
+      rows.push({ id, load: +load.toFixed(0), frames: fr.length, maxFrame: +Math.max(...fr).toFixed(0), maxStep: b.maxStep, maxLabel: b.maxLabel, top: b.top,
+        build: b.build, tex: b.tex, texN: b.texN, up: b.up, gl: b.gl, progs: b.progs, late: locPrograms() - pf,
+        first: +first.toFixed(0), total: +(load + first).toFixed(0), drain: +drain.toFixed(0) });
     }
-    for (const id of ids) { const t = performance.now(); setLocation(id); warm[id] = +(performance.now() - t).toFixed(2); }
+    for (const id of ids) { const t = performance.now(); setLocation(id, 'now'); warm[id] = +(performance.now() - t).toFixed(2); }
   } finally {
     sfx.place = save.place; LOCPROF.noTrim = false;
-    G.state = save.state; window.__camHold = save.hold; setLocation(save.loc || 'gym'); locTrim();
+    G.state = save.state; window.__camHold = save.hold; setLocation(save.loc || 'gym', 'now'); locTrim();
   }
   for (const r of rows) r.warm = warm[r.id];
   const pad = (s, n) => String(s).padStart(n);
-  const head = 'локация      вход(хол), мс  build, мс  canvas, мс (N)  1-й кадр, мс  повтор, мс  программ';
-  const line = '───────────  ────────────  ─────────  ─────────────  ───────────  ─────────  ─────────';
-  const table = [`шейдерных программ в начале: ${p0}`, head, line].concat(rows.map(r =>
-    pad(r.id, 11) + '  ' + pad(r.cold, 12) + '  ' + pad(r.build, 9) + '  ' + pad(`${r.tex} (${r.texN})`, 14) + '  '
-    + pad(r.first, 12) + '  ' + pad(r.warm, 10) + '  ' + pad(r.progs, 9))).join('\n');
-  const csv = 'location,cold_ms,build_ms,canvas_tex_ms,canvas_tex_n,first_frame_ms,warm_entry_ms,programs\n'
-    + rows.map(r => [r.id, r.cold, r.build, r.tex, r.texN, r.first, r.warm, r.progs].join(',')).join('\n');
+  const head = 'локация      всего, мс  кадров  макс. кадр  build (canvas, N)    текстуры  шейдеры (прогр.)  1-й кадр (+прогр.)  повтор  самые тяжёлые шаги, мс';
+  const line = '───────────  ─────────  ──────  ──────────  ───────────────────  ────────  ────────────────  ──────────────────  ──────  ──────────────────────';
+  const table = [`уровень графики: ${GFX.level}; бюджет кадра загрузки ${LOC_BUDGET} мс; шейдерных программ в начале: ${p0}`, head, line].concat(rows.map(r =>
+    pad(r.id, 11) + '  ' + pad(r.total, 9) + '  ' + pad(r.frames, 6) + '  ' + pad(r.maxFrame, 10) + '  ' + pad(`${r.build} (${r.tex}, ${r.texN})`, 19) + '  '
+    + pad(r.up, 8) + '  ' + pad(`${r.gl} (${r.progs})`, 16) + '  ' + pad(`${r.first} (+${r.late})`, 18) + '  ' + pad(r.warm, 6) + '  ' + r.top)).join('\n')
+    + '\nвсего = шаги загрузки + первый кадр после неё; GPU прошлых кадров перед каждой площадкой дожидались отдельно: '
+    + rows.map(r => r.id + ' ' + r.drain).join(', ') + ' мс';
+  const csv = 'location,total_ms,frames,max_frame_ms,build_ms,canvas_tex_ms,canvas_tex_n,upload_ms,gl_ms,programs,first_frame_ms,late_programs,warm_entry_ms,max_step_ms,max_step\n'
+    + rows.map(r => [r.id, r.total, r.frames, r.maxFrame, r.build, r.tex, r.texN, r.up, r.gl, r.progs, r.first, r.late, r.warm, r.maxStep, r.maxLabel].join(',')).join('\n');
   return { p0, rows, csv, table };
 }
 if (window.__perf) window.__perf.locReport = locReport;
 Object.assign(window.__loc || (window.__loc = {}), { prefetch: locPrefetch, kick: locPrefetchKick, next: locNext,
-  dispose: locDispose, warm: locWarm, busy: locBusy, report: locReport,
-  cold: id => { const L = LOCS[id]; if (L && L.group) locDispose(L); setLocation(id); } });   // keep __loc.set/get/LOCS of dbg_extra.js
+  dispose: locDispose, warm: locWarm, busy: locBusy, report: locReport, pump: locPumpFrame,
+  cold: id => { const L = LOCS[id]; if (L && (L.group || L.job)) locDispose(L); setLocation(id, 'now'); } });   // keep __loc.set/get/LOCS of dbg_extra.js
 /* ───────── issue 49: «Бой с другом» — PeerJS P2P, host-authoritative 1v1 ─────────
    One ES module scope with all the other game files, so everything here is a hoisted function. The host keeps running the
    fight exactly as it does against the AI; netHostAI() only replaces ai() as the source of P2's decisions (08_ai_flow.js).
@@ -13428,7 +13636,7 @@ function netBeginMatch() {
   G.mode = 'net'; G.diff = 'normal'; OPT.cine = false;
   const C = NET.host ? NET.cfg : { loc: 'gym', rounds: 3, len: 120, spar: false };   // the guest's real settings come with the host's hello
   ROUNDS = netRounds(C); ROUND_LEN = C.len; G.loc = C.loc;
-  try { setLocation(G.loc); } catch (e) {}
+  try { setLocation(G.loc, 'wait'); } catch (e) {}
   uiShow(null); show('net-drop', false); $('net-ping').hidden = false; $('net-ping').textContent = '… мс';
   camCut = true;
   if (NET.host) netHostStart(); else netGuestSetup();
@@ -13906,7 +14114,7 @@ function storyPlay(i) {
   UI.from = null; uiShow(null); show('result', false); show('rec', false);
   DLG.kicker = `глава ${i + 1} · ${ch.title}`;
   const go = () => {
-    setLocation(ch.fight.loc);
+    setLocation(ch.fight.loc, 'wait');   // a cold place: the loading screen until it is ready (17_loc_load.js)
     showP2(true); P2.applyLook({ ...ch.fight.look, street: true });
     storyDress(ch);   // R-17: the hero in the chapter's clothes
     AI.style = STYLES[ch.fight.st] || STYLES.brawler; $('n2').textContent = ch.fight.nm;
@@ -13914,8 +14122,7 @@ function storyPlay(i) {
     P1.resetState(); P2.resetState(); sfx.unlock();
     storyTalk(ch.intro, storyFightGo);
   };
-  const cold = !LOCS[ch.fight.loc] || !LOCS[ch.fight.loc].group;
-  if (cold) { locBusy(true); setTimeout(() => { try { go(); } finally { locBusy(false); } }, 0); } else go();
+  go();
   return true;
 }
 /* the hero's outfit for the chapter: a copy of LOOK with the chapter's clothes over it (skin, hair, tattoos stay his own) */

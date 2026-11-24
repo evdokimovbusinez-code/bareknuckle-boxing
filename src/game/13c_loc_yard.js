@@ -21,7 +21,8 @@ LOCS.yard = {
   wall: { r: 2.85, k: 1.0e4, mu: 0.75, h: 2.1, d: 1.2, give: 0.45, damp: 9, top() { return this.h; } },
   // dusk: the sodium lamp is the key (the shared shadow light) and the warm rim, the sky fills cold
   light: { bg: '#232338', fog: ['#2c2a42', 16, 64], exposure: 1.0, hemi: ['#6f86cc', '#33261c', 0.62], key: ['#ffae62', 44], rim: ['#ff9a48', 1.5], rim2: ['#7f9dff', 2.0], fill: ['#93a9ee', 0.5] },
-  build() {
+  steps: 6,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+  *build() {
     const R = locRng(1313), g = new THREE.Group(), PI = Math.PI, lite = lowEnd || GFX.level === 'low';
     const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
     const pick = a => a[(R() * a.length) | 0];
@@ -74,6 +75,7 @@ LOCS.yard = {
       line.renderOrder = -55; line.frustumCulled = false; far.add(line);
     }
 
+    yield 'sky';
     /* ── ground: one 5 m asphalt tile (aggregate, blotches, cracks, a patch) over the whole yard; over the middle a layer of things that
        do not repeat (repairs, long cracks, a manhole, chalk hopscotch, stains, leaves); puddles; dead lawns behind kerbs ── */
     const asTex = rep(canvasTex(lite ? 512 : 1024, lite ? 512 : 1024, (c, w, h) => {
@@ -88,6 +90,7 @@ LOCS.yard = {
     }));
     const floor = staticMesh(geoUvMul(new THREE.PlaneGeometry(84, 84).rotateX(-PI / 2), 16.8, 16.8), new THREE.MeshStandardMaterial({ map: asTex, roughness: 0.8, envMapIntensity: 0.35 }));
     floor.receiveShadow = true; g.add(floor);
+    yield 'asphalt';
     const markTex = canvasTex(lite ? 512 : 1024, lite ? 512 : 1024, (c, w, h) => {
       const s = w / 14; c.setTransform(s, 0, 0, s, w / 2, h / 2);   // metres: a top-down map of the middle 14 × 14 m, x to the right, z down
       for (const [x, z, ww, hh, a] of [[-3.4, -1.3, 2.6, 1.7, 0.2], [1.7, 1.9, 3.2, 1.3, -0.1], [3.3, -4.4, 1.8, 2.4, 0.5], [-4.6, 4.6, 2.2, 2.0, -0.3]]) {
@@ -127,6 +130,7 @@ LOCS.yard = {
     }
     const lawn = staticMesh(geoMerge(lawnGs), new THREE.MeshStandardMaterial({ map: dirtTex, roughness: 1, envMapIntensity: 0.2 })); lawn.receiveShadow = true; g.add(lawn);
 
+    yield 'ground';
     /* ── the houses. Every cell (bay × floor) of the façade gets its own random look once (`spec`), then the same picture is drawn
        twice: the colour map and the emissive map (lit windows only: warm lamps, cold TVs, the odd violet grow lamp) ── */
     const LIT = ['#ffc66e', '#ffb04e', '#ffd9a0', '#ffe9c4', '#a9c8ff', '#e6efff', '#ff9a52'], FRAME = ['#d9d8d0', '#d9d8d0', '#6a4a34', '#8f9499', '#c7c2b0'], PARA = ['#5f7f96', '#7b8f7a', '#9a8f78', '#8c5a48', '#7a7f86', '#b3ab98', '#4f6a80'];
@@ -203,6 +207,7 @@ LOCS.yard = {
     g.add(staticMesh(wallGeo(F), new THREE.MeshStandardMaterial({ map: facTex, emissiveMap: emTex, emissive: '#ffffff', emissiveIntensity: 1.5, roughness: 0.92, envMapIntensity: 0.25 })));
     g.add(staticMesh(wallGeo(Bk), new THREE.MeshStandardMaterial({ map: panelTex, roughness: 0.95, envMapIntensity: 0.2 })));
 
+    yield 'houses';
     /* ── props (each built around its own origin, front = +z, then put in place) ── */
     const bench = col => [...[-0.13, 0, 0.13].map(z => tb(col, 1.8, 0.04, 0.11, 0, 0.45, z)), tb(col, 1.8, 0.11, 0.035, 0, 0.66, -0.23), tb(col, 1.8, 0.11, 0.035, 0, 0.82, -0.25),
       ...[-0.72, 0.72].flatMap(x => [tb('#6f6d68', 0.09, 0.43, 0.42, x, 0.215, 0), tb('#6f6d68', 0.09, 0.5, 0.07, x, 0.65, -0.27)])];
@@ -268,7 +273,7 @@ LOCS.yard = {
     /* ── placing ── */
     const propMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.1, envMapIntensity: 0.3 }), carMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.36, metalness: 0.45, envMapIntensity: 0.6 });
     const lampMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(3.2, 3.2, 3.2), fog: false });
-    const glowTex = canvasTex(128, 128, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.1, 'rgba(255,255,255,.7)'); gr.addColorStop(0.35, 'rgba(255,255,255,.16)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
+    const glowTex = glowSprite([[0, 1], [0.1, 0.7], [0.35, 0.16], [1, 0]]);   // R-24: shared between places (17_loc_load.js)
     // a halo around a lamp. Sprites must stay out of the AO normal pass (they would be drawn there as solid quads): the crowd keeps
     // such a list for its floor blobs (CROWD.blobs, hidden for the time of that pass) — the halos join it
     const glow = (p, s, col) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); sp.position.copy(p); sp.scale.set(s, s, 1); g.add(sp); CROWD.blobs.push(sp); };

@@ -201,7 +201,7 @@ function netBeginMatch() {
   G.mode = 'net'; G.diff = 'normal'; OPT.cine = false;
   const C = NET.host ? NET.cfg : { loc: 'gym', rounds: 3, len: 120, spar: false };   // the guest's real settings come with the host's hello
   ROUNDS = netRounds(C); ROUND_LEN = C.len; G.loc = C.loc;
-  try { setLocation(G.loc); } catch (e) {}
+  try { setLocation(G.loc, 'wait'); } catch (e) {}
   uiShow(null); show('net-drop', false); $('net-ping').hidden = false; $('net-ping').textContent = '… мс';
   camCut = true;
   if (NET.host) netHostStart(); else netGuestSetup();

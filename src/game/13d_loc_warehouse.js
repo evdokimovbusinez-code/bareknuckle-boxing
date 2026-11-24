@@ -17,7 +17,8 @@ LOCS.warehouse = {
   // height of a panel, its depth, how far a body pushes the mesh out before the frame stops it, normal damping (1/s; steel mesh rattles, it does not swallow)
   wall: { kind: 'rect', hx: WH_HALF - 0.03, hz: WH_HALF - 0.03, k: 1.2e4, mu: 0.5, h: 2.0, d: 0.1, give: 0.24, damp: 12, top() { return this.h; } },
   light: { bg: '#06070a', fog: ['#06070a', 8, 30], exposure: 0.92, hemi: ['#6f86ac', '#14110e', 0.2], key: ['#ffd9a6', 22], rim: ['#8fb4ff', 1.9], rim2: ['#b8ceff', 0.7], fill: ['#dfe8ff', 0.1] },
-  build() {
+  steps: 9,   // R-24: build() is a generator — every chunk between two yields is one loading step (17_loc_load.js)
+  *build() {
     const R = locRng(1313), g = new THREE.Group(), PI = Math.PI, HX = 17, HZ = 12, HH = 7, H = WH_HALF;
     const rep = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
     const speck = (c, w, h, n, a) => { for (let i = 0; i < n; i++) { c.fillStyle = `rgba(${R() < 0.55 ? '0,0,0' : '255,255,255'},${R() * a})`; c.fillRect(R() * w, R() * h, 1 + R() * 2, 1 + R() * 2); } };
@@ -38,6 +39,7 @@ LOCS.warehouse = {
     }));
     const floor = staticMesh(geoUvMul(new THREE.PlaneGeometry(2 * HX, 2 * HZ).rotateX(-PI / 2), HX / 2, HZ / 2), new THREE.MeshStandardMaterial({ map: concTex, roughness: 0.84, envMapIntensity: 0.35 }));
     floor.receiveShadow = true; g.add(floor);
+    yield 'floor';
     /* old blood (most of it inside the cage: dried brown-red blotches with their spatter, a few drag smears, bloody shoe prints
        walking out) and grime, one 10 × 10 m decal over the cage */
     const bloodTex = canvasTex(1024, 1024, (c, w, h) => {
@@ -60,6 +62,7 @@ LOCS.warehouse = {
       new THREE.MeshStandardMaterial({ color: '#050607', alphaMap: pudTex, transparent: true, opacity: 0.8, roughness: 0.05, envMapIntensity: 0.3, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
     pud.receiveShadow = true; pud.renderOrder = -2; g.add(pud);
 
+    yield 'blood';
     /* walls (single-sided): brick up to 3 m, stained concrete above; one 7 × 7 m tile */
     const wallTex = rep(canvasTex(1024, 1024, (c, w, h) => {
       const m = h / HH, yb = h - 3 * m;
@@ -74,6 +77,7 @@ LOCS.warehouse = {
     }));
     const wallG = (len, ry, x, z) => geoUvMul(new THREE.PlaneGeometry(len, HH), len / 7, 1).rotateY(ry).translate(x, HH / 2, z);
     g.add(staticMesh(geoMerge([wallG(2 * HX, 0, 0, -HZ), wallG(2 * HX, PI, 0, HZ), wallG(2 * HZ, PI / 2, -HX, 0), wallG(2 * HZ, -PI / 2, HX, 0)]), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.92, envMapIntensity: 0.3 })));
+    yield 'walls';
     /* graffiti: four pieces on one atlas (made-up tags, no real names), worn; planes a hair off the walls */
     const grafTex = canvasTex(2048, 1024, (c, W, Hh) => {
       c.lineCap = c.lineJoin = 'round';
@@ -102,6 +106,7 @@ LOCS.warehouse = {
     const graf = (q, w, ry, x, y, z) => { const p = new THREE.PlaneGeometry(w, w / 2), u = p.attributes.uv; for (let i = 0; i < u.count; i++) u.setXY(i, ((q & 1) + u.getX(i)) / 2, (1 - (q >> 1) + u.getY(i)) / 2); return p.rotateY(ry).translate(x, y, z); };
     g.add(staticMesh(geoMerge([graf(0, 5.6, 0, -6.6, 1.75, -HZ + 0.02), graf(1, 5.0, 0, 5.6, 1.6, -HZ + 0.02), graf(2, 5.4, -PI / 2, HX - 0.02, 1.7, -2.5), graf(3, 5.0, PI / 2, -HX + 0.02, 1.65, 2.5), graf(2, 5.2, PI, -4.5, 1.7, HZ - 0.02), graf(3, 4.6, PI, 7, 1.6, HZ - 0.02), graf(3, 4.4, 0, -13.4, 1.55, -HZ + 0.02)]), decalMat(grafTex, { roughness: 0.9, envMapIntensity: 0.3 })));
 
+    yield 'graffiti';
     /* windows under the roof on the long walls: small panes, dirty, some knocked out; they glow with the moonlight / a street lamp */
     const winTex = canvasTex(256, 192, (c, w, h) => {
       c.fillStyle = '#0e1013'; c.fillRect(0, 0, w, h); const pw = w / 6, ph = h / 4;
@@ -114,6 +119,7 @@ LOCS.warehouse = {
     for (const x of winX) wins.push(new THREE.PlaneGeometry(2.4, 1.7).translate(x, WY, -HZ + 0.03), new THREE.PlaneGeometry(2.4, 1.7).rotateY(PI).translate(x, WY, HZ - 0.03));
     g.add(staticMesh(geoMerge(wins), new THREE.MeshBasicMaterial({ map: winTex, color: new THREE.Color(1.35, 1.45, 1.7) })));
 
+    yield 'windows';
     /* steel: roof trusses with purlins, wall columns, pallet racks along the short walls and in the far corners (never between the
        camera and the fighters: one mesh) */
     const propMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.2, envMapIntensity: 0.4 });
@@ -150,6 +156,7 @@ LOCS.warehouse = {
     prop(0.8, -8.4, 1.4, gs => { load(gs, 0.2, 0, -8.6, 0.1); load(gs, 1.7, 0, -8.3, -0.2); });
     prop(-1.5, 8.2, 1.4, gs => { stack(gs, -1.8, 8.4, 5); drum(gs, -0.6, 7.9, '#1f3a56'); });
 
+    yield 'steel';
     /* the cage: per side three 2 m panels (tube frame, a mid rail, welded mesh), concrete feet under the joints, clamps. Built in
        the ARENA frame so the dent shader can work in it; a side = a mesh of tubes and feet + a mesh of the net */
     const netTex = rep(canvasTex(256, 256, (c, w, h) => { c.fillStyle = '#000'; c.fillRect(0, 0, w, h); c.fillStyle = '#fff'; for (let k = 0; k < 8; k++) c.fillRect(14 + 32 * k, 0, 4, h); for (let k = 0; k < 4; k++) c.fillRect(0, 30 + 64 * k, w, 4); }));
@@ -175,6 +182,7 @@ LOCS.warehouse = {
       g.add(tm, nm); this.sides.push({ tm, nm, ox: Math.sin(a), oz: Math.cos(a) });
     }
 
+    yield 'cage';
     /* light. Two enamel dish lamps on cables over the cage: hard warm pools straight down (the shared `key` only adds the fighters'
        shadows); a cold LED work light on a tripod outside one corner; moonlight from the window walls for the depth of the hall */
     const rig = this.rig = new THREE.Group(); g.add(rig);
@@ -230,6 +238,7 @@ LOCS.warehouse = {
     const poolTex = canvasTex(64, 64, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(150,180,235,.5)'); gr.addColorStop(0.6, 'rgba(120,150,210,.2)'); gr.addColorStop(1, 'rgba(100,130,200,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
     shaft.add(noAO(staticMesh(geoMerge(pools), new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.55 }))));
 
+    yield 'light';
     /* the crowd: three rows right against the mesh on all four sides, the back rows on crates */
     this.crowd = makeCrowd({ shape: 'rect', w: 2 * H, h: 2 * H, r: 0.42, rows: 3, look: 'masked', seed: 41, max: 120, squat: 0.1 });
     g.add(this.crowd.group);

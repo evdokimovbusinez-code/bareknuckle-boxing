@@ -27,7 +27,7 @@ LOCS.bar = {
     const noAO = o => { CROWD.blobs.push(o); return o; };
     const near = this.near = [];
     const propMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.12, envMapIntensity: 0.4 });
-    const glowTex = canvasTex(128, 128, (c, w, h) => { const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.12, 'rgba(255,255,255,.6)'); gr.addColorStop(0.4, 'rgba(255,255,255,.14)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
+    const glowTex = glowSprite([[0, 1], [0.12, 0.6], [0.4, 0.14], [1, 0]]);   // R-24: shared with the metro (17_loc_load.js)
     const glow = (p, s, col) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); sp.position.copy(p); sp.scale.set(s, s, 1); g.add(noAO(sp)); };
 
     /* floor: a 1.5 m plank tile of dark varnished wood, scuffed; over the middle — non-repeating spills, beer rings and footpaths */

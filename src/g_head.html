@@ -358,6 +358,12 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .locbusy{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:9px 16px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(12,14,18,.86);font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);z-index:60;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.45)}
 .locbusy i{width:9px;height:9px;border-radius:50%;background:var(--gold);animation:locpulse 1s ease-in-out infinite}
 .locbusy[hidden]{display:none}
+/* R-24: a fight waits for a cold place — the set is built in steps under this screen (17_loc_load.js, locLoadUI) */
+.locload{z-index:8;background:radial-gradient(ellipse at 50% 42%,#171a22 0%,var(--ink) 70%)}
+.locload .box{align-items:stretch;text-align:left}
+.locload small{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+.locload b{font:900 clamp(26px,5vmin,44px)/1 'Big Shoulders Display',Impact,'Arial Black',sans-serif;letter-spacing:.02em;color:#f1ece2;text-transform:uppercase}
+.locload .bar span{transition:width .12s linear}
 @keyframes locpulse{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
 .err{color:#ff9b8a}
 #stage.short .rules,#stage.short .keys{display:none}
@@ -735,6 +741,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   </div></div>
 
   <div class="loading" id="loading"><div class="box"><span id="ld-text">Загружаю бойцов…</span><div class="bar"><span id="ld-bar"></span></div></div></div>
+  <div class="loading locload" id="loc-load" hidden><div class="box"><small>площадка</small><b id="ll-n"></b><span>Готовим площадку…</span><div class="bar"><span id="ll-bar"></span></div></div></div>
   <div class="locbusy" id="loc-busy" hidden><i></i><span>Готовим площадку…</span></div>
 </div>
 

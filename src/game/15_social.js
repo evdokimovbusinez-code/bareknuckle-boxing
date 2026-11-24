@@ -149,7 +149,7 @@ function socAccept(id) {
   const S = PROF.soc, d = S.dm.find(x => x.id === id); if (!d || G.state !== 'menu') return;
   S.dm = S.dm.filter(x => x !== d); const L = LADDER[d.i];
   if (G.mode === 'career') { G.diff = G.userDiff; }
-  G.prev = { diff: G.userDiff, loc: G.loc }; G.mode = 'quick'; G.diff = L.diff; G.loc = d.loc; setLocation(d.loc);   // the fight is on his ground; the quick-fight settings come back at the menu (socLeave)
+  G.prev = { diff: G.userDiff, loc: G.loc }; G.mode = 'quick'; G.diff = L.diff; G.loc = d.loc; setLocation(d.loc, 'wait');   // the fight is on his ground; the quick-fight settings come back at the menu (socLeave)
   P2.applyLook({ ...L.look, street: true }); AI.style = STYLES[L.st]; $('n2').textContent = L.nm; const sl = $('st2'); if (sl) sl.textContent = STYLES[L.st].label;
   G.chal = { id, i: d.i, nm: L.nm }; save(); startFight(true);
 }

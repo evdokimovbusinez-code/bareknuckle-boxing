@@ -153,7 +153,7 @@ function storyPlay(i) {
   UI.from = null; uiShow(null); show('result', false); show('rec', false);
   DLG.kicker = `глава ${i + 1} · ${ch.title}`;
   const go = () => {
-    setLocation(ch.fight.loc);
+    setLocation(ch.fight.loc, 'wait');   // a cold place: the loading screen until it is ready (17_loc_load.js)
     showP2(true); P2.applyLook({ ...ch.fight.look, street: true });
     storyDress(ch);   // R-17: the hero in the chapter's clothes
     AI.style = STYLES[ch.fight.st] || STYLES.brawler; $('n2').textContent = ch.fight.nm;
@@ -161,8 +161,7 @@ function storyPlay(i) {
     P1.resetState(); P2.resetState(); sfx.unlock();
     storyTalk(ch.intro, storyFightGo);
   };
-  const cold = !LOCS[ch.fight.loc] || !LOCS[ch.fight.loc].group;
-  if (cold) { locBusy(true); setTimeout(() => { try { go(); } finally { locBusy(false); } }, 0); } else go();
+  go();
   return true;
 }
 /* the hero's outfit for the chapter: a copy of LOOK with the chapter's clothes over it (skin, hair, tattoos stay his own) */
