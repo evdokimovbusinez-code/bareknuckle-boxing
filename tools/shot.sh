@@ -5,6 +5,7 @@
 #   bash tools/shot.sh /tmp/shots/x.jpg js "document.getElementById('go').click(); __tick(400, 1/60);"
 #   bash tools/shot.sh /tmp/shots/t.jpg tut   # issue 45: run tools/tut_test.py (all steps, desktop keys + touch PointerEvents)
 #   bash tools/shot.sh /tmp/shots/mp.jpg mp   # issue 49: run tools/test/mp_test.py (two pages, real PeerJS P2P)
+#   bash tools/shot.sh /tmp/shots/s.jpg smoke # R-01: tools/test/smoke.py — audit scenarios, desktop + phone; exit 1 on errors
 # then look at the JPG with the Read tool.  Takes 1-4 minutes (software rendering).
 set -e
 cd "$(dirname "$0")/.."
@@ -19,4 +20,7 @@ PORT=${SHOT_PORT:-$((8700 + $(pwd | cksum | cut -d' ' -f1) % 200))}
 curl -sf -o /dev/null http://localhost:$PORT/gtest.html || { (python3 -m http.server $PORT >/dev/null 2>&1 &); sleep 1; }
 # issue 49: two pages in one browser, real PeerJS — tools/test/mp_test.py starts its own http.server
 if [ "${2:-}" = "mp" ]; then exec python3 tools/test/mp_test.py "$1"; fi
+# R-01: the smoke set — docs/audit/scenarios/{menu,fight,modes,phone}.js at 1280x720 and 740x360 touch; exit code 1 on any
+# page error / console.error / unreached state (tools/test/smoke.py; extra args e.g. `--only fight --vp desk`)
+if [ "${2:-}" = "smoke" ]; then OUT=$1; shift 2; exec timeout 1500 python3 tools/test/smoke.py "$OUT" "$@"; fi
 SHOT_PORT=$PORT timeout 600 python3 tools/shot.py "$@"

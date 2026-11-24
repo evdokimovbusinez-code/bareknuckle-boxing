@@ -33,6 +33,18 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
   (`go-fighter`, `go-set`, `go-quick`, …; `go` starts the quick fight). Small / touch screen: append `WxH [touch]`, e.g.
   `bash tools/shot.sh /tmp/shots/s.jpg js "CODE" 740x360 touch` (`390x800 touch` = portrait phone, rotated stage).
   Then open the JPG with the Read tool. Software rendering: ~30 s – 3 min per shot. Compare before/after.
+  Menu screens slide in with CSS transitions (real time): append `settle` after `WxH [touch]` (or `SHOT_SETTLE=1`) and every shot
+  first waits for them to finish (`settle()` in `tools/shot.py`).
+
+## Smoke set (R-01) — run it before every PR
+- `bash tools/shot.sh /tmp/shots/s.jpg smoke` → `tools/test/smoke.py`: runs `docs/audit/scenarios/{menu,fight,modes,phone}.js` at
+  1280×720 and 740×360 touch, each in a fresh browser context (~6–7 min). Exit code 1 on any `pageerror` / `console.error`
+  (only SwiftShader chatter and the `/favicon.ico` 404 are ignored), a game that does not load, a scenario that throws or times out,
+  a state not reached (`NEED`: `fight`, `kd`, `ko`, `replay`, `result`, `talk` — every `G.state` assignment is recorded by a setter)
+  or a menu screen that did not open. Prints a table: states in order, the smallest tap target, ms per `__tick` frame; frames are
+  `/tmp/shots/s-desk-fight-f4.jpg`, … Narrow it while working: `... smoke --only fight,modes --vp desk`.
+- A new scenario: add `docs/audit/scenarios/NAME.js` (one `(async () => { … })()` expression, `await __shot('tag')` for frames,
+  returns a log string) and list it in `SCEN` / `NEED` of `smoke.py`.
 
 ## Map of `src/game/`
 | File | What |
