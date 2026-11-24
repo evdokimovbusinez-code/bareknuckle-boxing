@@ -6913,6 +6913,22 @@ const FX = (() => {
   dmesh.frustumCulled = false; dmesh.receiveShadow = true; dmesh.matrixAutoUpdate = false; dmesh.visible = false; ARENA.add(dmesh); let dh = 0, live = 0;
   for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero);
   const q = new Quat(), s3 = new V3(), p3 = new V3(), up = new V3(0, 1, 0);
+  /* R-04: the flash at the point of contact — an additive star sprite that lives 2 frames (full, then larger and fading):
+     warm and bright on a clean hit, small and pale on a block. A pool of 3 (two hits in one frame happen in a trade). */
+  const FL = (() => {
+    const S = 64, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'), h = S / 2;
+    const g = x.createRadialGradient(h, h, 0, h, h, h); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.07, 'rgba(255,255,255,0.95)'); g.addColorStop(0.2, 'rgba(255,255,255,0.3)'); g.addColorStop(0.5, 'rgba(255,255,255,0.05)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, S, S); x.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 6; i++) {   // thin rays of uneven length
+      const a = i * Math.PI / 3 + 0.25 * Math.sin(i * 2.3), L = h * (i % 2 ? 0.6 : 0.97), w = 2.4;
+      x.save(); x.translate(h, h); x.rotate(a); const rg = x.createLinearGradient(0, 0, L, 0); rg.addColorStop(0, 'rgba(255,255,255,0.9)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = rg; x.beginPath(); x.moveTo(0, -w); x.lineTo(L, 0); x.lineTo(0, w); x.closePath(); x.fill(); x.restore(); }
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const pool = [0, 1, 2].map(() => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: 0xffffff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, depthTest: false, fog: false, toneMapped: false }));   // on top: at a block it sits among both men's hands
+      s.visible = false; s.frustumCulled = false; s.renderOrder = 20; s.matrixAutoUpdate = true; scene.add(s); return { s, f: -9, k: 1, sz: 0.1 }; });
+    return { pool, i: 0, frame: 0 };
+  })();
+  const cWarm = new THREE.Color(1.0, 0.7, 0.36), cPale = new THREE.Color(0.62, 0.72, 0.9);
   function decal(x, z, r) {
     p3.set(x, 0, z); ARENA.worldToLocal(p3); if (LOC.bound.kind === 'circle' ? Math.hypot(p3.x, p3.z) > LOC.wall.r - 0.05 : Math.abs(p3.x) > 2.75 || Math.abs(p3.z) > 2.75) return;   // only on the fighting floor
     q.setFromAxisAngle(up, rr() * 6.28); s3.set(r * (2.2 + rr() * 3), 1, r * (1.6 + rr() * 2.4)); p3.y = 0.003 + (dh % DN) * 2e-5;
@@ -6949,7 +6965,22 @@ const FX = (() => {
       }
       mesh.instanceMatrix.needsUpdate = true; mesh.visible = !!live;
     },
-    clearAir() { for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); } mesh.instanceMatrix.needsUpdate = true; mesh.visible = false; live = 0; MIST.clear(); },
+    // R-04: the contact flash (resolveHit / followHit, the replay, the P2P guest); drawn on top, nudged 8 cm towards the camera
+    flash(pos, dir, power, blocked) {
+      if (!pos) return; const F = FL.pool[FL.i++ % FL.pool.length], pw = clamp(power || 0, 0, 1.4);
+      F.s.position.copy(pos).addScaledVector(p3.subVectors(camera.position, pos).normalize(), 0.08);
+      F.sz = blocked ? 0.07 + 0.05 * pw : 0.1 + 0.07 * pw; F.k = blocked ? 0.55 + 0.2 * pw : 0.9 + 0.7 * pw / 1.4;
+      F.s.material.color.copy(blocked ? cPale : cWarm).multiplyScalar(F.k); F.s.material.rotation = rr() * 6.28;
+      F.s.scale.set(F.sz, F.sz, 1); F.f = FL.frame; F.s.visible = true;
+    },
+    flashTick() {   // once per frame, after the sim: age 1 = the frame of the hit, age 2 = the next one (larger, fading), then gone
+      if (G.paused) return;   // a paused game is a still of that moment: the flash stays on it
+      FL.frame++;
+      for (const F of FL.pool) { if (!F.s.visible) continue; const age = FL.frame - F.f;
+        if (age > 2 || age < 1) { F.s.visible = false; continue; }
+        if (age === 2) { F.s.scale.set(F.sz * 1.35, F.sz * 1.35, 1); F.s.material.color.multiplyScalar(0.4); } }
+    },
+    clearAir() { for (const F of FL.pool) F.s.visible = false; for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); } mesh.instanceMatrix.needsUpdate = true; mesh.visible = false; live = 0; MIST.clear(); },
     clearFloor() { for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero); dmesh.instanceMatrix.needsUpdate = true; dmesh.visible = false; dh = 0; },
   };
 })();
@@ -7514,10 +7545,11 @@ function nextSeg() {
   RP.seg++; if (RP.seg >= RP.segs.length) return endReplay();
   if (RP.segs[RP.seg].enter) RP.segs[RP.seg].enter();   // a segment may announce itself (the highlights' plate)
   P1.simReset = P2.simReset = true;   // a cut back in time: hair and shorts start from the pose, not from where they were
-  RP.tau = RP.segs[RP.seg].from; RP.i = 0; FX.clearAir(); wearSeek(RP.tau); P1.simReset = P2.simReset = true; RP.cut = true;
+  RP.tau = RP.segs[RP.seg].from; RP.i = 0; RP.hold = 0; FX.clearAir(); wearSeek(RP.tau); P1.simReset = P2.simReset = true; RP.cut = true;
   stepReplay(0);   // pose the fighters before the camera cuts to them
 }
 function stepReplay(dtReal) {
+  if (RP.hold > 0 && dtReal > 0) { RP.hold -= dtReal; dtReal = 0; }   // R-04: a recorded hit-stop freezes the replay too (dtReal = 0 also keeps the watchdog quiet)
   const s = RP.segs[RP.seg], F = s.F || REC.frames, prev = RP.tau; RP.tau = Math.min(s.to, RP.tau + dtReal * (s.rf ? s.rf(RP.tau) : s.rate));   // s.F: a clip of its own (highlights); s.rf: a rate that follows the replay time (slow motion at the impact)
   while (RP.i < F.length - 2 && F[RP.i + 1].t <= RP.tau) RP.i++;
   const a = F[RP.i], b = F[RP.i + 1], k = clamp((RP.tau - a.t) / Math.max(1e-5, b.t - a.t), 0, 1), sdt = RP.tau - prev;
@@ -7531,7 +7563,9 @@ function stepReplay(dtReal) {
     if (e.spray) F.flesh.spray(e.spray.map(i => F.flesh.wounds[i]).filter(Boolean), e.dir, e.power, F);
     if (e.blocked) sfx.block(clamp(e.power * 2, 0.3, 1.4)); else sfx.thud(e.power * 0.7);
     if (e.knux) sfx.knux(e.power * 0.7, e.blocked);   // issue 52: the metal rings again in the replay
-    G.shake = Math.max(G.shake, 0.01 + 0.02 * e.power); EVT.emit('hit', { pos: e.pos, power: e.power, replay: true }); }
+    // R-04: the same kick, lens push, flash and freeze as when it happened (the freeze holds the replay clock, RP.hold)
+    shakeHit(e.sh ?? 0.01 + 0.02 * e.power, e.dir, !!e.fov); FX.flash(e.fp || e.pos, e.dir, e.bf || e.power, !!e.blocked); if (e.hs) RP.hold = Math.max(RP.hold || 0, e.hs);
+    EVT.emit('hit', { pos: e.pos, power: e.power, replay: true }); }
   RP.wd = sdt > 1e-6 || dtReal === 0 ? 0 : (RP.wd || 0) + dtReal;   // a replay whose clock stopped (bad segment) must not hang the game
   if (RP.tau >= s.to) nextSeg(); else if (RP.wd > 1.5 && !s.enter) { RP.wd = 0; endReplay(); }
   return sdt;
@@ -7548,6 +7582,24 @@ function endReplay() {
 }
 
 /* ───────── hits ───────── */
+/* R-04 — the weight of a hit: the freeze, the camera, the flash.
+   was: G.hitstop = min(0.04, 0.012 + 0.03·(power − 0.55)) and only on a clean shot with power > 0.55 (jab / cross: no freeze at all,
+   the biggest hook 0.04 s), nothing on a block; the camera jittered at random on both axes; no lens push, no flash.
+   now: a clean hit 0.03 → 0.11 s over power 0.3 → 1.4 (eased, ^0.75, so a clean cross ≈ 0.065 s reads as a hit, not a tap),
+   a counter or a power shot ×1.2; a block 0.006 → 0.02 s by the raw force (≤ 0.02); a flurry keeps it short: the freezes of the
+   last 2 s (real time, both men's hits) share a budget of 0.2 s, so 4 quick hits never stop the game longer than ≈ 0.22 s together
+   (the loop rounds each freeze to whole frames: ± half a frame a hit).
+   fovP / fov / fovT: a clean hit above power 0.8 narrows the lens by 2° for 80 ms (camKick). */
+const HITK = { p0: 0.3, p1: 1.4, hs0: 0.03, hs1: 0.11, ease: 0.75, bonus: 1.2, blk0: 0.006, blk1: 0.014, blkMax: 0.02, win: 2, budget: 0.2, fovP: 0.8, fov: 2, fovT: 0.08 };
+const HS_LOG = [];   // [G.real, seconds granted] of the recent freezes
+function hitStop(power, blocked, bonus) {
+  let hs = blocked ? Math.min(HITK.blkMax, HITK.blk0 + HITK.blk1 * clamp(power / 1.6, 0, 1))
+    : (HITK.hs0 + (HITK.hs1 - HITK.hs0) * Math.pow(clamp((power - HITK.p0) / (HITK.p1 - HITK.p0), 0, 1), HITK.ease)) * (bonus ? HITK.bonus : 1);
+  while (HS_LOG.length && (HS_LOG[0][0] < G.real - HITK.win || HS_LOG[0][0] > G.real)) HS_LOG.shift();
+  const used = HS_LOG.reduce((a, e) => a + e[1], 0);
+  hs = clamp(HITK.budget - used, 0, hs); if (hs > 0) HS_LOG.push([G.real, hs]);
+  return hs;
+}
 const evades = (att, n, d) => !!d && (att.bodyShot ? d.type === 'lean' : EV[n].includes(d.type));
 function aimFor(att, def) {
   if (!att.cur) return null; const n = att.cur, d = def.dodge;
@@ -7609,7 +7661,8 @@ function followHit(att, name, contact) {
   def.face.hit && def.face.hit(power, true, fr.skin); FX.spawn(fr.skin, dir, power); { const bl = Math.min(1, def.flesh.wounds.reduce((a, x) => a + x.sev, 0) * 0.8); if (bl > 0.12) { FX.mist(fr.skin, dir, power, bl); ev.mist = bl; } } REC.events.push(ev);
   const fd = P.dmg * DMG_K * (knux ? KNUX.dmg : 1);
   if (att.fs) { att.fs.land++; att.fs.dmg += fd; } if (G.state === 'kd') { def.hp = Math.max(0, def.hp - fd); G.kd.up += 0.8; }
-  att.lastLand = G.t; sfx.thud(power, false); if (knux) sfx.knux(power, false); EVT.emit('hit', { pos, power }); G.shake = Math.max(G.shake, 0.02 + 0.03 * power); G.hitstop = 0.02 + 0.02 * power;
+  att.lastLand = G.t; sfx.thud(power, false); if (knux) sfx.knux(power, false); EVT.emit('hit', { pos, power }); G.hitstop = 0.02 + 0.02 * power;
+  ev.sh = Math.round((0.02 + 0.03 * power) * 1000) / 1000; shakeHit(ev.sh, dir, false); FX.flash(fr.skin, dir, power, false);   // R-04: the kick along the punch + the flash
   popup(fr.skin.clone().add(_v4.set(0, 0.15, 0)), 'добил', 'crit');
 }
 function resolveHit(att, name, contact) {
@@ -7618,7 +7671,8 @@ function resolveHit(att, name, contact) {
   if (BAG.on) { if (att === P1) bagHit(att, name, contact); return; }
   const P = PUNCH[name], d = def.dodge, evading = !!d && d.t > 0.05 && d.t < 0.44, body = att.bodyShot, knux = !!att.gear.knux;
   const evaded = evading && evades(att, name, d);
-  let pos = contact || (body ? def.ribs[att.ribIdx].w.clone() : def.headNow.clone().add(_v3.copy(att.knuckle(_v4)).sub(def.headNow).setLength(0.1)));
+  // contactTest hands back the shared temp _v6 (overwritten in takeHit before a block's sweat / flash / replay event used it): copy it
+  let pos = contact ? contact.clone() : (body ? def.ribs[att.ribIdx].w.clone() : def.headNow.clone().add(_v3.copy(att.knuckle(_v4)).sub(def.headNow).setLength(0.1)));
   if (evaded) {
     att.whiff = true; def.counterUntil = G.t + 1.0; popup(pos, 'уклон', 'dodge'); sfx.whoosh(); if (def.fs) def.fs.eva++;
     if (def === P1) { G.slow = 0.4; G.slowT = 0.3; }
@@ -7716,13 +7770,18 @@ function resolveHit(att, name, contact) {
     if (fr.cut) popup(_v4.copy(pos).add(_v5.set(0, 0.12, 0)), 'рассечение', 'crit');
     if (fr.broke) popup(_v4.copy(pos).add(_v5.set(0, 0.12, 0)), 'сломан нос', 'crit');
   }
-  FX.spawn(pos, dir, blocked ? power * 0.4 : power); REC.events.push(ev);
-  // contact is soft: a very short freeze, then a moment of slow motion while the head travels with the fist
-  // was on every hit (0.012–0.034 s freeze + 0.05–0.11 s at 40 % speed) — in a combo that read as stutter. Now: nothing on blocks
-  // and light shots, a short freeze on a clean heavy one, a breath of slow motion only on the really big ones
-  if (!blocked && power > 0.55) G.hitstop = Math.min(0.04, 0.012 + 0.03 * (power - 0.55));
+  // the flash: on the skin for a clean hit, at the knuckles for a block (the point on his head is behind the gloves)
+  // (a block's flash goes by the raw force of the shot, bforce: its `power` is what got through the guard)
+  const fp = blocked ? att.knuckle(new V3()) : pos; if (blocked) { ev.fp = fp; ev.bf = Math.round(bforce * 1000) / 1000; }
+  FX.spawn(pos, dir, blocked ? power * 0.4 : power); FX.flash(fp, dir, blocked ? bforce : power, blocked); REC.events.push(ev);
+  // R-04: the freeze follows the weight of the shot (hitStop above), a breath of slow motion only on the really big ones;
+  // the camera kicks along the punch, a big clean one also pushes the lens in 2° (shakeHit, 10_camera_layout.js)
+  const hs = hitStop(blocked ? bforce : power, blocked, counter || isPow); G.hitstop = Math.max(G.hitstop, hs);
   if (!blocked && power > 1.05 && G.slowT <= 0.02) { G.slow = 0.6; G.slowT = 0.06; }
-  G.shake = Math.max(G.shake, 0.012 + 0.03 * power + (breakIt ? 0.02 : 0));
+  const sh = 0.012 + 0.03 * power + (breakIt ? 0.02 : 0), fov = !blocked && power > HITK.fovP;
+  shakeHit(sh, dir, fov);
+  ev.hs = Math.round(hs * 1000) / 1000; ev.sh = Math.round(sh * 1000) / 1000; if (fov) ev.fov = 1;   // the same values for the replay and the P2P guest
+  if (window.__hsLog) window.__hsLog.push({ att: att === P1 ? 1 : 2, t: +G.t.toFixed(3), real: +G.real.toFixed(3), name, power: +power.toFixed(3), blocked, counter, pow: isPow, hs: ev.hs, sh: ev.sh, fov });
   if (blocked) sfx.block(bforce, breakIt ? 1.8 : 1); else sfx.thud(power, body);   // dull/short on gloves, louder on a break
   if (knux) sfx.knux(power, blocked);   // issue 52: the brass ring over the punch
   EVT.emit('hit', { pos, power, blocked });
@@ -9156,6 +9215,29 @@ function camFade(dt) {
   }
 }
 window.__camClear = { CC, ccGap, ccTargets, ccWinCover, ccPostsWorld, endReplay: () => endReplay() };   // debug (docs/audit/scenarios/camera.js)
+/* R-04: the camera's answer to a hit. G.shake = amplitude (m), decays ×e^(−9 t) as before; it used to push the camera at random on
+   x and y every frame — now it swings along the punch (SHK.d, its part across the view: a damped 15 Hz swing that starts at full
+   push), with a quarter of the old random jitter left on top (all of it when the punch runs along the line of sight).
+   SHK.fovT: a big clean hit narrows the lens by HITK.fov = 2° for HITK.fovT = 80 ms (full for 50 ms, eased back over the last 30).
+   OPT.shake off: neither. Called by camUpdate and netGuestCam; fed by shakeHit (resolveHit, followHit, the replay, the guest). */
+const SHK = { d: new V3(1, 0, 0), ph: 0, hz: 15, fov0: 28, fovT: 0, fovA: 0 }, _sk1 = new V3(), _sk2 = new V3();
+function shakeHit(amp, dir, fov) {
+  if (!OPT.shake) return;
+  if (dir && amp >= G.shake * 0.7) { SHK.d.copy(dir).normalize(); SHK.ph = 0; }   // a weaker hit inside a stronger one's shake keeps its direction
+  G.shake = Math.max(G.shake, amp); if (fov) SHK.fovT = HITK.fovT;
+}
+function camKick(dt) {
+  if (!OPT.shake) { G.shake = 0; SHK.fovT = 0; }
+  if (G.shake > 0.0005 && dt > 0) {
+    const v = _sk1.copy(camL).sub(camera.position).normalize(), d = _sk2.copy(SHK.d).addScaledVector(v, -SHK.d.dot(v)), across = Math.min(1, d.length() * 1.5);
+    if (across > 0.01) d.normalize(); const sw = Math.cos(SHK.ph) * 0.6 * G.shake * across, jit = G.shake * (0.25 + 0.75 * (1 - across));
+    camera.position.addScaledVector(d, sw); camera.position.x += (rr() - 0.5) * jit; camera.position.y += (rr() - 0.5) * jit;
+    SHK.ph += dt * SHK.hz * 6.283; G.shake *= Math.exp(-dt * 9);
+  }
+  const fa = SHK.fovT > 0 ? HITK.fov * sstep(0, 0.03, SHK.fovT) : 0; if (SHK.fovT > 0 && dt > 0) SHK.fovT -= dt;
+  if (Math.abs(fa - SHK.fovA) > 1e-4) { SHK.fovA = fa; camera.fov = SHK.fov0 - fa; camera.updateProjectionMatrix(); }
+}
+window.__hitFeel = { HITK, SHK, HS_LOG, hitStop };   // debug (R-04): the constants, the shake state, the recent freezes
 function camUpdate(dt) {
   camClock += dt; let k = 4;
   // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
@@ -9225,8 +9307,7 @@ function camUpdate(dt) {
   else CC.yaw = CC.want = 0;
   if (camCut) { camP.copy(_cp); camL.copy(_cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * k); camP.lerp(_cp, a); camL.lerp(_cl, a); }
-  camera.position.copy(camP); if (!OPT.shake) G.shake = 0;   // settings: camera shake off
-  if (G.shake > 0.0005 && dt > 0) { camera.position.x += (rr() - 0.5) * G.shake; camera.position.y += (rr() - 0.5) * G.shake; G.shake *= Math.exp(-dt * 9); }
+  camera.position.copy(camP); camKick(dt);   // R-04: the kick along the punch + the lens push (both off with OPT.shake)
   camera.lookAt(camL);
   if (!window.__camOff) camFade(dt);   // R-03 fallback (debug: window.__camOff = true — the old camera, for before / after): a post still in front of a head / torso goes see-through
 }
@@ -9299,7 +9380,7 @@ function layout() {
   stage.style.width = VW + 'px'; stage.style.height = VH + 'px';
   stage.classList.toggle('short', VH < 520);
   applyRes();
-  camera.aspect = VW / VH; camera.fov = VW / VH < 1.45 ? 34 : 28; camera.updateProjectionMatrix();
+  camera.aspect = VW / VH; camera.fov = SHK.fov0 = VW / VH < 1.45 ? 34 : 28; SHK.fovA = 0; camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', layout); layout(); GFX.ready = true;
 
@@ -9406,7 +9487,8 @@ function frame(now) {
   else if (G.state === 'replay') simDt = stepReplay(dtReal);
   if (!guestLive && G.state !== 'replay') {
     if (G.slowT > 0) { G.slowT -= dtReal; if (G.slowT <= 0) G.slow = 1; }
-    let dt = dtReal * G.slow; if (G.hitstop > 0) { G.hitstop -= dtReal; dt = 0; }
+    // R-04: a freeze is rounded to whole frames (was: always rounded up — every hit of a flurry froze up to one frame extra)
+    let dt = dtReal * G.slow; if (G.hitstop > 0) { if (G.hitstop > dtReal * 0.5) { G.hitstop -= dtReal; dt = 0; } else G.hitstop = 0; }
     G.t += dt; simDt = dt;
     if (G.paused) {}
     else if (G.state === 'fight') { playerInput(); ai(dt); }
@@ -9424,7 +9506,7 @@ function frame(now) {
   P1.simulate(simDt); P2.simulate(simDt);
   ropeTick(simDt); bagStep(simDt);
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
-  FX.update(simDt); MIST.update(simDt); wearTick(simDt);
+  FX.update(simDt); MIST.update(simDt); FX.flashTick(); wearTick(simDt);
   tq = performance.now(); pm.fx += tq - tp; tp = tq;
   trailTick(dtReal);   // the punch smear behind the knuckles (05b_trail.js)
   camUpdate(dtReal); locSync(); crowdTick(simDt); hudUpdate(dtReal); resTick(rawDt); AUDIO.tick();   // locSync: the location hides what stands between the camera and the fighters; crowdTick: its crowd (14_crowd.js); AUDIO.tick: music ducking (06b_audio.js)
@@ -13448,7 +13530,7 @@ Object.assign(window.__loc || (window.__loc = {}), { prefetch: locPrefetch, kick
      ping   {c:'ping', t} / {c:'pong', t}       both ways, 1 Hz; RTT in ms, yellow above 200
      over   {c:'over', w:0|1, d:0|1}           host → guest at the result (w = host's P1 won)
      again  {c:'again'}                        either side → the other, one-button rematch
-   ev items: {t, w, b, p, s:[x,y,z], d:[x,y,z], m?} (hit / block / knockdown); p items: {t, p:[x,y,z], s, c} (captions).
+   ev items: {t, w, b, p, s:[x,y,z], d:[x,y,z], m?, k?, sh?, h?, f?, q?} (hit / block / knockdown; R-04: sh shake, h hit-stop, f lens push, q flash point); p items: {t, p:[x,y,z], s, c} (captions).
    No TURN server: symmetric NAT / strict firewalls cannot connect — see .claude-summary.md. */
 
 /* NET and the ICE/code tables are declared in 00a_net_state.js (an early file: see the note there). */
@@ -13729,6 +13811,7 @@ function netEv(e) {
   if (e.dir) o.d = [r3(e.dir.x), r3(e.dir.y), r3(e.dir.z)]; else o.d = [0, 0, 1];
   if (e.mist) o.m = r3(e.mist);
   if (e.knux) o.k = 1;   // issue 52: the guest plays the metallic ring too
+  if (e.sh) o.sh = r3(e.sh); if (e.hs) o.h = r3(e.hs); if (e.fov) o.f = 1; if (e.fp) o.q = [r3(e.fp.x), r3(e.fp.y), r3(e.fp.z)]; if (e.bf) o.bf = e.bf;   // R-04: shake, hit-stop, lens push, the flash at the knuckles (block)
   return o;
 }
 function netCapturePopup(pos, text, cls) {
@@ -13827,7 +13910,8 @@ function netPlayEvent(e) {
   if (e.m) FX.mist(pos, dir, e.p, e.m);
   if (e.b) sfx.block(clamp(e.p * 2, 0.3, 1.4)); else sfx.thud(e.p * 0.7);
   if (e.k) sfx.knux(e.p * 0.7, !!e.b);
-  G.shake = Math.max(G.shake, 0.01 + 0.02 * e.p);
+  // R-04: the host's values (e.sh = shake, e.f = lens push); the host's freeze (e.h) is already in the snapshots — its poses stand still
+  shakeHit(e.sh ?? 0.01 + 0.02 * e.p, dir, !!e.f); FX.flash(e.q ? new V3(e.q[0], e.q[1], e.q[2]) : pos, dir, e.bf || e.p, !!e.b); NET.lastH = e.h || 0;
   EVT.emit('hit', { pos, power: e.p, blocked: !!e.b });
   const hb = $(e.w ? 'hpb2' : 'hpb1'); if (hb) { hb.classList.remove('hit'); void hb.offsetWidth; hb.classList.add('hit'); }
 }
@@ -13839,8 +13923,7 @@ function netGuestCam(dt, cp, cl) {
   cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), -z); cl.set(mx + drift * 0.3, 0.93, 0);
   if (camCut) { camP.copy(cp); camL.copy(cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * 3.5); camP.lerp(cp, a); camL.lerp(cl, a); }
-  camera.position.copy(camP); if (!OPT.shake) G.shake = 0;
-  if (G.shake > 0.0005 && dt > 0) { camera.position.x += (rr() - 0.5) * G.shake; camera.position.y += (rr() - 0.5) * G.shake; G.shake *= Math.exp(-dt * 9); }
+  camera.position.copy(camP); camKick(dt);   // R-04: the same kick / lens push as the host's camera (10_camera_layout.js)
   camera.lookAt(camL);
 }
 

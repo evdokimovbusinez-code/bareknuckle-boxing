@@ -64,7 +64,8 @@ function frame(now) {
   else if (G.state === 'replay') simDt = stepReplay(dtReal);
   if (!guestLive && G.state !== 'replay') {
     if (G.slowT > 0) { G.slowT -= dtReal; if (G.slowT <= 0) G.slow = 1; }
-    let dt = dtReal * G.slow; if (G.hitstop > 0) { G.hitstop -= dtReal; dt = 0; }
+    // R-04: a freeze is rounded to whole frames (was: always rounded up — every hit of a flurry froze up to one frame extra)
+    let dt = dtReal * G.slow; if (G.hitstop > 0) { if (G.hitstop > dtReal * 0.5) { G.hitstop -= dtReal; dt = 0; } else G.hitstop = 0; }
     G.t += dt; simDt = dt;
     if (G.paused) {}
     else if (G.state === 'fight') { playerInput(); ai(dt); }
@@ -82,7 +83,7 @@ function frame(now) {
   P1.simulate(simDt); P2.simulate(simDt);
   ropeTick(simDt); bagStep(simDt);
   tq = performance.now(); pm.phys += tq - tp; tp = tq;
-  FX.update(simDt); MIST.update(simDt); wearTick(simDt);
+  FX.update(simDt); MIST.update(simDt); FX.flashTick(); wearTick(simDt);
   tq = performance.now(); pm.fx += tq - tp; tp = tq;
   trailTick(dtReal);   // the punch smear behind the knuckles (05b_trail.js)
   camUpdate(dtReal); locSync(); crowdTick(simDt); hudUpdate(dtReal); resTick(rawDt); AUDIO.tick();   // locSync: the location hides what stands between the camera and the fighters; crowdTick: its crowd (14_crowd.js); AUDIO.tick: music ducking (06b_audio.js)

@@ -43,6 +43,22 @@ const FX = (() => {
   dmesh.frustumCulled = false; dmesh.receiveShadow = true; dmesh.matrixAutoUpdate = false; dmesh.visible = false; ARENA.add(dmesh); let dh = 0, live = 0;
   for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero);
   const q = new Quat(), s3 = new V3(), p3 = new V3(), up = new V3(0, 1, 0);
+  /* R-04: the flash at the point of contact — an additive star sprite that lives 2 frames (full, then larger and fading):
+     warm and bright on a clean hit, small and pale on a block. A pool of 3 (two hits in one frame happen in a trade). */
+  const FL = (() => {
+    const S = 64, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'), h = S / 2;
+    const g = x.createRadialGradient(h, h, 0, h, h, h); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.07, 'rgba(255,255,255,0.95)'); g.addColorStop(0.2, 'rgba(255,255,255,0.3)'); g.addColorStop(0.5, 'rgba(255,255,255,0.05)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, S, S); x.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 6; i++) {   // thin rays of uneven length
+      const a = i * Math.PI / 3 + 0.25 * Math.sin(i * 2.3), L = h * (i % 2 ? 0.6 : 0.97), w = 2.4;
+      x.save(); x.translate(h, h); x.rotate(a); const rg = x.createLinearGradient(0, 0, L, 0); rg.addColorStop(0, 'rgba(255,255,255,0.9)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = rg; x.beginPath(); x.moveTo(0, -w); x.lineTo(L, 0); x.lineTo(0, w); x.closePath(); x.fill(); x.restore(); }
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const pool = [0, 1, 2].map(() => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: 0xffffff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, depthTest: false, fog: false, toneMapped: false }));   // on top: at a block it sits among both men's hands
+      s.visible = false; s.frustumCulled = false; s.renderOrder = 20; s.matrixAutoUpdate = true; scene.add(s); return { s, f: -9, k: 1, sz: 0.1 }; });
+    return { pool, i: 0, frame: 0 };
+  })();
+  const cWarm = new THREE.Color(1.0, 0.7, 0.36), cPale = new THREE.Color(0.62, 0.72, 0.9);
   function decal(x, z, r) {
     p3.set(x, 0, z); ARENA.worldToLocal(p3); if (LOC.bound.kind === 'circle' ? Math.hypot(p3.x, p3.z) > LOC.wall.r - 0.05 : Math.abs(p3.x) > 2.75 || Math.abs(p3.z) > 2.75) return;   // only on the fighting floor
     q.setFromAxisAngle(up, rr() * 6.28); s3.set(r * (2.2 + rr() * 3), 1, r * (1.6 + rr() * 2.4)); p3.y = 0.003 + (dh % DN) * 2e-5;
@@ -79,7 +95,22 @@ const FX = (() => {
       }
       mesh.instanceMatrix.needsUpdate = true; mesh.visible = !!live;
     },
-    clearAir() { for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); } mesh.instanceMatrix.needsUpdate = true; mesh.visible = false; live = 0; MIST.clear(); },
+    // R-04: the contact flash (resolveHit / followHit, the replay, the P2P guest); drawn on top, nudged 8 cm towards the camera
+    flash(pos, dir, power, blocked) {
+      if (!pos) return; const F = FL.pool[FL.i++ % FL.pool.length], pw = clamp(power || 0, 0, 1.4);
+      F.s.position.copy(pos).addScaledVector(p3.subVectors(camera.position, pos).normalize(), 0.08);
+      F.sz = blocked ? 0.07 + 0.05 * pw : 0.1 + 0.07 * pw; F.k = blocked ? 0.55 + 0.2 * pw : 0.9 + 0.7 * pw / 1.4;
+      F.s.material.color.copy(blocked ? cPale : cWarm).multiplyScalar(F.k); F.s.material.rotation = rr() * 6.28;
+      F.s.scale.set(F.sz, F.sz, 1); F.f = FL.frame; F.s.visible = true;
+    },
+    flashTick() {   // once per frame, after the sim: age 1 = the frame of the hit, age 2 = the next one (larger, fading), then gone
+      if (G.paused) return;   // a paused game is a still of that moment: the flash stays on it
+      FL.frame++;
+      for (const F of FL.pool) { if (!F.s.visible) continue; const age = FL.frame - F.f;
+        if (age > 2 || age < 1) { F.s.visible = false; continue; }
+        if (age === 2) { F.s.scale.set(F.sz * 1.35, F.sz * 1.35, 1); F.s.material.color.multiplyScalar(0.4); } }
+    },
+    clearAir() { for (const F of FL.pool) F.s.visible = false; for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); } mesh.instanceMatrix.needsUpdate = true; mesh.visible = false; live = 0; MIST.clear(); },
     clearFloor() { for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero); dmesh.instanceMatrix.needsUpdate = true; dmesh.visible = false; dh = 0; },
   };
 })();

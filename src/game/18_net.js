@@ -13,7 +13,7 @@
      ping   {c:'ping', t} / {c:'pong', t}       both ways, 1 Hz; RTT in ms, yellow above 200
      over   {c:'over', w:0|1, d:0|1}           host → guest at the result (w = host's P1 won)
      again  {c:'again'}                        either side → the other, one-button rematch
-   ev items: {t, w, b, p, s:[x,y,z], d:[x,y,z], m?} (hit / block / knockdown); p items: {t, p:[x,y,z], s, c} (captions).
+   ev items: {t, w, b, p, s:[x,y,z], d:[x,y,z], m?, k?, sh?, h?, f?, q?} (hit / block / knockdown; R-04: sh shake, h hit-stop, f lens push, q flash point); p items: {t, p:[x,y,z], s, c} (captions).
    No TURN server: symmetric NAT / strict firewalls cannot connect — see .claude-summary.md. */
 
 /* NET and the ICE/code tables are declared in 00a_net_state.js (an early file: see the note there). */
@@ -294,6 +294,7 @@ function netEv(e) {
   if (e.dir) o.d = [r3(e.dir.x), r3(e.dir.y), r3(e.dir.z)]; else o.d = [0, 0, 1];
   if (e.mist) o.m = r3(e.mist);
   if (e.knux) o.k = 1;   // issue 52: the guest plays the metallic ring too
+  if (e.sh) o.sh = r3(e.sh); if (e.hs) o.h = r3(e.hs); if (e.fov) o.f = 1; if (e.fp) o.q = [r3(e.fp.x), r3(e.fp.y), r3(e.fp.z)]; if (e.bf) o.bf = e.bf;   // R-04: shake, hit-stop, lens push, the flash at the knuckles (block)
   return o;
 }
 function netCapturePopup(pos, text, cls) {
@@ -392,7 +393,8 @@ function netPlayEvent(e) {
   if (e.m) FX.mist(pos, dir, e.p, e.m);
   if (e.b) sfx.block(clamp(e.p * 2, 0.3, 1.4)); else sfx.thud(e.p * 0.7);
   if (e.k) sfx.knux(e.p * 0.7, !!e.b);
-  G.shake = Math.max(G.shake, 0.01 + 0.02 * e.p);
+  // R-04: the host's values (e.sh = shake, e.f = lens push); the host's freeze (e.h) is already in the snapshots — its poses stand still
+  shakeHit(e.sh ?? 0.01 + 0.02 * e.p, dir, !!e.f); FX.flash(e.q ? new V3(e.q[0], e.q[1], e.q[2]) : pos, dir, e.bf || e.p, !!e.b); NET.lastH = e.h || 0;
   EVT.emit('hit', { pos, power: e.p, blocked: !!e.b });
   const hb = $(e.w ? 'hpb2' : 'hpb1'); if (hb) { hb.classList.remove('hit'); void hb.offsetWidth; hb.classList.add('hit'); }
 }
@@ -404,8 +406,7 @@ function netGuestCam(dt, cp, cl) {
   cp.set(mx + drift, 1.12 + 0.04 * Math.sin(camClock * 0.21), -z); cl.set(mx + drift * 0.3, 0.93, 0);
   if (camCut) { camP.copy(cp); camL.copy(cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * 3.5); camP.lerp(cp, a); camL.lerp(cl, a); }
-  camera.position.copy(camP); if (!OPT.shake) G.shake = 0;
-  if (G.shake > 0.0005 && dt > 0) { camera.position.x += (rr() - 0.5) * G.shake; camera.position.y += (rr() - 0.5) * G.shake; G.shake *= Math.exp(-dt * 9); }
+  camera.position.copy(camP); camKick(dt);   // R-04: the same kick / lens push as the host's camera (10_camera_layout.js)
   camera.lookAt(camL);
 }
 
