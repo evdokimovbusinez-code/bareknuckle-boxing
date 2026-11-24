@@ -28,6 +28,7 @@
   __tick(200, 1 / 60); log.push('red I=' + peak(true)); await __shot('patrol-fight'); log.push('blue I=' + peak(false)); await __shot('patrol-blue');
   window.__camHold = { p: [0.1, 1.55, 1.25], l: [0.45, 1.35, 0] }; __tick(2, 1 / 60); await __shot('patrol-baton'); delete window.__camHold;
   // rule «уронить»: his first knockdown ends it
+  for (let i = 0; i < 60 && G.state !== 'fight'; i++) __tick(15, 1 / 60);   // __story.ko only acts in 'fight' (a round break / knockdown can be on)
   log.push('ko: ' + __story.ko(true)); toResult(); await __shot('patrol-end'); st('end');
   log.push('car: ' + document.getElementById('r-car').textContent + ' · done=' + __story.done);
   c('r-menu'); __tick(5, 1 / 60); c('go-story'); await wait(900); await __shot('patrol-list');

@@ -20,6 +20,7 @@
   await __shot('fight'); taps('fight');
   c('pause-btn'); __tick(2, 1 / 60); await __shot('pause'); taps('pause'); log.push('paused=' + G.paused);
   c('p-resume'); __tick(5, 1 / 60);
+  for (let i = 0; i < 60 && G.state !== 'fight'; i++) __tick(15, 1 / 60);   // a knockdown / clinch from the punches above: wait for the fight to resume (KO only from 'fight')
   if (G.state === 'fight') { P2.lastContact = P2.headNow.clone(); g.knockout(P1, P2, new V3(1, 0.2, 0).normalize(), 1.3, 'hookR', 1, true, false); }
   __tick(120, 1 / 60); await __shot('ko');
   n = 0; while (n++ < 120 && document.getElementById('result').hidden) { try { g.cineSkip(); } catch (e) {} __tick(30, 1 / 60); }
