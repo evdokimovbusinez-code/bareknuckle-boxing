@@ -6026,6 +6026,56 @@ Object.assign(ITEMS, {
 });
 ITEMS.teeCloth.id = 'teeCloth';
 window.__cloth = { CLOTH, clothParse, clothLoad, clothRedress };
+/* ───────── the police baton (R-18, story chapter 2 «Патруль») ─────────
+   A straight rubber baton (ПР-73 style: knob, a flange past the little finger, a long shaft) gripped in one fist. Like the brass
+   knuckles (04i_knux.js) it is one rigid mesh on the Hand bone: world = Hand.matrixWorld × local geometry, built once in the
+   Hand-local frame from the live finger bones (the clips keep the hand curled into a fist), so it follows the stance, the
+   punch, the guard and the KO ragdoll, and the replay for free.
+   What it does in the fight (only in a story bout whose opponent's look has `weapon: 'baton'` — Fighter.handGear sets gear.baton):
+   · reach: Fighter.knuckle() of the baton arm returns a point on the shaft BATON.reach m beyond the middle knuckle, so the contact
+     test, the graze check and the aim all work off the shaft; aimFor (07) pulls the IK target of the hand back by the same offset —
+     the shaft lands on the face where the knuckles would have;
+   · damage ×BATON.dmg (resolveHit / followHit, 07); the wind-up runs at ×BATON.slow (startPunch, 05) — the swing is easier to read.
+   It sits in the LEAD hand (L): the camera sees that side of the opponent, and the lead hand is the one that keeps a man on the
+   end of the stick (STYLES.cop in 19_story.js stands off and pokes with it). */
+const BATON = { arm: 'L', reach: 0.25, dmg: 1.3, slow: 0.78, tilt: 0.6, r: 1.6, butt: 13, tip: 3 };   // m, ×, ×, rad toward the punch line, cm
+function batonMat() { return new THREE.MeshStandardMaterial({ color: '#2b2d31', roughness: 0.32, metalness: 0.08, envMapIntensity: 1.4 }); }   // black rubber with a sheen: a plain #16 black vanished against dark clothes in the wide shot
+function batonGeo(F) {
+  if (GEAR.baton) return GEAR.baton;
+  F.cc.updateMatrixWorld(true);
+  const S = BATON.arm, B = F.bones, u = GEAR.HF[S].u, invH = B['CC_Base_' + S + '_Hand'].matrixWorld.clone().invert();
+  const W = nm => new V3().setFromMatrixPosition(B['CC_Base_' + S + '_' + nm].matrixWorld).applyMatrix4(invH);   // live bone origin, Hand-local
+  const FN = ['Index', 'Mid', 'Ring', 'Pinky'];
+  // the grip: the centre of the tube the curled fingers make (knuckle, middle and end joints of each finger, averaged)
+  const C = new V3(); for (const f of FN) for (const k of [1, 2, 3]) C.add(W(f + k)); C.multiplyScalar(1 / 12);
+  const Xl = W('Index1').sub(W('Pinky1')).normalize();                     // little finger → index: out of the thumb side of the fist
+  const kn = W('Mid1'), fwd = FN.reduce((s, f) => s.add(W(f + '1')), new V3()).multiplyScalar(0.25).normalize();   // wrist → knuckles
+  fwd.addScaledVector(Xl, -fwd.dot(Xl)).normalize();
+  const A = Xl.clone().multiplyScalar(Math.cos(BATON.tilt)).addScaledVector(fwd, Math.sin(BATON.tilt)).normalize();   // the shaft: thumb side, tipped toward the punch
+  // the striking point: on the shaft, BATON.reach from the middle knuckle (|C + A·s − kn| = R, the far root); the tip a little past it
+  const d = C.clone().sub(kn), R = BATON.reach * 100 * u, ad = A.dot(d), s = -ad + Math.sqrt(Math.max(0, ad * ad - d.lengthSq() + R * R));
+  const tip = s / u + BATON.tip, r = BATON.r, b = -BATON.butt;
+  // one lathe profile along +y in cm: knob, grip, the flange past the little finger, the shaft, a rounded tip
+  const prof = [[0, b - 0.6], [1.3, b - 0.6], [2.1, b - 0.1], [2.2, b + 0.7], [1.8, b + 1.5], [r, b + 2.1], [r, -6.6], [2.8, -6.3], [2.8, -5.6], [r, -5.3],
+    [r, tip - 1.3], [r * 0.85, tip - 0.45], [r * 0.5, tip - 0.05], [0, tip]].map(([x, y]) => new THREE.Vector2(x, y));
+  const g = new THREE.LatheGeometry(prof, 14);
+  const P = new V3(1, 0, 0); if (Math.abs(P.dot(A)) > 0.9) P.set(0, 0, 1); P.addScaledVector(A, -P.dot(A)).normalize();
+  const Q = new V3().crossVectors(P, A);
+  g.applyMatrix4(new M4().makeBasis(P, A, Q).scale(new V3(u, u, u)).setPosition(C));
+  GEAR.batonHit = C.clone().addScaledVector(A, s);   // Hand-local: Fighter.knuckle() of the baton arm
+  return GEAR.baton = g;
+}
+function batonMesh(F) {   // rigid: world = Hand.matrixWorld × local geometry
+  const m = new THREE.Mesh(batonGeo(F), GEAR.batonMat || (GEAR.batonMat = batonMat()));
+  m.matrixAutoUpdate = false; m.castShadow = m.receiveShadow = true; m.frustumCulled = false; scene.add(m);
+  return { m, b: F.bones['CC_Base_' + BATON.arm + '_Hand'] };
+}
+/* where the shaft is minus where the middle knuckle is (world): aimFor pulls the hand's IK target back by this */
+function batonOff(F, out) {
+  F.knuckle(out); return out.sub(_batonK.setFromMatrixPosition(F.bones['CC_Base_' + BATON.arm + '_Mid1'].matrixWorld));
+}
+const _batonK = new V3();
+const batonArm = (F, n) => !!(F.gear && F.gear.baton) && PUNCH[n] && PUNCH[n].arm === BATON.arm;
 /* ───────── fighter ───────── */
 // scratch for the per-frame fighter code (walk, ik, pose, plantFeet, armClear): nothing there allocates
 const _walkQ = [], _ik1 = new Quat(), _ik2 = new Quat(), _ik3 = new Quat(), _po1 = new V3(), _po2 = new V3(), _po3 = new V3(), _po4 = new V3(), _poq1 = new Quat(), _poq2 = new Quat();
@@ -6410,6 +6460,9 @@ class Fighter {
     if (mma && !G2.mma) { G2.mma = mmaShell(this, G2.mat); G2.mmaPads = mmaPads(this, G2.mat); }
     if (knux && !G2.knuxPads) G2.knuxPads = knuxPads(this, G2.knuxMat || (G2.knuxMat = knuxMat()));
     G2.knux = knux;   // read by resolveHit (07): damage, cuts, guard break, metallic sound
+    const baton = !box && L.weapon === 'baton' && G.mode === 'story';   // R-18: the patrolman's baton (04k_baton.js), only in his story bout
+    if (baton && !G2.batonM) G2.batonM = batonMesh(this);
+    G2.baton = baton; if (G2.batonM) G2.batonM.m.visible = baton;   // read by knuckle(), startPunch, aimFor and resolveHit
     if (G2.mat) { G2.mat.color.set(gc.c); G2.trim.color.set(gc.trim); }
     if (G2.gloves) { for (const gl of G2.gloves) gl.g.visible = box; G2.hg.visible = box; }
     if (G2.mma) { G2.mma.visible = mma; G2.mma.material.color.set(gc.c); for (const pd of G2.mmaPads) pd.m.visible = mma; }
@@ -6486,7 +6539,7 @@ class Fighter {
     this.fatK = 0.88 + 0.12 * sstep(0, 55, this.stamina); this.punchK = lerp(REACT.gas, 1, sstep(0, 45, this.stamina)) * (this.heavy ? 1.45 : 1);   // R-10: REACT.gas, the floor on empty (was 0.45)
     // (fatigue was 0.42…1 and daze −30 %: a tired cross took 0.7 s to land; now tiredness mostly costs power and accuracy — punchK, aimJit)
     this.tsBase = this.speed * this.fatK * (this.heavy ? 0.9 : 1) * (P.slow || 1) * (1 - 0.1 * this.daze) * (this.sig && sigOf(n) === this.sig ? 1.08 : 1);
-    const wind = (P.impact - P.start) / (PUNCH_T[n] || (P.impact - P.start)); this.tsWind = 1 + (wind - 1) * (this === P1 ? 1 : AI_SNAP);
+    const wind = (P.impact - P.start) / (PUNCH_T[n] || (P.impact - P.start)); this.tsWind = (1 + (wind - 1) * (this === P1 ? 1 : AI_SNAP)) * (batonArm(this, n) ? BATON.slow : 1);   // R-18: the baton winds up slower
     a.reset(); a.time = P.start; a.setEffectiveTimeScale(this.tsBase * this.tsWind); a.play();
     if (this === P1 && !BAG.on) sfx.whoosh(0.3);   // instant feedback on the press, long before the impact
     if (this.fs) this.fs.thr++;
@@ -6499,7 +6552,10 @@ class Fighter {
     this.stamina = Math.max(0, this.stamina - P.sta * (1 - 0.05 * SK(this, 'sta')) * (this.heavy ? 1.7 : 1)); this.staT = G.t + 0.55 + (this.stamina < 10 ? 0.35 : 0);
   }
   startDodge(type) { this.dodge = { type, t: 0 }; this.stamina = Math.max(0, this.stamina - 4); this.staT = G.t + 0.3; }
-  knuckle(v) { return v.setFromMatrixPosition(this.bones[`CC_Base_${this.aimArm}_Mid1`].matrixWorld); }
+  knuckle(v) {
+    if (this.gear.baton && this.aimArm === BATON.arm) return v.copy(GEAR.batonHit).applyMatrix4(this.bones[`CC_Base_${BATON.arm}_Hand`].matrixWorld);   // R-18: the striking point on the shaft
+    return v.setFromMatrixPosition(this.bones[`CC_Base_${this.aimArm}_Mid1`].matrixWorld);
+  }
   takeHit(dirWorld, power, name, contact, body, blocked, rx) {
     const g = this.group, hp = contact, P = PUNCH[name], type = P.type, s = this.sp;
 
@@ -7003,7 +7059,8 @@ class Fighter {
       if (G2.spar && G2.gloves) { G2.hg.matrix.copy(hf); G2.hg.matrixWorldNeedsUpdate = true; for (const gl of G2.gloves) { gl.g.matrix.multiplyMatrices(gl.h.matrixWorld, gl.rel); gl.g.matrixWorldNeedsUpdate = true; } }
       if (G2.pants) pantsTick(this, G2.pants, 1 / 60); if (G2.top) topTick(this, G2.top, 1 / 60);
       if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; }
-      if (G2.knux) for (const pd of G2.knuxPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
+      if (G2.knux) for (const pd of G2.knuxPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; }
+      if (G2.baton) { const bt = G2.batonM; bt.m.matrix.copy(bt.b.matrixWorld); bt.m.matrixWorldNeedsUpdate = true; } }
   }
   capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; arr.set(this.flesh.u.uFW.value, 4 * n + 5); }   // + the face shape weights
   restore(a, b2, t) {
@@ -7914,7 +7971,10 @@ function hitStop(power, blocked, bonus) {
   return hs;
 }
 const evades = (att, n, d) => !!d && (att.bodyShot ? d.type === 'lean' : EV[n].includes(d.type));
-function aimFor(att, def) {
+/* R-18: with the baton (04k_baton.js) the knuckle() point is on the shaft, but the IK (Fighter.pose) moves the middle knuckle —
+   so the hand's target is pulled back by the shaft's offset and the shaft, not the fist, arrives on the face */
+function aimFor(att, def) { const a = aimAt(att, def); if (a && att.gear.baton && att.aimArm === BATON.arm) a.sub(batonOff(att, _v4)); return a; }
+function aimAt(att, def) {
   if (!att.cur) return null; const n = att.cur, d = def.dodge;
   if (BAG.on) return def === P2 ? bagAim(att) : null;   // the heavy bag: the leather, wherever it has swung to
   if (att.bodyShot) return att.aimV.copy(def.ribs[att.ribIdx].w);
@@ -7972,7 +8032,7 @@ function followHit(att, name, contact) {
   const fr = def.flesh.onHit(pos, dir, power, name, false, def, knux), ev = { t: G.t, pos: fr.skin, dir, power, who: def === P1 ? 0 : 1, dent: fr.dent, knux: knux ? 1 : 0 };
   const sp = def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.06 * def.flesh.U); if (sp.length || fr.spray.length) { const s2 = fr.spray.length ? fr.spray : sp; def.flesh.spray(s2, dir, power, def); ev.spray = s2.map(w => def.flesh.wounds.indexOf(w)); }
   def.face.hit && def.face.hit(power, true, fr.skin); FX.spawn(fr.skin, dir, power); { const bl = Math.min(1, def.flesh.wounds.reduce((a, x) => a + x.sev, 0) * 0.8); if (bl > 0.12) { FX.mist(fr.skin, dir, power, bl); ev.mist = bl; } } REC.events.push(ev);
-  const fd = P.dmg * DMG_K * (knux ? KNUX.dmg : 1);
+  const fd = P.dmg * DMG_K * (knux ? KNUX.dmg : 1) * (batonArm(att, name) ? BATON.dmg : 1);
   if (att.fs) { att.fs.land++; att.fs.dmg += fd; } if (G.state === 'kd') { def.hp = Math.max(0, def.hp - fd); G.kd.up += 0.8; }
   att.lastLand = G.t; sfx.thud(power, false); if (knux) sfx.knux(power, false); EVT.emit('hit', { pos, power }); G.hitstop = 0.02 + 0.02 * power;
   ev.sh = Math.round((0.02 + 0.03 * power) * 1000) / 1000; shakeHit(ev.sh, dir, false); FX.flash(fr.skin, dir, power, false);   // R-04: the kick along the punch + the flash
@@ -7997,6 +8057,7 @@ function resolveHit(att, name, contact) {
   if (att.adv > 0.04) dmg *= 1.08;   // stepping in behind it
   dmg *= att.punchK ?? 1; if (evading) dmg *= 1.35; if (body) dmg *= 0.8;
   if (knux) dmg *= KNUX.dmg;   // issue 52: a punch with the knux on hits harder (only when worn and allowed)
+  if (batonArm(att, name)) dmg *= BATON.dmg;   // R-18: the patrolman's baton (04k_baton.js)
   const stamBefore = def.stamina;
   const guardBroken = (def.guardDown || 0) > G.t;   // the next punch after a break gets through clean (issue 41)
   const blocked = def.blockW > 0.55 && (!def.cur || def.dodge) && !guardBroken;
@@ -8150,7 +8211,7 @@ function kdProgress(K) {
 }
 /* knockdown: down but conscious — a knee taken, or a flash fall. The referee counts (BKFC: 10 s to stand; the other man to a neutral spot) */
 function knockdown(att, def, dir, power, name, fwd, sev, kind, bodyArg) {
-  if (pvp('kd1')) return knockout(att, def, dir, power, name, fwd, true, bodyArg);   // P2P «Первый нокдаун»: the first fall ends it
+  if (pvp('kd1') || storyDrop(def)) return knockout(att, def, dir, power, name, fwd, true, bodyArg);   // P2P «Первый нокдаун»: the first fall ends it; R-18: so does the story rule «уронить»
   if (att.fs) att.fs.kd++;
   G.state = 'kd'; def.kdCount = (def.kdCount || 0) + 1; if (G.rkd) G.rkd[def === P1 ? 0 : 1]++;
   const body = !!bodyArg || kind === 'liver';
@@ -9937,7 +9998,7 @@ function hudUpdate(dt) {
   if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), mmss = s => `${(s / 60) | 0}:${String(s % 60).padStart(2, '0')}`;
     // R-06: the clock is 20 px on its own plate (#tmr), the round beside it (#rnd). Issue 51: a story bout has no rounds — «ДО НОКАУТА»;
     // R-17: plus the time of the bout so far, counting up. The heavy bag (BAG.on): no bars / «VS» — score, combo and time, large (#bagp)
-    const rnd = G.mode === 'story' ? 'ДО НОКАУТА' : 'Р' + G.round, tm = G.mode === 'story' ? mmss(Math.max(0, Math.floor(STORY_TIME - G.roundT))) : mmss(t);
+    const sh = G.mode === 'story' ? storyHud() : null, rnd = sh ? sh[0] : 'Р' + G.round, tm = sh ? sh[1] : mmss(t);   // R-18: a chapter rule has its own plate (19_story.js)
     const live = G.t - BAG.lastT < 0.95 && BAG.combo > 1, txt = BAG.on ? `b${BAG.score}|${live ? BAG.combo : 0}|${BAG.best}|${tm}|${G.bagBest}` : rnd + '|' + tm;
     if (G.hudTxt !== txt) { G.hudTxt = txt; elHud.classList.toggle('bag', BAG.on);
       if (BAG.on) { $('bag-sc').textContent = BAG.score; $('bag-rec').textContent = G.bagBest ? 'рекорд ' + G.bagBest : '';
@@ -11300,6 +11361,19 @@ LOCS.tires = {
    The camera's far plane is 40 m, so the sky (a vertex-coloured dome) and the skyline (a painted strip) are drawn first without depth
    and follow the camera (`far`): they are «infinitely far» and nothing real stands farther than ~34 m from the centre.
    Texture sizes, far lamps and the breath follow GFX.level / GFX.particles; the crowd follows GFX.crowd (14_crowd.js). */
+/* R-18: the light bar of the patrol car (built in LOCS.yard.build, `siren`): a 0.9 s cycle — red blinks twice, then blue twice
+   (YARD_SIREN.on = the lit share of each blink); `I` = the point light's intensity at a blink (cd), `glow` = the halo's HDR colour */
+const YARD_SIREN = { T: 0.9, on: 0.55, I: 140, glow: 2.6 };
+function yardSiren(S) {
+  if (!S) return;
+  const on = G.mode === 'story' && G.state !== 'menu' && !!(storyCh() || {}).fight?.siren;   // (G.mode stays 'story' in the menu after a chapter)
+  S.g.visible = on; if (!on) { S.pl.intensity = 0; return; }
+  const Y = YARD_SIREN, ph = (CROWD.u.uT.value % Y.T) / Y.T, half = ph < 0.5, q = (ph % 0.5) * 4;   // q: 0…2 over a colour's two blinks
+  const k = (q % 1) < Y.on ? Math.sin(Math.PI * (q % 1) / Y.on) ** 0.4 : 0, r = half ? k : 0, b = half ? 0 : k;
+  S.lr.material.color.setRGB(0.2 + 5 * r, 0.02 + 0.4 * r, 0.02 + 0.3 * r); S.lb.material.color.setRGB(0.02 + 0.3 * b, 0.05 + 1.2 * b, 0.2 + 5 * b);
+  S.hr.material.color.setRGB(Y.glow * r, 0.15 * r, 0.1 * r); S.hb.material.color.setRGB(0.1 * b, 0.4 * b, Y.glow * b);
+  S.pl.color.setRGB(half ? 1 : 0.15, half ? 0.08 : 0.3, half ? 0.06 : 1); S.pl.intensity = Y.I * k;
+}
 const YARD_BAYS = 'wbswbwsb', YARD_H = 27.4;   // the façade texture: 8 bays of 3.2 m (window / balcony / staircase), plinth 1 m + 9 floors of 2.8 m + parapet
 
 LOCS.yard = {
@@ -11589,6 +11663,21 @@ LOCS.yard = {
       ['hatch', '#8e1418', 11.7, -8.2, 0], ['sedan', '#9a9da0', 11.6, -11, 0], ['van', '#d3d0c6', 11.5, -19.6, 0], ['sedan', '#1b3a2a', 11.6, -22.6, PI], ['sedan', '#c7c2b4', -9.2, 14.3, PI], ['hatch', '#22344f', -1.2, 14.3, 0], ['sedan', '#101114', 6.6, 14.3, 0]]) carGs.push(...put(car(kind, col), x, z, ry));
     g.add(staticMesh(geoMerge(carGs), carMat));
     nearMesh(put(car('sedan', '#1f2c4d'), 8.6, 3.2, 1.9), carMat, 8.6, 3.2, 2.4);
+    /* ── R-18: the patrol car of story chapter 2 (19_story.js, fight.siren) behind the circle on the far side, nose to the people: white
+       with the blue band, a light bar on the roof. Shown only in that chapter; sync() flashes the bar red / blue (two blinks each) and
+       swings one point light between the two colours over the circle. The light always exists (intensity 0 when off), so the light
+       count of the set — and every material compiled against it (17_loc_load.js) — stays the same. ── */
+    { const CX = -1.6, CZ = -7.4, CRY = 0.22, cg = new THREE.Group(), K = CARS.sedan, Lh = K.body[K.body.length - 1][0];
+      const body = put([...car('sedan', '#e6e8ea'), tb('#1f4fb0', 2 * Lh - 0.3, 0.14, K.W + 0.012, 0, 0.6, 0), tb('#d8dade', 0.4, 0.05, K.W - 0.4, 1.55, 0.86, 0),
+        tb('#16171a', 0.34, 0.07, 1.16, -0.12, 1.42, 0)], CX, CZ, CRY);
+      cg.add(staticMesh(geoMerge(body), carMat));
+      const lamp = (z, c) => { const m = new THREE.Mesh(geoMerge(put([new THREE.BoxGeometry(0.26, 0.11, 0.5).translate(-0.12, 1.5, z)], CX, CZ, CRY)), new THREE.MeshBasicMaterial({ color: c, fog: false, toneMapped: false })); cg.add(m); return m; };
+      const lr = lamp(-0.29, '#300'), lb = lamp(0.29, '#003');
+      const halo = (z, c) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: c, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); sp.position.copy(at(CX, CZ, CRY, z, 1.52)); sp.scale.set(2.2, 2.2, 1); cg.add(sp); CROWD.blobs.push(sp); return sp; };
+      const hr = halo(-0.3, new THREE.Color(0, 0, 0)), hb = halo(0.3, new THREE.Color(0, 0, 0));
+      const pl = new THREE.PointLight('#ff2020', 0, 16, 1.2); pl.position.copy(at(CX, CZ, CRY, 0, 2.3)).add(new V3(1.2, 0, 1.6)); g.add(pl);
+      cg.visible = false; g.add(cg);
+      this.siren = { g: cg, lr, lb, hr, hb, pl }; }
 
     /* ── light: the lamp by the circle throws an orange pool over it from behind-left (the shared `key` gives the shadows), the bulb
        under the canopy of the nearest door, two far lamps so that the cars, the bins and house B / C read ── */
@@ -11618,6 +11707,7 @@ LOCS.yard = {
     // lamp post, tree, bench, car by the circle: hidden while inside the view wedge in front of what the camera looks at
     const dx = camL.x - cam.x, dz = camL.z - cam.z, len = Math.hypot(dx, dz) || 1, ux = dx / len, uz = dz / len, tH = Math.tan(camera.fov * Math.PI / 360) * camera.aspect * 1.1;
     for (const o of this.near) { _lp.copy(o.p).applyMatrix4(M); const px = _lp.x - cam.x, pz = _lp.z - cam.z, s = px * ux + pz * uz; o.m.visible = !(s > -o.r && s < len - 0.5 && Math.abs(px * uz - pz * ux) - o.r < Math.max(s, 0) * tH + 0.3); }
+    yardSiren(this.siren);
     // breath: each man breathes out for a third of his cycle (faster when he is tired); a puff drifts forward and up, swells and thins out
     const B = this.breath, t = CROWD.u.uT.value, dt = clamp(t - B.t, 0, 0.05); B.t = t;
     if (dt <= 0) return;
@@ -15044,7 +15134,36 @@ const STORY = { chapters: [
       { who: 'n', text: 'Очнулся ты у стойки. Перед тобой стоит полный бокал — кто-то умеет ухаживать за проигравшими.' },
       { who: 'o', text: 'Лежи, чемпион. Лежать тебе пока полезнее, чем драться.' } ],
     reward: { win: 700, ko: 300 }, pts: 2 },
-  { id: 'patrol', title: 'Патруль', sub: 'На шум приезжает полиция. Дубинка бьёт далеко и сильно.', todo: true },
+  /* R-18: the patrol. The yard at dusk under the blue / red light bar of the patrol car (LOCS.yard.sync, `siren`); the sergeant
+     has a baton in his lead hand (look.weapon → 04k_baton.js: +0.25 m reach, ×1.3 damage, a slower wind-up) and stands off on
+     the end of it (STYLES.cop). The rule (`hold` / `drop`): stay on your feet for 60 s — or put him down once; either is a win. */
+  { id: 'patrol', title: 'Патруль', sub: 'На шум приезжает полиция. Дубинка бьёт далеко и сильно.',
+    intro: [
+      { card: 'Патруль' },
+      { who: 'n', text: 'Сирена догнала тебя у подъезда. Синий, красный, синий — по стенам панелек. Весь двор прилип к окнам.' },
+      { who: 'o', text: 'Стоять, гражданин. В баре на Заводской человека уложил — ты?' },
+      { who: 'p', text: 'Он сам полез. Бармен видел.', opt: [
+        { t: 'Я не бегу. Поехали, разберёмся.', r: 'Сержант кивает, но дубинку с пояса уже снял. «Разберёмся», — говорит он. И понятно, что не в отделе.', a: 1 },
+        { t: 'Ты меня с кем-то путаешь, начальник.', r: 'Сержант улыбается одними губами и перехватывает дубинку поудобнее. — Сейчас проверим, путаю или нет.', a: -1 } ] },
+      { who: 'Сосед', text: 'Э, служивый! Он же без ничего! Давай по-честному!' },
+      { who: 'o', text: 'По-честному? Минута, герой. Устоишь — свободен. Ляжешь — поедешь со мной.' },
+      { who: 'n', text: 'Дубинка длиннее руки. Не стой на её конце: заходи вплотную или уходи с линии. Минуту на ногах — или урони его.' } ],
+    hero: { top: { id: 'tee', color: 'black' }, bottom: { id: 'jeans', color: 'indigo' }, shoes: { id: 'sneak', color: 'white' }, belt: { id: 'beltFrame', color: 'black' } },   // the same night: still in what he wore in the bar
+    fight: { loc: 'yard', nm: 'Сержант', st: 'cop', diff: 'normal', lvl: 1, speed: 1, siren: true, hold: 60, drop: true,
+      look: { skin: 'light', hair: 'brown', hairStyle: 'classic', beard: 'stubble', head: { id: 'cap', color: 'navy' }, top: { id: 'vest', color: 'black' }, bottom: { id: 'jeans', color: 'navy' },
+        belt: { id: 'beltMil', color: 'black' }, shoes: { id: 'boots', color: 'black' }, wraps: 'black', hands: 'wraps', guard: 'clear', shorts: 'black', tats: [], weapon: 'baton' } },
+    outro: [   // he went down
+      { who: 'n', text: 'Сержант на асфальте, фуражка укатилась под ноги толпе. Двор молчит — и вдруг кто-то хлопает.' },
+      { who: 'o', text: 'Ты… ты сам себе срок намотал. Понял?' },
+      { who: 'n', text: 'Через десять минут во двор въехали ещё две машины. Дальше — наручники, отдел, суд. Три года.' } ],
+    outroHeld: [   // the minute ran out with the hero on his feet
+      { who: 'n', text: 'Минута вышла. Сержант дышит тяжело, дубинка опущена. Двор смотрит на него.' },
+      { who: 'o', text: 'Ладно. Слово дал — свободен. Пока.' },
+      { who: 'n', text: 'А утром в дверь позвонили. Тот, из бара, написал заявление. Дальше — отдел, суд. Три года.' } ],
+    outroLose: [
+      { who: 'n', text: 'Асфальт холодный. Наручники — ещё холоднее.' },
+      { who: 'o', text: 'Я же предупреждал, герой. Поехали.' } ],
+    reward: { win: 900, ko: 400 }, pts: 2 },
   { id: 'prison', title: 'Тюрьма', sub: 'Три года. Двор, этап, сокамерники, смотрящий.', todo: true },
   { id: 'under', title: 'Подполье', sub: 'На выходе — организатор подпольных боёв и первые деньги.', todo: true },
   { id: 'circle', title: 'Железный круг', sub: 'Своя лига. Путь к поясу.', todo: true },
@@ -15052,6 +15171,9 @@ const STORY = { chapters: [
 
 /* the drunk: heavy loops and overhands from far, almost no defence, long pauses between swings — «размашистый, медленный» */
 STYLES.drunk = { label: 'пьяный', gap: 1.65, w: { jab: 1, cross: 1.3, hookL: 3.4, hookR: 3.1, upperL: 0.5, upperR: 0.8, over: 4.2 }, dodge: 0.16, block: 0.25, combo: 0.3, trade: 0.6, feint: 0, body: 0.12, adv: 0.02, counter: 0.08 };
+/* R-18 the patrolman: stands off on the end of his baton (adv −0.2 → he wants 1.33 m, 0.2 m farther than the others) and works the
+   lead hand that holds it (jab / lead hook); the rear hand only now and then. Blocks more than he slips — a uniform does not duck */
+STYLES.cop = { label: 'с дубинкой', gap: 1.0, w: { jab: 4, cross: 1.2, hookL: 3.4, hookR: 0.9, upperL: 0.4, upperR: 0.3, over: 0.8 }, dodge: 0.35, block: 0.85, combo: 0.35, trade: 0.3, feint: 0.08, body: 0.15, adv: -0.2, counter: 0.3 };
 /* the bar joins the quick-fight list only after chapter 1 (15_social.js checks LOC_LOCK in locOpen) */
 LOC_LOCK.bar = () => storyDone() >= 1;
 /* old saves: whoever climbed the ladder has walked this road already — chapter 1 counts as cleared, plus a gift */
@@ -15177,16 +15299,16 @@ function storyDress(ch) {
 /* back to the player's own look (toMenu calls it; the creator and the shop re-apply LOOK themselves anyway) */
 function storyUndress() { if (!P1.storyLook) return; P1.storyLook = null; P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar); }
 function storyFightGo() {
-  startFight(true);
+  startFight(true); G.storyT = 0; G.storyHeldAt = 0;   // R-18: the chapter's own clock (fight time only) for the `hold` rule
   if (LOC.noFly) msg(LOC.label, 'place');   // the bar gets no fly-round — the dialogue already showed the place
 }
 /* the end of the bout: the story intercepts endReplay() with its outro; the result screen comes after the dialog */
-function storyOut(win) {
+function storyOut(win, held) {
   if (G.mode !== 'story') return false;
   const ch = storyCh(); if (!ch) return false;
   if (G.storyOut) return false;
   G.storyOut = true;
-  const lines = win ? ch.outro : ch.outroLose;
+  const lines = win ? (held && ch.outroHeld) || ch.outro : ch.outroLose;
   storyTalk(lines, () => { G.state = 'result'; camCut = true; resultOpen(); });
   return true;
 }
@@ -15201,7 +15323,9 @@ function storyAgain() {
 }
 /* the drunk: he never fully stops swaying, and now and then one leg gives out (Fighter's wobble drives the pose) */
 function storyTick(dt) {
-  const ch = storyCh(); if (!ch || !ch.fight.drunk) return;
+  const ch = storyCh(); if (!ch || !ch.fight) return;
+  if (ch.fight.hold) storyHoldTick(ch, dt);
+  if (!ch.fight.drunk) return;
   const F = P2; if (!F || F.ko || (F.rag && F.rag.on) || F.gu) return;
   if (G.state !== 'fight' && G.state !== 'talk' && G.state !== 'intro' && G.state !== 'break') return;
   F.drunkT = (F.drunkT || 0) + dt;
@@ -15209,13 +15333,38 @@ function storyTick(dt) {
   if (F.drunkT > (F.drunkNext || 4)) { F.drunkNext = F.drunkT + 3 + rr() * 4.5; if (G.state === 'fight') F.wobble = Math.max(F.wobble, 0.9 + rr() * 0.5); }
 }
 
+/* ── R-18: chapter rules ──
+   drop — his first knockdown ends the bout as a knockout (knockdown() → knockout(…, forced), 07);
+   hold — the HUD counts `hold` s of fighting down (the clock stands while a man is on the canvas); the hero still up at 0 wins (storyHeld) */
+const storyDrop = def => G.mode === 'story' && def === P2 && !!(storyCh() || {}).fight?.drop;
+function storyHoldTick(ch, dt) {
+  if (G.state === 'fight') { G.storyT = (G.storyT || 0) + dt * G.slow; if (G.storyT >= ch.fight.hold && !P1.ko && !P1.doomed && !P2.ko) storyHeld(ch); }
+  else if (G.state === 'result' && G.storyHeldAt && G.real >= G.storyHeldAt) { G.storyHeldAt = 0; storyOut(true, true); }   // a breath on the two of them, then the outro
+}
+function storyHeld(ch) {
+  G.state = 'result'; $('pad').hidden = true; Q.length = 0;
+  for (const F of [P1, P2]) { F.cancelPunch(); F.dodge = null; F.blocking = false; }
+  G.winner = P1; G.loser = P2; celStart(null);   // nobody is down: no victory walk-off
+  fightOver(true, false, 'dec');
+  $('r-title').textContent = 'Победа'; $('r-title').className = 'rt win';
+  $('r-sub').textContent = `устоял ${ch.fight.hold} с · счёт ${G.wins} : ${G.losses}`; $('r-replay').hidden = true;   // no knockout to replay (startFight shows the button again)
+  msg('Устоял!', 'ko'); sfx.clap(); EVT.emit('round');
+  G.storyHeldAt = G.real + 1.6;
+}
+/* the HUD plate of a story bout (hudUpdate, 10_camera_layout.js): [label, clock] */
+function storyHud() {
+  const ch = storyCh(), f = (ch && ch.fight) || {}, mmss = s => `${(s / 60) | 0}:${String(s % 60).padStart(2, '0')}`;
+  if (f.hold) return [f.drop ? 'УСТОЙ ИЛИ УРОНИ' : 'ПРОДЕРЖИСЬ', mmss(Math.max(0, Math.ceil(f.hold - (G.storyT || 0))))];
+  return ['ДО НОКАУТА', mmss(Math.max(0, Math.floor(STORY_TIME - G.roundT)))];
+}
+
 /* ── the «История» screen: a vertical timeline of the chapters ── */
 function buildStory() {
   const box = $('st-list'); if (!box) return;
   box.textContent = '';
   STORY.chapters.forEach((ch, i) => {
-    const done = i < storyDone(), cur = storyPlayable(i) && !done, lock = !done && !cur;
-    const row = document.createElement('div'); row.className = 'stc ' + (done ? 'done' : cur ? 'cur' : 'lock');
+    const done = i < storyDone(), cur = storyPlayable(i) && !done, next = !done && !cur && i === storyDone();   // next: reached, but its content is not in yet («скоро»)
+    const row = document.createElement('div'); row.className = 'stc ' + (done ? 'done' : cur ? 'cur' : next ? 'cur soon' : 'lock');
     row.innerHTML = `<i class="dot"></i><div class="stc-b"><b>${i + 1}. ${esc(ch.title)}</b><small>${esc(ch.sub || '')}</small></div>`;
     if (done || cur) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm' + (cur ? ' pri' : ''); b.textContent = done ? 'Ещё раз' : 'Играть';
       if (cur) b.id = 'st-play'; b.onclick = () => storyPlay(i); row.appendChild(b); }
@@ -15227,6 +15376,8 @@ function buildStory() {
 window.__story = {
   STORY, DLG,
   get done() { return storyDone(); },
+  unlock(n) { PROF.story.done = Math.max(storyDone(), n); save(); return storyDone(); },   // R-18 test: open chapters up to n + 1
+  get hold() { return +(G.storyT || 0).toFixed(2); },
   play(i = storyDone()) { return storyPlay(i) ? G.state : 'locked'; },
   next(n = 1) { for (let k = 0; k < n && DLG.active; k++) { const L = dlgCur(); if (L && L.opt && !DLG.reply) dlgChoose(L.opt[0]); dlgNext(); } return DLG.active ? DLG.i + '/' + DLG.lines.length : 'done'; },
   skip() { if (DLG.active) dlgDone(); return G.state + ':' + G.mode; },

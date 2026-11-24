@@ -382,6 +382,9 @@ class Fighter {
     if (mma && !G2.mma) { G2.mma = mmaShell(this, G2.mat); G2.mmaPads = mmaPads(this, G2.mat); }
     if (knux && !G2.knuxPads) G2.knuxPads = knuxPads(this, G2.knuxMat || (G2.knuxMat = knuxMat()));
     G2.knux = knux;   // read by resolveHit (07): damage, cuts, guard break, metallic sound
+    const baton = !box && L.weapon === 'baton' && G.mode === 'story';   // R-18: the patrolman's baton (04k_baton.js), only in his story bout
+    if (baton && !G2.batonM) G2.batonM = batonMesh(this);
+    G2.baton = baton; if (G2.batonM) G2.batonM.m.visible = baton;   // read by knuckle(), startPunch, aimFor and resolveHit
     if (G2.mat) { G2.mat.color.set(gc.c); G2.trim.color.set(gc.trim); }
     if (G2.gloves) { for (const gl of G2.gloves) gl.g.visible = box; G2.hg.visible = box; }
     if (G2.mma) { G2.mma.visible = mma; G2.mma.material.color.set(gc.c); for (const pd of G2.mmaPads) pd.m.visible = mma; }
@@ -458,7 +461,7 @@ class Fighter {
     this.fatK = 0.88 + 0.12 * sstep(0, 55, this.stamina); this.punchK = lerp(REACT.gas, 1, sstep(0, 45, this.stamina)) * (this.heavy ? 1.45 : 1);   // R-10: REACT.gas, the floor on empty (was 0.45)
     // (fatigue was 0.42…1 and daze −30 %: a tired cross took 0.7 s to land; now tiredness mostly costs power and accuracy — punchK, aimJit)
     this.tsBase = this.speed * this.fatK * (this.heavy ? 0.9 : 1) * (P.slow || 1) * (1 - 0.1 * this.daze) * (this.sig && sigOf(n) === this.sig ? 1.08 : 1);
-    const wind = (P.impact - P.start) / (PUNCH_T[n] || (P.impact - P.start)); this.tsWind = 1 + (wind - 1) * (this === P1 ? 1 : AI_SNAP);
+    const wind = (P.impact - P.start) / (PUNCH_T[n] || (P.impact - P.start)); this.tsWind = (1 + (wind - 1) * (this === P1 ? 1 : AI_SNAP)) * (batonArm(this, n) ? BATON.slow : 1);   // R-18: the baton winds up slower
     a.reset(); a.time = P.start; a.setEffectiveTimeScale(this.tsBase * this.tsWind); a.play();
     if (this === P1 && !BAG.on) sfx.whoosh(0.3);   // instant feedback on the press, long before the impact
     if (this.fs) this.fs.thr++;
@@ -471,7 +474,10 @@ class Fighter {
     this.stamina = Math.max(0, this.stamina - P.sta * (1 - 0.05 * SK(this, 'sta')) * (this.heavy ? 1.7 : 1)); this.staT = G.t + 0.55 + (this.stamina < 10 ? 0.35 : 0);
   }
   startDodge(type) { this.dodge = { type, t: 0 }; this.stamina = Math.max(0, this.stamina - 4); this.staT = G.t + 0.3; }
-  knuckle(v) { return v.setFromMatrixPosition(this.bones[`CC_Base_${this.aimArm}_Mid1`].matrixWorld); }
+  knuckle(v) {
+    if (this.gear.baton && this.aimArm === BATON.arm) return v.copy(GEAR.batonHit).applyMatrix4(this.bones[`CC_Base_${BATON.arm}_Hand`].matrixWorld);   // R-18: the striking point on the shaft
+    return v.setFromMatrixPosition(this.bones[`CC_Base_${this.aimArm}_Mid1`].matrixWorld);
+  }
   takeHit(dirWorld, power, name, contact, body, blocked, rx) {
     const g = this.group, hp = contact, P = PUNCH[name], type = P.type, s = this.sp;
 
@@ -975,7 +981,8 @@ class Fighter {
       if (G2.spar && G2.gloves) { G2.hg.matrix.copy(hf); G2.hg.matrixWorldNeedsUpdate = true; for (const gl of G2.gloves) { gl.g.matrix.multiplyMatrices(gl.h.matrixWorld, gl.rel); gl.g.matrixWorldNeedsUpdate = true; } }
       if (G2.pants) pantsTick(this, G2.pants, 1 / 60); if (G2.top) topTick(this, G2.top, 1 / 60);
       if (G2.mma && G2.mma.visible) for (const pd of G2.mmaPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; }
-      if (G2.knux) for (const pd of G2.knuxPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; } }
+      if (G2.knux) for (const pd of G2.knuxPads) { pd.m.matrix.multiplyMatrices(pd.b.matrixWorld, pd.rel); pd.m.matrixWorldNeedsUpdate = true; }
+      if (G2.baton) { const bt = G2.batonM; bt.m.matrix.copy(bt.b.matrixWorld); bt.m.matrixWorldNeedsUpdate = true; } }
   }
   capture(arr) { const b = this.allBones, n = b.length; for (let i = 0; i < n; i++) { const q = b[i].quaternion, k = 4 * i; arr[k] = q.x; arr[k + 1] = q.y; arr[k + 2] = q.z; arr[k + 3] = q.w; } const p = this.hip.position; arr[4 * n] = p.x; arr[4 * n + 1] = p.y; arr[4 * n + 2] = p.z; const L = this.flesh.u.uLid.value; arr[4 * n + 3] = L.x; arr[4 * n + 4] = L.y; arr.set(this.flesh.u.uFW.value, 4 * n + 5); }   // + the face shape weights
   restore(a, b2, t) {

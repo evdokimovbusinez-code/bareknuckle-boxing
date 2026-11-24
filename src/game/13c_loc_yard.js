@@ -10,6 +10,19 @@
    The camera's far plane is 40 m, so the sky (a vertex-coloured dome) and the skyline (a painted strip) are drawn first without depth
    and follow the camera (`far`): they are «infinitely far» and nothing real stands farther than ~34 m from the centre.
    Texture sizes, far lamps and the breath follow GFX.level / GFX.particles; the crowd follows GFX.crowd (14_crowd.js). */
+/* R-18: the light bar of the patrol car (built in LOCS.yard.build, `siren`): a 0.9 s cycle — red blinks twice, then blue twice
+   (YARD_SIREN.on = the lit share of each blink); `I` = the point light's intensity at a blink (cd), `glow` = the halo's HDR colour */
+const YARD_SIREN = { T: 0.9, on: 0.55, I: 140, glow: 2.6 };
+function yardSiren(S) {
+  if (!S) return;
+  const on = G.mode === 'story' && G.state !== 'menu' && !!(storyCh() || {}).fight?.siren;   // (G.mode stays 'story' in the menu after a chapter)
+  S.g.visible = on; if (!on) { S.pl.intensity = 0; return; }
+  const Y = YARD_SIREN, ph = (CROWD.u.uT.value % Y.T) / Y.T, half = ph < 0.5, q = (ph % 0.5) * 4;   // q: 0…2 over a colour's two blinks
+  const k = (q % 1) < Y.on ? Math.sin(Math.PI * (q % 1) / Y.on) ** 0.4 : 0, r = half ? k : 0, b = half ? 0 : k;
+  S.lr.material.color.setRGB(0.2 + 5 * r, 0.02 + 0.4 * r, 0.02 + 0.3 * r); S.lb.material.color.setRGB(0.02 + 0.3 * b, 0.05 + 1.2 * b, 0.2 + 5 * b);
+  S.hr.material.color.setRGB(Y.glow * r, 0.15 * r, 0.1 * r); S.hb.material.color.setRGB(0.1 * b, 0.4 * b, Y.glow * b);
+  S.pl.color.setRGB(half ? 1 : 0.15, half ? 0.08 : 0.3, half ? 0.06 : 1); S.pl.intensity = Y.I * k;
+}
 const YARD_BAYS = 'wbswbwsb', YARD_H = 27.4;   // the façade texture: 8 bays of 3.2 m (window / balcony / staircase), plinth 1 m + 9 floors of 2.8 m + parapet
 
 LOCS.yard = {
@@ -299,6 +312,21 @@ LOCS.yard = {
       ['hatch', '#8e1418', 11.7, -8.2, 0], ['sedan', '#9a9da0', 11.6, -11, 0], ['van', '#d3d0c6', 11.5, -19.6, 0], ['sedan', '#1b3a2a', 11.6, -22.6, PI], ['sedan', '#c7c2b4', -9.2, 14.3, PI], ['hatch', '#22344f', -1.2, 14.3, 0], ['sedan', '#101114', 6.6, 14.3, 0]]) carGs.push(...put(car(kind, col), x, z, ry));
     g.add(staticMesh(geoMerge(carGs), carMat));
     nearMesh(put(car('sedan', '#1f2c4d'), 8.6, 3.2, 1.9), carMat, 8.6, 3.2, 2.4);
+    /* ── R-18: the patrol car of story chapter 2 (19_story.js, fight.siren) behind the circle on the far side, nose to the people: white
+       with the blue band, a light bar on the roof. Shown only in that chapter; sync() flashes the bar red / blue (two blinks each) and
+       swings one point light between the two colours over the circle. The light always exists (intensity 0 when off), so the light
+       count of the set — and every material compiled against it (17_loc_load.js) — stays the same. ── */
+    { const CX = -1.6, CZ = -7.4, CRY = 0.22, cg = new THREE.Group(), K = CARS.sedan, Lh = K.body[K.body.length - 1][0];
+      const body = put([...car('sedan', '#e6e8ea'), tb('#1f4fb0', 2 * Lh - 0.3, 0.14, K.W + 0.012, 0, 0.6, 0), tb('#d8dade', 0.4, 0.05, K.W - 0.4, 1.55, 0.86, 0),
+        tb('#16171a', 0.34, 0.07, 1.16, -0.12, 1.42, 0)], CX, CZ, CRY);
+      cg.add(staticMesh(geoMerge(body), carMat));
+      const lamp = (z, c) => { const m = new THREE.Mesh(geoMerge(put([new THREE.BoxGeometry(0.26, 0.11, 0.5).translate(-0.12, 1.5, z)], CX, CZ, CRY)), new THREE.MeshBasicMaterial({ color: c, fog: false, toneMapped: false })); cg.add(m); return m; };
+      const lr = lamp(-0.29, '#300'), lb = lamp(0.29, '#003');
+      const halo = (z, c) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: c, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); sp.position.copy(at(CX, CZ, CRY, z, 1.52)); sp.scale.set(2.2, 2.2, 1); cg.add(sp); CROWD.blobs.push(sp); return sp; };
+      const hr = halo(-0.3, new THREE.Color(0, 0, 0)), hb = halo(0.3, new THREE.Color(0, 0, 0));
+      const pl = new THREE.PointLight('#ff2020', 0, 16, 1.2); pl.position.copy(at(CX, CZ, CRY, 0, 2.3)).add(new V3(1.2, 0, 1.6)); g.add(pl);
+      cg.visible = false; g.add(cg);
+      this.siren = { g: cg, lr, lb, hr, hb, pl }; }
 
     /* ── light: the lamp by the circle throws an orange pool over it from behind-left (the shared `key` gives the shadows), the bulb
        under the canopy of the nearest door, two far lamps so that the cars, the bins and house B / C read ── */
@@ -328,6 +356,7 @@ LOCS.yard = {
     // lamp post, tree, bench, car by the circle: hidden while inside the view wedge in front of what the camera looks at
     const dx = camL.x - cam.x, dz = camL.z - cam.z, len = Math.hypot(dx, dz) || 1, ux = dx / len, uz = dz / len, tH = Math.tan(camera.fov * Math.PI / 360) * camera.aspect * 1.1;
     for (const o of this.near) { _lp.copy(o.p).applyMatrix4(M); const px = _lp.x - cam.x, pz = _lp.z - cam.z, s = px * ux + pz * uz; o.m.visible = !(s > -o.r && s < len - 0.5 && Math.abs(px * uz - pz * ux) - o.r < Math.max(s, 0) * tH + 0.3); }
+    yardSiren(this.siren);
     // breath: each man breathes out for a third of his cycle (faster when he is tired); a puff drifts forward and up, swells and thins out
     const B = this.breath, t = CROWD.u.uT.value, dt = clamp(t - B.t, 0, 0.05); B.t = t;
     if (dt <= 0) return;

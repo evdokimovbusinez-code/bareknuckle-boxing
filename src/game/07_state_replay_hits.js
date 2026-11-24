@@ -299,7 +299,10 @@ function hitStop(power, blocked, bonus) {
   return hs;
 }
 const evades = (att, n, d) => !!d && (att.bodyShot ? d.type === 'lean' : EV[n].includes(d.type));
-function aimFor(att, def) {
+/* R-18: with the baton (04k_baton.js) the knuckle() point is on the shaft, but the IK (Fighter.pose) moves the middle knuckle —
+   so the hand's target is pulled back by the shaft's offset and the shaft, not the fist, arrives on the face */
+function aimFor(att, def) { const a = aimAt(att, def); if (a && att.gear.baton && att.aimArm === BATON.arm) a.sub(batonOff(att, _v4)); return a; }
+function aimAt(att, def) {
   if (!att.cur) return null; const n = att.cur, d = def.dodge;
   if (BAG.on) return def === P2 ? bagAim(att) : null;   // the heavy bag: the leather, wherever it has swung to
   if (att.bodyShot) return att.aimV.copy(def.ribs[att.ribIdx].w);
@@ -357,7 +360,7 @@ function followHit(att, name, contact) {
   const fr = def.flesh.onHit(pos, dir, power, name, false, def, knux), ev = { t: G.t, pos: fr.skin, dir, power, who: def === P1 ? 0 : 1, dent: fr.dent, knux: knux ? 1 : 0 };
   const sp = def.flesh.wounds.filter(w => w.p.distanceTo(fr.dent[0]) < 0.06 * def.flesh.U); if (sp.length || fr.spray.length) { const s2 = fr.spray.length ? fr.spray : sp; def.flesh.spray(s2, dir, power, def); ev.spray = s2.map(w => def.flesh.wounds.indexOf(w)); }
   def.face.hit && def.face.hit(power, true, fr.skin); FX.spawn(fr.skin, dir, power); { const bl = Math.min(1, def.flesh.wounds.reduce((a, x) => a + x.sev, 0) * 0.8); if (bl > 0.12) { FX.mist(fr.skin, dir, power, bl); ev.mist = bl; } } REC.events.push(ev);
-  const fd = P.dmg * DMG_K * (knux ? KNUX.dmg : 1);
+  const fd = P.dmg * DMG_K * (knux ? KNUX.dmg : 1) * (batonArm(att, name) ? BATON.dmg : 1);
   if (att.fs) { att.fs.land++; att.fs.dmg += fd; } if (G.state === 'kd') { def.hp = Math.max(0, def.hp - fd); G.kd.up += 0.8; }
   att.lastLand = G.t; sfx.thud(power, false); if (knux) sfx.knux(power, false); EVT.emit('hit', { pos, power }); G.hitstop = 0.02 + 0.02 * power;
   ev.sh = Math.round((0.02 + 0.03 * power) * 1000) / 1000; shakeHit(ev.sh, dir, false); FX.flash(fr.skin, dir, power, false);   // R-04: the kick along the punch + the flash
@@ -382,6 +385,7 @@ function resolveHit(att, name, contact) {
   if (att.adv > 0.04) dmg *= 1.08;   // stepping in behind it
   dmg *= att.punchK ?? 1; if (evading) dmg *= 1.35; if (body) dmg *= 0.8;
   if (knux) dmg *= KNUX.dmg;   // issue 52: a punch with the knux on hits harder (only when worn and allowed)
+  if (batonArm(att, name)) dmg *= BATON.dmg;   // R-18: the patrolman's baton (04k_baton.js)
   const stamBefore = def.stamina;
   const guardBroken = (def.guardDown || 0) > G.t;   // the next punch after a break gets through clean (issue 41)
   const blocked = def.blockW > 0.55 && (!def.cur || def.dodge) && !guardBroken;
@@ -535,7 +539,7 @@ function kdProgress(K) {
 }
 /* knockdown: down but conscious — a knee taken, or a flash fall. The referee counts (BKFC: 10 s to stand; the other man to a neutral spot) */
 function knockdown(att, def, dir, power, name, fwd, sev, kind, bodyArg) {
-  if (pvp('kd1')) return knockout(att, def, dir, power, name, fwd, true, bodyArg);   // P2P «Первый нокдаун»: the first fall ends it
+  if (pvp('kd1') || storyDrop(def)) return knockout(att, def, dir, power, name, fwd, true, bodyArg);   // P2P «Первый нокдаун»: the first fall ends it; R-18: so does the story rule «уронить»
   if (att.fs) att.fs.kd++;
   G.state = 'kd'; def.kdCount = (def.kdCount || 0) + 1; if (G.rkd) G.rkd[def === P1 ? 0 : 1]++;
   const body = !!bodyArg || kind === 'liver';
