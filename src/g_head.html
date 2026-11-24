@@ -344,6 +344,17 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .shc.own .pr{color:#8fd49a}.shc.lock{opacity:.7}.shc.lock .pr{color:var(--muted)}
 .shc:hover,.shc:focus{border-color:rgba(255,255,255,.5);outline:none}
 .shc[aria-pressed="true"]{border-color:var(--gold);background:rgba(226,177,74,.1)}.shc[aria-pressed="true"] b{color:var(--gold)}
+/* R-21: the picture of the thing (a JPEG drawn by thStep, 14b_shop.js; a spinner until it is there), «новое», «хватает» */
+.shgrid{--thw:clamp(44px,8.6vmin,62px)}
+.shc{padding-left:calc(var(--thw) + 9px);min-height:var(--thw);justify-content:center}
+.shc .th{position:absolute;left:0;top:0;bottom:0;width:var(--thw);background:#262a33 center/cover no-repeat;border-right:1px solid rgba(255,255,255,.1)}
+.shc .th:not([style])::after{content:'';position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-9px 0 0 -9px;border:2px solid rgba(255,255,255,.12);border-top-color:rgba(255,255,255,.5);border-radius:50%;animation:thspin .9s linear infinite}
+@keyframes thspin{to{transform:rotate(1turn)}}
+.shc.lock .th{filter:grayscale(.85) brightness(.75)}
+.shc .nw{position:absolute;left:3px;top:3px;font:700 8px/1 var(--mono);font-style:normal;letter-spacing:.08em;text-transform:uppercase;background:var(--neon);color:#fff;padding:2px 4px;border-radius:2px;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.shc .pr small{min-height:0;margin-left:7px;font:700 8.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#8fd49a;vertical-align:1px}
+.shc .pr.no{color:rgba(226,177,74,.6)}
+.sw button.nw{position:relative}.sw button.nw::after{content:'';position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--neon)}
 .sw button.txt.lock{opacity:.7}.sw button.txt.lock::after{content:none}.sw button.txt .pr{font-size:9px;letter-spacing:.04em;opacity:.8;color:var(--gold)}
 .btn:disabled{opacity:.55;cursor:default;box-shadow:none}.btn.pri:disabled{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.2)}
 .rtabs{display:flex;gap:clamp(10px,3vmin,34px);align-items:flex-start;justify-content:center}.rtabs .fstats{margin:6px 0 0}
