@@ -37,10 +37,11 @@ async function clothParse(base, buf, nmap, ao) {
   clothRedress();
   return d;
 }
+const CLOTH_AO = false;
 function clothLoad(base) {
   const t0 = performance.now(), f = CLOTH_FILES[base], st = CLOTH.st[base] = { s: 'load' }, tl = new THREE.TextureLoader();
   const tex = file => tl.loadAsync(file).then(t => { t.flipY = false; t.anisotropy = 4; return t; });   // glTF uv: v runs down
-  return Promise.all([fetch(f + '.glb').then(r => { if (!r.ok) throw new Error(f + '.glb ' + r.status); return r.arrayBuffer(); }), tex(f + '_n.webp'), tex(f + '_ao.webp')])
+  return Promise.all([fetch(f + '.glb').then(r => { if (!r.ok) throw new Error(f + '.glb ' + r.status); return r.arrayBuffer(); }), tex(f + '_n.webp'), CLOTH_AO ? tex(f + '_ao.webp') : null])   // the first AO bake came out blotchy (camouflage patches) — off until re-baked
     .then(([buf, n, ao]) => clothParse(base, buf, n, ao).then(d => { Object.assign(st, { s: 'ok', ms: Math.round(performance.now() - t0), bytes: buf.byteLength, verts: d.verts, tris: d.tris }); console.info(`cloth ${base}: ${d.tris} tris, ${(buf.byteLength / 1024).toFixed(0)} KB, ${st.ms} ms`); }))
     .catch(e => { st.s = 'fail'; st.err = String(e); console.info('cloth ' + base + ': no GLB, the older export / procedural cut', e); handLoad().then(clothRedress); });
 }
