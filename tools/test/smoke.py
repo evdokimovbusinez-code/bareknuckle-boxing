@@ -3,7 +3,7 @@
   python3 tools/test/smoke.py [OUT.jpg] [--only menu,fight] [--vp desk,phone]
   bash tools/shot.sh /tmp/shots/s.jpg smoke          (the same, after rebuilding gtest.html)
 
-Runs menu.js, fight.js, modes.js, phone.js at 1280×720 (desk) and 740×360 touch (phone), each in a fresh browser context
+Runs menu.js, fight.js, modes.js, phone.js, resil.js (R-26: hidden tab → pause, lost WebGL context, error toast) at 1280×720 (desk) and 740×360 touch (phone), each in a fresh browser context
 (clean localStorage, so the first-visit offer and the default profile are what a new player gets). Fails (exit code 1) on:
   · any `pageerror` (an uncaught exception, also one thrown inside a click handler) or `console.error`;
   · the game not loading (the `.err` box) or a scenario that throws / times out;
@@ -22,11 +22,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 from shot import settle  # noqa: E402  (the CSS-transition wait of tools/shot.py)
 
-SCEN = ['menu', 'fight', 'modes', 'phone']
+SCEN = ['menu', 'fight', 'modes', 'phone', 'resil']
 VPS = {'desk': (1280, 720, False), 'phone': (740, 360, True)}
 # states each scenario must pass through (G.state); the union covers fight, kd, ko, replay, result, talk
 NEED = {'menu': [], 'fight': ['fight', 'kd', 'ko', 'replay', 'result'], 'modes': ['fight', 'talk', 'result'],
-        'phone': ['fight', 'ko', 'result']}
+        'phone': ['fight', 'ko', 'result'], 'resil': ['fight']}
+# R-26: resil.js throws on purpose inside frame() to see the error toast; that one error (and only it) is not a failure
+OWN_ERR = 'R-26 test'
 # console lines that are not errors of the game: Chrome/SwiftShader chatter (+ the browser's own /favicon.ico 404, by URL)
 IGNORE = ('GL Driver Message', 'GPU stall due to ReadPixels', 'KHR_parallel_shader_compile')
 MENU_SCR = {'main': 'menu', 'main2': 'menu', 'train': 'menu'}   # menu.js tag → the element that must be visible (else id = tag)
@@ -62,7 +64,7 @@ async def run_one(b, url, base, ext, vp, sc, fmt):
     ctx = await b.new_context(viewport={'width': w, 'height': h}, has_touch=touch, is_mobile=touch)
     pg = await ctx.new_page()
     errs, shots = [], []
-    pg.on('pageerror', lambda e: errs.append(f'pageerror: {e}'))
+    pg.on('pageerror', lambda e: errs.append(f'pageerror: {e}') if not (sc == 'resil' and OWN_ERR in str(e)) else None)
     pg.on('console', lambda m: errs.append(f'console.error: {m.text}' + (f" ({m.location.get('url', '')})" if m.location.get('url') else ''))
           if m.type == 'error' and not any(k in m.text for k in IGNORE) and not m.location.get('url', '').endswith('/favicon.ico') else None)
 

@@ -11,6 +11,7 @@ const NET = {
   snaps: [], evs: [], pops: [], playT: 0, first: true,
   mv: { x: 0, y: 0, b: false }, blk: false, q: [], iq: [], evI: 0, pop: [],
   dropT: 0, retryT: null, roomShown: false,
+  oAway: false, awayI: 0,   // R-26: the opponent's tab is hidden (banner #net-away); our keep-alive timer while ours is
   stat: { snaps: 0, recv: 0, bytes: 0, max: 0, ins: 0, closes: 0 },
   tmp: null,
 };

@@ -425,6 +425,15 @@ function netMsg(m) {
   else if (m.c === 'pong') netPing(performance.now() - m.t);
   else if (m.c === 'over') { if (NET.guest) netGuestOver(m); }
   else if (m.c === 'again') netRestart();
+  else if (m.c === 'away') { NET.oAway = !!m.on; show('net-away', NET.oAway && !NET.over && NET.dropT <= 0); }
+}
+/* R-26: this tab was hidden / shown (visChange, 14_screens.js). The fight is not stopped: the opponent gets «Соперник отошёл».
+   A hidden tab has no animation frames, so netTick and its pings stop; a timer keeps pinging (background timers fire about
+   once a second) so the peer's silence watchdog does not open the disconnect window — and that watchdog is lenient while we are away. */
+function netAway(on) {
+  netSend({ c: 'away', on: on ? 1 : 0 });
+  clearInterval(NET.awayI); NET.awayI = 0;
+  if (on) NET.awayI = setInterval(() => { if (!NET.role) { clearInterval(NET.awayI); NET.awayI = 0; return; } netSend({ c: 'ping', t: performance.now() }); }, 500);
 }
 function netPing(rtt) {
   NET.ping = Math.round(NET.ping ? NET.ping * 0.6 + rtt * 0.4 : rtt);   // smoothed: one late pong doesn't flash a spike
@@ -433,7 +442,7 @@ function netPing(rtt) {
 }
 function netShowResult(win, draw) {
   show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', false); show('pad', false);
-  show('result', true); show('net-drop', false);
+  show('result', true); show('net-drop', false); show('net-away', false);
   $('r-car').textContent = ''; $('r-stats').innerHTML = '';
   try { payShow(null); } catch (e) {}
   $('r-replay').hidden = true; $('r-again').textContent = 'Реванш';
@@ -480,7 +489,7 @@ function netTick(dt) {
   if (NET.over && (NET.guest || NET.over.sent)) return;   // the host's NET.over is set at the KO (fightOver): keep streaming through the replay until netResult
   // a lost link does not always raise PeerJS's remote 'close' (crashed tab, dead NAT mapping):
   // if nothing has arrived for silenceMax seconds, open the 10 s recovery window on our own
-  if (NET.dropT === 0 && NET.silent > NET.silenceMax) return netLost(NET.conn);
+  if (NET.dropT === 0 && NET.silent > NET.silenceMax * (NET.oAway ? 8 : 1)) return netLost(NET.conn);   // R-26: a hidden tab pings ~1/s at best
   NET.acc += dt; NET.clk = (NET.clk || 0) + dt;
   if (NET.acc >= NET.rate) { NET.acc = 0; if (NET.host) netSnapshot(); else netFlushInput(); }
 }
@@ -490,7 +499,7 @@ function netLost(c) {
   if (NET.conn && NET.conn !== c && NET.conn.open) return;
   if (NET.conn === c) NET.conn = null;
   if (!NET.role) return;
-  $('net-drop-t').textContent = 'Ждём восстановления… 10 с'; show('net-drop', true);
+  $('net-drop-t').textContent = 'Ждём восстановления… 10 с'; show('net-drop', true); show('net-away', false);
   NET.dropT = 10;
   if (NET.guest) netRetry();   // a new DataConnection to the same room id; the host keeps listening
 }
@@ -512,7 +521,7 @@ function netClose() {
   clearTimeout(NET.retryT);
   NET.role = null; NET.host = false; NET.guest = false; NET.started = false; NET.oLook = null; NET.over = null;
   NET.conn = null; NET.dropT = 0; NET.closing = true; NET.roomShown = false;
-  show('net-drop', false); $('net-ping').hidden = true; $('net-ping').textContent = '';
+  show('net-drop', false); show('net-away', false); NET.oAway = false; clearInterval(NET.awayI); NET.awayI = 0; $('net-ping').hidden = true; $('net-ping').textContent = '';
   if (NET.saved) {
     G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; ROUND_LEN = NET.saved.len || 120; NET.cfg.spar = false; NET.cfg.weap = false; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
     NET.saved = null; try { setLocation(G.loc); } catch (e) {}

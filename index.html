@@ -368,6 +368,21 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .locbusy{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:9px 16px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(12,14,18,.86);font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);z-index:60;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.45)}
 .locbusy i{width:9px;height:9px;border-radius:50%;background:var(--gold);animation:locpulse 1s ease-in-out infinite}
 .locbusy[hidden]{display:none}
+/* R-26: the GPU dropped the context — the game waits under this until it is back (or offers a reload) */
+.gllost{z-index:30;background:rgba(7,8,11,.9)}
+.gllost .box{align-items:center;text-align:center;width:min(380px,82%)}
+.gllost b{font:900 clamp(22px,4.6vmin,36px)/1.05 'Big Shoulders Display',Impact,'Arial Black',sans-serif;letter-spacing:.02em;color:#f1ece2;text-transform:uppercase}
+.gllost .btn{min-height:44px;margin-top:6px}
+.gllost [hidden]{display:none}
+/* R-26: an error of the running game — a small pill under the HUD bars instead of silence (the bottom holds the touch controls) */
+.errtoast{position:absolute;left:50%;top:calc(var(--pt,12px) + 92px);transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:10px;max-width:min(560px,92%);box-sizing:border-box;
+  padding:5px 5px 5px 14px;border:1px solid rgba(255,90,100,.45);border-left:3px solid #ff4a5c;border-radius:8px;background:rgba(14,15,19,.92);box-shadow:0 12px 34px -10px rgba(0,0,0,.9);
+  font:500 12px var(--mono);letter-spacing:.03em;color:#e9e3d8}
+.errtoast[hidden]{display:none}
+.errtoast span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.errtoast span i{font-style:normal;color:#ff8a95;margin-right:8px}
+.errtoast button{flex:none;min-height:40px;min-width:40px;border:1px solid rgba(255,255,255,.2);border-radius:6px;background:rgba(255,255,255,.06);color:#fff;font:700 12px var(--mono);letter-spacing:.06em;padding:0 12px;cursor:pointer}
+.errtoast button.pri{border-color:rgba(255,140,140,.5);background:linear-gradient(180deg,#d42a3c,#8f1626)}
 /* R-24: a fight waits for a cold place — the set is built in steps under this screen (17_loc_load.js, locLoadUI) */
 .locload{z-index:8;background:radial-gradient(ellipse at 50% 42%,#171a22 0%,var(--ink) 70%)}
 .locload .box{align-items:stretch;text-align:left}
@@ -525,6 +540,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <div class="msg" id="msg"></div>
   <!-- issue 49: «Соперник отключился» — ten seconds to reconnect, then a win to the man left standing -->
   <div class="net-drop" id="net-drop" hidden><b>Соперник отключился</b><small id="net-drop-t">Ждём восстановления… 10 с</small></div>
+  <div class="net-drop" id="net-away" hidden><b>Соперник отошёл</b><small>свернул игру — бой идёт</small></div>
   <div class="kdbar" id="kdbar" hidden><div class="kdbar-t"><span id="kdtxt">ВСТАВАЙ · ЖМИ УДАРЫ</span><span id="kdn"></span></div><div class="kdbar-r"><i id="kdfill"></i></div></div>
 
   <!-- the card of a career opponent before the fight (fightCard): name and nickname, style · place · level, his legend -->
@@ -789,6 +805,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 
   <div class="loading" id="loading"><div class="box"><span id="ld-text">Загружаю бойцов…</span><div class="bar"><span id="ld-bar"></span></div></div></div>
   <div class="loading locload" id="loc-load" hidden><div class="box"><small>площадка</small><b id="ll-n"></b><span>Готовим площадку…</span><div class="bar"><span id="ll-bar"></span></div></div></div>
+  <div class="loading gllost" id="gl-lost" hidden><div class="box"><b>Графика перезапускается…</b><span id="gl-lost-t">видеокарта сбросила картинку — игра ждёт</span><button class="btn pri" id="gl-reload" hidden>Перезагрузить</button></div></div>
+  <div class="errtoast" id="err-toast" role="alert" hidden><span id="err-msg"></span><button class="pri" id="err-reload">Перезагрузить</button><button id="err-x" aria-label="Закрыть">✕</button></div>
   <div class="locbusy" id="loc-busy" hidden><i></i><span>Готовим площадку…</span></div>
 </div>
 
@@ -796,11 +814,24 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 /* boot watchdog: if the game module never starts (old browser, blocked CDN, script error) say why instead of an endless loading bar */
 window.__errs = [];
 (function () {
-  function show() { var t = document.getElementById('ld-text'); if (!t || !window.__errs.length) return; t.className = 'err';
+  // R-26: once the game is up (the loading screen gone) an error goes to a small toast with a reload button instead of nowhere
+  // (it hides itself after 20 s; ✕ closes it); window.__onErr (11_arena_loop.js) restarts the main loop if the error killed a frame.
+  // The list is capped: a broken frame throws 60 times a second.
+  var el = document.getElementById('err-toast'), msg = document.getElementById('err-msg'), nT = 0, hideT = 0;
+  function toast() { nT++; var i = document.createElement('i'); i.textContent = 'Ошибка' + (nT > 1 ? ' ×' + nT : '');
+    msg.replaceChildren(i, document.createTextNode(window.__errs[window.__errs.length - 1].replace(/^Uncaught /, '')));
+    el.hidden = false; clearTimeout(hideT); hideT = setTimeout(function () { el.hidden = true; nT = 0; }, 20000); }
+  document.getElementById('err-reload').addEventListener('click', function () { location.reload(); });
+  document.getElementById('err-x').addEventListener('click', function () { el.hidden = true; nT = 0; });
+  function show() { var t = document.getElementById('ld-text'); if (!t || !window.__errs.length) return;
+    if (document.getElementById('loading').hidden) return toast();
+    t.className = 'err';
     var v = (navigator.userAgent.match(/Version\/([\d.]+).*Safari/) || [])[1]; t.textContent = 'Ошибка: ' + window.__errs[0] + (v ? ' · Safari ' + v : ''); }
+  function push(m) { var E = window.__errs; E.push(m); if (E.length > 40) E.splice(1, E.length - 40);
+    try { if (window.__onErr) window.__onErr(m); } catch (_) {} show(); }
   addEventListener('error', function (e) { var t = e.target, m = e.message || (t && t.tagName === 'SCRIPT' && 'не загрузился ' + t.src);   // fonts/images failing don't matter
-    if (!m) return; window.__errs.push(String(m).slice(0, 160)); show(); }, true);
-  addEventListener('unhandledrejection', function (e) { var r = e.reason; window.__errs.push('promise: ' + String(r && r.message || r).slice(0, 160)); show(); });
+    if (!m) return; push(String(m).slice(0, 160)); }, true);
+  addEventListener('unhandledrejection', function (e) { var r = e.reason; push('promise: ' + String(r && r.message || r).slice(0, 160)); });
   setTimeout(function () { if (window.__boot) return;
     window.__errs.push(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap') ? 'скрипт игры не запустился (проверь интернет / блокировщик)' : 'браузер не поддерживает import maps — нужен Safari 16.4+ или Chrome');
     show(); }, 25000);
@@ -2013,7 +2044,8 @@ function perfTick(rawDt) {
   }
   m.anim = m.phys = m.fx = m.misc = m.render = 0; P.frames = 0; P.dt = 0; P.max = 0; P.calls = 0; P.tris = 0; P.t0 = now;
 }
-function renderFrame() { const t = performance.now(); renderer.info.reset(); composer.render(); socSnap(); PERF.m.render += performance.now() - t; }
+function renderFrame() { if (GLX.lost) return;   // R-26: no GL calls into a lost context (GLX: 11_arena_loop.js, handlers: 14_screens.js)
+  const t = performance.now(); renderer.info.reset(); composer.render(); socSnap(); PERF.m.render += performance.now() - t; }
 window.addEventListener('keydown', e => { if (e.code === 'F3') { e.preventDefault(); if (!e.repeat) perfToggle(); } });
 window.addEventListener('touchstart', e => { if (e.touches.length === 3) perfToggle(); }, { passive: true });
 
@@ -2243,6 +2275,7 @@ const NET = {
   snaps: [], evs: [], pops: [], playT: 0, first: true,
   mv: { x: 0, y: 0, b: false }, blk: false, q: [], iq: [], evI: 0, pop: [],
   dropT: 0, retryT: null, roomShown: false,
+  oAway: false, awayI: 0,   // R-26: the opponent's tab is hidden (banner #net-away); our keep-alive timer while ours is
   stat: { snaps: 0, recv: 0, bytes: 0, max: 0, ins: 0, closes: 0 },
   tmp: null,
 };
@@ -9785,13 +9818,21 @@ function ropeTick(dt) {
 
 /* ───────── main loop ───────── */
 let last = performance.now();
+/* R-26: FRAME.on = a frame is running. An error event while it is set means that frame died before it asked for the next one:
+   window.__onErr (called by the error listener of the page head, g_head.html) asks for it, so the game goes on under the error toast.
+   GLX.lost = the WebGL context is gone (glLost / glRestored in 14_screens.js): frame() stands still, renderFrame() draws nothing. */
+const FRAME = { on: false, errs: 0 }, GLX = { lost: false, n: 0, failT: 0 };
+window.__onErr = () => { if (!FRAME.on) return; FRAME.on = false; FRAME.errs++; if (!window.__manual) requestAnimationFrame(frame); };
 // the ragdoll steps run inside Fighter.update: timed separately so the overlay can show them as physics
 for (const k of ['step', 'hitStep']) { const fn = Ragdoll.prototype[k]; Ragdoll.prototype[k] = function (dt) { const t = performance.now(), r = fn.call(this, dt); PERF.rag += performance.now() - t; return r; }; }
 function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
 function frame(now) {
   // R-24: a cold set is being prepared in steps (17_loc_load.js); while the fight waits for it the game stands still under
   // «Готовим площадку…» — no simulation, no 3D frame (the clock restarts from the end of this frame's loading work)
-  if (locPumpFrame()) { if (NET.role) netTick(Math.min(0.1, (now - last) / 1000)); last = performance.now(); if (!window.__manual) requestAnimationFrame(frame); return; }
+  FRAME.on = true;
+  // R-26: a lost GPU context — a solo game waits (no simulation, no frame) under «Графика перезапускается…»; a P2P fight goes on unseen
+  if (GLX.lost && !NET.role) { last = performance.now(); FRAME.on = false; if (!window.__manual) requestAnimationFrame(frame); return; }
+  if (!GLX.lost && locPumpFrame()) { if (NET.role) netTick(Math.min(0.1, (now - last) / 1000)); last = performance.now(); FRAME.on = false; if (!window.__manual) requestAnimationFrame(frame); return; }
   const rawDt = (now - last) / 1000, dtReal = G.paused ? 0 : Math.min(0.05, rawDt); last = now; G.real += dtReal;   // pause: everything below runs with dt = 0 (as in a hit-stop frame)
   if (NET.role) netTick(rawDt);   // issue 49: snapshots / input / ping / the disconnect clock
   const pm = PERF.m; let tp = performance.now(), tq; PERF.rag = 0;   // CPU split for the F3 overlay
@@ -9827,6 +9868,7 @@ function frame(now) {
   pm.misc += performance.now() - tp;
   perfTick(rawDt);
   renderFrame(rawDt);
+  FRAME.on = false;
   requestAnimationFrame(frame);
 }
 
@@ -13251,6 +13293,59 @@ function uiKey(e) {
 const canPause = () => !G.paused && ['intro', 'fight', 'break', 'kd', 'ko', 'rend'].includes(G.state);
 function pauseGame() { if (!canPause()) return; G.paused = true; HELD.clear(); mvKeys(); setBlock(false); Q.length = 0; UI.from = 'pause'; uiShow('pause'); }
 function resumeGame() { G.paused = false; UI.from = null; uiShow(null); last = performance.now(); }
+
+/* R-26: the tab goes away (a call, the app switcher, another tab): a solo fight opens the pause — coming back the player finds the
+   pause menu, not a beating; a P2P fight is not stopped, the opponent is told «отошёл» (netAway, 18_net.js). The sound is suspended
+   while hidden either way and resumed on return (only if it was us who suspended it). */
+const VIS = { hidden: false, sus: false, n: 0 };
+function visChange() {
+  const h = document.visibilityState === 'hidden' || document.hidden === true;
+  if (h === VIS.hidden) return; VIS.hidden = h;
+  const ac = sfx._nodes().ac;   // the one AudioContext of the game (sounds + music); null until the first gesture
+  if (h) {
+    VIS.n++;
+    // P2P: let go of whatever is held (its keyup / pointerup never comes to a hidden tab), so the man does not walk on by himself
+    if (NET.role) { HELD.clear(); MV.sx = MV.sy = 0; mvKeys(); setBlock(false); netAway(true); }
+    else pauseGame();
+    if (ac && ac.state === 'running') { VIS.sus = true; ac.suspend().catch(() => {}); }
+  } else {
+    if (NET.role) netAway(false);
+    if (ac && VIS.sus) ac.resume().catch(() => {});
+    VIS.sus = false; last = performance.now();
+  }
+}
+document.addEventListener('visibilitychange', visChange);
+
+/* R-26: the WebGL context lost (a GPU reset, a phone reclaiming memory) and given back. Lost: «Графика перезапускается…» over the
+   game, which stands still (frame() → GLX.lost; a P2P fight goes on unseen). Restored: three.js has already rebuilt its own state
+   (textures, programs, targets are re-made lazily on the next draw); here the PMREM environment (rendered into a target at boot, so
+   its pixels are gone) is rendered again and applyGfx re-applies the preset; the game goes on from where it stood. Not back in
+   GLX_WAIT s (or the restore failed) → the «Перезагрузить» button; the profile is already saved (save() on every change). */
+const GLX_WAIT = 8;
+function glLost(e) {
+  e.preventDefault();   // without this the browser never offers the context back
+  if (GLX.lost) return;
+  GLX.lost = true; GLX.n++;
+  $('gl-lost-t').textContent = 'видеокарта сбросила картинку — игра ждёт'; $('gl-reload').hidden = true; $('gl-lost').hidden = false;
+  clearTimeout(GLX.failT); GLX.failT = setTimeout(glFail, GLX_WAIT * 1000);
+}
+function glFail() {
+  if (!GLX.lost) return;
+  $('gl-lost-t').textContent = 'Не вышло вернуть графику. Прогресс сохранён — перезагрузи страницу.'; $('gl-reload').hidden = false; $('gl-reload').focus();
+}
+function glRestored() {
+  clearTimeout(GLX.failT);
+  try {
+    const env = scene.environment;
+    scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+    if (env) env.dispose();
+    applyGfx(GFX.level);
+  } catch (err) { console.warn('[R-26] restore failed', err); GLX.lost = true; return glFail(); }
+  GLX.lost = false; $('gl-lost').hidden = true; last = performance.now();
+}
+renderer.domElement.addEventListener('webglcontextlost', glLost, false);
+renderer.domElement.addEventListener('webglcontextrestored', glRestored, false);
+$('gl-reload').addEventListener('click', () => location.reload());
 function surrender() { if (!BAG.on && G.state !== 'ko') { G.losses++; save(); } toMenu(); }   // giving up a live fight is a loss (after the knockout the result is already counted)
 
 /* the menu camera: an orbit about P1 (yaw 0 = the fight camera's side, +z; π/2 = straight in front of him), eased here, so camUpdate
@@ -14522,6 +14617,15 @@ function netMsg(m) {
   else if (m.c === 'pong') netPing(performance.now() - m.t);
   else if (m.c === 'over') { if (NET.guest) netGuestOver(m); }
   else if (m.c === 'again') netRestart();
+  else if (m.c === 'away') { NET.oAway = !!m.on; show('net-away', NET.oAway && !NET.over && NET.dropT <= 0); }
+}
+/* R-26: this tab was hidden / shown (visChange, 14_screens.js). The fight is not stopped: the opponent gets «Соперник отошёл».
+   A hidden tab has no animation frames, so netTick and its pings stop; a timer keeps pinging (background timers fire about
+   once a second) so the peer's silence watchdog does not open the disconnect window — and that watchdog is lenient while we are away. */
+function netAway(on) {
+  netSend({ c: 'away', on: on ? 1 : 0 });
+  clearInterval(NET.awayI); NET.awayI = 0;
+  if (on) NET.awayI = setInterval(() => { if (!NET.role) { clearInterval(NET.awayI); NET.awayI = 0; return; } netSend({ c: 'ping', t: performance.now() }); }, 500);
 }
 function netPing(rtt) {
   NET.ping = Math.round(NET.ping ? NET.ping * 0.6 + rtt * 0.4 : rtt);   // smoothed: one late pong doesn't flash a spike
@@ -14530,7 +14634,7 @@ function netPing(rtt) {
 }
 function netShowResult(win, draw) {
   show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', false); show('pad', false);
-  show('result', true); show('net-drop', false);
+  show('result', true); show('net-drop', false); show('net-away', false);
   $('r-car').textContent = ''; $('r-stats').innerHTML = '';
   try { payShow(null); } catch (e) {}
   $('r-replay').hidden = true; $('r-again').textContent = 'Реванш';
@@ -14577,7 +14681,7 @@ function netTick(dt) {
   if (NET.over && (NET.guest || NET.over.sent)) return;   // the host's NET.over is set at the KO (fightOver): keep streaming through the replay until netResult
   // a lost link does not always raise PeerJS's remote 'close' (crashed tab, dead NAT mapping):
   // if nothing has arrived for silenceMax seconds, open the 10 s recovery window on our own
-  if (NET.dropT === 0 && NET.silent > NET.silenceMax) return netLost(NET.conn);
+  if (NET.dropT === 0 && NET.silent > NET.silenceMax * (NET.oAway ? 8 : 1)) return netLost(NET.conn);   // R-26: a hidden tab pings ~1/s at best
   NET.acc += dt; NET.clk = (NET.clk || 0) + dt;
   if (NET.acc >= NET.rate) { NET.acc = 0; if (NET.host) netSnapshot(); else netFlushInput(); }
 }
@@ -14587,7 +14691,7 @@ function netLost(c) {
   if (NET.conn && NET.conn !== c && NET.conn.open) return;
   if (NET.conn === c) NET.conn = null;
   if (!NET.role) return;
-  $('net-drop-t').textContent = 'Ждём восстановления… 10 с'; show('net-drop', true);
+  $('net-drop-t').textContent = 'Ждём восстановления… 10 с'; show('net-drop', true); show('net-away', false);
   NET.dropT = 10;
   if (NET.guest) netRetry();   // a new DataConnection to the same room id; the host keeps listening
 }
@@ -14609,7 +14713,7 @@ function netClose() {
   clearTimeout(NET.retryT);
   NET.role = null; NET.host = false; NET.guest = false; NET.started = false; NET.oLook = null; NET.over = null;
   NET.conn = null; NET.dropT = 0; NET.closing = true; NET.roomShown = false;
-  show('net-drop', false); $('net-ping').hidden = true; $('net-ping').textContent = '';
+  show('net-drop', false); show('net-away', false); NET.oAway = false; clearInterval(NET.awayI); NET.awayI = 0; $('net-ping').hidden = true; $('net-ping').textContent = '';
   if (NET.saved) {
     G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; ROUND_LEN = NET.saved.len || 120; NET.cfg.spar = false; NET.cfg.weap = false; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
     NET.saved = null; try { setLocation(G.loc); } catch (e) {}

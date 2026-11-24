@@ -59,6 +59,59 @@ function uiKey(e) {
 const canPause = () => !G.paused && ['intro', 'fight', 'break', 'kd', 'ko', 'rend'].includes(G.state);
 function pauseGame() { if (!canPause()) return; G.paused = true; HELD.clear(); mvKeys(); setBlock(false); Q.length = 0; UI.from = 'pause'; uiShow('pause'); }
 function resumeGame() { G.paused = false; UI.from = null; uiShow(null); last = performance.now(); }
+
+/* R-26: the tab goes away (a call, the app switcher, another tab): a solo fight opens the pause — coming back the player finds the
+   pause menu, not a beating; a P2P fight is not stopped, the opponent is told «отошёл» (netAway, 18_net.js). The sound is suspended
+   while hidden either way and resumed on return (only if it was us who suspended it). */
+const VIS = { hidden: false, sus: false, n: 0 };
+function visChange() {
+  const h = document.visibilityState === 'hidden' || document.hidden === true;
+  if (h === VIS.hidden) return; VIS.hidden = h;
+  const ac = sfx._nodes().ac;   // the one AudioContext of the game (sounds + music); null until the first gesture
+  if (h) {
+    VIS.n++;
+    // P2P: let go of whatever is held (its keyup / pointerup never comes to a hidden tab), so the man does not walk on by himself
+    if (NET.role) { HELD.clear(); MV.sx = MV.sy = 0; mvKeys(); setBlock(false); netAway(true); }
+    else pauseGame();
+    if (ac && ac.state === 'running') { VIS.sus = true; ac.suspend().catch(() => {}); }
+  } else {
+    if (NET.role) netAway(false);
+    if (ac && VIS.sus) ac.resume().catch(() => {});
+    VIS.sus = false; last = performance.now();
+  }
+}
+document.addEventListener('visibilitychange', visChange);
+
+/* R-26: the WebGL context lost (a GPU reset, a phone reclaiming memory) and given back. Lost: «Графика перезапускается…» over the
+   game, which stands still (frame() → GLX.lost; a P2P fight goes on unseen). Restored: three.js has already rebuilt its own state
+   (textures, programs, targets are re-made lazily on the next draw); here the PMREM environment (rendered into a target at boot, so
+   its pixels are gone) is rendered again and applyGfx re-applies the preset; the game goes on from where it stood. Not back in
+   GLX_WAIT s (or the restore failed) → the «Перезагрузить» button; the profile is already saved (save() on every change). */
+const GLX_WAIT = 8;
+function glLost(e) {
+  e.preventDefault();   // without this the browser never offers the context back
+  if (GLX.lost) return;
+  GLX.lost = true; GLX.n++;
+  $('gl-lost-t').textContent = 'видеокарта сбросила картинку — игра ждёт'; $('gl-reload').hidden = true; $('gl-lost').hidden = false;
+  clearTimeout(GLX.failT); GLX.failT = setTimeout(glFail, GLX_WAIT * 1000);
+}
+function glFail() {
+  if (!GLX.lost) return;
+  $('gl-lost-t').textContent = 'Не вышло вернуть графику. Прогресс сохранён — перезагрузи страницу.'; $('gl-reload').hidden = false; $('gl-reload').focus();
+}
+function glRestored() {
+  clearTimeout(GLX.failT);
+  try {
+    const env = scene.environment;
+    scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+    if (env) env.dispose();
+    applyGfx(GFX.level);
+  } catch (err) { console.warn('[R-26] restore failed', err); GLX.lost = true; return glFail(); }
+  GLX.lost = false; $('gl-lost').hidden = true; last = performance.now();
+}
+renderer.domElement.addEventListener('webglcontextlost', glLost, false);
+renderer.domElement.addEventListener('webglcontextrestored', glRestored, false);
+$('gl-reload').addEventListener('click', () => location.reload());
 function surrender() { if (!BAG.on && G.state !== 'ko') { G.losses++; save(); } toMenu(); }   // giving up a live fight is a loss (after the knockout the result is already counted)
 
 /* the menu camera: an orbit about P1 (yaw 0 = the fight camera's side, +z; π/2 = straight in front of him), eased here, so camUpdate
