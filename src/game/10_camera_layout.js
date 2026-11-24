@@ -252,7 +252,7 @@ function hudUpdate(dt) {
   if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), mmss = s => `${(s / 60) | 0}:${String(s % 60).padStart(2, '0')}`;
     // R-06: the clock is 20 px on its own plate (#tmr), the round beside it (#rnd). Issue 51: a story bout has no rounds — «ДО НОКАУТА»;
     // R-17: plus the time of the bout so far, counting up. The heavy bag (BAG.on): no bars / «VS» — score, combo and time, large (#bagp)
-    const rnd = G.mode === 'story' ? 'ДО НОКАУТА' : 'Р' + G.round, tm = G.mode === 'story' ? mmss(Math.max(0, Math.floor(STORY_TIME - G.roundT))) : mmss(t);
+    const sh = G.mode === 'story' ? storyHud() : null, rnd = sh ? sh[0] : 'Р' + G.round, tm = sh ? sh[1] : mmss(t);   // R-18: a chapter rule has its own plate (19_story.js)
     const live = G.t - BAG.lastT < 0.95 && BAG.combo > 1, txt = BAG.on ? `b${BAG.score}|${live ? BAG.combo : 0}|${BAG.best}|${tm}|${G.bagBest}` : rnd + '|' + tm;
     if (G.hudTxt !== txt) { G.hudTxt = txt; elHud.classList.toggle('bag', BAG.on);
       if (BAG.on) { $('bag-sc').textContent = BAG.score; $('bag-rec').textContent = G.bagBest ? 'рекорд ' + G.bagBest : '';

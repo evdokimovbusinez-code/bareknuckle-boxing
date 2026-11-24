@@ -40,7 +40,36 @@ const STORY = { chapters: [
       { who: 'n', text: 'Очнулся ты у стойки. Перед тобой стоит полный бокал — кто-то умеет ухаживать за проигравшими.' },
       { who: 'o', text: 'Лежи, чемпион. Лежать тебе пока полезнее, чем драться.' } ],
     reward: { win: 700, ko: 300 }, pts: 2 },
-  { id: 'patrol', title: 'Патруль', sub: 'На шум приезжает полиция. Дубинка бьёт далеко и сильно.', todo: true },
+  /* R-18: the patrol. The yard at dusk under the blue / red light bar of the patrol car (LOCS.yard.sync, `siren`); the sergeant
+     has a baton in his lead hand (look.weapon → 04k_baton.js: +0.25 m reach, ×1.3 damage, a slower wind-up) and stands off on
+     the end of it (STYLES.cop). The rule (`hold` / `drop`): stay on your feet for 60 s — or put him down once; either is a win. */
+  { id: 'patrol', title: 'Патруль', sub: 'На шум приезжает полиция. Дубинка бьёт далеко и сильно.',
+    intro: [
+      { card: 'Патруль' },
+      { who: 'n', text: 'Сирена догнала тебя у подъезда. Синий, красный, синий — по стенам панелек. Весь двор прилип к окнам.' },
+      { who: 'o', text: 'Стоять, гражданин. В баре на Заводской человека уложил — ты?' },
+      { who: 'p', text: 'Он сам полез. Бармен видел.', opt: [
+        { t: 'Я не бегу. Поехали, разберёмся.', r: 'Сержант кивает, но дубинку с пояса уже снял. «Разберёмся», — говорит он. И понятно, что не в отделе.', a: 1 },
+        { t: 'Ты меня с кем-то путаешь, начальник.', r: 'Сержант улыбается одними губами и перехватывает дубинку поудобнее. — Сейчас проверим, путаю или нет.', a: -1 } ] },
+      { who: 'Сосед', text: 'Э, служивый! Он же без ничего! Давай по-честному!' },
+      { who: 'o', text: 'По-честному? Минута, герой. Устоишь — свободен. Ляжешь — поедешь со мной.' },
+      { who: 'n', text: 'Дубинка длиннее руки. Не стой на её конце: заходи вплотную или уходи с линии. Минуту на ногах — или урони его.' } ],
+    hero: { top: { id: 'tee', color: 'black' }, bottom: { id: 'jeans', color: 'indigo' }, shoes: { id: 'sneak', color: 'white' }, belt: { id: 'beltFrame', color: 'black' } },   // the same night: still in what he wore in the bar
+    fight: { loc: 'yard', nm: 'Сержант', st: 'cop', diff: 'normal', lvl: 1, speed: 1, siren: true, hold: 60, drop: true,
+      look: { skin: 'light', hair: 'brown', hairStyle: 'classic', beard: 'stubble', head: { id: 'cap', color: 'navy' }, top: { id: 'vest', color: 'black' }, bottom: { id: 'jeans', color: 'navy' },
+        belt: { id: 'beltMil', color: 'black' }, shoes: { id: 'boots', color: 'black' }, wraps: 'black', hands: 'wraps', guard: 'clear', shorts: 'black', tats: [], weapon: 'baton' } },
+    outro: [   // he went down
+      { who: 'n', text: 'Сержант на асфальте, фуражка укатилась под ноги толпе. Двор молчит — и вдруг кто-то хлопает.' },
+      { who: 'o', text: 'Ты… ты сам себе срок намотал. Понял?' },
+      { who: 'n', text: 'Через десять минут во двор въехали ещё две машины. Дальше — наручники, отдел, суд. Три года.' } ],
+    outroHeld: [   // the minute ran out with the hero on his feet
+      { who: 'n', text: 'Минута вышла. Сержант дышит тяжело, дубинка опущена. Двор смотрит на него.' },
+      { who: 'o', text: 'Ладно. Слово дал — свободен. Пока.' },
+      { who: 'n', text: 'А утром в дверь позвонили. Тот, из бара, написал заявление. Дальше — отдел, суд. Три года.' } ],
+    outroLose: [
+      { who: 'n', text: 'Асфальт холодный. Наручники — ещё холоднее.' },
+      { who: 'o', text: 'Я же предупреждал, герой. Поехали.' } ],
+    reward: { win: 900, ko: 400 }, pts: 2 },
   { id: 'prison', title: 'Тюрьма', sub: 'Три года. Двор, этап, сокамерники, смотрящий.', todo: true },
   { id: 'under', title: 'Подполье', sub: 'На выходе — организатор подпольных боёв и первые деньги.', todo: true },
   { id: 'circle', title: 'Железный круг', sub: 'Своя лига. Путь к поясу.', todo: true },
@@ -48,6 +77,9 @@ const STORY = { chapters: [
 
 /* the drunk: heavy loops and overhands from far, almost no defence, long pauses between swings — «размашистый, медленный» */
 STYLES.drunk = { label: 'пьяный', gap: 1.65, w: { jab: 1, cross: 1.3, hookL: 3.4, hookR: 3.1, upperL: 0.5, upperR: 0.8, over: 4.2 }, dodge: 0.16, block: 0.25, combo: 0.3, trade: 0.6, feint: 0, body: 0.12, adv: 0.02, counter: 0.08 };
+/* R-18 the patrolman: stands off on the end of his baton (adv −0.2 → he wants 1.33 m, 0.2 m farther than the others) and works the
+   lead hand that holds it (jab / lead hook); the rear hand only now and then. Blocks more than he slips — a uniform does not duck */
+STYLES.cop = { label: 'с дубинкой', gap: 1.0, w: { jab: 4, cross: 1.2, hookL: 3.4, hookR: 0.9, upperL: 0.4, upperR: 0.3, over: 0.8 }, dodge: 0.35, block: 0.85, combo: 0.35, trade: 0.3, feint: 0.08, body: 0.15, adv: -0.2, counter: 0.3 };
 /* the bar joins the quick-fight list only after chapter 1 (15_social.js checks LOC_LOCK in locOpen) */
 LOC_LOCK.bar = () => storyDone() >= 1;
 /* old saves: whoever climbed the ladder has walked this road already — chapter 1 counts as cleared, plus a gift */
@@ -173,16 +205,16 @@ function storyDress(ch) {
 /* back to the player's own look (toMenu calls it; the creator and the shop re-apply LOOK themselves anyway) */
 function storyUndress() { if (!P1.storyLook) return; P1.storyLook = null; P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar); }
 function storyFightGo() {
-  startFight(true);
+  startFight(true); G.storyT = 0; G.storyHeldAt = 0;   // R-18: the chapter's own clock (fight time only) for the `hold` rule
   if (LOC.noFly) msg(LOC.label, 'place');   // the bar gets no fly-round — the dialogue already showed the place
 }
 /* the end of the bout: the story intercepts endReplay() with its outro; the result screen comes after the dialog */
-function storyOut(win) {
+function storyOut(win, held) {
   if (G.mode !== 'story') return false;
   const ch = storyCh(); if (!ch) return false;
   if (G.storyOut) return false;
   G.storyOut = true;
-  const lines = win ? ch.outro : ch.outroLose;
+  const lines = win ? (held && ch.outroHeld) || ch.outro : ch.outroLose;
   storyTalk(lines, () => { G.state = 'result'; camCut = true; resultOpen(); });
   return true;
 }
@@ -197,7 +229,9 @@ function storyAgain() {
 }
 /* the drunk: he never fully stops swaying, and now and then one leg gives out (Fighter's wobble drives the pose) */
 function storyTick(dt) {
-  const ch = storyCh(); if (!ch || !ch.fight.drunk) return;
+  const ch = storyCh(); if (!ch || !ch.fight) return;
+  if (ch.fight.hold) storyHoldTick(ch, dt);
+  if (!ch.fight.drunk) return;
   const F = P2; if (!F || F.ko || (F.rag && F.rag.on) || F.gu) return;
   if (G.state !== 'fight' && G.state !== 'talk' && G.state !== 'intro' && G.state !== 'break') return;
   F.drunkT = (F.drunkT || 0) + dt;
@@ -205,13 +239,38 @@ function storyTick(dt) {
   if (F.drunkT > (F.drunkNext || 4)) { F.drunkNext = F.drunkT + 3 + rr() * 4.5; if (G.state === 'fight') F.wobble = Math.max(F.wobble, 0.9 + rr() * 0.5); }
 }
 
+/* ── R-18: chapter rules ──
+   drop — his first knockdown ends the bout as a knockout (knockdown() → knockout(…, forced), 07);
+   hold — the HUD counts `hold` s of fighting down (the clock stands while a man is on the canvas); the hero still up at 0 wins (storyHeld) */
+const storyDrop = def => G.mode === 'story' && def === P2 && !!(storyCh() || {}).fight?.drop;
+function storyHoldTick(ch, dt) {
+  if (G.state === 'fight') { G.storyT = (G.storyT || 0) + dt * G.slow; if (G.storyT >= ch.fight.hold && !P1.ko && !P1.doomed && !P2.ko) storyHeld(ch); }
+  else if (G.state === 'result' && G.storyHeldAt && G.real >= G.storyHeldAt) { G.storyHeldAt = 0; storyOut(true, true); }   // a breath on the two of them, then the outro
+}
+function storyHeld(ch) {
+  G.state = 'result'; $('pad').hidden = true; Q.length = 0;
+  for (const F of [P1, P2]) { F.cancelPunch(); F.dodge = null; F.blocking = false; }
+  G.winner = P1; G.loser = P2; celStart(null);   // nobody is down: no victory walk-off
+  fightOver(true, false, 'dec');
+  $('r-title').textContent = 'Победа'; $('r-title').className = 'rt win';
+  $('r-sub').textContent = `устоял ${ch.fight.hold} с · счёт ${G.wins} : ${G.losses}`; $('r-replay').hidden = true;   // no knockout to replay (startFight shows the button again)
+  msg('Устоял!', 'ko'); sfx.clap(); EVT.emit('round');
+  G.storyHeldAt = G.real + 1.6;
+}
+/* the HUD plate of a story bout (hudUpdate, 10_camera_layout.js): [label, clock] */
+function storyHud() {
+  const ch = storyCh(), f = (ch && ch.fight) || {}, mmss = s => `${(s / 60) | 0}:${String(s % 60).padStart(2, '0')}`;
+  if (f.hold) return [f.drop ? 'УСТОЙ ИЛИ УРОНИ' : 'ПРОДЕРЖИСЬ', mmss(Math.max(0, Math.ceil(f.hold - (G.storyT || 0))))];
+  return ['ДО НОКАУТА', mmss(Math.max(0, Math.floor(STORY_TIME - G.roundT)))];
+}
+
 /* ── the «История» screen: a vertical timeline of the chapters ── */
 function buildStory() {
   const box = $('st-list'); if (!box) return;
   box.textContent = '';
   STORY.chapters.forEach((ch, i) => {
-    const done = i < storyDone(), cur = storyPlayable(i) && !done, lock = !done && !cur;
-    const row = document.createElement('div'); row.className = 'stc ' + (done ? 'done' : cur ? 'cur' : 'lock');
+    const done = i < storyDone(), cur = storyPlayable(i) && !done, next = !done && !cur && i === storyDone();   // next: reached, but its content is not in yet («скоро»)
+    const row = document.createElement('div'); row.className = 'stc ' + (done ? 'done' : cur ? 'cur' : next ? 'cur soon' : 'lock');
     row.innerHTML = `<i class="dot"></i><div class="stc-b"><b>${i + 1}. ${esc(ch.title)}</b><small>${esc(ch.sub || '')}</small></div>`;
     if (done || cur) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm' + (cur ? ' pri' : ''); b.textContent = done ? 'Ещё раз' : 'Играть';
       if (cur) b.id = 'st-play'; b.onclick = () => storyPlay(i); row.appendChild(b); }
@@ -223,6 +282,8 @@ function buildStory() {
 window.__story = {
   STORY, DLG,
   get done() { return storyDone(); },
+  unlock(n) { PROF.story.done = Math.max(storyDone(), n); save(); return storyDone(); },   // R-18 test: open chapters up to n + 1
+  get hold() { return +(G.storyT || 0).toFixed(2); },
   play(i = storyDone()) { return storyPlay(i) ? G.state : 'locked'; },
   next(n = 1) { for (let k = 0; k < n && DLG.active; k++) { const L = dlgCur(); if (L && L.opt && !DLG.reply) dlgChoose(L.opt[0]); dlgNext(); } return DLG.active ? DLG.i + '/' + DLG.lines.length : 'done'; },
   skip() { if (DLG.active) dlgDone(); return G.state + ':' + G.mode; },
