@@ -78,6 +78,7 @@ function show(id, on) { $(id).hidden = !on; }
 function toMenu() {
   if (NET.role) netClose();   // issue 49: leaving the match tears the P2P connection down
   if (window.__tutOn) tutEnd();   // (issue 45) leaving through the pause «Сдаться / Выйти» also closes the lesson
+  storyUndress();   // R-17: the story chapter's clothes come off, LOOK goes back on (19_story.js)
   socFlush(); socLeave();   // the frame of the last post; a challenge's place and level go back (15_social.js)
   if (G.mode === 'career') G.diff = G.userDiff; BAG.on = false; showP2(true); BAG.g.visible = false; updateMenu(); for (const F of [P1, P2]) F.sparGear(false);
   G.state = 'menu'; G.paused = false; G.slow = 1; G.slowT = 0; G.hitstop = 0; G.shake = 0; FX.clearAir(); FX.clearFloor(); REC.frames.length = 0; REC.events.length = 0; wearReset();

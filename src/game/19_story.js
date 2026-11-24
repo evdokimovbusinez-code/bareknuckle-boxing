@@ -5,6 +5,8 @@
      { id, title, sub,                       // sub: one line in the «История» list
        todo: true,                           // a chapter not implemented yet: the list shows «скоро», it is not playable
        intro: [line, …], outro: [line, …], outroLose: [line, …],
+       hero: { top, bottom, shoes, … },       // what the player's man wears in the chapter (wardrobe fields over LOOK; LOOK itself is
+                                             // never touched, toMenu → storyUndress puts LOOK back on him)
        fight: { loc, nm, st, diff, lvl, speed, drunk, look },   // place, the name on the HUD, STYLES key, level, P2 stat level (0-5),
                                                                  // P2 speed ×, the drunk sway, his fixed look (04d_street clothes, like LADDER)
        reward: { win, ko } }                 // ₽ lines of the purse (07b_economy.js); a win also gives pts fighter points
@@ -27,6 +29,7 @@ const STORY = { chapters: [
         { t: 'Иди домой, дед. Тут не твоё время.', r: 'Пёс усмехается и ставит стакан на стойку. Домой он сегодня точно не пойдёт.', a: -1 } ] },
       { who: 'n', text: 'Бармен не вмешался. Он просто вытер стакан и стал ждать, когда начнётся.' },
       { who: 'o', text: 'Давай, чемпион. Развлеки старика. Кто упал — тот и прав.' } ],
+    hero: { top: { id: 'tee', color: 'black' }, bottom: { id: 'jeans', color: 'indigo' }, shoes: { id: 'sneak', color: 'white' }, belt: { id: 'beltFrame', color: 'black' } },   // after the shift: tee, jeans, trainers
     fight: { loc: 'bar', nm: 'Пёс', st: 'drunk', diff: 'easy', lvl: 0, speed: 0.88, drunk: true,
       look: { skin: 'tan', hair: 'bald', beard: 'stubble', top: 'tank', bottom: 'sweatG', shoes: 'sneakB', wraps: 'white', hands: 'wraps', guard: 'clear', shorts: 'black', tats: [] } },
     outro: [
@@ -38,7 +41,7 @@ const STORY = { chapters: [
       { who: 'o', text: 'Лежи, чемпион. Лежать тебе пока полезнее, чем драться.' } ],
     reward: { win: 700, ko: 300 }, pts: 2 },
   { id: 'patrol', title: 'Патруль', sub: 'На шум приезжает полиция. Дубинка бьёт далеко и сильно.', todo: true },
-  { id: 'prison', title: 'Тюрьма', sub: 'Три года. Двор, этап, сокскамерники, смотрящий.', todo: true },
+  { id: 'prison', title: 'Тюрьма', sub: 'Три года. Двор, этап, сокамерники, смотрящий.', todo: true },
   { id: 'under', title: 'Подполье', sub: 'На выходе — организатор подпольных боёв и первые деньги.', todo: true },
   { id: 'circle', title: 'Железный круг', sub: 'Своя лига. Путь к поясу.', todo: true },
 ] };
@@ -121,11 +124,16 @@ function storyTalkKey(e) {
   if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space') { dlgNext(); return true; }
   return false;
 }
-/* the camera of a dialog line: close on the speaker's face (stareCam-style), a wide shot for off-screen voices */
+/* the camera of a dialog line: the speaker's head and shoulders from ~1 m, the lens at his eye level, 3/4 from his front side,
+   the face in the upper half of the frame (the dialog box covers the lower third); a wide shot for off-screen voices.
+   Was (#51) 0.52 m from the head in near profile: the face was cut and the other man's hand filled the corner (mode-story-dlg2.jpg).
+   From (f·0.38, 1.02) — 1.09 m — the other man's lead hand is ~38° off the lens axis, outside the 28° (vertical, 48° wide) lens.
+   The aim 0.13 m under the eyes puts the crown at ~10 % and the chin at ~55 % of the frame height (above the box with answers, 64 %). */
+const TALK_CAM = { fwd: 0.38, side: 1.02, eye: 0.07, drop: 0.13 };   // m: forward of the head, out to +z, eyes above the head bone, aim below the eyes
 function talkCam() {
   if (DLG.who === 'p' || DLG.who === 'o') {
-    const F = DLG.who === 'p' ? P1 : P2, h = F.headNow, f = Math.sign(F.other.headNow.x - h.x) || 1;
-    _cp.set(h.x + f * 0.16, h.y - 0.05, 0.52); _cl.set(h.x + f * 0.1, h.y - 0.08, 0); return 7;
+    const F = DLG.who === 'p' ? P1 : P2, h = F.headNow, f = Math.sign(F.other.headNow.x - h.x) || 1, C = TALK_CAM, ey = h.y + C.eye;
+    _cp.set(h.x + f * C.fwd, ey, h.z + C.side); _cl.set(h.x + f * 0.03, ey - C.drop, h.z); return 6;
   }
   const mx = (P1.headNow.x + P2.headNow.x) * 0.5;
   _cp.set(mx, 1.16, 3.1); _cl.set(mx, 0.94, 0); return 2.6;
@@ -147,6 +155,7 @@ function storyPlay(i) {
   const go = () => {
     setLocation(ch.fight.loc);
     showP2(true); P2.applyLook({ ...ch.fight.look, street: true });
+    storyDress(ch);   // R-17: the hero in the chapter's clothes
     AI.style = STYLES[ch.fight.st] || STYLES.brawler; $('n2').textContent = ch.fight.nm;
     const sl = $('st2'); if (sl) sl.textContent = AI.style.label;
     P1.resetState(); P2.resetState(); sfx.unlock();
@@ -156,6 +165,14 @@ function storyPlay(i) {
   if (cold) { locBusy(true); setTimeout(() => { try { go(); } finally { locBusy(false); } }, 0); } else go();
   return true;
 }
+/* the hero's outfit for the chapter: a copy of LOOK with the chapter's clothes over it (skin, hair, tattoos stay his own) */
+function storyDress(ch) {
+  if (!ch.hero) return storyUndress();
+  P1.applyLook({ ...LOOK, street: true, head: { id: 'none' }, eyes: { id: 'none' }, belt: { id: 'none' }, hands: LOOK.hands === 'mma' ? 'wraps' : LOOK.hands, ...ch.hero });
+  P1.storyLook = ch.id;
+}
+/* back to the player's own look (toMenu calls it; the creator and the shop re-apply LOOK themselves anyway) */
+function storyUndress() { if (!P1.storyLook) return; P1.storyLook = null; P1.applyLook(LOOK); if (P1.gear.spar !== UI.spar) P1.sparGear(UI.spar); }
 function storyFightGo() {
   startFight(true);
   if (LOC.noFly) msg(LOC.label, 'place');   // the bar gets no fly-round — the dialogue already showed the place
