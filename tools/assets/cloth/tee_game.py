@@ -319,18 +319,9 @@ if BAKE:
     steep = sum(1 for i in range(2, len(px), 4) if px[i] < 0.75)
     say('normal map: texels still flat %.1f%% (unbaked or truly flat), steep %.2f%% (rays that hit the wrong side; raise CAGE / RAY if high)' % (100 * flat / RES ** 2, 100 * steep / RES ** 2))
     save_webp(img, os.path.join(OUT, 'tee_n.webp'), 100)
-    # AO of the cloth alone: the body is hidden (it moves under the shirt), the low poly does not shadow the high one
-    if sc.world is None: sc.world = bpy.data.worlds.new('World')
-    sc.world.light_settings.distance = 0.08
-    body.hide_render = True; vis = {}
-    for k in ('visible_camera', 'visible_diffuse', 'visible_glossy', 'visible_transmission', 'visible_volume_scatter', 'visible_shadow'):
-        vis[k] = getattr(lo, k); setattr(lo, k, False)
-    img = bake('AO', 'tee_ao', AO_RES, (1, 1, 1, 1), AO_SAMPLES)
-    for k, x in vis.items(): setattr(lo, k, x)
-    body.hide_render = False
-    px = img.pixels[:]; mean = sum(px[0::4]) / (AO_RES * AO_RES)
-    say('AO: mean %.2f %s' % (mean, '(too dark: something shadows the whole shirt)' if mean < 0.4 else ''))
-    save_webp(img, os.path.join(OUT, 'tee_ao.webp'), 90)
+    # issue 81: no AO bake any more — the cloth-alone AO of the two fabric layers came out in camouflage patches, and the game's
+    # screen-space AO pass shades the folds and the contact with the body anyway (src/game/04j_cloth_asset.js).
+    # The light mesh for GFX low (tee_lo.glb, same uv, same tee_n.webp) is thinned from tee.glb by tools/assets/cloth/tee_lo.js.
 
 # —— 6. GLB ——
 me = lo.data; me.calc_loop_triangles(); me.calc_tangents(); r3 = lo.matrix_world.to_3x3().normalized(); uvl = me.uv_layers.active.data
