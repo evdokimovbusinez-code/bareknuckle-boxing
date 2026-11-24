@@ -8,6 +8,19 @@ const _pf1 = new V3(), _pf2 = new V3(), _pf3 = new V3(), _pf4 = new V3(), _pfq =
    is `urgent` m off its spot. restDrop: how far the procedural layer of pose() may sit the hips down when he is not dodging
    (was up to 0.26 m + guard + daze + rubber legs) */
 const STANCE = { lenMin: 0.55, lenMax: 0.80, widMin: 0.25, widMax: 0.40, gapMax: 0.82, step: 0.18, liftT: 0.12, overlap: 0.8, urgent: 0.25, restDrop: 0.08 };
+/* #83 the walk (plantFeet): while his root travels over the canvas faster than `on` m/s (ring frame; off below `off`) the feet step
+   on a cycle instead of catching up when stretched: a stride (how far each foot moves per cycle) of s0 + sK·v m, ≤ sMax, so a
+   cycle lasts T = stride / v (length × cadence = speed); the first foot leaves at the start of the cycle, the other `lag` of it
+   later; a step takes `ts` of the cycle (tsMin…tsMax s) and lands v·(T − step)/2 ahead of its spot, so the planted foot is
+   centred under him while he passes over it. Off the cycle (he stopped) a foot more than `settle` m off its spot steps into the
+   stance for `settleT` s. A planted foot keeps its ball (ToeBase) and its heading on the canvas; one turned more than `yawMax` rad
+   by the ring (circled round) steps. While walking the stance box (STANCE) stretches so a cycle can move the pair a stride (+ room
+   m): its minimum goes down (not below lenLo / widLo), the rest is added to its maximum (≤ up m; a stride that does not fit
+   even so is shortened, the cadence goes up). A step has travelled by `land` of its
+   time (the foot is still ~4 cm up), the rest it only comes down onto a spot that no longer moves. acc / dec: s from standing to full speed and back (the player's walk; was ~0.25 s, ease) */
+const GAIT = { on: 0.2, off: 0.1, s0: 0.2, sK: 0.14, sMax: 0.44, lag: 0.5, ts: 0.48, tsMin: 0.13, tsMax: 0.2, settle: 0.03, settleT: 0.45, yawMax: 0.3, acc: 0.12, dec: 0.12, room: 0.04, lenLo: 0.36, widLo: 0.1, up: 0.04, land: 0.82 };
+// v moved toward w by at most `rate` (a linear ramp: the walk speeds up and stops in GAIT.acc / dec s, not instantly)
+const ramp = (v, w, rate) => v + clamp(w - v, -rate, rate);
 // pinned points of a cloth / strand set follow their targets (used on the frames where the solver is skipped)
 // a skipped frame (GFX.simSkip = 2) carries the free hair points rigidly with the head instead of leaving them behind:
 // left where they were, they trailed every quick head move by a frame and then jumped — the hair looked like it ran at half rate
@@ -415,7 +428,8 @@ class Fighter {
     if ((this === P1 || (NET.host && this === P2)) && fight && (this.moveDir || 0) !== 0 && !brk) {   // issue 49: the guest's feet drive P2 as well
       // the player walks: ~1.5 m/s in and out (a step takes you out of his reach), slower punching or tired
       const v = this.moveDir * 1.5 * tiredK * (this.cur ? 0.45 : 1) * (this.blocking ? 0.55 : 1);
-      this.advV += (v - this.advV) * Math.min(1, dt * 12); this.hold = null;
+      // #83: full speed in GAIT.acc s, a linear ramp (was an ease, advV += (v − advV)·12·dt: 0.25 s to 95 %); turning round brakes at the GAIT.dec rate
+      this.advV = ramp(this.advV, v, 1.5 / (v * this.advV < 0 || Math.abs(v) < Math.abs(this.advV) ? GAIT.dec : GAIT.acc) * dt); this.hold = null;
     } else {
       let tgt;
       if (!fight) tgt = 0;
@@ -449,7 +463,7 @@ class Fighter {
     let lat = 0;
     if (fight && (this === P1 || (NET.host && this === P2))) lat = (this.moveLat || 0) * 1.15 * tiredK * (this.cur ? 0.4 : 1) * (this.blocking ? 0.55 : 1);
     if (fight && this === P2 && !(NET.host && (this.moveLat || 0) !== 0)) lat = (AI.lat || 0) * tiredK;
-    this.latV = (this.latV || 0) + (lat - (this.latV || 0)) * Math.min(1, dt * 10);
+    this.latV = ramp(this.latV || 0, lat, 1.15 / (Math.abs(lat) < Math.abs(this.latV || 0) ? GAIT.dec : GAIT.acc) * dt);   // #83: linear, 0.12 s to full (was an ease, ×10·dt)
     if (Math.abs(this.latV) > 0.01 && !circleStep(this, this.latV * dt)) this.latV *= 0.5;
   }
   cancelPunch() { if (!this.cur) return; this.release = true; this.relN = this.cur; this.resolved = true; this.whiff = true; this.cur = null; this.aimW = 0; }
@@ -588,7 +602,7 @@ class Fighter {
   /* arm / leg bones by side, looked up once (the per-frame code used to build the bone names every time) */
   limbs() {
     if (this.limbB) return this.limbB; const B = this.bones, o = {};
-    for (const S of ['L', 'R']) o[S] = { thigh: B[`CC_Base_${S}_Thigh`], calf: B[`CC_Base_${S}_Calf`], foot: B[`CC_Base_${S}_Foot`], upper: B[`CC_Base_${S}_Upperarm`], fore: B[`CC_Base_${S}_Forearm`], hand: B[`CC_Base_${S}_Hand`], mid1: B[`CC_Base_${S}_Mid1`] };
+    for (const S of ['L', 'R']) o[S] = { thigh: B[`CC_Base_${S}_Thigh`], calf: B[`CC_Base_${S}_Calf`], foot: B[`CC_Base_${S}_Foot`], toe: B[`CC_Base_${S}_ToeBase`], upper: B[`CC_Base_${S}_Upperarm`], fore: B[`CC_Base_${S}_Forearm`], hand: B[`CC_Base_${S}_Hand`], mid1: B[`CC_Base_${S}_Mid1`] };
     return this.limbB = o;
   }
   rot(bone, pitch, yaw, roll) { _qb.setFromEuler(_e1.set(pitch, yaw, roll, 'YXZ')); this.mquat(bone, _qa); this.setMQuat(bone, _qb.multiply(_qa)); }
@@ -811,30 +825,63 @@ class Fighter {
      0.55–0.80 m along the fight line, 0.25–0.40 m across it, ≤ 0.84 m apart) — a lunge or a step-in no longer leaves the rear
      foot pinned 1.1–1.3 m behind (the splits): the rear foot steps up behind the front one instead (step-drag). The foot that
      is further off its spot steps first; the other may follow as the first comes down (or at once, if it is far off), so a
-     man walking at full speed keeps his feet under him instead of dragging a stretched leg over the canvas. */
+     man walking at full speed keeps his feet under him instead of dragging a stretched leg over the canvas.
+     #83: (1) a planted foot is held by the ball (ToeBase), not the ankle, and keeps the heading it came down with on the canvas
+     (it turns with the ring when the men circle): the ankle hangs off the pinned ball as the animation has the foot, so a heel
+     coming up or a pivot turns about the ball (the ankle was pinned and the foot kept its animated heading: the ball slid 2.2 cm
+     on average, up to 8 cm, over a stance — docs/audit/scenarios/walk.js). (2) While he travels, the feet step on a cycle
+     from his speed (GAIT: stride × cadence = speed): forward the front foot goes first, back the rear one, sideways the one on
+     that side, the other half a cycle later, each landing ahead so it is under him in the middle of its stance. (3) When he
+     stops, a foot off its spot by more than GAIT.settle steps into the stance. */
   plantFeet(dt) {
     // (R-12: a frame of hit-stop or pause, dt = 0, no longer lets go of the planted feet — every landed punch used to drop both
     // to the animation's stance for a frame and pin them there, the lunge included)
-    if ((window.__tw || {}).noPlant || !this.ftOff || this.rag.on || this.gu || this.ko || this.slide || dt < 0 || G.state === 'menu' || G.state === 'replay' || (BAG.on && this === P2)) { const F0 = this.ftOff; if (F0) F0.L = F0.R = F0.sL = F0.sR = null; else this.ftOff = { L: null, R: null, sL: null, sR: null }; return; }
+    if ((window.__tw || {}).noPlant || !this.ftOff || this.rag.on || this.gu || this.ko || this.slide || dt < 0 || G.state === 'menu' || G.state === 'replay' || (BAG.on && this === P2)) { const F0 = this.ftOff; if (F0) { F0.L = F0.R = F0.sL = F0.sR = F0.bL = F0.bR = F0.rp = F0.gp = null; } else this.ftOff = { L: null, R: null, sL: null, sR: null }; return; }
     const cel = G.cel && G.cel.W === this && G.cel.walking;   // R-13: the winner backs off in a few long steps, not the fight shuffle
-    const F = this.ftOff, step = cel ? CEL.step : STANCE.step, reach = cel ? CEL.reach : this === P1 && (this.moveDir || this.moveLat) ? 0.07 : 0.09, LB = this.limbs();
+    const F = this.ftOff, LB = this.limbs();
     // scratch only: this runs for four feet every frame (a step itself still allocates its start point)
-    const X = this._pf || (this._pf = { W: [new V3(), new V3()], N: [new V3(), new V3()], D: [new V3(), new V3()], ax: new V3(), lat: new V3() });
-    const W = X.W, N = X.N, D = X.D, K = ['L', 'R'], SK = ['sL', 'sR'];
+    const X = this._pf || (this._pf = { W: [new V3(), new V3()], N: [new V3(), new V3()], D: [new V3(), new V3()], B: [new V3(), new V3()], ax: new V3(), lat: new V3(), o: new V3(), q: new Quat(), up: new V3(0, 1, 0) });
+    const W = X.W, N = X.N, D = X.D, Bw = X.B, K = ['L', 'R'], SK = ['sL', 'sR'], BK = ['bL', 'bR'], YK = ['yL', 'yR'];
     let fresh = false;
     for (let i = 0; i < 2; i++) {
       this.group.localToWorld(this.mpos(LB[K[i]].foot, W[i])); ringPt(W[i], N[i]);   // where the animation puts the foot, in the ring frame
-      if (!F[K[i]]) { F[K[i]] = N[i].clone(); fresh = true; }
+      Bw[i].setFromMatrixPosition(LB[K[i]].toe.matrixWorld);   // …and the ball of that foot (world)
+      if (!F[K[i]]) { F[K[i]] = N[i].clone(); F[BK[i]] = null; fresh = true; }
     }
+    // #83: his speed over the canvas (ring frame: circling turns the ring under him), from the root, smoothed over ~3 frames
+    const gp = this.group.position, rp = ringPt(gp, _pf2), v = F.v || (F.v = new V3());
+    if (!F.rp) { F.rp = rp.clone(); v.set(0, 0, 0); }
+    else if (dt > 0) { const d = _pf1.subVectors(rp, F.rp); d.y = 0; if (d.lengthSq() < 0.04) v.lerp(d.multiplyScalar(1 / dt), Math.min(1, dt * 20)); F.rp.copy(rp); }
     if (fresh) return;
     // the fight line (to the other man) and the line across it, in the ring frame (the ring turns when the men circle)
-    const gp = this.group.position, fwd = Math.sign(this.other.group.position.x - gp.x) || 1;
+    const fwd = Math.sign(this.other.group.position.x - gp.x) || 1;
     const ax = ringPt(_pf1.set(gp.x + fwd, gp.y, gp.z), X.ax).sub(ringPt(gp, _pf2)); ax.y = 0; ax.normalize();
     const lat = X.lat.set(-ax.z, 0, ax.x);
     // which foot leads and to which side the rear one sits: from the animation, with some hysteresis
     const dl = _pf1.subVectors(N[0], N[1]), al = dl.dot(ax);
     if (F.lead == null || Math.abs(al) > 0.1) F.lead = al >= 0 ? 0 : 1;
     const dw = dl.dot(lat) * (F.lead ? -1 : 1); if (F.latS == null || Math.abs(dw) > 0.08) F.latS = dw >= 0 ? 1 : -1;
+    // #83 the walking cycle (GAIT): on while he travels; `go` = the foot it sends off this frame
+    const sp = Math.hypot(v.x, v.z), walk = !cel && sp > (F.gp != null ? GAIT.off : GAIT.on);
+    let go = -1, Ts = 0, ant = 0; const bx = X.bx || (X.bx = {}); Object.assign(bx, STANCE);
+    if (walk) {
+      const va = Math.abs(v.dot(ax)) / sp, vl = Math.abs(v.dot(lat)) / sp;
+      // the stride, ≤ what the stretched stance box lets one cycle move the pair (else a shorter stride, quicker steps)
+      const S = Math.min(GAIT.sMax, GAIT.s0 + GAIT.sK * sp, (STANCE.lenMax + GAIT.up - GAIT.lenLo - GAIT.room) / Math.max(va, 1e-3), (STANCE.widMax + GAIT.up - GAIT.widLo - GAIT.room) / Math.max(vl, 1e-3)), T = S / sp;
+      Ts = clamp(GAIT.ts * T, GAIT.tsMin, GAIT.tsMax); ant = Math.max(0, (T - Ts) / 2);
+      // first: along the line the front foot going forward, the rear one going back; across it the foot on that side
+      const first = va >= vl ? (v.dot(ax) > 0 ? F.lead : 1 - F.lead) : ((F.L.x - F.R.x) * lat.x + (F.L.z - F.R.z) * lat.z) * v.dot(lat) >= 0 ? 0 : 1;
+      if (F.gp == null) { F.gp = 0; go = F.first = first; }
+      else { const g0 = F.gp; F.gp += dt / T; if (F.gp >= 1) { F.gp -= 1; go = F.first = first; } else if (g0 < GAIT.lag && F.gp >= GAIT.lag) go = 1 - F.first; }
+      F.setT = GAIT.settleT;
+      // the stance box stretches by the stride: the first foot steps out past its usual limit, the other closes up nearer than
+      // usual (a cycle moves the pair by a stride; inside 0.55–0.80 / 0.25–0.40 m it could only move 0.25 / 0.15 m)
+      // (the nearer limit gives first, the far one ≤ GAIT.up: R-12's 0.85 m p95 between the feet still holds)
+      const ea = Math.max(0, S * va + GAIT.room - (STANCE.lenMax - STANCE.lenMin)), el = Math.max(0, S * vl + GAIT.room - (STANCE.widMax - STANCE.widMin));
+      bx.lenMin = Math.max(GAIT.lenLo, STANCE.lenMin - ea); bx.lenMax = STANCE.lenMax + ea - (STANCE.lenMin - bx.lenMin);
+      bx.widMin = Math.max(GAIT.widLo, STANCE.widMin - el); bx.widMax = STANCE.widMax + el - (STANCE.widMin - bx.widMin);
+      bx.gapMax = STANCE.gapMax + Math.max(bx.lenMax - STANCE.lenMax, bx.widMax - STANCE.widMax);
+    } else { F.gp = null; F.setT = Math.max(0, (F.setT || 0) - dt); }
     // where each foot should stand: its own spot, kept inside the stance box measured from the other foot. One way only: a foot
     // in the air (the earlier one, if both are) measures from where the other stands; the other one from where the first lands
     // (measured both ways, from each other's landing spot, the two targets pushed each other back and forth 10+ cm a frame)
@@ -842,28 +889,46 @@ class Fighter {
     for (const i of p === 1 ? [1, 0] : [0, 1]) {
       const A = p >= 0 && i !== p ? D[p] : F[K[1 - i]];
       if (cel) { D[i].copy(N[i]); continue; }
-      const sg = F.lead === i ? 1 : -1, rel = _pf1.subVectors(N[i], A);
-      let a = clamp(sg * rel.dot(ax), STANCE.lenMin, STANCE.lenMax), b = clamp(sg * F.latS * rel.dot(lat), STANCE.widMin, STANCE.widMax);
-      if (a * a + b * b > STANCE.gapMax * STANCE.gapMax) { a = Math.max(STANCE.lenMin, Math.sqrt(Math.max(0, STANCE.gapMax * STANCE.gapMax - b * b))); if (a * a + b * b > STANCE.gapMax * STANCE.gapMax) b = Math.sqrt(Math.max(0, STANCE.gapMax * STANCE.gapMax - a * a)); }
+      const sg = F.lead === i ? 1 : -1, rel = _pf1.subVectors(N[i], A), sti = F[SK[i]];
+      if (sti && sti.ant) rel.addScaledVector(v, sti.ant);   // #83: a walking step lands ahead of the spot (GAIT)
+      let a = clamp(sg * rel.dot(ax), bx.lenMin, bx.lenMax), b = clamp(sg * F.latS * rel.dot(lat), bx.widMin, bx.widMax);
+      const gm = bx.gapMax * bx.gapMax; if (a * a + b * b > gm) { a = Math.max(bx.lenMin, Math.sqrt(Math.max(0, gm - b * b))); if (a * a + b * b > gm) b = Math.sqrt(Math.max(0, gm - a * a)); }
       D[i].copy(A).addScaledVector(ax, sg * a).addScaledVector(lat, sg * F.latS * b); D[i].y = N[i].y;
     }
-    // which foot steps: the one further off its spot first; the second as the first comes down, or at once if far off
+    // which foot steps: the cycle's; else the one further off its spot first, the second as the first comes down, or at once if far
+    // off (walking: only that — the cycle moves the feet; just stopped: a few cm off is enough to step into the stance)
+    const reach = cel ? CEL.reach : walk ? STANCE.urgent : F.setT > 0 ? GAIT.settle : this === P1 && (this.moveDir || this.moveLat) ? 0.07 : 0.09;
+    const ry = ARENA.rotation.y, yaw = i => F[YK[i]] == null ? 0 : Math.atan2(Math.sin(ry - F[YK[i]]), Math.cos(ry - F[YK[i]]));   // how far the ring turned the planted foot
     const dr0 = F[SK[0]] ? -1 : Math.hypot(D[0].x - F.L.x, D[0].z - F.L.z), dr1 = F[SK[1]] ? -1 : Math.hypot(D[1].x - F.R.x, D[1].z - F.R.z);
     for (const i of dr0 >= dr1 ? [0, 1] : [1, 0]) {
-      const dr = i ? dr1 : dr0, so = F[SK[1 - i]];
-      if (dr > reach && (cel ? !so : (!so || so.t >= STANCE.overlap || dr > STANCE.urgent))) F[SK[i]] = { t: 0, from: F[K[i]].clone() };
+      const dr = i ? dr1 : dr0, so = F[SK[1 - i]]; if (dr < 0) continue;
+      if (i === go || ((dr > reach || (!cel && Math.abs(yaw(i)) > GAIT.yawMax)) && (cel ? !so : (!so || so.t >= STANCE.overlap || dr > STANCE.urgent))))
+        F[SK[i]] = { t: 0, from: F[K[i]].clone(), T: cel ? CEL.step : walk ? Ts : STANCE.step, ant: walk ? ant : 0, d0: yaw(i) };
     }
     for (let i = 0; i < 2; i++) {
       const S = K[i], sK = SK[i], L = LB[S], foot = L.foot, st = F[sK];
-      let tgt = F[S], lift = 0;
+      const pinned = _v4; let dY = 0;   // the ankle's target (world) and how far the foot is turned off its animated heading (about y)
       if (st) {   // stepping: the foot travels from where it stood to where it should stand, lifting off the canvas on the way
         // R-12: the foot comes off the canvas first and only then travels (it used to skate the first few cm at floor height)
-        st.t += dt / step; const k = sstep(STANCE.liftT, 1, Math.min(1, st.t)); tgt = _pf3.copy(st.from).lerp(D[i], k); lift = 0.055 * Math.pow(Math.sin(Math.PI * Math.min(1, st.t)), 0.6);
-        if (st.t >= 1) { F[S].copy(D[i]); F[sK] = null; }
+        st.t += dt / st.T; const k = sstep(STANCE.liftT, GAIT.land, Math.min(1, st.t)), lift = 0.055 * Math.pow(Math.sin(Math.PI * Math.min(1, st.t)), 0.6);
+        // #83: the spot is fixed once the foot has got there (GAIT.land of the step) — it comes down onto it, it does not chase the
+        // moving spot over the last few millimetres above the canvas (it slid ~2 cm a frame into the stance at full speed)
+        if (st.t >= GAIT.land && !st.to) st.to = D[i].clone();
+        const to = st.to || D[i];
+        pinned.copy(st.from).lerp(to, k); pinned.y = N[i].y + lift; pinned.applyMatrix4(ARENA.matrixWorld);
+        dY = st.d0 * (1 - k);   // #83: the heading it had on the canvas turns back to the animation's in the air
+        if (st.t >= 1) { F[S].copy(to); F[sK] = null; F[BK[i]] = null; }
+      } else {   // #83 planted: the ball stays where it came down; the ankle hangs off it as animated, turned with the canvas
+        const o = X.o.subVectors(Bw[i], W[i]);   // ankle → ball as the animation has it (world)
+        if (!F[BK[i]]) { F[BK[i]] = ringPt(_pf3.copy(F[S]).applyMatrix4(ARENA.matrixWorld).add(o), new V3()); F[YK[i]] = ry; }
+        dY = yaw(i); if (dY) o.applyAxisAngle(X.up, dY);
+        pinned.copy(F[BK[i]]); pinned.y = ringPt(Bw[i], _pf3).y; pinned.applyMatrix4(ARENA.matrixWorld).sub(o);
+        ringPt(pinned, F[S]);   // (the ankle's spot: the stance box measures from it, a step starts from it)
       }
-      const pinned = _v4.copy(tgt); pinned.y = N[i].y + lift; pinned.applyMatrix4(ARENA.matrixWorld);
-      if (pinned.distanceToSquared(W[i]) < 1e-6) continue;
-      const q = this.mquat(foot, _pfq), t = this.group.worldToLocal(_pf4.copy(pinned));   // not a shared _v*: ik() uses those itself
+      if (pinned.distanceToSquared(W[i]) < 1e-6 && Math.abs(dY) < 1e-4) continue;
+      // (the group only turns about y: model y = world y; P2's is mirrored, scale.x = −1, so a turn about it goes the other way)
+      const sc = this.group.scale; let q = this.mquat(foot, _pfq); if (dY) q = X.q.setFromAxisAngle(X.up, sc.x * sc.y * sc.z < 0 ? -dY : dY).multiply(q);
+      const t = this.group.worldToLocal(_pf4.copy(pinned));   // not a shared _v*: ik() uses those itself
       this.ik(L.thigh, L.calf, foot, t); this.setMQuat(foot, q);
     }
     this.cc.updateMatrixWorld(true);

@@ -375,7 +375,7 @@ function netPred(dt, a, b, k) {
   if (run) {
     if (!PR.L) { PR.L = new Float32Array(REC.N); PR.S = new Float32Array(REC.N); }
     if (!PR.run) {   // a cold start: the feet stay where the stream had them (the bones still hold the last frame shown)
-      const LB = me.limbs(), F = me.ftOff || (me.ftOff = {}); F.sL = F.sR = null;
+      const LB = me.limbs(), F = me.ftOff || (me.ftOff = {}); F.sL = F.sR = F.bL = F.bR = F.rp = F.gp = null;   // (#83: the balls are pinned afresh from these)
       F.L = ringPt(_v1.setFromMatrixPosition(LB.L.foot.matrixWorld), new V3()); F.R = ringPt(_v1.setFromMatrixPosition(LB.R.foot.matrixWorld), new V3());
     }
     const st = me.stamina;
