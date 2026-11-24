@@ -422,6 +422,21 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .locbusy{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:9px 16px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(12,14,18,.86);font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);z-index:60;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.45)}
 .locbusy i{width:9px;height:9px;border-radius:50%;background:var(--gold);animation:locpulse 1s ease-in-out infinite}
 .locbusy[hidden]{display:none}
+/* R-26: the GPU dropped the context — the game waits under this until it is back (or offers a reload) */
+.gllost{z-index:30;background:rgba(7,8,11,.9)}
+.gllost .box{align-items:center;text-align:center;width:min(380px,82%)}
+.gllost b{font:900 clamp(22px,4.6vmin,36px)/1.05 'Big Shoulders Display',Impact,'Arial Black',sans-serif;letter-spacing:.02em;color:#f1ece2;text-transform:uppercase}
+.gllost .btn{min-height:44px;margin-top:6px}
+.gllost [hidden]{display:none}
+/* R-26: an error of the running game — a small pill under the HUD bars instead of silence (the bottom holds the touch controls) */
+.errtoast{position:absolute;left:50%;top:calc(var(--pt,12px) + 92px);transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:10px;max-width:min(560px,92%);box-sizing:border-box;
+  padding:5px 5px 5px 14px;border:1px solid rgba(255,90,100,.45);border-left:3px solid #ff4a5c;border-radius:8px;background:rgba(14,15,19,.92);box-shadow:0 12px 34px -10px rgba(0,0,0,.9);
+  font:500 12px var(--mono);letter-spacing:.03em;color:#e9e3d8}
+.errtoast[hidden]{display:none}
+.errtoast span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.errtoast span i{font-style:normal;color:#ff8a95;margin-right:8px}
+.errtoast button{flex:none;min-height:40px;min-width:40px;border:1px solid rgba(255,255,255,.2);border-radius:6px;background:rgba(255,255,255,.06);color:#fff;font:700 12px var(--mono);letter-spacing:.06em;padding:0 12px;cursor:pointer}
+.errtoast button.pri{border-color:rgba(255,140,140,.5);background:linear-gradient(180deg,#d42a3c,#8f1626)}
 /* R-24: a fight waits for a cold place — the set is built in steps under this screen (17_loc_load.js, locLoadUI) */
 .locload{z-index:8;background:radial-gradient(ellipse at 50% 42%,#171a22 0%,var(--ink) 70%)}
 .locload .box{align-items:stretch;text-align:left}
@@ -579,6 +594,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <div class="msg" id="msg"></div>
   <!-- issue 49: «Соперник отключился» — ten seconds to reconnect, then a win to the man left standing -->
   <div class="net-drop" id="net-drop" hidden><b>Соперник отключился</b><small id="net-drop-t">Ждём восстановления… 10 с</small></div>
+  <div class="net-drop" id="net-away" hidden><b>Соперник отошёл</b><small>свернул игру — бой идёт</small></div>
   <div class="kdbar" id="kdbar" hidden><div class="kdbar-t"><span id="kdtxt">ВСТАВАЙ · ЖМИ УДАРЫ</span><span id="kdn"></span></div><div class="kdbar-r"><i id="kdfill"></i></div></div>
 
   <!-- the card of a career opponent before the fight (fightCard): name and nickname, style · place · level, his legend -->
@@ -849,6 +865,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 
   <div class="loading" id="loading"><div class="box"><span id="ld-text">Загружаю бойцов…</span><div class="bar"><span id="ld-bar"></span></div></div></div>
   <div class="loading locload" id="loc-load" hidden><div class="box"><small>площадка</small><b id="ll-n"></b><span>Готовим площадку…</span><div class="bar"><span id="ll-bar"></span></div></div></div>
+  <div class="loading gllost" id="gl-lost" hidden><div class="box"><b>Графика перезапускается…</b><span id="gl-lost-t">видеокарта сбросила картинку — игра ждёт</span><button class="btn pri" id="gl-reload" hidden>Перезагрузить</button></div></div>
+  <div class="errtoast" id="err-toast" role="alert" hidden><span id="err-msg"></span><button class="pri" id="err-reload">Перезагрузить</button><button id="err-x" aria-label="Закрыть">✕</button></div>
   <div class="locbusy" id="loc-busy" hidden><i></i><span>Готовим площадку…</span></div>
 </div>
 
@@ -856,11 +874,24 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 /* boot watchdog: if the game module never starts (old browser, blocked CDN, script error) say why instead of an endless loading bar */
 window.__errs = [];
 (function () {
-  function show() { var t = document.getElementById('ld-text'); if (!t || !window.__errs.length) return; t.className = 'err';
+  // R-26: once the game is up (the loading screen gone) an error goes to a small toast with a reload button instead of nowhere
+  // (it hides itself after 20 s; ✕ closes it); window.__onErr (11_arena_loop.js) restarts the main loop if the error killed a frame.
+  // The list is capped: a broken frame throws 60 times a second.
+  var el = document.getElementById('err-toast'), msg = document.getElementById('err-msg'), nT = 0, hideT = 0;
+  function toast() { nT++; var i = document.createElement('i'); i.textContent = 'Ошибка' + (nT > 1 ? ' ×' + nT : '');
+    msg.replaceChildren(i, document.createTextNode(window.__errs[window.__errs.length - 1].replace(/^Uncaught /, '')));
+    el.hidden = false; clearTimeout(hideT); hideT = setTimeout(function () { el.hidden = true; nT = 0; }, 20000); }
+  document.getElementById('err-reload').addEventListener('click', function () { location.reload(); });
+  document.getElementById('err-x').addEventListener('click', function () { el.hidden = true; nT = 0; });
+  function show() { var t = document.getElementById('ld-text'); if (!t || !window.__errs.length) return;
+    if (document.getElementById('loading').hidden) return toast();
+    t.className = 'err';
     var v = (navigator.userAgent.match(/Version\/([\d.]+).*Safari/) || [])[1]; t.textContent = 'Ошибка: ' + window.__errs[0] + (v ? ' · Safari ' + v : ''); }
+  function push(m) { var E = window.__errs; E.push(m); if (E.length > 40) E.splice(1, E.length - 40);
+    try { if (window.__onErr) window.__onErr(m); } catch (_) {} show(); }
   addEventListener('error', function (e) { var t = e.target, m = e.message || (t && t.tagName === 'SCRIPT' && 'не загрузился ' + t.src);   // fonts/images failing don't matter
-    if (!m) return; window.__errs.push(String(m).slice(0, 160)); show(); }, true);
-  addEventListener('unhandledrejection', function (e) { var r = e.reason; window.__errs.push('promise: ' + String(r && r.message || r).slice(0, 160)); show(); });
+    if (!m) return; push(String(m).slice(0, 160)); }, true);
+  addEventListener('unhandledrejection', function (e) { var r = e.reason; push('promise: ' + String(r && r.message || r).slice(0, 160)); });
   setTimeout(function () { if (window.__boot) return;
     window.__errs.push(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap') ? 'скрипт игры не запустился (проверь интернет / блокировщик)' : 'браузер не поддерживает import maps — нужен Safari 16.4+ или Chrome');
     show(); }, 25000);

@@ -130,6 +130,7 @@ function perfTick(rawDt) {
   }
   m.anim = m.phys = m.fx = m.misc = m.render = 0; P.frames = 0; P.dt = 0; P.max = 0; P.calls = 0; P.tris = 0; P.t0 = now;
 }
-function renderFrame() { const t = performance.now(); renderer.info.reset(); composer.render(); socSnap(); PERF.m.render += performance.now() - t; }
+function renderFrame() { if (GLX.lost) return;   // R-26: no GL calls into a lost context (GLX: 11_arena_loop.js, handlers: 14_screens.js)
+  const t = performance.now(); renderer.info.reset(); composer.render(); socSnap(); PERF.m.render += performance.now() - t; }
 window.addEventListener('keydown', e => { if (e.code === 'F3') { e.preventDefault(); if (!e.repeat) perfToggle(); } });
 window.addEventListener('touchstart', e => { if (e.touches.length === 3) perfToggle(); }, { passive: true });

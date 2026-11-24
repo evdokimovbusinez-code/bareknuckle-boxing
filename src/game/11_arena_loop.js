@@ -48,13 +48,21 @@ function ropeTick(dt) {
 
 /* ───────── main loop ───────── */
 let last = performance.now();
+/* R-26: FRAME.on = a frame is running. An error event while it is set means that frame died before it asked for the next one:
+   window.__onErr (called by the error listener of the page head, g_head.html) asks for it, so the game goes on under the error toast.
+   GLX.lost = the WebGL context is gone (glLost / glRestored in 14_screens.js): frame() stands still, renderFrame() draws nothing. */
+const FRAME = { on: false, errs: 0 }, GLX = { lost: false, n: 0, failT: 0 };
+window.__onErr = () => { if (!FRAME.on) return; FRAME.on = false; FRAME.errs++; if (!window.__manual) requestAnimationFrame(frame); };
 // the ragdoll steps run inside Fighter.update: timed separately so the overlay can show them as physics
 for (const k of ['step', 'hitStep']) { const fn = Ragdoll.prototype[k]; Ragdoll.prototype[k] = function (dt) { const t = performance.now(), r = fn.call(this, dt); PERF.rag += performance.now() - t; return r; }; }
 function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
 function frame(now) {
   // R-24: a cold set is being prepared in steps (17_loc_load.js); while the fight waits for it the game stands still under
   // «Готовим площадку…» — no simulation, no 3D frame (the clock restarts from the end of this frame's loading work)
-  if (locPumpFrame()) { if (NET.role) netTick(Math.min(0.1, (now - last) / 1000)); last = performance.now(); if (!window.__manual) requestAnimationFrame(frame); return; }
+  FRAME.on = true;
+  // R-26: a lost GPU context — a solo game waits (no simulation, no frame) under «Графика перезапускается…»; a P2P fight goes on unseen
+  if (GLX.lost && !NET.role) { last = performance.now(); FRAME.on = false; if (!window.__manual) requestAnimationFrame(frame); return; }
+  if (!GLX.lost && locPumpFrame()) { if (NET.role) netTick(Math.min(0.1, (now - last) / 1000)); last = performance.now(); FRAME.on = false; if (!window.__manual) requestAnimationFrame(frame); return; }
   const rawDt = (now - last) / 1000, dtReal = G.paused ? 0 : Math.min(0.05, rawDt); last = now; G.real += dtReal;   // pause: everything below runs with dt = 0 (as in a hit-stop frame)
   if (NET.role) netTick(rawDt);   // issue 49: snapshots / input / ping / the disconnect clock
   const pm = PERF.m; let tp = performance.now(), tq; PERF.rag = 0;   // CPU split for the F3 overlay
@@ -90,6 +98,7 @@ function frame(now) {
   pm.misc += performance.now() - tp;
   perfTick(rawDt);
   renderFrame(rawDt);
+  FRAME.on = false;
   requestAnimationFrame(frame);
 }
 

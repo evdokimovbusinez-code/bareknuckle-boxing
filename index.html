@@ -54,13 +54,10 @@ button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:tra
 button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
 /* top bars */
-.hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:flex-start;gap:14px;padding:var(--pt) var(--pr) 0 var(--pl);pointer-events:none;isolation:isolate}
-/* R-06: a dark band under the top bars (0 → 76 px, 55 % black at the top) so the names and the clock read over a bright set */
-.hud::before{content:'';position:absolute;left:0;right:0;top:0;height:76px;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.55) 0px,rgba(0,0,0,.45) 38px,rgba(0,0,0,0) 76px)}
+.hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:flex-start;gap:14px;padding:var(--pt) var(--pr) 0 var(--pl);pointer-events:none}
 .side{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
 .nm{display:flex;align-items:baseline;gap:8px;font-family:var(--display);font-weight:900;font-size:clamp(16px,2.6vmin,24px);letter-spacing:.05em;text-transform:uppercase}
-.nm span{font-family:var(--mono);font-weight:500;font-size:11px;color:#b3ac9c;letter-spacing:.04em}
-.nm,.nm span{text-shadow:0 1px 2px rgba(0,0,0,.95),0 0 6px rgba(0,0,0,.7)}   /* R-06: «рубака · побед 0» over a bright wall */
+.nm span{font-family:var(--mono);font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.04em}
 .side.r .nm{flex-direction:row-reverse}
 .hp{position:relative;height:14px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 .hp i{position:absolute;top:0;bottom:0;left:0;width:100%;transform-origin:left center}
@@ -75,23 +72,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .st i{display:block;height:100%;width:100%;background:var(--blue);transform-origin:left center}
 .side.r .st i{transform-origin:right center}
 .mid{flex:none;min-width:54px;text-align:center;font-family:var(--display);font-weight:900;font-size:clamp(18px,3vmin,28px);color:var(--gold);line-height:1;padding-top:2px}
-.mid .vsl{display:block;text-shadow:0 2px 3px rgba(0,0,0,.8)}
-/* R-06: the clock — 20 px bold on its own dark plate, the round («Р1») beside it (hudUpdate, 10_camera_layout.js) */
-.clk{display:flex;align-items:baseline;justify-content:center;gap:6px;width:max-content;margin:4px auto 0;padding:2px 9px 3px;border-radius:5px;background:rgba(6,7,10,.66);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);white-space:nowrap}
-.clk i{font:700 12px var(--mono);font-style:normal;color:var(--gold);letter-spacing:.06em}
-.clk i:empty{display:none}
-.clk b{font:700 20px var(--mono);color:#fff;font-variant-numeric:tabular-nums;letter-spacing:.02em;text-shadow:0 1px 2px rgba(0,0,0,.8)}
-/* R-06: the heavy bag drill (#hud.bag, BAG.on): no health bars, no «VS» — score, combo and time, large */
-.bagp{display:none;gap:6px;justify-content:center;margin:0 auto}
-.bagp > div{display:flex;flex-direction:column;align-items:center;min-width:76px;padding:4px 12px 5px;border-radius:6px;background:rgba(6,7,10,.66);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
-.bagp small{font:600 10px var(--mono);color:#b3ac9c;letter-spacing:.12em;text-transform:uppercase}
-.bagp b{font:700 clamp(22px,4.4vmin,34px) var(--mono);color:#fff;font-variant-numeric:tabular-nums;line-height:1.05;text-shadow:0 1px 2px rgba(0,0,0,.8)}
-.bagp b.hot{color:var(--gold)}
-.bagp em{font:500 10px var(--mono);font-style:normal;color:#b3ac9c;letter-spacing:.04em;white-space:nowrap}
-.bagp em:empty{display:none}
-.hud.bag .hp,.hud.bag .side.r .st,.hud.bag #w2,.hud.bag .vsl,.hud.bag .clk{display:none}
-.hud.bag .bagp{display:flex}
-#stage.short .bagp > div{min-width:60px;padding:2px 8px 3px}
+.mid small{display:block;font-family:var(--mono);font-weight:500;font-size:10px;color:var(--muted);letter-spacing:.1em;margin-top:3px}
 .counter{align-self:flex-start;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:#0a0c11;background:var(--gold);border-radius:3px;padding:2px 7px;animation:pulse .35s infinite alternate}
 @keyframes pulse{from{transform:scale(1)}to{transform:scale(1.08)}}
 
@@ -183,11 +164,6 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .hl span{display:block;margin-top:2px;font-size:min(3vw,20px);font-weight:700;letter-spacing:.14em;color:#f1e3c2;text-shadow:0 2px 0 rgba(0,0,0,.7)}
 @keyframes hlin{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
 .rec button{margin-left:8px;font-size:13px;padding:6px 12px}
-/* R-15: the knockout replay's second plate, in the top letterbox bar on the right: what ended it (rpCaption, 07_state_replay_hits.js) */
-.rpcap{position:absolute;right:var(--pr);top:0;height:9%;max-width:58%;display:flex;align-items:center;gap:10px;pointer-events:none;font-family:var(--display);text-transform:uppercase;white-space:nowrap;overflow:hidden}
-.rpcap b{font-size:min(2.6vw,19px);font-weight:900;letter-spacing:.1em;color:var(--gold)}
-.rpcap span{font-size:min(2.1vw,15px);font-weight:700;letter-spacing:.12em;color:#f1e3c2;opacity:.92}
-.rpcap:empty,#rec[hidden]~.rpcap{display:none}
 .rec button:hover,.rb button:hover{border-color:var(--gold)} .rec button:active,.rb button:active,.go:active{transform:scale(.94)}
 .bars{position:absolute;left:0;right:0;height:9%;background:#000;pointer-events:none}
 .bars.t{top:0}.bars.b{bottom:0}
@@ -198,36 +174,6 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .rs{font-family:var(--mono);font-size:13px;color:#cfc8ba;letter-spacing:.06em}
 .rb{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:10px}
 .rb .pri,.go{background:linear-gradient(180deg,rgba(194,34,53,.95),rgba(130,18,32,.95));border-color:rgba(255,130,130,.4)}
-/* R-09: the result card. Desktop: a panel on the right (the camera frames the men in the space left of it), every text ≥ 13 px;
-   .cmp (short / touch stage): narrower panel, the tables folded behind «Подробнее», text ≥ 12 px; buttons ≥ 44 px everywhere */
-.result{display:block;background:linear-gradient(90deg,rgba(5,6,9,0) 35%,rgba(5,6,9,.4));padding:0}
-.rcard{position:absolute;right:calc(var(--pr) + 1vw);top:50%;transform:translateY(-50%);width:min(760px,60%);max-height:calc(100% - var(--pt) - var(--pb));overflow:auto;
-  display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 22px 18px;box-sizing:border-box;text-align:center;
-  background:rgba(9,11,16,.7);border:1px solid rgba(255,255,255,.1);border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.45);
-  animation:rcin .45s cubic-bezier(.2,1.2,.4,1);scrollbar-width:thin}
-@keyframes rcin{from{opacity:0;transform:translate(30px,-50%)}to{opacity:1;transform:translateY(-50%)}}
-.rcard .rt{font-size:clamp(44px,11vmin,92px);line-height:1.02}
-.rcard .rs{font-size:14px;line-height:1.3}.rcard .rs.car{color:var(--gold)}.rcard .rs:empty{display:none}
-.rbig{display:flex;justify-content:center;gap:10px;width:100%;margin:4px 0 2px}.rbig:empty{display:none}
-.rbig .rn{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 6px 7px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
-.rbig .rn b{font-family:var(--display);font-weight:900;font-size:clamp(28px,6vmin,44px);line-height:1;color:var(--text);white-space:nowrap;font-variant-numeric:tabular-nums}
-.rbig .rn.cash b{color:var(--gold)}.rbig .rn.fans b{color:#9fdca8}.rbig .rn.pts b{color:#f1e3c2}.rbig .rn.neg b{color:#e58a8a}.rbig .rn.zero b{color:var(--muted)}
-.rbig .rn small{font:500 13px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:#bdb6a8;white-space:nowrap}
-.rmore{display:none;min-height:44px;padding:0 18px;border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:6px;font:600 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#d8d2c6}
-.rmore::after{content:' ▾'}.rmore[aria-expanded="true"]::after{content:' ▴'}
-.rcard .rtabs{flex-wrap:wrap;gap:6px 22px;width:100%}.rcard .rtabs.none{display:none}
-.rcard .fstats,.rcard .fstats td,.rcard .fstats td:nth-child(2),.rcard .fstats.pay td,.rcard .fstats.pay td.l,.rcard .fstats.pay td.h,.rcard .fstats.pay td.new,.rcard .fstats.pay td:nth-child(2){font-size:13px;line-height:1.35}
-.rcard .fstats td{padding:1px 6px}.rcard .fstats:empty{display:none}
-.rcard .rb{margin-top:6px}.rcard .rb button{min-height:44px}
-.rcard.cmp{width:min(436px,60%);gap:6px;padding:10px 12px 12px}
-.rcard.cmp .rt{font-size:clamp(36px,12vmin,64px)}
-.rcard.cmp .rs{font-size:12px}
-.rcard.cmp .rbig .rn{padding:5px 4px}.rcard.cmp .rbig .rn b{font-size:clamp(22px,7vmin,32px)}.rcard.cmp .rbig .rn small{font-size:12px;letter-spacing:.03em}
-.rcard.cmp .rmore{display:block}.rcard.cmp .rmore.none{display:none}.rcard.cmp .rtabs{display:none}
-.rcard.cmp.more{width:min(720px,calc(100% - var(--pl) - var(--pr)))}.rcard.cmp.more .rtabs{display:flex}.rcard.cmp.more .rbig,.rcard.cmp.more .rt,.rcard.cmp.more .rs{display:none}
-.rcard.cmp .fstats,.rcard.cmp .fstats td,.rcard.cmp .fstats td:nth-child(2),.rcard.cmp .fstats.pay td,.rcard.cmp .fstats.pay td.l,.rcard.cmp .fstats.pay td.h,.rcard.cmp .fstats.pay td.new,.rcard.cmp .fstats.pay td:nth-child(2){font-size:12px}
-.rcard.cmp .rb{margin-top:2px;gap:8px}.rcard.cmp .rb button{font-size:15px;padding:0 12px}
-@media (prefers-reduced-motion:reduce){.rcard{animation:none}}
 
 /* menu */
 .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
@@ -422,6 +368,21 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .locbusy{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:9px 16px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(12,14,18,.86);font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);z-index:60;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.45)}
 .locbusy i{width:9px;height:9px;border-radius:50%;background:var(--gold);animation:locpulse 1s ease-in-out infinite}
 .locbusy[hidden]{display:none}
+/* R-26: the GPU dropped the context — the game waits under this until it is back (or offers a reload) */
+.gllost{z-index:30;background:rgba(7,8,11,.9)}
+.gllost .box{align-items:center;text-align:center;width:min(380px,82%)}
+.gllost b{font:900 clamp(22px,4.6vmin,36px)/1.05 'Big Shoulders Display',Impact,'Arial Black',sans-serif;letter-spacing:.02em;color:#f1ece2;text-transform:uppercase}
+.gllost .btn{min-height:44px;margin-top:6px}
+.gllost [hidden]{display:none}
+/* R-26: an error of the running game — a small pill under the HUD bars instead of silence (the bottom holds the touch controls) */
+.errtoast{position:absolute;left:50%;top:calc(var(--pt,12px) + 92px);transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:10px;max-width:min(560px,92%);box-sizing:border-box;
+  padding:5px 5px 5px 14px;border:1px solid rgba(255,90,100,.45);border-left:3px solid #ff4a5c;border-radius:8px;background:rgba(14,15,19,.92);box-shadow:0 12px 34px -10px rgba(0,0,0,.9);
+  font:500 12px var(--mono);letter-spacing:.03em;color:#e9e3d8}
+.errtoast[hidden]{display:none}
+.errtoast span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.errtoast span i{font-style:normal;color:#ff8a95;margin-right:8px}
+.errtoast button{flex:none;min-height:40px;min-width:40px;border:1px solid rgba(255,255,255,.2);border-radius:6px;background:rgba(255,255,255,.06);color:#fff;font:700 12px var(--mono);letter-spacing:.06em;padding:0 12px;cursor:pointer}
+.errtoast button.pri{border-color:rgba(255,140,140,.5);background:linear-gradient(180deg,#d42a3c,#8f1626)}
 /* R-24: a fight waits for a cold place — the set is built in steps under this screen (17_loc_load.js, locLoadUI) */
 .locload{z-index:8;background:radial-gradient(ellipse at 50% 42%,#171a22 0%,var(--ink) 70%)}
 .locload .box{align-items:stretch;text-align:left}
@@ -567,7 +528,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="st"><i id="s1"></i></div>
       <div class="counter" id="cnt" hidden>КОНТРУДАР ×1.5</div>
     </div>
-    <div class="mid" id="mid"><span class="vsl">VS</span><div class="clk" id="diffl"><i id="rnd"></i><b id="tmr">2:00</b></div><div class="bagp" id="bagp"><div><small>очки</small><b id="bag-sc">0</b><em id="bag-rec"></em></div><div><small>серия</small><b id="bag-cb">—</b><em id="bag-best"></em></div><div><small>время</small><b id="bag-t">0:45</b></div></div><span class="net-ping" id="net-ping" hidden></span><button class="pz" id="pause-btn" aria-label="Пауза"></button><button class="fs" id="fs-btn" aria-label="На весь экран" title="На весь экран" hidden><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M1.5 6V1.5H6M10 1.5h4.5V6M14.5 10v4.5H10M6 14.5H1.5V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg></button></div>
+    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><span class="net-ping" id="net-ping" hidden></span><button class="pz" id="pause-btn" aria-label="Пауза"></button><button class="fs" id="fs-btn" aria-label="На весь экран" title="На весь экран" hidden><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M1.5 6V1.5H6M10 1.5h4.5V6M14.5 10v4.5H10M6 14.5H1.5V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg></button></div>
     <div class="side r">
       <div class="nm"><b id="n2">Соперник</b><span id="w2">побед 0</span><span id="st2" style="opacity:.7"></span></div>
       <div class="hp" id="hpb2"><i class="ghost" id="g2"></i><i class="fill" id="h2"></i></div>
@@ -579,6 +540,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <div class="msg" id="msg"></div>
   <!-- issue 49: «Соперник отключился» — ten seconds to reconnect, then a win to the man left standing -->
   <div class="net-drop" id="net-drop" hidden><b>Соперник отключился</b><small id="net-drop-t">Ждём восстановления… 10 с</small></div>
+  <div class="net-drop" id="net-away" hidden><b>Соперник отошёл</b><small>свернул игру — бой идёт</small></div>
   <div class="kdbar" id="kdbar" hidden><div class="kdbar-t"><span id="kdtxt">ВСТАВАЙ · ЖМИ УДАРЫ</span><span id="kdn"></span></div><div class="kdbar-r"><i id="kdfill"></i></div></div>
 
   <!-- the card of a career opponent before the fight (fightCard): name and nickname, style · place · level, his legend -->
@@ -607,20 +569,14 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   </div>
 
   <div class="hl" id="hl" hidden><b>Лучшее в раунде</b><span id="hl-s"></span></div>
-  <div class="rec" id="rec" hidden><i></i>ПОВТОР<button id="skip">Пропустить</button></div><div class="rpcap" id="rp-cap"></div>
+  <div class="rec" id="rec" hidden><i></i>ПОВТОР<button id="skip">Пропустить</button></div>
 
-  <!-- R-09: the result card (07c_result.js) — a dark panel at the side, the men framed beside it (resWin → ccFit);
-       three big numbers that count up (₽, followers, fighter points), the tables under them (folded behind «Подробнее» on a phone) -->
   <div class="result" id="result" hidden>
-    <div class="rcard" id="r-card">
-      <div class="rt" id="r-title">Победа</div>
-      <div class="rs" id="r-sub"></div>
-      <div class="rs car" id="r-car"></div>
-      <div class="rbig" id="r-big"></div>
-      <button type="button" class="rmore" id="r-more" aria-expanded="false">Подробнее</button>
-      <div class="rtabs" id="r-tabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table><table class="fstats pay" id="r-soc"></table></div>
-      <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
-    </div>
+    <div class="rt" id="r-title">Победа</div>
+    <div class="rs" id="r-sub"></div>
+    <div class="rs car" id="r-car"></div>
+    <div class="rtabs"><table class="fstats" id="r-stats"></table><table class="fstats pay" id="r-pay"></table><table class="fstats pay" id="r-soc"></table></div>
+    <div class="rb"><button class="pri" id="r-again">Реванш</button><button id="r-replay">Повтор нокаута</button><button id="r-menu">Меню</button></div>
   </div>
 
   <!-- main menu: logo, the column of modes; the scene (the fighter warming up in the current location) shows through -->
@@ -849,6 +805,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 
   <div class="loading" id="loading"><div class="box"><span id="ld-text">Загружаю бойцов…</span><div class="bar"><span id="ld-bar"></span></div></div></div>
   <div class="loading locload" id="loc-load" hidden><div class="box"><small>площадка</small><b id="ll-n"></b><span>Готовим площадку…</span><div class="bar"><span id="ll-bar"></span></div></div></div>
+  <div class="loading gllost" id="gl-lost" hidden><div class="box"><b>Графика перезапускается…</b><span id="gl-lost-t">видеокарта сбросила картинку — игра ждёт</span><button class="btn pri" id="gl-reload" hidden>Перезагрузить</button></div></div>
+  <div class="errtoast" id="err-toast" role="alert" hidden><span id="err-msg"></span><button class="pri" id="err-reload">Перезагрузить</button><button id="err-x" aria-label="Закрыть">✕</button></div>
   <div class="locbusy" id="loc-busy" hidden><i></i><span>Готовим площадку…</span></div>
 </div>
 
@@ -856,11 +814,24 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 /* boot watchdog: if the game module never starts (old browser, blocked CDN, script error) say why instead of an endless loading bar */
 window.__errs = [];
 (function () {
-  function show() { var t = document.getElementById('ld-text'); if (!t || !window.__errs.length) return; t.className = 'err';
+  // R-26: once the game is up (the loading screen gone) an error goes to a small toast with a reload button instead of nowhere
+  // (it hides itself after 20 s; ✕ closes it); window.__onErr (11_arena_loop.js) restarts the main loop if the error killed a frame.
+  // The list is capped: a broken frame throws 60 times a second.
+  var el = document.getElementById('err-toast'), msg = document.getElementById('err-msg'), nT = 0, hideT = 0;
+  function toast() { nT++; var i = document.createElement('i'); i.textContent = 'Ошибка' + (nT > 1 ? ' ×' + nT : '');
+    msg.replaceChildren(i, document.createTextNode(window.__errs[window.__errs.length - 1].replace(/^Uncaught /, '')));
+    el.hidden = false; clearTimeout(hideT); hideT = setTimeout(function () { el.hidden = true; nT = 0; }, 20000); }
+  document.getElementById('err-reload').addEventListener('click', function () { location.reload(); });
+  document.getElementById('err-x').addEventListener('click', function () { el.hidden = true; nT = 0; });
+  function show() { var t = document.getElementById('ld-text'); if (!t || !window.__errs.length) return;
+    if (document.getElementById('loading').hidden) return toast();
+    t.className = 'err';
     var v = (navigator.userAgent.match(/Version\/([\d.]+).*Safari/) || [])[1]; t.textContent = 'Ошибка: ' + window.__errs[0] + (v ? ' · Safari ' + v : ''); }
+  function push(m) { var E = window.__errs; E.push(m); if (E.length > 40) E.splice(1, E.length - 40);
+    try { if (window.__onErr) window.__onErr(m); } catch (_) {} show(); }
   addEventListener('error', function (e) { var t = e.target, m = e.message || (t && t.tagName === 'SCRIPT' && 'не загрузился ' + t.src);   // fonts/images failing don't matter
-    if (!m) return; window.__errs.push(String(m).slice(0, 160)); show(); }, true);
-  addEventListener('unhandledrejection', function (e) { var r = e.reason; window.__errs.push('promise: ' + String(r && r.message || r).slice(0, 160)); show(); });
+    if (!m) return; push(String(m).slice(0, 160)); }, true);
+  addEventListener('unhandledrejection', function (e) { var r = e.reason; push('promise: ' + String(r && r.message || r).slice(0, 160)); });
   setTimeout(function () { if (window.__boot) return;
     window.__errs.push(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap') ? 'скрипт игры не запустился (проверь интернет / блокировщик)' : 'браузер не поддерживает import maps — нужен Safari 16.4+ или Chrome');
     show(); }, 25000);
@@ -2073,7 +2044,8 @@ function perfTick(rawDt) {
   }
   m.anim = m.phys = m.fx = m.misc = m.render = 0; P.frames = 0; P.dt = 0; P.max = 0; P.calls = 0; P.tris = 0; P.t0 = now;
 }
-function renderFrame() { const t = performance.now(); renderer.info.reset(); composer.render(); socSnap(); PERF.m.render += performance.now() - t; }
+function renderFrame() { if (GLX.lost) return;   // R-26: no GL calls into a lost context (GLX: 11_arena_loop.js, handlers: 14_screens.js)
+  const t = performance.now(); renderer.info.reset(); composer.render(); socSnap(); PERF.m.render += performance.now() - t; }
 window.addEventListener('keydown', e => { if (e.code === 'F3') { e.preventDefault(); if (!e.repeat) perfToggle(); } });
 window.addEventListener('touchstart', e => { if (e.touches.length === 3) perfToggle(); }, { passive: true });
 
@@ -2303,6 +2275,7 @@ const NET = {
   snaps: [], evs: [], pops: [], playT: 0, first: true,
   mv: { x: 0, y: 0, b: false }, blk: false, q: [], iq: [], evI: 0, pop: [],
   dropT: 0, retryT: null, roomShown: false,
+  oAway: false, awayI: 0,   // R-26: the opponent's tab is hidden (banner #net-away); our keep-alive timer while ours is
   stat: { snaps: 0, recv: 0, bytes: 0, max: 0, ins: 0, closes: 0 },
   tmp: null,
 };
@@ -6910,7 +6883,7 @@ class Fighter {
     // between exchanges a fighter recovers part of what he took (breath, legs, head clears) — but the damage that stays (swelling,
     // cuts, the brain's accumulated shake) lowers the ceiling he can come back to
     if (G.state === 'fight' && !this.ko && G.t - this.hitT > 1.6 && this.hp < this.hpCap) this.hp = Math.min(this.hpCap, this.hp + dt * (this.stamina > 40 ? 2 : 1));
-    if (this.liver && G.t >= this.liver.t && G.state === 'fight') { const L = this.liver; this.liver = null; knockdown(L.att, this, L.dir, 0.5, L.name, L.fwd, 1.2, 'liver'); if (G.kdHit && G.kdHit.def === this && L.t0 != null) G.kdHit.t = L.t0; }   // R-15: a count-out replays the liver punch, not the fold
+    if (this.liver && G.t >= this.liver.t && G.state === 'fight') { const L = this.liver; this.liver = null; knockdown(L.att, this, L.dir, 0.5, L.name, L.fwd, 1.2, 'liver'); }
     if (this.liver) { this.wobble = Math.max(this.wobble, 0.6); }
     if (this.doomed && G.t >= this.doomed.t && G.state === 'fight') { const D = this.doomed; this.lastContact = this.headNow.clone(); knockout(D.att, this, D.dir, 0.4, D.name, D.fwd, true); }
     if (this.doomed && !this.ko) { this.knock = (this.knock || 0) + dt * 0.25; this.wobble = Math.max(this.wobble, 2); }   // backing up on rubber legs
@@ -7650,11 +7623,10 @@ const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1
 // «Склад · аншлаг»: the place of career fight i as the menu, the card and the result screen name it
 const careerPlace = (i = G.career) => { const L = LADDER[Math.min(i, LADDER.length - 1)]; return (LOCS[L.loc] ? LOCS[L.loc].label : LOC.label) + (L.champ ? ' · аншлаг' : ''); };
 function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | 'tko' (the doctor stops it) — the purse depends on it
-  G.res = null;   // R-09: the big numbers of the result card (07c_result.js)
   if (NET.role) { NET.over = { win, draw, how }; return; }   // issue 49: a P2P bout pays nothing and does not touch the career
   fightTable();
   const stage = Math.min(G.career, LADDER.length - 1), before = careerWins();
-  if (draw) { const p = payOut(false, true, how, stage, before); p.soc = socFight(false, true, how, stage); payShow(p); G.res = resOf(p, 0); save(); return; }
+  if (draw) { const p = payOut(false, true, how, stage, before); p.soc = socFight(false, true, how, stage); payShow(p); save(); return; }
   if (win) G.wins++; else G.losses++;
   let t = '', pts = 0;
   if (G.mode === 'story') { const ch = storyCh();   // issue 51: a story chapter — clear it, the purse is in purse(), the outro comes after the replay
@@ -7665,12 +7637,10 @@ function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | '
     else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути — ${careerPlace()}`;
   } else if (win) pts = 1;
   if (pts) { PROF.pts += pts; t += (t ? ' · ' : '') + `+${pts} ${pts === 1 ? 'очко' : 'очка'} бойцу`; }
-  { const p = payOut(win, false, how, stage, before); p.soc = socFight(win, false, how, stage); payShow(p); G.res = resOf(p, pts); }   // the purse (07b_economy.js) and the followers (15_social.js) onto the result screen
+  { const p = payOut(win, false, how, stage, before); p.soc = socFight(win, false, how, stage); payShow(p); }   // the purse (07b_economy.js) and the followers (15_social.js) onto the result screen
   save(); const c = $('r-car'); if (c) c.textContent = t;
   const a = $('r-again'); if (a) a.textContent = G.mode === 'story' ? (win ? 'Дальше' : 'Ещё раз') : G.mode === 'career' && win && G.career < LADDER.length ? 'Следующий бой' : G.mode === 'career' && !win ? 'Ещё раз' : 'Реванш';
 }
-// R-09: what the three big numbers of the result card count up to (07c_result.js); a mode that pays nothing shows no ₽
-const resOf = (p, pts) => ({ cash: ['career', 'quick', 'story'].includes(G.mode) ? p.total : null, fans: p.soc ? p.soc.total : null, pts });
 const D_SEP = 1.15;
 
 const elMsg = $('msg'), elPops = $('pops');
@@ -7735,108 +7705,27 @@ function startReplay() {
   const S = (a, b, rate, cam) => ({ from: Math.max(t0, G.koT + a), to: Math.min(t1, G.koT + b), rate, cam });
   // was 4 shots at 0.27–0.6× (~19 s, mostly a body lying still in slow motion — it read as a frozen screen); now 3 shots, ~10 s
   const mid = [S(-0.35, 1.3, 0.55, 'low'), S(-0.2, 1.6, 0.65, 'top'), S(-0.5, 1.4, 0.5, 'shoulder')].sort(() => rr() - 0.5);
-  // R-15: the first shot is the punch itself — from the side its fist did not come from, the loser's face and the fist in frame,
-  // a stop on the contact, then 0.2× → 1× (RPK). Without a known punch (an old save / a story cut) the old close-up on the head.
-  const H = G.koHit && G.koHit.def === G.loser && G.koHit.t > t0 + 0.05 && G.koHit.t < t1 ? G.koHit : null;
-  const first = H ? { from: Math.max(t0, H.t - RPK.pre), to: Math.min(t1, H.t + RPK.post), rate: RPK.rate, cam: 'impact', hit: H.t, H } : S(-0.6, 0.9, 0.35, 'close');
-  RP.segs = [first, mid[0], S(-0.3, 2.0, 0.8, 'wide')].filter(g => g.to > g.from + 0.15);
+  RP.segs = [S(-0.6, 0.9, 0.35, 'close'), mid[0], S(-0.3, 2.0, 0.8, 'wide')].filter(g => g.to > g.from + 0.15);
   if (!RP.segs.length) return endReplay();   // e.g. a count-out: the knockdown is older than the buffer
-  if (RP.segs[0].H) rpImpactCam(RP.segs[0]);   // poses them at the contact and picks the camera there (rpImpactCam, below)
   RP.seg = -1; RP.wd = 0; nextSeg();
   $('rec').hidden = false; $('bar-t').hidden = $('bar-b').hidden = false; $('hud').hidden = true; $('pad').hidden = true; $('result').hidden = true;
-  rpCaption(H);
 }
 function nextSeg() {
   RP.seg++; if (RP.seg >= RP.segs.length) return endReplay();
   if (RP.segs[RP.seg].enter) RP.segs[RP.seg].enter();   // a segment may announce itself (the highlights' plate)
   P1.simReset = P2.simReset = true;   // a cut back in time: hair and shorts start from the pose, not from where they were
-  RP.tau = RP.segs[RP.seg].from; RP.i = 0; RP.hold = 0; RP.ramp = -1; FX.clearAir(); wearSeek(RP.tau); P1.simReset = P2.simReset = true; RP.cut = true;
+  RP.tau = RP.segs[RP.seg].from; RP.i = 0; RP.hold = 0; FX.clearAir(); wearSeek(RP.tau); P1.simReset = P2.simReset = true; RP.cut = true;
   stepReplay(0);   // pose the fighters before the camera cuts to them
 }
-/* R-15: the knockout punch in the replay. RPK: the shot runs from `pre` s before the contact to `post` after it; up to the contact at
-   `rate`; on the contact frame the clock stops for `freeze` s (real time; a longer recorded hit-stop wins), then the rate eases from
-   `r0` to 1 over `ramp` s of real time. */
-const RPK = { pre: 0.6, post: 1.0, rate: 0.5, freeze: 0.25, r0: 0.2, ramp: 1.0 };
-// the punch that ended it (knockout / knockdown → countOut): who hit whom, with what, when (sim time — a REC frame time)
-function koMark(att, def, name, body, t) { return { att, def, name, arm: PUNCH[name] ? PUNCH[name].arm : 'R', body: !!body, t, round: G.round }; }
-// the top plate of the replay (#rp-cap in the top letterbox bar): «НОКАУТ · Хук правой · раунд 2 · твой удар»
-function rpCaption(H) {
-  const el = $('rp-cap'); if (!H) { el.textContent = ''; return; }
-  const P = PUNCH[H.name], what = (P ? P.label : 'Удар') + (H.body ? ' в корпус' : '');
-  el.innerHTML = `<b>Нокаут</b><span>${what}${H.round && G.mode !== 'story' ? ' · раунд ' + H.round : ''} · ${H.att === P1 ? 'твой удар' : 'удар соперника'}</span>`;
-}
-// both men (and the ring, the ropes) as they were at replay time tau of the frames F; RP.i = the frame index found (a hint for the next call)
-function rpPose(F, tau, sdt) {
-  if (F[RP.i] && F[RP.i].t > tau) RP.i = 0;
-  while (RP.i < F.length - 2 && F[RP.i + 1].t <= tau) RP.i++;
-  const a = F[RP.i], b = F[RP.i + 1] || a, k = clamp((tau - a.t) / Math.max(1e-5, b.t - a.t), 0, 1);
+function stepReplay(dtReal) {
+  if (RP.hold > 0 && dtReal > 0) { RP.hold -= dtReal; dtReal = 0; }   // R-04: a recorded hit-stop freezes the replay too (dtReal = 0 also keeps the watchdog quiet)
+  const s = RP.segs[RP.seg], F = s.F || REC.frames, prev = RP.tau; RP.tau = Math.min(s.to, RP.tau + dtReal * (s.rf ? s.rf(RP.tau) : s.rate));   // s.F: a clip of its own (highlights); s.rf: a rate that follows the replay time (slow motion at the impact)
+  while (RP.i < F.length - 2 && F[RP.i + 1].t <= RP.tau) RP.i++;
+  const a = F[RP.i], b = F[RP.i + 1], k = clamp((RP.tau - a.t) / Math.max(1e-5, b.t - a.t), 0, 1), sdt = RP.tau - prev;
   if (a.gx && b.gx) { P1.group.position.x = a.gx[0] + (b.gx[0] - a.gx[0]) * k; P2.group.position.x = a.gx[1] + (b.gx[1] - a.gx[1]) * k; P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true); }   // a highlight is from earlier in the round: they stood somewhere else then
   P1.restore(a.d[0], b.d[0], k); P2.restore(a.d[1], b.d[1], k); P1.afterPose(sdt); P2.afterPose(sdt);
   if (a.ar && b.ar) { ARENA.position.set(a.ar[0] + (b.ar[0] - a.ar[0]) * k, 0, a.ar[1] + (b.ar[1] - a.ar[1]) * k); ARENA.rotation.y = a.ar[2] + (b.ar[2] - a.ar[2]) * k; }
   if (a.r && b.r) ROPES.forEach((R, i) => { const j = i * 4; R.hit = (R.hit || new V3()).set(a.r[j] + (b.r[j] - a.r[j]) * k, a.r[j + 1] + (b.r[j + 1] - a.r[j + 1]) * k, a.r[j + 2] + (b.r[j + 2] - a.r[j + 2]) * k); R.s = a.r[j + 3] + (b.r[j + 3] - a.r[j + 3]) * k; });
-}
-/* where the camera of the punch stands (s.ic = { p: camera, l: look point, back: unit vector look → camera }). Posed at the contact,
-   the search tries a ring of camera yaws about the point between the loser's head and the fist (RPC.yaw steps × RPC.d × RPC.h)
-   and takes the cheapest:
-   - the loser's face towards the lens: f = his head's forward · direction head → camera; f < RPC.fMin costs a lot (the test wants
-     > 0.2), and f away from RPC.fWant (≈ 57° off his face line: three-quarter face, the fist beside it) a little;
-   - the side opposite the punching arm (its shoulder's side across the fight line): the other side costs RPC.side — the punch then
-     turns his face towards the lens, not away;
-   - head and fist inside ±RPC.ndc of the frame (the test: 10 % margins = ±0.8; letterbox bars are 9 %);
-   - R-03's cover test on the winner: his head, neck, shoulders, chest and the guard arm (not the punching forearm / fist) nearer
-     the lens than the loser's head / the fist and within RPC.r metres of it on screen (RPC.cov per unit of cover);
-   - the 4 corner posts across the sight lines (ccGap < CC_R), the camera height inside RPC.y;
-   - f past RPC.fMax (straight down his face line = over the winner's shoulder, whose back then hides the fall) costs extra. */
-const RPC = { yaw: 48, d: [1.7, 2.05, 2.45], h: [0.12, 0.28, -0.04], fMin: 0.32, fWant: 0.55, fMax: 0.78, side: 1.2, ndc: 0.58, r: 0.13, cov: 9, y: [0.7, 2.1],
-  after: [[0.35, 0.7], [0.7, 0.5]] };   // after: [s past the contact, weight] of the cover test as he goes down
-const _rpM = new M4(), _rpA = new V3(), _rpB = new V3(), _rpC = new V3();
-function rpFist(A, arm, out) { return out.setFromMatrixPosition(A.bones[`CC_Base_${arm}_Mid1`].matrixWorld); }
-function rpHeadFwd(D, out) { return out.setFromMatrixColumn(_rpM.multiplyMatrices(D.head.matrixWorld, HEAD.restInvT), 2).normalize(); }
-function rpImpactCam(s) {
-  const H = s.H, A = H.att, D = H.def, F = REC.frames, L = H.arm === 'L', tEnd = F[F.length - 1].t;
-  // R-03's cover test, over the shot: at the contact (the head and the fist) and as he goes (RPC.after: his head, then his chest).
-  // The winner's points that may hide it: head, neck, both shoulders, chest, pelvis, the guard arm's forearm and hand (at the
-  // contact the punching forearm / fist is the subject, not a cover; later all of him counts)
-  const occOf = all => [A.jp[15], A.jp[4], A.jp[2], A.jp[3], new V3().addVectors(A.jp[2], A.jp[3]).multiplyScalar(0.5), new V3().addVectors(A.jp[0], A.jp[1]).multiplyScalar(0.5),
-    A.jp[L ? 7 : 5], A.jp[L ? 8 : 6], ...(all ? [A.jp[L ? 5 : 7], A.jp[L ? 6 : 8]] : [])].map(v => v.clone());
-  const smp = []; let head, fist, fwd, look, away;
-  for (const [dt, w] of [[0, 1], ...RPC.after]) {
-    RP.i = 0; rpPose(F, Math.min(tEnd, H.t + dt), 0);
-    if (!dt) {
-      head = D.headNow.clone(); fist = rpFist(A, H.arm, new V3()); fwd = rpHeadFwd(D, new V3());
-      look = head.clone().lerp(fist, 0.5); look.y -= 0.03;   // the middle of head and fist (a body shot: half a metre apart)
-      const sh = A.jp[L ? 2 : 3], so = A.jp[L ? 3 : 2]; away = -(Math.sign(sh.z - so.z) || 1);   // z side opposite the punching arm
-      smp.push({ tg: [[head, 1], [fist, 0.6]], occ: occOf(false), frame: true });
-    } else smp.push({ tg: [[D.headNow.clone(), w], [new V3().addVectors(D.jp[2], D.jp[3]).multiplyScalar(0.5), w * 0.5]], occ: occOf(true) });
-  }
-  const posts = RINGSET.visible ? ccPostsWorld() : [], ty = Math.tan(camera.fov * Math.PI / 360);
-  let best = null, bc = Infinity;
-  for (let i = 0; i < RPC.yaw; i++) for (const d of RPC.d) for (const h of RPC.h) {
-    const a = i / RPC.yaw * Math.PI * 2, cp = _rpA.set(look.x + Math.sin(a) * d, look.y + h, look.z + Math.cos(a) * d);
-    const f = fwd.dot(_rpB.subVectors(cp, head).normalize());
-    let c = (f < RPC.fMin ? 30 + (RPC.fMin - f) * 40 : 0) + 2 * Math.abs(f - RPC.fWant) + (f > RPC.fMax ? 4 * (f - RPC.fMax) : 0)
-      + (Math.sign(cp.z - look.z) !== away ? RPC.side : 0) + 0.25 * (d - RPC.d[0]);
-    if (cp.y < RPC.y[0] || cp.y > RPC.y[1]) c += 5;
-    for (const S of smp) for (const [t, w] of S.tg) {
-      const n = ccNdc(t, cp, look, _rpC), tx = n.x, tyN = n.y, tz = n.z, o = Math.max(Math.abs(n.x), Math.abs(n.y));
-      if (S.frame && o > RPC.ndc) c += 40 * (o - RPC.ndc);
-      for (const q of S.occ) { const m = ccNdc(q, cp, look, _rpC); if (m.z >= tz - 0.04) continue;
-        const rN = RPC.r / (Math.max(0.05, m.z) * ty), cov = 1 - Math.hypot((m.x - tx) * camera.aspect, m.y - tyN) / rN; if (cov > 0) c += RPC.cov * w * cov; }
-      for (const p of posts) { const g = ccGap(p.w, cp, t); if (g < CC_R) c += 10 * w * (1 - g / CC_R); }
-    }
-    if (c < bc) { bc = c; best = cp.clone(); }
-  }
-  s.ic = { p: best, l: look, back: best.clone().sub(look).normalize(), cost: bc };
-}
-function stepReplay(dtReal) {
-  if (RP.hold > 0 && dtReal > 0) { RP.hold -= dtReal; dtReal = 0; }   // R-04: a recorded hit-stop freezes the replay too (dtReal = 0 also keeps the watchdog quiet)
-  const s = RP.segs[RP.seg], F = s.F || REC.frames, prev = RP.tau;
-  // s.F: a clip of its own (highlights); s.rf: a rate that follows the replay time (slow motion at the impact); s.hit: R-15's stop + ease-in
-  let rate = s.rf ? s.rf(RP.tau) : s.rate;
-  if (s.hit != null && RP.ramp >= 0) { rate = RPK.r0 + (1 - RPK.r0) * sstep(0, RPK.ramp, RP.ramp); RP.ramp += dtReal; }
-  RP.tau = Math.min(s.to, RP.tau + dtReal * rate);
-  if (s.hit != null && RP.ramp < 0 && prev < s.hit && RP.tau >= s.hit) { RP.tau = s.hit; RP.hold = Math.max(RP.hold || 0, RPK.freeze); RP.ramp = 0; }   // the contact frame: stop there
-  const sdt = RP.tau - prev; rpPose(F, RP.tau, sdt);
   for (const e of REC.events) if (e.t > prev && e.t <= RP.tau) {
     if (e.wear) { wearEvent(e); continue; }   // a hat flies off / glasses break again (04e_wardrobe.js)
     const F = e.who ? P2 : P1; FX.spawn(e.pos, e.dir, e.power); if (e.dent) F.flesh.dent(...e.dent); if (e.mist) FX.mist(e.pos, e.dir, e.power, e.mist);
@@ -7852,13 +7741,13 @@ function stepReplay(dtReal) {
 }
 function endReplay() {
   if (RP.hl) return endHighlights();
-  rpCaption(null); const F = REC.frames; if (F.length) { const l = F[F.length - 1]; P1.restore(l.d[0], l.d[0], 0); P2.restore(l.d[1], l.d[1], 0); if (l.gx) { P1.group.position.x = l.gx[0]; P2.group.position.x = l.gx[1]; P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true); } }
+  const F = REC.frames; if (F.length) { const l = F[F.length - 1]; P1.restore(l.d[0], l.d[0], 0); P2.restore(l.d[1], l.d[1], 0); if (l.gx) { P1.group.position.x = l.gx[0]; P2.group.position.x = l.gx[1]; P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true); } }
   G.loser.frozen = true; G.loser.rag.on = false; G.winner.simReset = true; G.loser.simReset = true;
   if (NET.role) { $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true; return netResult(); }   // P2P: the host played the replay (streamed to the guest), then the shared result
   G.state = 'result'; $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true;
   const win = G.winner === P1; $('r-title').textContent = win ? 'Победа' : 'Нокаут'; $('r-title').className = 'rt ' + (win ? 'win' : 'lose');
   $('r-sub').textContent = `${win ? 'соперник на полу' : 'ты на полу'} · счёт ${G.wins} : ${G.losses}`;
-  if (!storyOut(win)) resultOpen();   // issue 51: a story bout plays its outro dialog first, the result screen after it
+  if (!storyOut(win)) $('result').hidden = false;   // issue 51: a story bout plays its outro dialog first, the result screen after it
 }
 
 /* ───────── hits ───────── */
@@ -8086,7 +7975,7 @@ function resolveHit(att, name, contact) {
   // and can't get his breath; a straight shot into the solar plexus knocks the wind out of him (bent over a second or two)
   if (body && !blocked && G.state === 'fight' && !window.__noKD) {
     const liverSide = name === 'hookL' || (name === 'jab' && rr() < 0.3);
-    if (liverSide && rr() < clamp((power - 0.55) * 0.6 + (1 - def.hp / 100) * 0.25 + (counter ? 0.15 : 0), 0, 0.45)) { def.liver = { t: G.t + 0.5 + rr() * 0.7, t0: G.t, att, dir: dir.clone(), name, fwd }; def.cancelPunch(); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'печень', 'crit'); }
+    if (liverSide && rr() < clamp((power - 0.55) * 0.6 + (1 - def.hp / 100) * 0.25 + (counter ? 0.15 : 0), 0, 0.45)) { def.liver = { t: G.t + 0.5 + rr() * 0.7, att, dir: dir.clone(), name, fwd }; def.cancelPunch(); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'печень', 'crit'); }
     else if (P.type === 'straight' && rr() < 0.3 * power) { def.wind = G.t + 1.0 + rr() * 1.2; def.cancelPunch(); }
   }
   // knockdowns and "his legs went": a clean shot to an already shaken, tiring man can put him down without putting him out
@@ -8126,7 +8015,6 @@ function knockdown(att, def, dir, power, name, fwd, sev, kind, bodyArg) {
   let up = 2 + (sev - 1) * 3 + (def.kdCount - 1) * 1.5 + (1 - def.hp / 100) * 3.2 + rr() * 1.5;
   if (type === 'knee') up = Math.min(up, 7.5);
   if (type === 'liver') up = 5 + (1 - def.hp / 100) * 4 + rr() * 3.5;   // a liver shot often keeps a man down past ten
-  G.kdHit = koMark(att, def, name, body, G.t);   // R-15: a count-out replays this punch
   AI.fol = 0; G.kd = { def, att, t0: G.t, type, n: 0, nT: 0, down: false, fallSnd: false, up: clamp(up, 2, 11.5), mash: 0, done: false };
   def.cur = null; def.dodge = null; def.blocking = false; Q.length = 0; def.daze = Math.max(def.daze, 0.8);
   if (type === 'fall') {
@@ -8155,7 +8043,6 @@ function kdTick(dt) {
 }
 function countOut(K) {
   const D = K.def, A = K.att; D.ko = true; G.state = 'ko'; G.koT = K.t0; G.koCine = G.t; G.koTitle = false;
-  G.koHit = G.kdHit && G.kdHit.def === D ? G.kdHit : null;   // R-15: the knockdown punch, ten seconds ago (koT is its time too)
   G.winner = A; G.loser = D; G.fallSnd = true; G.kd = null; celStart(A, 0.3);   // R-13: the man has been down ten seconds — no follow-up window to wait for
   if (D.rag.on) D.rag.prof.conscious = false;   // he stops trying
   else D.collapse();
@@ -8166,12 +8053,11 @@ function knockout(att, def, dir, power, name, fwd, forced, bodyArg) {
   // the delayed knockout (rare, but it happens — Barboza–Burgos): still on his feet, he backs up on rubber legs for a second or three and
   // then goes. Another clean shot meanwhile finishes it at once.
   if (!forced && !def.doomed && PUNCH[name].type !== 'upper' && power < 1.15 && rr() < (window.__koVar === 'stagger' ? 1 : window.__koVar ? 0 : 0.14)) {
-    def.doomed = { t: G.t + 1.1 + rr() * 1.8, t0: G.t, att, dir: dir.clone(), name, fwd }; def.wobble = 4; def.daze = 1; def.cancelPunch(); def.dodge = null; def.blocking = false;
+    def.doomed = { t: G.t + 1.1 + rr() * 1.8, att, dir: dir.clone(), name, fwd }; def.wobble = 4; def.daze = 1; def.cancelPunch(); def.dodge = null; def.blocking = false;
     popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'поплыл', 'crit'); return;
   }
-  const body = !!bodyArg;
-  G.koHit = koMark(att, def, name, body, forced && def.doomed ? def.doomed.t0 : G.t);   // R-15: a delayed knockout replays the punch, not the fall
   def.doomed = null;
+  const body = !!bodyArg;
   def.ko = true; G.state = 'ko'; G.koT = G.t; G.koCine = G.t; G.koTitle = false;
   AI.fol = 0; G.winner = att; G.loser = def; G.fallSnd = false; celStart(att);   // R-13: he backs off and celebrates (09b_cine.js)
   // keep the fall in the side-on plane: mostly away from the attacker, a little toward/away from camera
@@ -8328,49 +8214,6 @@ window.__kd = {
   },
 };
 
-/* ── debug hook (R-15): a knockout by a real punch, then its replay up to the contact frame (docs/audit/scenarios/replay.js).
-   ko(kind, who): kind = jab | cross | hookL | hookR | upperL | upperR | bodyL | bodyR (a hook to the body), who = 1 → P1 knocks
-   out P2, 2 → P2 knocks out P1; the loser is at 0.5 hp, the punch is thrown and the sim runs until it lands.
-   contact(): plays the KO cine out, starts the replay and steps it to the stop on the contact frame. metrics(): the test's numbers
-   from the real camera — f = the loser's head forward · direction head → camera, NDC of his head and the fist, ok = f > 0.2 and
-   both inside ±0.8 (10 % margins). */
-window.__rp = {
-  RPK, RPC,
-  ko(kind = 'cross', who = 1, tries = 3) {
-    if (P1 && G.state !== 'fight' && G.state !== 'menu') { rpCaption(null); startFight(true); }   // a fresh bout after the last replay
-    if (!window.__kd._setup()) return null;
-    const A = who === 2 ? P2 : P1, D = A.other, body = /^body/.test(kind), name = body ? (kind === 'bodyL' ? 'hookL' : 'hookR') : PUNCH[kind] ? kind : 'cross';
-    if (A === P2 && !P1._kdQuiet) { P1._kdQuiet = true; P1.startDodge = () => {}; }
-    // 1.0 m apart (a fresh bout may start at 1.08 m, where a short hook to the body whiffs)
-    { const sx = Math.sign(D.group.position.x - A.group.position.x) || 1, dx = (Math.abs(D.group.position.x - A.group.position.x) - 1.0) * sx;
-      if (A.mark) A.mark.x += dx; A.group.position.x += dx; A.group.updateMatrixWorld(true); window.__tick(4, 1 / 60); }
-    D.hp = 0.5; D.hpCap = 100; A.cur = null; A.powerNext = true; A.wantBody = body; A.startPunch(name); G.koHit = null;
-    for (let i = 0; i < 90 && G.state === 'fight'; i++) window.__tick(1, 1 / 60);
-    // the first bout of a fresh page may still be settling in (the location loading), or the punch fell short: a fresh bout, once more
-    if (G.state !== 'ko' && tries > 1) { startFight(true); return this.ko(kind, who, tries - 1); }
-    return { kind, name, who, state: G.state, hit: G.koHit ? { name: G.koHit.name, arm: G.koHit.arm, body: G.koHit.body } : null,
-      hp: +D.hp.toFixed(2), gap: +Math.abs(D.group.position.x - A.group.position.x).toFixed(2), whiff: !!A.whiff, cur: A.cur };
-  },
-  contact() {
-    if (G.state !== 'ko' && G.state !== 'replay') return null;
-    for (let i = 0; i < 400 && G.state === 'ko'; i++) window.__tick(1, 1 / 60);   // the KO cine (KO_CINE.hold) starts the replay itself
-    if (G.state !== 'replay') startReplay();
-    const s = RP.segs[0]; if (!s || s.hit == null) return { state: G.state, impact: false };
-    for (let i = 0; i < 400 && G.state === 'replay' && !(RP.seg === 0 && RP.ramp === 0 && RP.hold > 0); i++) window.__tick(1, 1 / 60);
-    return this.metrics();
-  },
-  metrics() {
-    const s = RP.segs[RP.seg]; if (!s || !s.H) return null;
-    camera.updateMatrixWorld(true);
-    const H = s.H, D = H.def, head = D.headNow.clone(), fist = rpFist(H.att, H.arm, new V3()), fwd = rpHeadFwd(D, new V3());
-    const f = fwd.dot(new V3().subVectors(camera.position, head).normalize());
-    const nh = head.clone().project(camera), nf = fist.clone().project(camera), m = v => Math.max(Math.abs(v.x), Math.abs(v.y));
-    const r = x => +x.toFixed(3);
-    return { name: H.name, arm: H.arm, body: H.body, who: H.att === P1 ? 1 : 2, f: r(f), head: [r(nh.x), r(nh.y)], fist: [r(nf.x), r(nf.y)], gap: r(head.distanceTo(fist)),
-      cam: camera.position.toArray().map(r), cost: r(s.ic.cost), tau: r(RP.tau - s.hit), hold: r(RP.hold), ok: f > 0.2 && m(nh) <= 0.8 && m(nf) <= 0.8 && nh.z < 1 && nf.z < 1 };
-  },
-};
-
 /* ───────── money: purses for fights, what is owned, career rewards ─────────
    Currency: roubles (₽), PROF.cash. PROF.own = { itemId: 1 } is what was bought in the shop (14b_shop.js): an item is bought with all
    its colours. Free (price 0) things are always owned; an item with `reward: n` (04e_wardrobe.js) is not for sale — it opens by
@@ -8430,76 +8273,6 @@ function payShow(p) {
     `<tr class="tot"><td class="l">Итого</td><td>${cash(p.total)}</td></tr><tr><td class="l">В кошельке</td><td>${cash(PROF.cash)}</td></tr>` +
     (p.opened && p.opened.length ? `<tr><td colspan="2" class="new">открыто: ${p.opened.map(esc).join(', ')}</td></tr>` : ''));
 }
-/* ───────── R-09: the result screen ─────────
-   One card (#r-card, g_head.html) on the right: the title, the lines under it, three big numbers that count up (₽ of the purse,
-   followers, fighter points), the tables under them (folded behind «Подробнее» on a short / touch stage — .cmp), three buttons.
-   resultOpen() is the one way the card comes up: it hides whatever could sit over it (#msg «Нокаут» / «Стоп!», the get-up bar,
-   the HUD, the round highlight plate, the touch pad) and starts the count. The numbers come from G.res, filled by fightOver
-   (07_state_replay_hits.js), bagEnd (09_bag.js) or nobody (P2P: G.res = null, no numbers).
-   The camera (camUpdate → resView, camClear → ccFit) frames the men in the part of the screen left of the card: resWin() gives
-   the NDC window [-CC_FX, card's left edge − RES.gap], the projection is skewed so that window's centre is the frame's centre. */
-const RES = { dur: 1.1, lag: 0.18, gap: 0.04, minH: 0.22, s: 0, raf: 0, tm: 0 };
-const resSign = n => (n < 0 ? '−' : '+');
-// what the big numbers say: [{ cls, v, f(v) → text, label }]
-function resItems(r) {
-  if (!r) return [];
-  if (r.bag) return [{ cls: 'cash', v: r.score, f: v => numF(v), label: 'очки' }, { cls: 'fans', v: r.best, f: v => '×' + Math.round(v), label: 'лучшая серия' },
-    { cls: 'pts', v: r.pts, f: v => '+' + Math.round(v), label: 'очки бойца' }];
-  const out = [];
-  if (r.cash != null) out.push({ cls: 'cash', v: r.cash, f: v => '+' + cash(v), label: 'выплата' });
-  if (r.fans != null) out.push({ cls: 'fans', v: r.fans, f: v => resSign(v) + numF(Math.abs(v)), label: 'подписчики' });
-  out.push({ cls: 'pts', v: r.pts || 0, f: v => '+' + Math.round(v), label: 'очки бойца' });
-  return out;
-}
-function resCount(items) {
-  cancelAnimationFrame(RES.raf); clearTimeout(RES.tm);
-  const els = [...$('r-big').querySelectorAll('.rn b')], t0 = performance.now();
-  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const put = done => {
-    const t = (performance.now() - t0) / 1000;
-    items.forEach((it, i) => { const p = done || reduce ? 1 : clamp((t - i * RES.lag) / RES.dur, 0, 1), e = 1 - Math.pow(1 - p, 3);
-      els[i].textContent = it.f(Math.round(it.v * e)); });
-    return t >= RES.dur + RES.lag * (items.length - 1);
-  };
-  const step = () => { if (!put(false)) RES.raf = requestAnimationFrame(step); };
-  put(false); RES.raf = requestAnimationFrame(step);
-  RES.tm = setTimeout(() => { cancelAnimationFrame(RES.raf); put(true); }, (RES.dur + RES.lag * items.length) * 1000 + 150);   // a hidden tab gets no frames: land on the totals anyway
-}
-// short or touch stage: the narrow card, tables behind «Подробнее»
-function resCompact() { const c = $('r-card'); if (c) c.classList.toggle('cmp', TOUCH || VH < 520); }
-function resMore(on) {
-  const c = $('r-card'), b = $('r-more'); c.classList.toggle('more', on); b.setAttribute('aria-expanded', on ? 'true' : 'false');
-  b.textContent = on ? 'Свернуть' : 'Подробнее';
-}
-function resultOpen() {
-  const R = $('result');
-  elMsg.className = 'msg'; elMsg.textContent = '';   // «Нокаут» / «Стоп! Рассечение» would sit over the card
-  show('kdbar', false); show('hud', false); show('hl', false); show('pad', false); show('rec', false);
-  resCompact(); resMore(false);
-  const items = resItems(G.res), big = $('r-big');
-  big.innerHTML = items.map(it => `<div class="rn ${it.cls}${it.v < 0 ? ' neg' : !it.v ? ' zero' : ''}"><b>${it.f(0)}</b><small>${it.label}</small></div>`).join('');
-  const tabs = $('r-tabs'), any = !!tabs.querySelector('tr');
-  tabs.classList.toggle('none', !any); $('r-more').classList.toggle('none', !any);
-  R.hidden = false; resCount(items);
-}
-$('r-more').addEventListener('click', () => resMore(!$('r-card').classList.contains('more')));
-/* the window the men are framed in while the card is up: { s, h } = shift of the frame centre (NDC) and the half width */
-function resWin() {
-  if (G.state !== 'result' || $('result').hidden || window.__camHold) return null;
-  const c = $('r-card'); if (!c || !c.offsetWidth) return null;
-  const a = -CC_FX, b = 2 * c.offsetLeft / VW - 1 - RES.gap, h = (b - a) / 2;
-  return h < RES.minH ? null : { s: -(a + b) / 2, h };
-}
-// skews the projection so the centre of resWin() is the centre of the camera's frame (eased in, dropped at once when the card goes)
-function resView(dt, cut) {
-  const w = resWin(), t = w ? w.s : 0;
-  RES.s = !w ? 0 : cut ? t : RES.s + (t - RES.s) * (1 - Math.exp(-dt * 4));
-  if (Math.abs(RES.s) > 1e-3) camera.setViewOffset(VW, VH, RES.s * VW / 2, 0, VW, VH);
-  else if (camera.view && camera.view.enabled) camera.clearViewOffset();
-  return w;
-}
-// debug: __res.decision([[9, 10], [9, 10]]) = a loss on the cards now (test docs/audit/scenarios/result.js)
-window.__res = { RES, resWin, resItems, open: resultOpen, more: resMore, decision: cards => { G.cards = cards; decision(); } };
 /* ───────── AI ───────── */
 /* opponent styles, after how bare-knuckle bouts actually go: short range, lots of hooks and overhands, fighters who stand and trade,
    counter-punchers who make you miss and make you pay, and pressure fighters who walk you to the ropes with combinations and body shots */
@@ -8673,8 +8446,7 @@ function startBag() {
   G.mode = 'bag'; if (G.diff !== G.userDiff && G.userDiff) G.diff = G.userDiff;
   startFight(true); BAG.on = true; showP2(false); BAG.g.visible = true;
   BAG.x = null; Object.assign(BAG, { score: 0, hits: 0, combo: 0, best: 0, lastT: -9 }); bagReset(); BAG.setSkin(BAG.skin + 1);   // the other bag every time
-  G.roundT = 45; $('n2').textContent = 'Груша'; const sl = $('st2'); if (sl) sl.textContent = '';   // R-06: the record is under the score in the bag panel
-  elHud.classList.add('bag'); G.hudTxt = '';
+  G.roundT = 45; $('n2').textContent = 'Груша'; const sl = $('st2'); if (sl) sl.textContent = 'рекорд ' + G.bagBest;
 }
 function bagHit(att, name, contact) {
   const P = PUNCH[name]; let dmg = P.dmg * (att.dmgMul || 1) * (1 + 0.06 * SK(att, 'pow')) * (att.sig && sigOf(name) === att.sig ? 1.12 : 1) * (att.punchK ?? 1) * (att.counterUntil > G.t ? 1.5 : 1); att.counterUntil = 0;
@@ -8693,7 +8465,8 @@ function bagHit(att, name, contact) {
   G.hitstop = 0.01 + 0.018 * power; G.shake = Math.max(G.shake, 0.008 + 0.02 * power);
   popup(pos, BAG.combo > 1 ? `${pts} ×${BAG.combo}` : String(pts), BAG.combo >= 4 ? 'crit' : 'hit');
   if (BAG.combo === 4 || BAG.combo === 7) msg('Серия ×' + BAG.combo);
-}   // R-06: the score / combo / time are drawn large in the HUD's bag panel (hudUpdate)
+  const sl = $('st2'); if (sl) sl.textContent = 'очки ' + BAG.score;
+}
 function bagEnd() {
   G.state = 'result'; G.winner = P1; G.loser = P2; BAG.on = true; sfx.bell(3); $('pad').hidden = true; Q.length = 0;
   const rec = BAG.score > G.bagBest; if (rec) G.bagBest = BAG.score; const bp = (BAG.score >= 400 ? 1 : 0) + (BAG.score >= 800 ? 1 : 0); PROF.pts += bp; save();
@@ -8701,7 +8474,7 @@ function bagEnd() {
   $('r-title').textContent = rec ? 'Рекорд!' : 'Время'; $('r-title').className = 'rt win';
   $('r-sub').textContent = `очки ${BAG.score} · попаданий ${BAG.hits} · лучшая серия ×${BAG.best} · рекорд ${G.bagBest}`;
   $('r-car').textContent = (BAG.score >= 900 ? 'Готов к титулу' : BAG.score >= 600 ? 'Боевая форма' : BAG.score >= 350 ? 'Неплохо — добавь серий' : 'Разминка') + (bp ? ` · +${bp} ${bp === 1 ? 'очко' : 'очка'} бойцу` : ' · 400+ очков дают очко бойцу');
-  $('r-again').textContent = 'Ещё раз'; $('r-replay').hidden = true; G.res = { bag: 1, score: BAG.score, best: BAG.best, pts: bp }; resultOpen();
+  $('r-again').textContent = 'Ещё раз'; $('r-replay').hidden = true; $('result').hidden = false;
 }
 function updateMenu() {
   renderStats();
@@ -8756,8 +8529,7 @@ function startFight(fromMode) {
   // A story bout has no rounds — one fall to the knockout, the clock is out of reach (issue 51).
   G.round = 1; G.roundT = G.mode === 'story' ? STORY_TIME : ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0]; G.cutWarn = false;
   show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', !G.cardT); show('pad', false);
-  G.hudTxt = ''; elHud.classList.remove('bag'); $('rnd').textContent = G.mode === 'story' ? 'ДО НОКАУТА' : 'Р1'; $('tmr').textContent = '';   // R-06: the clock, never the difficulty label (hudUpdate fills it); startBag turns the bag panel on
-  $('w1').textContent = 'побед ' + G.wins; $('w2').textContent = 'побед ' + G.losses;
+  $('diffl').textContent = DIFFS[G.diff].label.toUpperCase(); $('w1').textContent = 'побед ' + G.wins; $('w2').textContent = 'побед ' + G.losses;
   if (G.cardT) fightCard(); else show('vs', false);
   if (G.flyT) { camCut = true; if (!G.cardT) msg(LOC.label, 'place'); }
   introTick(0);
@@ -8824,7 +8596,7 @@ function decision() {
   G.winner = win || draw ? P1 : P2; G.loser = G.winner.other; celStart(draw ? null : G.winner, 0.3);   // R-13: the winner's pose (09b_cine.js)
   fightOver(win, draw);
   $('r-title').textContent = draw ? 'Ничья' : win ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (draw ? '' : win ? 'win' : 'lose');
-  $('r-sub').textContent = `решение судей ${t[0]}–${t[1]} · счёт ${G.wins} : ${G.losses}`; resultOpen();
+  $('r-sub').textContent = `решение судей ${t[0]}–${t[1]} · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false;
 }
 // a cut over the eye that keeps running into it: the referee calls time for the doctor; if it can't be controlled, the fight is stopped
 function cutCheck() {
@@ -8834,7 +8606,7 @@ function cutCheck() {
     if (!F.cutLook) { F.cutLook = true; msg('Врач смотрит рассечение'); G.state = 'break'; G.breakT = 3.5; G.doc = true; corner(F, 0.35); return; }
     if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; celStart(A, 0.3); fightOver(A === P1, false, 'tko'); $('pad').hidden = true; if (NET.role) return netResult();   // P2P: the shared result (the guest was left hanging)
       $('r-title').textContent = A === P1 ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (A === P1 ? 'win' : 'lose');
-      $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; resultOpen(); return; }   // (R-09: no «Стоп!» over the card — the line under the title says it)
+      $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false; msg('Стоп! Рассечение', 'ko'); return; }
   }
 }
 function stateTick(dtReal) {
@@ -9420,7 +9192,7 @@ function startHighlights() {
     RP.segs.push(seg(cams[0], -0.5, 0.12, 0.9, () => hlPlate(`${i + 1}/${picks.length} · ${tag} · ${c.who ? 'твой удар' : 'удар соперника'}`)), seg(cams[1], -0.28, c.kd ? 1.0 : 0.45, 0.7));
   });
   G.state = 'replay'; RP.seg = -1; nextSeg();
-  $('rec').hidden = false; $('rp-cap').textContent = ''; $('hud').hidden = true; $('pad').hidden = true; $('result').hidden = true;
+  $('rec').hidden = false; $('hud').hidden = true; $('pad').hidden = true; $('result').hidden = true;
 }
 function hlPlate(text) { const el = $('hl'); $('hl-s').textContent = text; el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
 function endHighlights() {
@@ -9722,28 +9494,28 @@ function ccWinCover(cp, cl, W, L) {
    [CC_FB, CC_FT] (the top keeps clear of the HUD bars). A body past an edge first slides the shot (camera and look point together) by
    the overshoot, then the camera backs off along its view until all fit — both continuous, so the eased camera never jumps */
 const CC_FX = 0.86, CC_FT = 0.72, CC_FB = -0.86, _ccE = new V3(), _ccS = new V3();
-function ccFit(cp, cl, Fs, FX = CC_FX) {   // FX: the half width of the frame (R-09: narrower beside the result card, resWin)
+function ccFit(cp, cl, Fs) {
   const tx = Math.tan(camera.fov * Math.PI / 360) * camera.aspect, ty = tx / camera.aspect;
-  for (let it = 0, N = FX < CC_FX ? 3 : 2; it < N; it++) {   // a narrow window (the result card) takes a third pass to settle
+  for (let it = 0; it < 2; it++) {
     const f = _ccF.subVectors(cl, cp).normalize(), r = _ccR.crossVectors(f, _ccU.set(0, 1, 0)).normalize(), u = _ccU.crossVectors(r, f);
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, zs = 0, n = 0;
     const each = fn => { for (const F of Fs) { for (const p of F.jp) fn(p); _ccE.copy(F.headNow); _ccE.y += 0.14; fn(_ccE); } };   // joints + the crown
     each(p => { const d = _ccD.subVectors(p, cp), z = Math.max(0.3, d.dot(f)), nx = d.dot(r) / (z * tx), ny = d.dot(u) / (z * ty);
       x0 = Math.min(x0, nx); x1 = Math.max(x1, nx); y0 = Math.min(y0, ny); y1 = Math.max(y1, ny); zs += z; n++; });
-    if (x0 >= -FX && x1 <= FX && y0 >= CC_FB && y1 <= CC_FT) return;
+    if (x0 >= -CC_FX && x1 <= CC_FX && y0 >= CC_FB && y1 <= CC_FT) return;
     const zm = zs / n, cy = (CC_FT + CC_FB) / 2;
-    const sx = x0 < -FX && x1 > FX ? (x0 + x1) / 2 : x0 < -FX ? x0 + FX : x1 > FX ? x1 - FX : 0;
+    const sx = x0 < -CC_FX && x1 > CC_FX ? (x0 + x1) / 2 : x0 < -CC_FX ? x0 + CC_FX : x1 > CC_FX ? x1 - CC_FX : 0;
     const sy = y0 < CC_FB && y1 > CC_FT ? (y0 + y1) / 2 - cy : y0 < CC_FB ? y0 - CC_FB : y1 > CC_FT ? y1 - CC_FT : 0;
     _ccS.copy(r).multiplyScalar(sx * zm * tx).addScaledVector(u, sy * zm * ty); cp.add(_ccS); cl.add(_ccS);
     let back = 0;
     each(p => { const d = _ccD.subVectors(p, cp), z = d.dot(f), yr = d.dot(u);
-      back = Math.max(back, Math.max(Math.abs(d.dot(r)) / (FX * tx), yr > 0 ? yr / (CC_FT * ty) : -yr / (-CC_FB * ty)) - z); });
+      back = Math.max(back, Math.max(Math.abs(d.dot(r)) / (CC_FX * tx), yr > 0 ? yr / (CC_FT * ty) : -yr / (-CC_FB * ty)) - z); });
     cp.addScaledVector(f, -Math.min(back, 3)); cp.y = Math.max(0.4, cp.y);
   }
 }
 /* swing the wanted camera _cp about _cl (k ≥ 1e3 = a scripted move: left alone). down = [winner, loser] in kd / ko / result */
-function camClear(dt, down, fit, FX) {
-  if (fit) ccFit(_cp, _cl, fit, FX);
+function camClear(dt, down, fit) {
+  if (fit) ccFit(_cp, _cl, fit);
   const vis = RINGSET.visible;
   if (!vis && !down) CC.want = 0; else {
     const P = vis ? ccPostsWorld() : [], T = ccTargets(), lim = down ? CC_KO : CC_YAW;
@@ -9814,7 +9586,6 @@ function camKick(dt) {
 window.__hitFeel = { HITK, SHK, HS_LOG, hitStop };   // debug (R-04): the constants, the shake state, the recent freezes
 function camUpdate(dt) {
   camClock += dt; let k = 4;
-  const rw = resView(dt, camCut || CC.st !== G.state);   // R-09: the result card covers the right — the frame is skewed and narrowed to the space left of it (07c_result.js)
   // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
   if (window.__camHold) { const h = window.__camHold; camera.position.set(h.p[0], h.p[1], h.p[2]); camera.lookAt(h.l[0], h.l[1], h.l[2]); camP.copy(camera.position); camL.set(h.l[0], h.l[1], h.l[2]); return; }
   if (NET.guest && NET.started) return netGuestCam(dt, _cp, _cl);   // issue 49: the guest sees the fight from behind his own man
@@ -9826,14 +9597,7 @@ function camUpdate(dt) {
   else if (G.state === 'replay') {
     const s = RP.segs[RP.seg], h = G.loser.headNow, side = Math.sign(G.loser.group.position.x) || 1;
     const p = clamp((RP.tau - s.from) / Math.max(0.01, s.to - s.from), 0, 1), c = G.loser.jp[0], w = G.winner.headNow;
-    if (s.cam === 'impact' && s.ic) {   // R-15: the knockout punch from the camera rpImpactCam picked at the contact (07_state_replay_hits.js)
-      // a slow push in up to the contact; after it the look point follows his head down and the lens backs off, so the fall stays in
-      // the shot. A scripted move (k = 1e3): camClear's swing would turn the face away again (the posts were weighed in the pick)
-      const I = s.ic, pre = sstep(s.from, s.hit, RP.tau), post = sstep(s.hit, s.to, RP.tau);
-      _cl.copy(I.l).lerp(_ccE.set(h.x, Math.max(0.3, h.y - 0.05), h.z), 0.7 * post);
-      _cp.copy(I.p).addScaledVector(I.back, 0.18 * (1 - pre) + 0.9 * post); _cp.y += 0.25 * post; k = 1e3;
-    }
-    else if (s.cam === 'close') { _cp.set(h.x - side * 0.55, Math.max(0.55, h.y + 0.12), h.z + 1.45); _cl.set(h.x, Math.max(0.25, h.y - 0.05), h.z); k = 6; }
+    if (s.cam === 'close') { _cp.set(h.x - side * 0.55, Math.max(0.55, h.y + 0.12), h.z + 1.45); _cl.set(h.x, Math.max(0.25, h.y - 0.05), h.z); k = 6; }
     else if (s.cam === 'low') {   // from the canvas, looking up past the falling man — slow push in
       const a = 0.9 + 0.35 * p; _cp.set(c.x + side * 0.9 * Math.cos(a), 0.18, c.z + 1.6 * Math.sin(a) + 0.3); _cl.set((c.x + h.x) / 2, Math.max(0.35, h.y * 0.6 + 0.15), c.z); k = 5;
     } else if (s.cam === 'top') {   // straight down from the rig, slowly turning
@@ -9886,7 +9650,7 @@ function camUpdate(dt) {
   const down = st === 'kd' && G.kd ? [G.kd.att, G.kd.def] : (st === 'ko' || st === 'result') && G.loser && G.winner ? [G.winner, G.loser] : null;
   // whole men in the shot: the standing man joins once the push-in on the fall is over (kd: after 1 s; ko: from the two-shot reveal)
   const fit = !down ? null : st === 'result' || (st === 'kd' ? G.t - G.kd.t0 > 1 : G.t - G.koCine > 1.45) ? down : [down[1]];
-  if (k < 1e3 && !window.__camOff && st !== 'menu' && st !== 'rend' && st !== 'talk' && !(st === 'intro' && G.stareT && G.introT >= 0 && G.introT < G.stareT - 0.6)) camClear(dt, down, fit, rw ? rw.h : CC_FX);
+  if (k < 1e3 && !window.__camOff && st !== 'menu' && st !== 'rend' && st !== 'talk' && !(st === 'intro' && G.stareT && G.introT >= 0 && G.introT < G.stareT - 0.6)) camClear(dt, down, fit);
   else CC.yaw = CC.want = 0;
   if (camCut) { camP.copy(_cp); camL.copy(_cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * k); camP.lerp(_cp, a); camL.lerp(_cl, a); }
@@ -9902,15 +9666,9 @@ function hudUpdate(dt) {
   hudBar(0, ME.hp / 100); hudBar(1, ME.hp / 100); hudBar(2, OP.hp / 100); hudBar(3, OP.hp / 100); hudBar(4, ME.stamina / 100); hudBar(5, OP.stamina / 100);
   $('cnt').hidden = !(G.state === 'fight' && ME.counterUntil > G.t);
   if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), mmss = s => `${(s / 60) | 0}:${String(s % 60).padStart(2, '0')}`;
-    // R-06: the clock is 20 px on its own plate (#tmr), the round beside it (#rnd). Issue 51: a story bout has no rounds — «ДО НОКАУТА»;
-    // R-17: plus the time of the bout so far, counting up. The heavy bag (BAG.on): no bars / «VS» — score, combo and time, large (#bagp)
-    const rnd = G.mode === 'story' ? 'ДО НОКАУТА' : 'Р' + G.round, tm = G.mode === 'story' ? mmss(Math.max(0, Math.floor(STORY_TIME - G.roundT))) : mmss(t);
-    const live = G.t - BAG.lastT < 0.95 && BAG.combo > 1, txt = BAG.on ? `b${BAG.score}|${live ? BAG.combo : 0}|${BAG.best}|${tm}|${G.bagBest}` : rnd + '|' + tm;
-    if (G.hudTxt !== txt) { G.hudTxt = txt; elHud.classList.toggle('bag', BAG.on);
-      if (BAG.on) { $('bag-sc').textContent = BAG.score; $('bag-rec').textContent = G.bagBest ? 'рекорд ' + G.bagBest : '';
-        const cb = $('bag-cb'); cb.textContent = live ? '×' + BAG.combo : '—'; cb.classList.toggle('hot', live && BAG.combo >= 4);
-        $('bag-best').textContent = BAG.best > 1 ? 'лучшая ×' + BAG.best : ''; $('bag-t').textContent = tm; }
-      else { $('rnd').textContent = rnd; $('tmr').textContent = tm; } } }
+    // issue 51: a story bout has no rounds — the pill says «ДО НОКАУТА»; R-17: plus the time of the bout so far, counting up
+    const txt = G.mode === 'story' ? 'ДО НОКАУТА · ' + mmss(Math.max(0, Math.floor(STORY_TIME - G.roundT))) : `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${mmss(t)}`;
+    if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
   const k = Math.min(1, dt * 3); P1.u.uDmg.value += (clamp(1 - P1.hp / 100, 0, 1) - P1.u.uDmg.value) * k; P2.u.uDmg.value += (clamp(1 - P2.hp / 100, 0, 1) - P2.u.uDmg.value) * k;
   // (issue 46) the get-up bar during the referee's count: how close the man is to beating it (mashing punches adds)
   const kb = $('kdbar');
@@ -10060,13 +9818,21 @@ function ropeTick(dt) {
 
 /* ───────── main loop ───────── */
 let last = performance.now();
+/* R-26: FRAME.on = a frame is running. An error event while it is set means that frame died before it asked for the next one:
+   window.__onErr (called by the error listener of the page head, g_head.html) asks for it, so the game goes on under the error toast.
+   GLX.lost = the WebGL context is gone (glLost / glRestored in 14_screens.js): frame() stands still, renderFrame() draws nothing. */
+const FRAME = { on: false, errs: 0 }, GLX = { lost: false, n: 0, failT: 0 };
+window.__onErr = () => { if (!FRAME.on) return; FRAME.on = false; FRAME.errs++; if (!window.__manual) requestAnimationFrame(frame); };
 // the ragdoll steps run inside Fighter.update: timed separately so the overlay can show them as physics
 for (const k of ['step', 'hitStep']) { const fn = Ragdoll.prototype[k]; Ragdoll.prototype[k] = function (dt) { const t = performance.now(), r = fn.call(this, dt); PERF.rag += performance.now() - t; return r; }; }
 function headFrames(F) { F.head.updateMatrixWorld(true); F.headFrame.multiplyMatrices(F.head.matrixWorld, HEAD.restInvT); F.headFrameInv.copy(F.headFrame).invert(); armSegs(F); }
 function frame(now) {
   // R-24: a cold set is being prepared in steps (17_loc_load.js); while the fight waits for it the game stands still under
   // «Готовим площадку…» — no simulation, no 3D frame (the clock restarts from the end of this frame's loading work)
-  if (locPumpFrame()) { if (NET.role) netTick(Math.min(0.1, (now - last) / 1000)); last = performance.now(); if (!window.__manual) requestAnimationFrame(frame); return; }
+  FRAME.on = true;
+  // R-26: a lost GPU context — a solo game waits (no simulation, no frame) under «Графика перезапускается…»; a P2P fight goes on unseen
+  if (GLX.lost && !NET.role) { last = performance.now(); FRAME.on = false; if (!window.__manual) requestAnimationFrame(frame); return; }
+  if (!GLX.lost && locPumpFrame()) { if (NET.role) netTick(Math.min(0.1, (now - last) / 1000)); last = performance.now(); FRAME.on = false; if (!window.__manual) requestAnimationFrame(frame); return; }
   const rawDt = (now - last) / 1000, dtReal = G.paused ? 0 : Math.min(0.05, rawDt); last = now; G.real += dtReal;   // pause: everything below runs with dt = 0 (as in a hit-stop frame)
   if (NET.role) netTick(rawDt);   // issue 49: snapshots / input / ping / the disconnect clock
   const pm = PERF.m; let tp = performance.now(), tq; PERF.rag = 0;   // CPU split for the F3 overlay
@@ -10102,6 +9868,7 @@ function frame(now) {
   pm.misc += performance.now() - tp;
   perfTick(rawDt);
   renderFrame(rawDt);
+  FRAME.on = false;
   requestAnimationFrame(frame);
 }
 
@@ -13526,6 +13293,59 @@ function uiKey(e) {
 const canPause = () => !G.paused && ['intro', 'fight', 'break', 'kd', 'ko', 'rend'].includes(G.state);
 function pauseGame() { if (!canPause()) return; G.paused = true; HELD.clear(); mvKeys(); setBlock(false); Q.length = 0; UI.from = 'pause'; uiShow('pause'); }
 function resumeGame() { G.paused = false; UI.from = null; uiShow(null); last = performance.now(); }
+
+/* R-26: the tab goes away (a call, the app switcher, another tab): a solo fight opens the pause — coming back the player finds the
+   pause menu, not a beating; a P2P fight is not stopped, the opponent is told «отошёл» (netAway, 18_net.js). The sound is suspended
+   while hidden either way and resumed on return (only if it was us who suspended it). */
+const VIS = { hidden: false, sus: false, n: 0 };
+function visChange() {
+  const h = document.visibilityState === 'hidden' || document.hidden === true;
+  if (h === VIS.hidden) return; VIS.hidden = h;
+  const ac = sfx._nodes().ac;   // the one AudioContext of the game (sounds + music); null until the first gesture
+  if (h) {
+    VIS.n++;
+    // P2P: let go of whatever is held (its keyup / pointerup never comes to a hidden tab), so the man does not walk on by himself
+    if (NET.role) { HELD.clear(); MV.sx = MV.sy = 0; mvKeys(); setBlock(false); netAway(true); }
+    else pauseGame();
+    if (ac && ac.state === 'running') { VIS.sus = true; ac.suspend().catch(() => {}); }
+  } else {
+    if (NET.role) netAway(false);
+    if (ac && VIS.sus) ac.resume().catch(() => {});
+    VIS.sus = false; last = performance.now();
+  }
+}
+document.addEventListener('visibilitychange', visChange);
+
+/* R-26: the WebGL context lost (a GPU reset, a phone reclaiming memory) and given back. Lost: «Графика перезапускается…» over the
+   game, which stands still (frame() → GLX.lost; a P2P fight goes on unseen). Restored: three.js has already rebuilt its own state
+   (textures, programs, targets are re-made lazily on the next draw); here the PMREM environment (rendered into a target at boot, so
+   its pixels are gone) is rendered again and applyGfx re-applies the preset; the game goes on from where it stood. Not back in
+   GLX_WAIT s (or the restore failed) → the «Перезагрузить» button; the profile is already saved (save() on every change). */
+const GLX_WAIT = 8;
+function glLost(e) {
+  e.preventDefault();   // without this the browser never offers the context back
+  if (GLX.lost) return;
+  GLX.lost = true; GLX.n++;
+  $('gl-lost-t').textContent = 'видеокарта сбросила картинку — игра ждёт'; $('gl-reload').hidden = true; $('gl-lost').hidden = false;
+  clearTimeout(GLX.failT); GLX.failT = setTimeout(glFail, GLX_WAIT * 1000);
+}
+function glFail() {
+  if (!GLX.lost) return;
+  $('gl-lost-t').textContent = 'Не вышло вернуть графику. Прогресс сохранён — перезагрузи страницу.'; $('gl-reload').hidden = false; $('gl-reload').focus();
+}
+function glRestored() {
+  clearTimeout(GLX.failT);
+  try {
+    const env = scene.environment;
+    scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+    if (env) env.dispose();
+    applyGfx(GFX.level);
+  } catch (err) { console.warn('[R-26] restore failed', err); GLX.lost = true; return glFail(); }
+  GLX.lost = false; $('gl-lost').hidden = true; last = performance.now();
+}
+renderer.domElement.addEventListener('webglcontextlost', glLost, false);
+renderer.domElement.addEventListener('webglcontextrestored', glRestored, false);
+$('gl-reload').addEventListener('click', () => location.reload());
 function surrender() { if (!BAG.on && G.state !== 'ko') { G.losses++; save(); } toMenu(); }   // giving up a live fight is a loss (after the knockout the result is already counted)
 
 /* the menu camera: an orbit about P1 (yaw 0 = the fight camera's side, +z; π/2 = straight in front of him), eased here, so camUpdate
@@ -14797,6 +14617,15 @@ function netMsg(m) {
   else if (m.c === 'pong') netPing(performance.now() - m.t);
   else if (m.c === 'over') { if (NET.guest) netGuestOver(m); }
   else if (m.c === 'again') netRestart();
+  else if (m.c === 'away') { NET.oAway = !!m.on; show('net-away', NET.oAway && !NET.over && NET.dropT <= 0); }
+}
+/* R-26: this tab was hidden / shown (visChange, 14_screens.js). The fight is not stopped: the opponent gets «Соперник отошёл».
+   A hidden tab has no animation frames, so netTick and its pings stop; a timer keeps pinging (background timers fire about
+   once a second) so the peer's silence watchdog does not open the disconnect window — and that watchdog is lenient while we are away. */
+function netAway(on) {
+  netSend({ c: 'away', on: on ? 1 : 0 });
+  clearInterval(NET.awayI); NET.awayI = 0;
+  if (on) NET.awayI = setInterval(() => { if (!NET.role) { clearInterval(NET.awayI); NET.awayI = 0; return; } netSend({ c: 'ping', t: performance.now() }); }, 500);
 }
 function netPing(rtt) {
   NET.ping = Math.round(NET.ping ? NET.ping * 0.6 + rtt * 0.4 : rtt);   // smoothed: one late pong doesn't flash a spike
@@ -14805,14 +14634,13 @@ function netPing(rtt) {
 }
 function netShowResult(win, draw) {
   show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', false); show('pad', false);
-  show('net-drop', false);
+  show('result', true); show('net-drop', false); show('net-away', false);
   $('r-car').textContent = ''; $('r-stats').innerHTML = '';
   try { payShow(null); } catch (e) {}
   $('r-replay').hidden = true; $('r-again').textContent = 'Реванш';
   $('r-title').textContent = draw ? 'Ничья' : win ? 'Победа' : 'Нокаут';
   $('r-title').className = 'rt ' + (draw ? '' : win ? 'win' : 'lose');
   $('r-sub').textContent = draw ? 'решение судей' : win ? 'соперник на полу' : 'ты на полу';
-  G.res = null; resultOpen();   // R-09: the card without the big numbers (a P2P bout pays nothing)
 }
 function netResult() {   // host: startReplay() is diverted here (07_state_replay_hits.js)
   if (NET.over && NET.over.sent) return;
@@ -14853,7 +14681,7 @@ function netTick(dt) {
   if (NET.over && (NET.guest || NET.over.sent)) return;   // the host's NET.over is set at the KO (fightOver): keep streaming through the replay until netResult
   // a lost link does not always raise PeerJS's remote 'close' (crashed tab, dead NAT mapping):
   // if nothing has arrived for silenceMax seconds, open the 10 s recovery window on our own
-  if (NET.dropT === 0 && NET.silent > NET.silenceMax) return netLost(NET.conn);
+  if (NET.dropT === 0 && NET.silent > NET.silenceMax * (NET.oAway ? 8 : 1)) return netLost(NET.conn);   // R-26: a hidden tab pings ~1/s at best
   NET.acc += dt; NET.clk = (NET.clk || 0) + dt;
   if (NET.acc >= NET.rate) { NET.acc = 0; if (NET.host) netSnapshot(); else netFlushInput(); }
 }
@@ -14863,7 +14691,7 @@ function netLost(c) {
   if (NET.conn && NET.conn !== c && NET.conn.open) return;
   if (NET.conn === c) NET.conn = null;
   if (!NET.role) return;
-  $('net-drop-t').textContent = 'Ждём восстановления… 10 с'; show('net-drop', true);
+  $('net-drop-t').textContent = 'Ждём восстановления… 10 с'; show('net-drop', true); show('net-away', false);
   NET.dropT = 10;
   if (NET.guest) netRetry();   // a new DataConnection to the same room id; the host keeps listening
 }
@@ -14885,7 +14713,7 @@ function netClose() {
   clearTimeout(NET.retryT);
   NET.role = null; NET.host = false; NET.guest = false; NET.started = false; NET.oLook = null; NET.over = null;
   NET.conn = null; NET.dropT = 0; NET.closing = true; NET.roomShown = false;
-  show('net-drop', false); $('net-ping').hidden = true; $('net-ping').textContent = '';
+  show('net-drop', false); show('net-away', false); NET.oAway = false; clearInterval(NET.awayI); NET.awayI = 0; $('net-ping').hidden = true; $('net-ping').textContent = '';
   if (NET.saved) {
     G.loc = NET.saved.loc; OPT.cine = NET.saved.cine; ROUNDS = NET.saved.rounds; ROUND_LEN = NET.saved.len || 120; NET.cfg.spar = false; NET.cfg.weap = false; G.diff = NET.saved.diff; G.mode = NET.saved.mode;
     NET.saved = null; try { setLocation(G.loc); } catch (e) {}
@@ -15083,7 +14911,7 @@ function storyOut(win) {
   if (G.storyOut) return false;
   G.storyOut = true;
   const lines = win ? ch.outro : ch.outroLose;
-  storyTalk(lines, () => { G.state = 'result'; camCut = true; resultOpen(); });
+  storyTalk(lines, () => { G.state = 'result'; camCut = true; show('result', true); });
   return true;
 }
 /* «Реванш / Дальше» on the result screen (r-again routes here through startFight's dispatch) */
