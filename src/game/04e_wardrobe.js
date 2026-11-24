@@ -93,7 +93,7 @@ function wearShorts(v) {
 // a random street outfit (underground fights): the hook for rollOpponent; r = a random source
 function streetLook(r = rr) {
   const pick = a => a[(r() * a.length) | 0], of = (cat, pNone) => { if (r() < pNone) return { id: 'none' }; const it = pick(wearItems(cat).filter(i => i.tags.includes('street'))); return { id: it.id, color: pick(it.colors) }; };
-  const L = { street: true, bottom: of('bottom', 0), top: of('top', 0.35), shoes: of('shoes', 0.15), head: of('head', 0.6), eyes: of('eyes', 0.8), belt: of('belt', 0.4) };
+  const L = { street: true, bottom: of('bottom', 0), top: of('top', 0.35), shoes: of('shoes', 0), head: of('head', 0.6), eyes: of('eyes', 0.8), belt: of('belt', 0.4) };
   return L;
 }
 
