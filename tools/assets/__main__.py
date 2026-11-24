@@ -6,6 +6,7 @@ resolve — the permission rule needs a space after the directory).
     python3 tools/assets/            — every step of the tee pipeline, in order (#55 + #56)
     python3 tools/assets/ --from sim — start at sim.py (out/ already has tee_placed.blend)
     python3 tools/assets/ --only sim — run only sim.py
+    python3 tools/assets/ --gen police — issue 85: run cloth/gen/police.py (the clothes generator)
 
 Steps live in cloth/ and run in their own module namespace (runpy), each honouring its exit code.
 """
@@ -34,6 +35,9 @@ def main(argv):
     elif argv and argv[0] == '--from':
         k = [s for s in STEPS if s.startswith(argv[1].lstrip('--') + '.')]
         steps = STEPS[STEPS.index(k[0]):] if k else STEPS
+    elif argv and argv[0] == '--gen':   # issue 85: the clothes generator, cloth/gen/<name>.py (the rest of argv goes to the script)
+        steps = [os.path.join('gen', os.path.basename(argv[1]) + '.py')]
+        sys.argv = [os.path.join(CLOTH, steps[0])] + argv[2:]
     steps = [s for s in steps if os.path.exists(os.path.join(CLOTH, s))]
     print(f'=== tools/assets: {", ".join(steps)} ===', flush=True)
     for s in steps:
