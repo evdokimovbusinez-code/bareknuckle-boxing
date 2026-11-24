@@ -2338,7 +2338,15 @@ const NET = {
   oAway: false, awayI: 0,   // R-26: the opponent's tab is hidden (banner #net-away); our keep-alive timer while ours is
   stat: { snaps: 0, recv: 0, bytes: 0, max: 0, ins: 0, closes: 0 },
   tmp: null,
+  // R-25: the guest predicts his own man. seq = number of the last press / block change sent; on the host ack = the last one it
+  // consumed, hs = the last one it started (both go back in every snapshot, `k`); now = this page's clock (sum of frame dt),
+  // off / jit = the host's clock against ours and how much the arrivals wander (→ the adaptive buffer `buf`);
+  // lag / lagQ = debug: every inbound message is held for `lag` seconds (__mp.lag(ms))
+  seq: 0, ack: 0, hs: 0, bAck: 0, now: 0, off: 0, jit: 0, lag: 0, lagQ: [],
+  pr: { q: [], ok: [], on: false, conf: false, w: 0, curS: 0, maxS: 0, maxAt: -9, last: null, run: false, L: null, S: null, off: false,
+    stat: { n: 0, back: 0, late: 0 } },
 };
+const NET_PR = { up: 0.05, down: 0.08, hold: 0.65, lost: 1.5, bufMin: 0.06, bufMax: 0.16 };   // R-25: blend in / roll back (s), a press waits this long for its turn, an unanswered one is forgotten; buffer limits (s)
 const NET_PEER_URL = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
 const NET_ICE = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -6708,7 +6716,9 @@ class Fighter {
       // the punch lands when the knuckles actually touch the face (or ribs); if they never do, it is decided at the end of the window
       if (!this.resolved && t >= P.impact - 0.14) { const c = contactTest(this, this.other); if (c || t >= P.impact + 0.06) { this.resolved = true;
         // no touch by the end of the swing: a graze if the knuckles were within a few cm, otherwise it is thin air
-        if (c || (BAG.on ? bagMiss(this) < 0.14 : this.other.ko || nearMiss(this, this.other) < (PUNCH[this.cur].type === 'upper' ? 0.1 : 0.06))) resolveHit(this, this.cur, c); else whiffPunch(this); } }
+        // (R-25: a P2P guest only predicts the swing of his own man — whether it landed is the host's call, here it just times the recovery)
+        const hit = c || (BAG.on ? bagMiss(this) < 0.14 : this.other.ko || nearMiss(this, this.other) < (PUNCH[this.cur].type === 'upper' ? 0.1 : 0.06));
+        if (NET.guest) this.whiff = !hit; else if (hit) resolveHit(this, this.cur, c); else whiffPunch(this); } }
       if (this.cur) { if (!this.release && t >= P.impact + (this.whiff ? 0.3 : 0.15)) { this.release = true; this.relN = this.cur; } if (this.release && this.relN === this.cur && t >= P.impact + (this.whiff ? 0.52 : 0.25)) this.cur = null; }
     }
     if (this.daze > 0) { this.daze = Math.max(this.hp < 25 ? 0.5 : 0, this.daze - dt * 0.1);
@@ -14468,13 +14478,14 @@ Object.assign(window.__loc || (window.__loc = {}), { prefetch: locPrefetch, kick
 /* ───────── issue 49: «Бой с другом» — PeerJS P2P, host-authoritative 1v1 ─────────
    One ES module scope with all the other game files, so everything here is a hoisted function. The host keeps running the
    fight exactly as it does against the AI; netHostAI() only replaces ai() as the source of P2's decisions (08_ai_flow.js).
-   The guest simulates nothing: it gets ~30 Hz snapshots of Fighter.capture() poses and plays them back with a ~100 ms
-   buffer, the same way stepReplay() plays REC.frames. Its own Q / MV / block never reach the local fighters — they are
-   sent to the host from press()/setMove()/setBlock() in 12_ui.js.
+   The guest simulates no fight: it gets ~30 Hz snapshots of Fighter.capture() poses and plays them back with a 60–160 ms
+   buffer, the same way stepReplay() plays REC.frames. Its own Q / MV / block are sent to the host from press()/setMove()/
+   setBlock() in 12_ui.js; R-25: the animation of its own punch / dodge / guard is predicted locally (netPred, below).
+   Snapshots also carry k:[ack,hs,cur,act,busy] (netActK).
 
    Wire format (all plain JSON-safe values; PeerJS connection uses serialization:'json'):
      hello  {c:'hello', look, nm}               once, on open — each side gets the other's fighter look
-     in     {c:'in', x, y, b, q:[{t,n,body,pow}]}  guest → host, 30 Hz + immediately on every press
+     in     {c:'in', x, y, b, q:[{t,n,body,pow,i}], bi?}  guest → host, 30 Hz + immediately on every press (R-25: i / bi = number of the press / block change)
      s      {c:'s', t, st, d:[[..],[..]], gx:[x,x], ar:[x,z,ry], r:[..], h:[hp,hp], e:[sta,sta], rd, rt, ev:[..], p:[..]}
                                               host → guest, 30 Hz (1/30 s), ~3–5 KB each
      ping   {c:'ping', t} / {c:'pong', t}       both ways, 1 Hz; RTT in ms, yellow above 200
@@ -14529,6 +14540,17 @@ function netBoot() {
     net: () => NET,
     room: c => netRoomUI(c || 'ABC234'),   // debug: the room panel (with the host's settings when NET.host)
     cfg: () => NET.cfg,
+    // R-25: lag(ms) = hold every inbound message that long (on this page's clock); pred() = the state of the guest's prediction:
+    // w = weight of the local pose, act = how much of an action it holds, shown = their product (what is on the screen);
+    // sCur = the press the played stream shows in flight; pos() = where both men and the ring stand on this page
+    lag: ms => { NET.lag = Math.max(0, +ms || 0) / 1000; return NET.lag; },
+    pred: () => { const PR = NET.pr, me = P2; let pw = 0; for (const n of PN) pw += me.w[n] || 0; const act = Math.max(pw, me.blockW || 0, me.dodge ? 1 : 0);
+      return { on: PR.on, w: PR.w, act, shown: PR.w * act, cur: me.cur, curS: PR.curS, seq: NET.seq, conf: PR.conf, sCur: NET.sk ? NET.sk[2] : 0, sAct: NET.sk ? NET.sk[3] : 0,
+        buf: NET.buf, jit: NET.jit, behind: NET.snaps.length ? NET.snaps[NET.snaps.length - 1].t - NET.playT : 0, now: NET.now, ...PR.stat }; },
+    predOff: v => { NET.pr.off = !!v; },
+    block: v => setBlock(!!v),
+    pos: () => [P1.group.position.x, P2.group.position.x, ARENA.position.x, ARENA.position.z, ARENA.rotation.y],
+    hostAct: () => ({ cur: P2.cur, blk: P2.blocking, ack: NET.ack, hs: NET.hs, now: NET.now }),
   };
 }
 function netHome() {
@@ -14676,7 +14698,7 @@ function netBeginMatch() {
 function netHostStart() {
   showP2(true);
   rollOpponent();   // a stand-in until the guest's hello arrives with his own look
-  if (NET.oLook) try { P2.applyLook(NET.oLook); } catch (e) {}   // a rematch: rollOpponent just re-dressed the guest's man as a random one
+  if (NET.oLook) try { P2.applyLook(netGuestLook(LOOK, NET.oLook)); } catch (e) {}   // a rematch: rollOpponent just re-dressed the guest's man as a random one
   for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
   startFight(true);
   NET.evI = REC.events.length; NET.pop.length = 0; NET.q.length = 0; NET.acc = 0; NET.pingAcc = 0; NET.first = true;
@@ -14686,7 +14708,7 @@ function netGuestSetup() {
   showP2(true);
   // issue 49: here the local player's man is P2 (left on the mirrored camera); hello sends LOOK,
   // so dress him in that same look instead of the random opponent left over from the menu boot
-  P2.applyLook(LOOK);
+  P2.applyLook(netGuestLook(NET.oLook, LOOK));   // R-25: not the host's trunks colour
   if (NET.oLook) try { P1.applyLook(NET.oLook); } catch (e) {}
   for (const F of [P1, P2]) F.sparGear(NET.cfg.spar);
   P1.stat = PROF.stats; P2.stat = lvlStats(1); P1.speed = 1.5; P2.speed = DIFFS.normal.speed;
@@ -14700,7 +14722,7 @@ function netGuestSetup() {
   G.round = 1; G.roundT = ROUND_LEN; G.hudTxt = '';
   NET.snaps.length = 0; NET.evs.length = 0; NET.pops.length = 0; NET.first = true; NET.playT = 0;
   NET.mv = { x: 0, y: 0, b: false }; NET.blk = false; NET.q.length = 0; NET.iq.length = 0;
-  NET.acc = 0; NET.pingAcc = 0;
+  NET.acc = 0; NET.pingAcc = 0; netPredReset();
   uiShow(null);
   show('hud', true); show('pad', TOUCH); show('vs', false); show('result', false); show('rec', false);
   show('bar-t', false); show('bar-b', false); show('net-drop', false); show('loading', false);
@@ -14720,11 +14742,14 @@ function netLabels() {
 /* ── guest input → host ── */
 function netMove() { NET.mv = { x: MV.kx || MV.sx, y: MV.ky || MV.sy, b: !!NET.blk }; }
 function netBlock(v) {
+  if (NET.blk === !!v) return;
   NET.blk = !!v; netMove();
-  netSend({ c: 'in', x: NET.mv.x, y: NET.mv.y, b: NET.blk, q: [] });
+  const PR = NET.pr; PR.maxS = ++NET.seq; PR.maxAt = NET.now;   // R-25: a block change is numbered like a press — the guard is predicted until the host's stream shows it
+  netSend({ c: 'in', x: NET.mv.x, y: NET.mv.y, b: NET.blk, q: [], bi: NET.seq });
 }
 function netSendPress(t, n, body, pow) {
-  NET.iq.push({ t, n, body: !!body, pow: !!pow });
+  const p = { t, n, body: !!body, pow: !!pow, i: ++NET.seq };
+  NET.iq.push(p); netPredPress(p);   // R-25: the animation starts here and now, the host decides what it did
   netMove();
   netSend({ c: 'in', x: NET.mv.x, y: NET.mv.y, b: NET.blk, q: NET.iq.splice(0) });
 }
@@ -14735,7 +14760,9 @@ function netFlushInput() {
 function netInput(m) {
   if (!NET.host) return;
   if (m.x !== undefined) NET.mv = { x: clamp(m.x, -1, 1), y: clamp(m.y, -1, 1), b: !!m.b };
-  if (m.q) for (const p of m.q) if (NET.q.length < 6) NET.q.push({ t: p.t, n: p.n, body: !!p.body, pow: !!p.pow, at: G.real });
+  // R-25: every press carries its number `i`; NET.ack = the last one consumed (started or thrown away), in the order they came
+  if (m.q) for (const p of m.q) { if (NET.q.length < 6) NET.q.push({ t: p.t, n: p.n, body: !!p.body, pow: !!p.pow, i: p.i | 0, at: G.real }); else NET.ack = Math.max(NET.ack, p.i | 0); }
+  if (m.bi) { if (NET.q.length) NET.bAck = m.bi | 0; else NET.ack = Math.max(NET.ack, m.bi | 0); }
 }
 function netHostAI(dt) {   // called from ai(dt) instead of the AI (08_ai_flow.js)
   if (pvp('iron')) { P1.stamina = Math.max(P1.stamina, 100); P2.stamina = Math.max(P2.stamina, 100); }   // «Железные лёгкие»
@@ -14745,12 +14772,105 @@ function netHostAI(dt) {   // called from ai(dt) instead of the AI (08_ai_flow.j
   AI.lat = 0;   // the AI's own circling must not fight the guest's stick
   while (NET.q.length) {
     const q = NET.q[0];
-    if (G.real - q.at > 0.4) { NET.q.shift(); continue; }
+    if (G.real - q.at > 0.4) { NET.q.shift(); NET.ack = Math.max(NET.ack, q.i); continue; }
     if (!(me.canAct() || me.canChain(q.t === 'punch' ? q.n : null))) break;
-    NET.q.shift();
+    NET.q.shift(); NET.ack = Math.max(NET.ack, q.i); NET.hs = me.netS = q.i;
     if (q.t === 'punch') { me.wantBody = q.body; me.powerNext = q.pow; me.startPunch(q.n); }
     else me.startDodge(q.n);
   }
+  if (!NET.q.length && NET.bAck) { NET.ack = Math.max(NET.ack, NET.bAck); NET.bAck = 0; }
+}
+/* R-25: what the guest's man is doing, for the guest's prediction — [ack, hs, cur, act, busy]:
+   ack / hs = the last press consumed / started; cur = the press whose punch or dodge is in flight (0 = none);
+   act = how much of an action is in the pose (punch weights, guard, dodge), 0…1; busy = 1 while the host alone moves him
+   (hit and stunned, winded, guard broken, falling, getting up, any state but the fight) */
+function netActK() {
+  const me = P2; let pw = 0; for (const n of PN) pw += me.w[n] || 0;
+  const busy = G.state !== 'fight' || me.ko || me.frozen || me.rag.on || me.rag.hitOn || me.gu || me.doomed || me.liver || me.slide
+    || G.t < me.stunUntil || me.wind > G.t || (me.guardDown || 0) > G.t;
+  return [NET.ack, NET.hs, me.cur || me.dodge ? me.netS || 0 : 0, Math.round(clamp(Math.max(pw, me.blockW || 0, me.dodge ? 1 : 0), 0, 1) * 100) / 100, busy ? 1 : 0];
+}
+
+/* ── R-25: the guest predicts his own man (P2 on his page) ──
+   A press starts the punch / dodge on the spot (netPredPress → netPredStart: the same Fighter.startPunch the host will call),
+   a held block raises the guard on the spot. While such an action is live the man's pose comes from the local animation
+   (netPred: tick → animate → pose, no footwork — where he stands is still the host's), blended over the host's stream with
+   the weight PR.w (in over NET_PR.up, back over NET_PR.down = the 80 ms roll-back). The host's stream of the same man runs
+   one round trip + the buffer behind; it is matched to the local actions by the press number (the `k` of a snapshot):
+     · the action stays local until the stream has shown the host's copy of it to the end (k.ack ≥ its number, k.act → 0),
+       so the punch is not played a second time;
+     · the host threw the press away (k.ack passed it, k.hs did not reach it) → cancelled, rolled back in 80 ms;
+     · the stream shows him hit / stunned / down (k.busy) or doing something that was not predicted → the stream wins.
+   Hits, damage, stamina and positions are never predicted. */
+function netPredPress(p) {
+  const PR = NET.pr; if (PR.off || !NET.started) return;
+  if (PR.q.length < 6) PR.q.push({ t: p.t, n: p.n, body: p.body, pow: p.pow, i: p.i, at: NET.now });
+  netPredPump();
+}
+function netPredStart(q) {
+  const me = P2, PR = NET.pr, st = me.stamina;
+  if (q.t === 'punch') { me.wantBody = q.body; me.powerNext = q.pow; me.startPunch(q.n); sfx.whoosh(0.3); }
+  else me.startDodge(q.n);
+  me.stamina = st;   // the bar shows the host's number only
+  PR.curS = q.i; PR.maxS = Math.max(PR.maxS, q.i); PR.maxAt = NET.now; PR.on = true; PR.stat.n++;
+  PR.ok.push(q.i); if (PR.ok.length > 24) PR.ok.shift();
+}
+function netPredPump() {
+  const PR = NET.pr, me = P2, free = G.state === 'fight' && !NET.over && PR.last && !PR.last[4];
+  while (PR.q.length) {
+    const q = PR.q[0];
+    if (NET.now - q.at > NET_PR.hold) { PR.q.shift(); continue; }
+    if (!free || !(me.canAct() || me.canChain(q.t === 'punch' ? q.n : null))) break;
+    PR.q.shift(); netPredStart(q);
+  }
+}
+function netPredAck(k) {   // a snapshot has arrived: what the host did with our presses
+  const PR = NET.pr, me = P2; PR.last = k;
+  for (let j = 0; j < PR.q.length; j++) { const q = PR.q[j]; if (k[0] < q.i) continue;
+    PR.q.splice(j--, 1); if (k[1] === q.i && G.state === 'fight') { netPredStart(q); PR.stat.late++; } }   // still waiting here, already thrown there
+  if (PR.curS && (me.cur || me.dodge) && k[0] >= PR.curS && k[1] < PR.curS) { me.cancelPunch(); me.dodge = null; PR.curS = 0; PR.stat.back++; }   // thrown away by the host
+}
+function netPredStop() {
+  const PR = NET.pr; PR.q.length = 0; PR.on = false; PR.conf = false; PR.w = 0; PR.run = false; PR.curS = 0;
+  if (P2.cur || P2.dodge) { P2.cancelPunch(); P2.dodge = null; }
+}
+function netPredReset() { netPredStop(); const PR = NET.pr; PR.ok.length = 0; PR.maxS = 0; PR.maxAt = -9; PR.last = null; }
+/* poses the guest's man for this frame from the stream pair (a, b, k) and, while an action of his own is live, the local animation */
+function netPred(dt, a, b, k) {
+  const PR = NET.pr, me = P2, sk = NET.sk = (k > 0.5 ? b.k : a.k) || null, n4 = 4 * me.allBones.length;
+  if (!sk || G.state !== 'fight' || NET.over || PR.off) { if (PR.run || PR.on || PR.q.length || me.cur) netPredStop(); me.restore(a.d[1], b.d[1], k); return false; }
+  me.blocking = NET.blk;
+  netPredPump();
+  let pw = 0; for (const n of PN) pw += me.w[n] || 0;
+  if (sk[4] && PR.curS && PR.curS <= sk[0] && (me.cur || me.dodge)) { me.cancelPunch(); me.dodge = null; PR.curS = 0; }   // the host's copy of this action was hit
+  const pend = PR.maxS > sk[0] && NET.now - PR.maxAt < NET_PR.lost;   // the stream has not got to our last press yet
+  const local = !!(me.cur || me.dodge || NET.blk || pw > 0.03 || me.blockW > 0.03 || pend);
+  PR.conf = sk[2] !== 0 && !PR.ok.includes(sk[2]);   // the stream shows an action that was not predicted here
+  if (local) PR.on = true; else if (!(sk[3] > 0.03)) PR.on = false;   // …and stays local until the host's copy has played out
+  const wT = PR.on && !sk[4] && !PR.conf ? 1 : 0, run = PR.on || PR.w > 0;
+  if (wT > PR.w) PR.w = Math.min(1, PR.w + dt / NET_PR.up); else if (wT < PR.w) PR.w = Math.max(0, PR.w - dt / NET_PR.down);
+  if (run) {
+    if (!PR.L) { PR.L = new Float32Array(REC.N); PR.S = new Float32Array(REC.N); }
+    if (!PR.run) {   // a cold start: the feet stay where the stream had them (the bones still hold the last frame shown)
+      const LB = me.limbs(), F = me.ftOff || (me.ftOff = {}); F.sL = F.sR = null;
+      F.L = ringPt(_v1.setFromMatrixPosition(LB.L.foot.matrixWorld), new V3()); F.R = ringPt(_v1.setFromMatrixPosition(LB.R.foot.matrixWorld), new V3());
+    }
+    const st = me.stamina;
+    headFrames(P1); me.aimTarget = aimFor(me, P1);
+    me.tick(dt); me.animate(dt); me.retarget(); me.cc.updateMatrixWorld(true);
+    me.headNeutral.setFromMatrixPosition(_m1.multiplyMatrices(me.head.matrixWorld, HEAD.restInvT));
+    me.pose(dt); me.spreadTwist(); me.cc.updateMatrixWorld(true);
+    headFrames(me); me.armClear(); me.armClear();
+    me.stamina = st;
+    me.capture(PR.L);
+  }
+  PR.run = run;
+  me.restore(a.d[1], b.d[1], k);
+  if (run && PR.w > 0) {
+    me.capture(PR.S); PR.L.set(PR.S.subarray(n4 + 3), n4 + 3);   // lids and face come from the host either way
+    me.restore(PR.S, PR.L, PR.w);
+  }
+  return run && PR.w > 0;
 }
 
 /* ── host snapshots ── */
@@ -14799,6 +14919,7 @@ function netSnapshot() {
     r: ROPES.map(R => [r3(R.cur.x), r3(R.cur.y), r3(R.cur.z), r3(R.s)]).flat(),
     h: [r3(P1.hp), r3(P2.hp)], e: [r3(P1.stamina), r3(P2.stamina)],
     rd: G.round, rt: r3(G.roundT), ev: [], p: NET.pop.map(p => Object.assign({}, p, { t: r3(NET.clk) })),
+    k: netActK(),   // R-25
   };
   NET.pop.length = 0;
   for (let i = NET.evI; i < REC.events.length; i++) { const e = netEv(REC.events[i]); if (e) { e.t = r3(NET.clk); m.ev.push(e); } }
@@ -14811,8 +14932,19 @@ function netOnSnapshot(m) {
   NET.snaps.push(m); if (NET.snaps.length > 90) NET.snaps.shift();
   for (const e of m.ev) NET.evs.push(e);
   for (const p of m.p) NET.pops.push(p);
-  if (NET.first) { NET.first = false; NET.playT = m.t - NET.buf; }
+  // R-25: the adaptive buffer. o = the host's clock against ours as this snapshot came in; NET.off follows its mean, NET.jit its
+  // mean deviation (jitter); the playback runs NET.buf behind: 60 ms on a steady link … 160 ms on a wandering one
+  // (was: a fixed 100 ms at the start, then wherever it drifted between 60 and 240 ms)
+  const o = m.t - NET.now;
+  if (NET.first) { NET.first = false; NET.off = o; NET.jit = 0; NET.buf = 0.10; NET.playT = m.t - NET.buf; }
+  else {
+    const d = o - NET.off;
+    if (Math.abs(d) > 0.5) NET.off = o; else { NET.off += d * 0.08; NET.jit += (Math.abs(d) - NET.jit) * 0.08; }
+    const want = clamp(0.04 + 2.5 * NET.jit, NET_PR.bufMin, NET_PR.bufMax);
+    NET.buf += (want - NET.buf) * (want > NET.buf ? 0.2 : 0.02);   // up at once, down slowly
+  }
   netApplyState(m);
+  if (m.k) netPredAck(m.k);
 }
 function netApplyState(m) {
   const prev = G.state;
@@ -14836,8 +14968,10 @@ function netGuestStep(dtReal) {
   const S = NET.snaps;
   if (S.length < 2) return 0;
   const last = S[S.length - 1], prev = NET.playT;
-  NET.playT += dtReal * (NET.playT < last.t - 0.24 ? 1.12 : NET.playT > last.t - 0.06 ? 0.88 : 1);
-  NET.playT = clamp(NET.playT, S[0].t, Math.max(S[0].t, last.t - 0.06));
+  // R-25: the playback clock is steered to (host clock − NET.buf), ±15 % at most; a jump of more than 0.5 s is taken at once
+  const err = NET.now + NET.off - NET.buf - NET.playT;
+  if (Math.abs(err) > 0.5) NET.playT += err; else NET.playT += dtReal * (1 + clamp(err * 3, -0.15, 0.15));
+  NET.playT = clamp(NET.playT, S[0].t, last.t);
   let i = 0; while (i < S.length - 2 && S[i + 1].t <= NET.playT) i++;
   const a = S[i], b = S[i + 1] || a;
   const k = clamp((NET.playT - a.t) / Math.max(1e-5, b.t - a.t), 0, 1), sdt = Math.max(0, NET.playT - prev);
@@ -14845,8 +14979,8 @@ function netGuestStep(dtReal) {
     P1.group.position.x = lerp(a.gx[0], b.gx[0], k); P2.group.position.x = lerp(a.gx[1], b.gx[1], k);
     P1.group.updateMatrixWorld(true); P2.group.updateMatrixWorld(true);
   }
-  P1.restore(a.d[0], b.d[0], k); P2.restore(a.d[1], b.d[1], k);
-  P1.afterPose(sdt); P2.afterPose(sdt);
+  P1.restore(a.d[0], b.d[0], k); P1.afterPose(sdt);
+  P2.afterPose(netPred(dtReal, a, b, k) ? dtReal : sdt);   // R-25: the guest's own man = the stream + his predicted action
   if (a.ar && b.ar) { ARENA.position.set(lerp(a.ar[0], b.ar[0], k), 0, lerp(a.ar[1], b.ar[1], k)); ARENA.rotation.y = lerp(a.ar[2], b.ar[2], k); }
   if (a.r && b.r) ROPES.forEach((R, j) => { const o = j * 4; R.hit = (R.hit || new V3()).set(lerp(a.r[o], b.r[o], k), lerp(a.r[o + 1], b.r[o + 1], k), lerp(a.r[o + 2], b.r[o + 2], k)); R.s = lerp(a.r[o + 3], b.r[o + 3], k); });
   while (NET.evs.length && NET.evs[0].t <= NET.playT) netPlayEvent(NET.evs.shift());
@@ -14881,10 +15015,23 @@ function netGuestCam(dt, cp, cl) {
 function netMsg(m) {
   if (!m || !m.c) return;
   NET.silent = 0;   // any inbound traffic proves the link is alive (issue 49 watchdog)
+  if (NET.lag > 0 && m.c !== 'hello') { NET.lagQ.push([NET.now + NET.lag, m]); return; }   // R-25 debug: an artificial one-way delay on this page's clock
+  netMsgNow(m);
+}
+/* R-25: both wear boxing trunks of the same colour (two fresh profiles are both red) → the guest's man gets blue ones (red if the
+   host's are blue), on both pages; anything else — street trousers, different colours — is left as chosen */
+function netGuestLook(hostL, guestL) {
+  if (!hostL || !guestL) return guestL;
+  const h = wearGet(hostL, 'bottom'), g = wearGet(guestL, 'bottom');
+  if (h.id !== 'shorts' || g.id !== 'shorts' || h.color !== g.color) return guestL;
+  return { ...guestL, bottom: { id: 'shorts', color: h.color === 'blue' ? 'red' : 'blue' } };
+}
+function netMsgNow(m) {
   if (m.c === 'hello') {
     NET.oLook = m.look;   // kept for rematches
     if (NET.guest && m.cfg) netCfgApply(m.cfg);
-    try { if (NET.host) P2.applyLook(m.look); else P1.applyLook(m.look); } catch (e) {}
+    try { if (NET.host) P2.applyLook(netGuestLook(LOOK, m.look)); else { P1.applyLook(m.look); P2.applyLook(netGuestLook(m.look, LOOK)); } } catch (e) {}
+    if (NET.host) { NET.ack = NET.hs = NET.bAck = 0; }   // a (re)joined guest counts his presses from his own number: ack only ever grows from here
     NET.nm = m.nm || '';
   } else if (m.c === 'in') netInput(m);
   else if (m.c === 's') { if (NET.guest) netOnSnapshot(m); }
@@ -14945,6 +15092,8 @@ function netRestart() {
 
 /* ── disconnect: ten seconds to recover, then a win to the man left standing ── */
 function netTick(dt) {
+  NET.now += dt;
+  while (NET.lagQ.length && NET.lagQ[0][0] <= NET.now) netMsgNow(NET.lagQ.shift()[1]);   // R-25 debug: the delayed messages (NET.lag)
   if (NET.dropT > 0) {
     NET.dropT -= dt;
     $('net-drop-t').textContent = 'Ждём восстановления… ' + Math.max(0, Math.ceil(NET.dropT)) + ' с';
@@ -14998,6 +15147,7 @@ function netClose() {
   NET.peer = null; NET.loading = null;
   NET.snaps.length = 0; NET.evs.length = 0; NET.pops.length = 0; NET.pop.length = 0; NET.q.length = 0; NET.iq.length = 0;
   NET.first = true; NET.evI = 0; NET.acc = 0; NET.pingAcc = 0;
+  NET.seq = NET.ack = NET.hs = NET.bAck = 0; NET.lagQ.length = 0; if (P2) netPredReset();   // R-25
   $('n1').textContent = myName(); $('st2').textContent = '';
   if (had) netHome();
   setTimeout(() => { NET.closing = false; }, 0);
