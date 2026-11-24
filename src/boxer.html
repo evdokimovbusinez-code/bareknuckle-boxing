@@ -498,8 +498,8 @@ class ShortsCloth {
   }
   targets() {
     const sm = this.sm, t = this.t, B = this.base, SI = this.si, SW = this.sw;
-    sm.skeleton.update();
-    const M = sm.skeleton.boneMatrices;
+    const sk = sm.skeleton, M = this.BM || (this.BM = new Float32Array(sk.bones.length * 16)), ub = this.ub || (this.ub = [...new Set(SI)]);   // R-23: only the bones the trunks hang on (was skeleton.update() — every bone of the man, on top of the renderer's own update)
+    for (let q = 0; q < ub.length; q++) { const b = ub[q]; _m1.multiplyMatrices(sk.bones[b].matrixWorld, sk.boneInverses[b]).toArray(M, 16 * b); }
     for (let i = 0; i < this.n; i++) {
       const x = B[3 * i], y = B[3 * i + 1], z = B[3 * i + 2]; let ox = 0, oy = 0, oz = 0;
       for (let j = 0; j < 4; j++) {
@@ -508,7 +508,7 @@ class ShortsCloth {
       }
       t[3 * i] = ox; t[3 * i + 1] = oy; t[3 * i + 2] = oz;
     }
-    this.segNames.forEach(([a, b], i) => { bpos(a, this.segA[i]); bpos(b, this.segB[i]); });
+    for (let i = 0; i < 3; i++) { const s = this.segNames[i]; bpos(s[0], this.segA[i]); bpos(s[1], this.segB[i]); }
   }
   step(h) {
     const n = this.n, p = this.p, o = this.o, t = this.t, inv = this.inv, d = Math.pow(0.955, h / H_BASE), g = -9.81 * h * h;
@@ -521,14 +521,14 @@ class ShortsCloth {
       const s = this.pull[i]; p[k] += (t[k] - p[k]) * s; p[k + 1] += (t[k + 1] - p[k + 1]) * s; p[k + 2] += (t[k + 2] - p[k + 2]) * s;
     }
     const CA = this.CA, CB = this.CB, CR = this.CR, CK = this.CK;
-    for (let it = 0; it < 4; it++) {
-      for (let c = 0; c < CA.length; c++) {
+    for (let it = 0, ni = GFX.simSkip > 1 ? 2 : 4, nl = ni === 4 ? CA.length : (this.ne ?? (this.ne = CK.findIndex(k => k < 1))); it < ni; it++) {   // R-23, low preset: 2 sweeps (was 4 everywhere) over the edge links only (the soft bending links, the second half of the list, are left out) — constrain() still holds every point within maxD of the skinned shape
+      for (let c = 0; c < nl; c++) {
         const ia = CA[c], ib = CB[c], wa = inv[ia], wb = inv[ib], ws = wa + wb; if (ws === 0) continue;
         const a = 3 * ia, b = 3 * ib, dx = p[b] - p[a], dy = p[b + 1] - p[a + 1], dz = p[b + 2] - p[a + 2], len = Math.sqrt(dx * dx + dy * dy + dz * dz); if (len < 1e-9) continue;
         const f = (len - CR[c]) / (len * ws) * CK[c];
         p[a] += dx * f * wa; p[a + 1] += dy * f * wa; p[a + 2] += dz * f * wa; p[b] -= dx * f * wb; p[b + 1] -= dy * f * wb; p[b + 2] -= dz * f * wb;
       }
-      this.constrain();
+      if (ni === 4 || it === ni - 1) this.constrain();   // R-23: low preset — the reach / leg limits once, after the last sweep
     }
   }
   constrain() {
@@ -552,20 +552,20 @@ class ShortsCloth {
       if (ed < 0.082 && ed > 1e-6) { const s3 = 0.082 / ed; p[k] = ox + ex * s3; p[k + 1] = oy + ey * s3; p[k + 2] = oz + ez * s3; }
     }
   }
-  render() {
-    const p = this.p, pn = this.pn, tri = this.tri, map = this.map; pn.fill(0);
-    for (let q = 0; q < tri.length; q += 3) {
+  render(keepN) {   // R-23: keepN = positions only, the normals of the last solved frame stay (the frames the solver skips on the low preset)
+    const p = this.p, pn = this.pn, tri = this.tri, map = this.map; if (!keepN) pn.fill(0);
+    for (let q = 0; q < tri.length && !keepN; q += 3) {
       const a = 3 * tri[q], b = 3 * tri[q + 1], c = 3 * tri[q + 2];
       const ux = p[b] - p[a], uy = p[b + 1] - p[a + 1], uz = p[b + 2] - p[a + 2], vx = p[c] - p[a], vy = p[c + 1] - p[a + 1], vz = p[c + 2] - p[a + 2];
       const f = this.flip, nx = (uy * vz - uz * vy) * f, ny = (uz * vx - ux * vz) * f, nz = (ux * vy - uy * vx) * f;
-      for (const j of [a, b, c]) { pn[j] += nx; pn[j + 1] += ny; pn[j + 2] += nz; }
+      pn[a] += nx; pn[a + 1] += ny; pn[a + 2] += nz; pn[b] += nx; pn[b + 1] += ny; pn[b + 2] += nz; pn[c] += nx; pn[c + 1] += ny; pn[c + 2] += nz;   // R-23: was `for (const j of [a, b, c])` — an array + iterator per triangle (~3 MB of garbage a frame)
     }
     const P = this.geo.attributes.position.array, N = this.geo.attributes.normal.array;
-    for (let i = 0; i < map.length; i++) {
-      const j = 3 * map[i], k = 3 * i, l = Math.hypot(pn[j], pn[j + 1], pn[j + 2]) || 1;
-      P[k] = p[j]; P[k + 1] = p[j + 1]; P[k + 2] = p[j + 2]; N[k] = pn[j] / l; N[k + 1] = pn[j + 1] / l; N[k + 2] = pn[j + 2] / l;
+    for (let j = 0, m = keepN ? 0 : 3 * this.n; j < m; j += 3) { const x = pn[j], y = pn[j + 1], z = pn[j + 2], l = Math.sqrt(x * x + y * y + z * z) || 1; pn[j] = x / l; pn[j + 1] = y / l; pn[j + 2] = z / l; }   // R-23: normalised once per particle (was Math.hypot per render vertex)
+    for (let i = 0; i < map.length; i++) { const j = 3 * map[i], k = 3 * i;
+      P[k] = p[j]; P[k + 1] = p[j + 1]; P[k + 2] = p[j + 2]; if (!keepN) { N[k] = pn[j]; N[k + 1] = pn[j + 1]; N[k + 2] = pn[j + 2]; }
     }
-    this.geo.attributes.position.needsUpdate = true; this.geo.attributes.normal.needsUpdate = true;
+    this.geo.attributes.position.needsUpdate = true; if (!keepN) this.geo.attributes.normal.needsUpdate = true;
   }
 }
 
@@ -661,10 +661,10 @@ function renderHair(H) {
     let sx = e[0] * sl.x + e[4] * sl.y + e[8] * sl.z, sy = e[1] * sl.x + e[5] * sl.y + e[9] * sl.z, sz = e[2] * sl.x + e[6] * sl.y + e[10] * sl.z;
     for (let k = 0; k < np; k++) {
       const i = s * np + k, q = 3 * i, a = 3 * (k > 0 ? i - 1 : i), b = 3 * (k < np - 1 ? i + 1 : i);
-      let tx = p[b] - p[a], ty = p[b + 1] - p[a + 1], tz = p[b + 2] - p[a + 2]; const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
-      const dt = sx * tx + sy * ty + sz * tz; let wx = sx - tx * dt, wy = sy - ty * dt, wz = sz - tz * dt; const wl = Math.hypot(wx, wy, wz) || 1;
+      let tx = p[b] - p[a], ty = p[b + 1] - p[a + 1], tz = p[b + 2] - p[a + 2]; const tl = Math.sqrt(tx * tx + ty * ty + tz * tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+      const dt = sx * tx + sy * ty + sz * tz; let wx = sx - tx * dt, wy = sy - ty * dt, wz = sz - tz * dt; const wl = Math.sqrt(wx * wx + wy * wy + wz * wz) || 1;
       const w = H.width[s] * (1 - 0.45 * k / (np - 1)) * 0.5 / wl; wx *= w; wy *= w; wz *= w;
-      let nx = p[q] - _hc.x, ny = p[q + 1] - _hc.y, nz = p[q + 2] - _hc.z; const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+      let nx = p[q] - _hc.x, ny = p[q + 1] - _hc.y, nz = p[q + 2] - _hc.z; const nl = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1; nx /= nl; ny /= nl; nz /= nl;
       const v = 6 * i;
       P[v] = p[q] - wx; P[v + 1] = p[q + 1] - wy; P[v + 2] = p[q + 2] - wz; P[v + 3] = p[q] + wx; P[v + 4] = p[q + 1] + wy; P[v + 5] = p[q + 2] + wz;
       N[v] = N[v + 3] = nx; N[v + 1] = N[v + 4] = ny; N[v + 2] = N[v + 5] = nz;
