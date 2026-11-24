@@ -54,10 +54,13 @@ button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:tra
 button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
 /* top bars */
-.hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:flex-start;gap:14px;padding:var(--pt) var(--pr) 0 var(--pl);pointer-events:none}
+.hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:flex-start;gap:14px;padding:var(--pt) var(--pr) 0 var(--pl);pointer-events:none;isolation:isolate}
+/* R-06: a dark band under the top bars (0 → 76 px, 55 % black at the top) so the names and the clock read over a bright set */
+.hud::before{content:'';position:absolute;left:0;right:0;top:0;height:76px;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.55) 0px,rgba(0,0,0,.45) 38px,rgba(0,0,0,0) 76px)}
 .side{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
 .nm{display:flex;align-items:baseline;gap:8px;font-family:var(--display);font-weight:900;font-size:clamp(16px,2.6vmin,24px);letter-spacing:.05em;text-transform:uppercase}
-.nm span{font-family:var(--mono);font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.04em}
+.nm span{font-family:var(--mono);font-weight:500;font-size:11px;color:#b3ac9c;letter-spacing:.04em}
+.nm,.nm span{text-shadow:0 1px 2px rgba(0,0,0,.95),0 0 6px rgba(0,0,0,.7)}   /* R-06: «рубака · побед 0» over a bright wall */
 .side.r .nm{flex-direction:row-reverse}
 .hp{position:relative;height:14px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 .hp i{position:absolute;top:0;bottom:0;left:0;width:100%;transform-origin:left center}
@@ -72,7 +75,23 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .st i{display:block;height:100%;width:100%;background:var(--blue);transform-origin:left center}
 .side.r .st i{transform-origin:right center}
 .mid{flex:none;min-width:54px;text-align:center;font-family:var(--display);font-weight:900;font-size:clamp(18px,3vmin,28px);color:var(--gold);line-height:1;padding-top:2px}
-.mid small{display:block;font-family:var(--mono);font-weight:500;font-size:10px;color:var(--muted);letter-spacing:.1em;margin-top:3px}
+.mid .vsl{display:block;text-shadow:0 2px 3px rgba(0,0,0,.8)}
+/* R-06: the clock — 20 px bold on its own dark plate, the round («Р1») beside it (hudUpdate, 10_camera_layout.js) */
+.clk{display:flex;align-items:baseline;justify-content:center;gap:6px;width:max-content;margin:4px auto 0;padding:2px 9px 3px;border-radius:5px;background:rgba(6,7,10,.66);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);white-space:nowrap}
+.clk i{font:700 12px var(--mono);font-style:normal;color:var(--gold);letter-spacing:.06em}
+.clk i:empty{display:none}
+.clk b{font:700 20px var(--mono);color:#fff;font-variant-numeric:tabular-nums;letter-spacing:.02em;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+/* R-06: the heavy bag drill (#hud.bag, BAG.on): no health bars, no «VS» — score, combo and time, large */
+.bagp{display:none;gap:6px;justify-content:center;margin:0 auto}
+.bagp > div{display:flex;flex-direction:column;align-items:center;min-width:76px;padding:4px 12px 5px;border-radius:6px;background:rgba(6,7,10,.66);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.bagp small{font:600 10px var(--mono);color:#b3ac9c;letter-spacing:.12em;text-transform:uppercase}
+.bagp b{font:700 clamp(22px,4.4vmin,34px) var(--mono);color:#fff;font-variant-numeric:tabular-nums;line-height:1.05;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.bagp b.hot{color:var(--gold)}
+.bagp em{font:500 10px var(--mono);font-style:normal;color:#b3ac9c;letter-spacing:.04em;white-space:nowrap}
+.bagp em:empty{display:none}
+.hud.bag .hp,.hud.bag .side.r .st,.hud.bag #w2,.hud.bag .vsl,.hud.bag .clk{display:none}
+.hud.bag .bagp{display:flex}
+#stage.short .bagp > div{min-width:60px;padding:2px 8px 3px}
 .counter{align-self:flex-start;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:#0a0c11;background:var(--gold);border-radius:3px;padding:2px 7px;animation:pulse .35s infinite alternate}
 @keyframes pulse{from{transform:scale(1)}to{transform:scale(1.08)}}
 
@@ -513,7 +532,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="st"><i id="s1"></i></div>
       <div class="counter" id="cnt" hidden>КОНТРУДАР ×1.5</div>
     </div>
-    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><span class="net-ping" id="net-ping" hidden></span><button class="pz" id="pause-btn" aria-label="Пауза"></button><button class="fs" id="fs-btn" aria-label="На весь экран" title="На весь экран" hidden><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M1.5 6V1.5H6M10 1.5h4.5V6M14.5 10v4.5H10M6 14.5H1.5V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg></button></div>
+    <div class="mid" id="mid"><span class="vsl">VS</span><div class="clk" id="diffl"><i id="rnd"></i><b id="tmr">2:00</b></div><div class="bagp" id="bagp"><div><small>очки</small><b id="bag-sc">0</b><em id="bag-rec"></em></div><div><small>серия</small><b id="bag-cb">—</b><em id="bag-best"></em></div><div><small>время</small><b id="bag-t">0:45</b></div></div><span class="net-ping" id="net-ping" hidden></span><button class="pz" id="pause-btn" aria-label="Пауза"></button><button class="fs" id="fs-btn" aria-label="На весь экран" title="На весь экран" hidden><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M1.5 6V1.5H6M10 1.5h4.5V6M14.5 10v4.5H10M6 14.5H1.5V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg></button></div>
     <div class="side r">
       <div class="nm"><b id="n2">Соперник</b><span id="w2">побед 0</span><span id="st2" style="opacity:.7"></span></div>
       <div class="hp" id="hpb2"><i class="ghost" id="g2"></i><i class="fill" id="h2"></i></div>

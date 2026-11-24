@@ -242,9 +242,15 @@ function hudUpdate(dt) {
   hudBar(0, ME.hp / 100); hudBar(1, ME.hp / 100); hudBar(2, OP.hp / 100); hudBar(3, OP.hp / 100); hudBar(4, ME.stamina / 100); hudBar(5, OP.stamina / 100);
   $('cnt').hidden = !(G.state === 'fight' && ME.counterUntil > G.t);
   if (G.round) { const t = Math.max(0, Math.ceil(G.roundT)), mmss = s => `${(s / 60) | 0}:${String(s % 60).padStart(2, '0')}`;
-    // issue 51: a story bout has no rounds — the pill says «ДО НОКАУТА»; R-17: plus the time of the bout so far, counting up
-    const txt = G.mode === 'story' ? 'ДО НОКАУТА · ' + mmss(Math.max(0, Math.floor(STORY_TIME - G.roundT))) : `${BAG.on ? 'ГРУША' : 'Р' + G.round} · ${mmss(t)}`;
-    if (G.hudTxt !== txt) { G.hudTxt = txt; $('diffl').textContent = txt; } }
+    // R-06: the clock is 20 px on its own plate (#tmr), the round beside it (#rnd). Issue 51: a story bout has no rounds — «ДО НОКАУТА»;
+    // R-17: plus the time of the bout so far, counting up. The heavy bag (BAG.on): no bars / «VS» — score, combo and time, large (#bagp)
+    const rnd = G.mode === 'story' ? 'ДО НОКАУТА' : 'Р' + G.round, tm = G.mode === 'story' ? mmss(Math.max(0, Math.floor(STORY_TIME - G.roundT))) : mmss(t);
+    const live = G.t - BAG.lastT < 0.95 && BAG.combo > 1, txt = BAG.on ? `b${BAG.score}|${live ? BAG.combo : 0}|${BAG.best}|${tm}|${G.bagBest}` : rnd + '|' + tm;
+    if (G.hudTxt !== txt) { G.hudTxt = txt; elHud.classList.toggle('bag', BAG.on);
+      if (BAG.on) { $('bag-sc').textContent = BAG.score; $('bag-rec').textContent = G.bagBest ? 'рекорд ' + G.bagBest : '';
+        const cb = $('bag-cb'); cb.textContent = live ? '×' + BAG.combo : '—'; cb.classList.toggle('hot', live && BAG.combo >= 4);
+        $('bag-best').textContent = BAG.best > 1 ? 'лучшая ×' + BAG.best : ''; $('bag-t').textContent = tm; }
+      else { $('rnd').textContent = rnd; $('tmr').textContent = tm; } } }
   const k = Math.min(1, dt * 3); P1.u.uDmg.value += (clamp(1 - P1.hp / 100, 0, 1) - P1.u.uDmg.value) * k; P2.u.uDmg.value += (clamp(1 - P2.hp / 100, 0, 1) - P2.u.uDmg.value) * k;
   // (issue 46) the get-up bar during the referee's count: how close the man is to beating it (mashing punches adds)
   const kb = $('kdbar');
