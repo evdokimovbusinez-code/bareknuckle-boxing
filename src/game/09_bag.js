@@ -8,7 +8,8 @@ function startBag() {
   G.mode = 'bag'; if (G.diff !== G.userDiff && G.userDiff) G.diff = G.userDiff;
   startFight(true); BAG.on = true; showP2(false); BAG.g.visible = true;
   BAG.x = null; Object.assign(BAG, { score: 0, hits: 0, combo: 0, best: 0, lastT: -9 }); bagReset(); BAG.setSkin(BAG.skin + 1);   // the other bag every time
-  G.roundT = 45; $('n2').textContent = 'Груша'; const sl = $('st2'); if (sl) sl.textContent = 'рекорд ' + G.bagBest;
+  G.roundT = 45; $('n2').textContent = 'Груша'; const sl = $('st2'); if (sl) sl.textContent = '';   // R-06: the record is under the score in the bag panel
+  elHud.classList.add('bag'); G.hudTxt = '';
 }
 function bagHit(att, name, contact) {
   const P = PUNCH[name]; let dmg = P.dmg * (att.dmgMul || 1) * (1 + 0.06 * SK(att, 'pow')) * (att.sig && sigOf(name) === att.sig ? 1.12 : 1) * (att.punchK ?? 1) * (att.counterUntil > G.t ? 1.5 : 1); att.counterUntil = 0;
@@ -27,8 +28,7 @@ function bagHit(att, name, contact) {
   G.hitstop = 0.01 + 0.018 * power; G.shake = Math.max(G.shake, 0.008 + 0.02 * power);
   popup(pos, BAG.combo > 1 ? `${pts} ×${BAG.combo}` : String(pts), BAG.combo >= 4 ? 'crit' : 'hit');
   if (BAG.combo === 4 || BAG.combo === 7) msg('Серия ×' + BAG.combo);
-  const sl = $('st2'); if (sl) sl.textContent = 'очки ' + BAG.score;
-}
+}   // R-06: the score / combo / time are drawn large in the HUD's bag panel (hudUpdate)
 function bagEnd() {
   G.state = 'result'; G.winner = P1; G.loser = P2; BAG.on = true; sfx.bell(3); $('pad').hidden = true; Q.length = 0;
   const rec = BAG.score > G.bagBest; if (rec) G.bagBest = BAG.score; const bp = (BAG.score >= 400 ? 1 : 0) + (BAG.score >= 800 ? 1 : 0); PROF.pts += bp; save();
@@ -91,7 +91,8 @@ function startFight(fromMode) {
   // A story bout has no rounds — one fall to the knockout, the clock is out of reach (issue 51).
   G.round = 1; G.roundT = G.mode === 'story' ? STORY_TIME : ROUND_LEN; G.cards = []; G.rs0 = null; G.rd = [0, 0]; G.rkd = [0, 0]; G.cutWarn = false;
   show('result', false); show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', !G.cardT); show('pad', false);
-  $('diffl').textContent = DIFFS[G.diff].label.toUpperCase(); $('w1').textContent = 'побед ' + G.wins; $('w2').textContent = 'побед ' + G.losses;
+  G.hudTxt = ''; elHud.classList.remove('bag'); $('rnd').textContent = G.mode === 'story' ? 'ДО НОКАУТА' : 'Р1'; $('tmr').textContent = '';   // R-06: the clock, never the difficulty label (hudUpdate fills it); startBag turns the bag panel on
+  $('w1').textContent = 'побед ' + G.wins; $('w2').textContent = 'побед ' + G.losses;
   if (G.cardT) fightCard(); else show('vs', false);
   if (G.flyT) { camCut = true; if (!G.cardT) msg(LOC.label, 'place'); }
   introTick(0);
