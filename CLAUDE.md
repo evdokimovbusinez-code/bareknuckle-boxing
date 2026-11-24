@@ -11,6 +11,10 @@ Browser boxing game on three.js 0.160 (+ cannon-es), single page. UI text is in 
   Do not change line numbers in `src/boxer.html` (assemble.py depends on them). New game code goes into a new `src/game/NN_name.js`
   placed in the right order (things it uses must be defined earlier or be hoisted functions).
 - `src/bench.js` / `src/dbg_extra.js` only go into the debug build `gtest.html` (git-ignored).
+- Balance bench (R-02): `bash tools/shot.sh /tmp/b.csv balance [-p masher,jabspam,turtle,mover] [-d easy,normal,hard] [-n 30]`
+  (`tools/test/balance.py`: parallel pages, CSV + policy × difficulty table). In the page: `__bot.run(policy, diff, n, o)` (bots drive P1
+  through `press` / `setBlock` / `P1.moveDir`, nothing drawn, cutscenes skipped), `__bot.prof()` = ms per step of `frame()`.
+  Baseline of `main`: `docs/balance/`. Any change to the AI / damage / stamina: rerun it and put before/after in the PR.
 
 ## Assets (issue #43)
 - First load: `assets/pack.glb` (3.35 MB) + 13 `.webp` (2.46 MB) instead of 9 `.fbx.txt` + 13 `.jpg` (20.9 MB).
