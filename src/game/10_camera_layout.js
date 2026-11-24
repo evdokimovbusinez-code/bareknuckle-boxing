@@ -126,7 +126,7 @@ function resTick(dt) {
 }
 function layout() {
   // a phone held upright gets the stage turned on its side; a computer never does — a tall window gets a 16:9 band instead
-  const touch = TOUCH; stage.classList.toggle('desk', !touch);
+  const touch = TOUCH; stage.classList.toggle('desk', !touch); stage.classList.toggle('touch', touch);   // R-07: .touch = 44 px tap targets (g_head.html)
   const iw = window.innerWidth, ih = window.innerHeight, rot = touch && ih > iw * 1.05;
   stage.classList.toggle('rot', rot); VW = rot ? ih : iw; VH = rot ? iw : ih;
   if (!touch && VH > VW * 0.75) VH = Math.round(VW * 0.5625);

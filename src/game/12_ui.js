@@ -115,7 +115,8 @@ const setMove = () => { if (NET.guest) netMove(); if (!P1) return; const x = MV.
   const stickR = () => Math.min(290, Math.max(180, 0.52 * Math.min(window.innerWidth, window.innerHeight))) / 2;
   const toLocal = (vx, vy) => stage.classList.contains('rot') ? { x: vy, y: VH - vx } : (() => { const r = stage.getBoundingClientRect(); return { x: vx - r.left, y: vy - r.top }; })();
   const place = (x, y) => { el.style.left = x + 'px'; el.style.top = y + 'px'; };
-  const idle = () => { const r = stickR() + 16; place(r, VH - r); el.classList.remove('on'); knob.style.transform = ''; MV.sx = MV.sy = 0; setMove(); };
+  // at rest its caption (15 px under the ring) ends 16 px above the bottom edge, plus whatever the safe area adds over 12 px (#sa-b = --pb)
+  const idle = () => { const r = stickR() + 16, sb = ($('sa-b') || {}).offsetHeight || 12; place(r, VH - r - 15 - Math.max(0, sb - 12)); el.classList.remove('on'); knob.style.transform = ''; MV.sx = MV.sy = 0; setMove(); };
   let id = null, st = null;
   const upd = e => {
     if (!st) return; const R = stickR();
