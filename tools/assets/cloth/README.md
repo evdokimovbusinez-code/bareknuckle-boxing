@@ -12,6 +12,7 @@
 | `run_all.sh` | всё по порядку |
 | `bake_tee.py` | ручная футболка: лоуполи `tshirt_game` (QuadriFlow 6k квадов, кромки как острые петли, Smart UV) + normal с high (Cycles, 1024 px, ~4 с) → `assets/tee_hand_n.png`, `out/tshirt_baked.blend` (открыть и крутить — Material Preview) |
 | `user_tee.py` | ручная футболка → игра: веса с тела, обратный скиннинг T-поза → bind A-поза, экспорт `assets/tee_hand.json` (запуск — в шапке файла) |
+| `tee_game.py` | **#57, всё в одном:** веса, обратный скиннинг + проверки (Armature-модификатор, ткань в теле, удар плечом 80° для Decimate и QuadriFlow), Smart UV, запекание normal 1024 + AO 512 → `assets/cloth/tee.glb`, `tee_n.webp`, `tee_ao.webp` (запуск — в шапке файла) |
 | `user/tshirt_src.blend` | **футболка, сделанная вручную в Blender** (лучшая на сейчас): `tshirt_high` (21,6k тр.), `tshirt_low` (1,9k, Decimate), тело CC3 + скелет `CC3_Base_Plus` |
 
 `out/` в .gitignore — пересоздаётся скриптами.
@@ -28,6 +29,7 @@
   Обратный скиннинг: `rest = (Σ wᵢ·Sᵢ)⁻¹ · pose`. Кадр игры = 100 × мир Blender (cm, z вверх) — сверено по вершине тела №0.
 - Проверки скрипта: вершин футболки внутри тела — 0% в T-позе и 0% в A-позе (оракул: тело −1 см → 86%, +1 см → 8%); зазор 2–3,7 см.
 - Игра: предмет `teeHand` «футболка (ручная)» (`04f_tops.js`: `HAND_TOP`, `handGeo`, `handTex`); пока JSON не пришёл — процедурная `tee`.
+  (С #57 предмет — `teeCloth`, JSON остался запасным вариантом, см. ниже.)
   Кожа живота под топом теперь прячется до его подола (`uGearT`, `g_pre.js`), а не только выше `GEAR_TOP − 7`.
 - Сетка в игре: `tshirt_game` — 11,3k тр., `tee_hand.json` 944 КБ (260 КБ gzip; в нём нормали и MikkTSpace-касательные из Blender —
   с теми, что выводит three.js, карта даёт вмятины на каждом шве UV) + `tee_hand_n.png` 506 КБ (без потерь). Порядок сборки:
@@ -41,6 +43,16 @@
   (ворот, подол, манжеты): их решает только плотность лоуполи.
 - В игре (кадр против той же сцены с high без карты): low с картой 1,00, без карты 1,94, с перевёрнутым Y карты 2,49 → знак Y верный.
 - Запекание детерминированное.
+
+## GLB в игре (#57)
+- `python3 tools/assets/cloth/tee_game.py` (bpy 5.3 модулем) или `Blender -b tools/assets/cloth/user/tshirt_src.blend --python tools/assets/cloth/tee_game.py`.
+  Переменные: `LOW=quad|decimate`, `FACES=6000`, `CAGE=0.005`, `RAY=0.02`, `RES=1024`, `AO_RES=512`, `BAKE=0` (без запекания). Печатает все проверки.
+- GLB пишется вручную (без экспортёра glTF: без сюрпризов с осями и арматурой): один меш, `KHR_mesh_quantization` — позиции int16 + перенос/масштаб узла,
+  нормали и MikkTSpace-касательные из Blender int8, UV uint16 (v вниз, как в glTF), `JOINTS_0` = индекс в `primitive.extras.bones` (имена CC_Base_*),
+  `WEIGHTS_0` uint8. Метры, Y-up, bind A-поза. Тот же меш (11,3k тр.) в этой раскладке — 271 КБ (против 944 КБ JSON).
+- Игра: `src/game/04j_cloth_asset.js` (`clothLoad`, `clothFromGLTF`, `clothGeo`, `clothTex`), предмет `teeCloth` «футболка (ткань)», 150 ₽;
+  старый id `teeHand` в сохранениях → `teeCloth` (`WALIAS`). Нет GLB → JSON (`handLoad`, грузится только тогда) → процедурная `tee`.
+  Проверка пути GLB без Blender: в отладочной сборке `await __clothTestGLB()` собирает GLB той же раскладки из `tee_hand.json`.
 
 ## Следующие шаги
 - Размер: JSON → бинарь (Float16 / Int16), карта → WebP без потерь (нужен энкодер, Blender WebP 90 даёт блоки).
