@@ -145,7 +145,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .pz-fl{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--display);font-weight:900;font-size:clamp(16px,4.6vmin,28px);color:#fff;text-shadow:0 0 16px rgba(226,177,74,.95);white-space:nowrap;pointer-events:none;opacity:0}
 .pz-fl.on{animation:flrec .3s ease-out}
 @keyframes flrec{0%{opacity:0}15%{opacity:1}70%{opacity:1}100%{opacity:0}}
-.pb.blk{width:clamp(120px,32vmin,175px);height:clamp(42px,11vmin,56px);border-radius:999px;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}
+.pb.blk{width:clamp(120px,32vmin,175px);height:clamp(44px,11vmin,56px);border-radius:999px;border-color:rgba(226,177,74,.55);background:rgba(226,177,74,.12)}
 /* the floating stick: no fixed home, a faint hint at rest, solid under the thumb; the document catches the left-half touch */
 .stick{position:absolute;left:15%;top:78%;width:clamp(180px,52vmin,290px);height:clamp(180px,52vmin,290px);transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(255,255,255,.18);background:radial-gradient(circle,rgba(255,255,255,.07),rgba(13,16,23,.55) 70%);touch-action:none;pointer-events:none;opacity:.26;transition:opacity .14s}
 .stick.on{opacity:1}
@@ -342,6 +342,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .pz{pointer-events:auto;position:relative;display:block;margin:6px auto 0;width:36px;height:30px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
 .pz::before{content:'';position:absolute;left:50%;top:50%;box-sizing:content-box;width:4px;height:12px;margin:-6px 0 0 -6px;border-left:4px solid var(--text);border-right:4px solid var(--text)}
 .fs{pointer-events:auto;display:block;margin:6px auto 0;padding:2px 9px;border:1px solid var(--line);border-radius:5px;background:var(--panel);font:500 13px var(--body);color:var(--muted);line-height:1.2}
+.fs svg{display:block}
+.sa-b{position:absolute;left:0;bottom:0;width:1px;height:var(--pb);visibility:hidden;pointer-events:none}
 #stage.desk .pz,#stage.desk .fs{display:none}
 #stage.desk.nokeys .pad > .kbar{display:none}
 #stage:not(.desk) .khint{display:none}
@@ -450,6 +452,38 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 #stage.short .tut-chip{font-size:11px;padding:2px 8px}
 #stage.short .tut-foot{gap:8px;margin-top:3px}
 #stage.short .tut-btns .btn{font-size:11px;padding:3px 9px}
+
+/* ── R-07: tap targets ≥ 44 CSS px on a touch screen (#stage.touch = TOUCH in 10_camera_layout.js: pointer: coarse, or touch
+   without hover). The boxes themselves grow (the audit's phone.js measures getBoundingClientRect); where the drawn shape
+   should stay small, the extra is a transparent border / padding around it, or negative margins keep the row in place. ── */
+#stage.touch .mnav button,#stage.touch .btn,#stage.touch .inp,#stage.touch .cats button,#stage.touch .tabs button,#stage.touch .tabs2 button,
+#stage.touch .shc,#stage.touch .locs button,#stage.touch .rec button,#stage.touch .rb button{min-height:44px}
+#stage.touch .mnav{gap:0}
+#stage.touch .sw button.txt,#stage.touch .ui .sw button.txt{height:44px;min-width:44px;padding:0 7px}
+#stage.touch input[type=range]{height:44px;margin:0}
+/* colour swatches: a 44 px box, the 28 px dot drawn inside it (background clipped to the content box, the ring = an outline pulled in) */
+#stage.touch .sw button:not(.txt){width:44px;height:44px;padding:8px;border:0;background-clip:content-box;background-origin:content-box;outline:2px solid rgba(255,255,255,.18);outline-offset:-10px}
+#stage.touch .sw button:not(.txt)[aria-pressed="true"]{outline-color:var(--gold)}
+#stage.touch .sw{gap:4px}
+#stage.touch .stt{grid-template-columns:88px 1fr 44px}#stage.touch .stt button{height:44px}
+/* text links: the box grows, negative margins keep the line where it was */
+#stage.touch .dlg-skip,#stage.touch .a2hs button{min-height:44px;min-width:44px;padding:0 8px;margin:-14px -8px -14px 0}
+/* pause / full screen in the HUD: side by side, 44 × 44 boxes, the drawn plate 36 × 30 inside (transparent border, inset ring) */
+#stage.touch .pz,#stage.touch .fs{display:inline-flex;align-items:center;justify-content:center;vertical-align:top;box-sizing:border-box;width:44px;height:44px;margin:2px 0 0;padding:0;
+  border:solid transparent;border-width:7px 4px;border-radius:8px/11px;background:var(--panel) padding-box;box-shadow:inset 0 0 0 1px var(--line);color:var(--text)}
+/* a short phone (≤ 520 px tall): the main menu in two columns of four (title over its note), the creator's tabs in a row */
+#stage.touch.short #nav-main{display:grid;grid-template-rows:repeat(4,auto);grid-auto-flow:column;column-gap:clamp(14px,3.4vw,36px)}
+#stage.touch.short #nav-main button{flex-wrap:wrap;align-content:center;row-gap:0}
+#stage.touch.short #nav-main button small{flex-basis:100%;padding-left:28px;line-height:1.15}
+#stage.touch.short .crb{flex-direction:column;gap:8px}
+#stage.touch.short .cats{flex-direction:row;width:auto;gap:3px}
+#stage.touch.short .cats button{flex:1 1 0;min-width:0;padding:0 2px;text-align:center;border-left:0;border-bottom:3px solid rgba(255,255,255,.14);font-size:12px;letter-spacing:.02em}
+#stage.touch.short .cats button[aria-pressed="true"]{border-bottom-color:var(--neon);background:linear-gradient(0deg,rgba(255,59,78,.24),rgba(255,59,78,0))}
+#stage.touch.short .cats i{top:5px;right:4px;margin:0}
+/* the tutorial's top plate must stay low over the heads: its buttons keep the small drawn plate inside a 44 px box */
+#stage.touch.short .tut-btns .btn{border:solid transparent;border-width:10px 0;padding:0 9px;margin:-10px 0;background-clip:padding-box;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+/* desktop: 8 menu rows + the two-line logo did not fit 720 px (the ladder and the record line were cut) — a tighter row pitch */
+@media (max-height:900px){#stage.desk .mnav{gap:clamp(0px,.4vmin,4px)}#stage.desk .mnav button{line-height:1.02}}
 </style>
 
 <div id="stage">
@@ -459,6 +493,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
   <div class="bars t" id="bar-t" hidden></div><div class="bars b" id="bar-b" hidden></div>
 
   <div class="hurt" id="hurt"></div>
+  <i class="sa-b" id="sa-b" aria-hidden="true"></i><!-- R-07: its height is the bottom safe area (--pb) of the stage frame; the stick's rest place reads it -->
   <div class="hud" id="hud" hidden>
     <div class="side l">
       <div class="nm"><b id="n1">Ты</b><span id="w1">побед 0</span></div>
@@ -466,7 +501,7 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="st"><i id="s1"></i></div>
       <div class="counter" id="cnt" hidden>КОНТРУДАР ×1.5</div>
     </div>
-    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><span class="net-ping" id="net-ping" hidden></span><button class="pz" id="pause-btn" aria-label="Пауза"></button><button class="fs" id="fs-btn" aria-label="На весь экран" title="На весь экран" hidden>⛶</button></div>
+    <div class="mid" id="mid">VS<small id="diffl">НОРМ</small><span class="net-ping" id="net-ping" hidden></span><button class="pz" id="pause-btn" aria-label="Пауза"></button><button class="fs" id="fs-btn" aria-label="На весь экран" title="На весь экран" hidden><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M1.5 6V1.5H6M10 1.5h4.5V6M14.5 10v4.5H10M6 14.5H1.5V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg></button></div>
     <div class="side r">
       <div class="nm"><b id="n2">Соперник</b><span id="w2">побед 0</span><span id="st2" style="opacity:.7"></span></div>
       <div class="hp" id="hpb2"><i class="ghost" id="g2"></i><i class="fill" id="h2"></i></div>
@@ -9291,7 +9326,7 @@ function resTick(dt) {
 }
 function layout() {
   // a phone held upright gets the stage turned on its side; a computer never does — a tall window gets a 16:9 band instead
-  const touch = TOUCH; stage.classList.toggle('desk', !touch);
+  const touch = TOUCH; stage.classList.toggle('desk', !touch); stage.classList.toggle('touch', touch);   // R-07: .touch = 44 px tap targets (g_head.html)
   const iw = window.innerWidth, ih = window.innerHeight, rot = touch && ih > iw * 1.05;
   stage.classList.toggle('rot', rot); VW = rot ? ih : iw; VH = rot ? iw : ih;
   if (!touch && VH > VW * 0.75) VH = Math.round(VW * 0.5625);
@@ -9551,7 +9586,8 @@ const setMove = () => { if (NET.guest) netMove(); if (!P1) return; const x = MV.
   const stickR = () => Math.min(290, Math.max(180, 0.52 * Math.min(window.innerWidth, window.innerHeight))) / 2;
   const toLocal = (vx, vy) => stage.classList.contains('rot') ? { x: vy, y: VH - vx } : (() => { const r = stage.getBoundingClientRect(); return { x: vx - r.left, y: vy - r.top }; })();
   const place = (x, y) => { el.style.left = x + 'px'; el.style.top = y + 'px'; };
-  const idle = () => { const r = stickR() + 16; place(r, VH - r); el.classList.remove('on'); knob.style.transform = ''; MV.sx = MV.sy = 0; setMove(); };
+  // at rest its caption (15 px under the ring) ends 16 px above the bottom edge, plus whatever the safe area adds over 12 px (#sa-b = --pb)
+  const idle = () => { const r = stickR() + 16, sb = ($('sa-b') || {}).offsetHeight || 12; place(r, VH - r - 15 - Math.max(0, sb - 12)); el.classList.remove('on'); knob.style.transform = ''; MV.sx = MV.sy = 0; setMove(); };
   let id = null, st = null;
   const upd = e => {
     if (!st) return; const R = stickR();
