@@ -14909,7 +14909,7 @@ function netPing(rtt) {
 }
 function netShowResult(win, draw) {
   show('rec', false); show('bar-t', false); show('bar-b', false); show('hud', false); show('pad', false);
-  show('result', true); show('net-drop', false); show('net-away', false);
+  show('net-drop', false); show('net-away', false);   // the card itself: resultOpen() (R-09)
   $('r-car').textContent = ''; $('r-stats').innerHTML = '';
   try { payShow(null); } catch (e) {}
   $('r-replay').hidden = true; $('r-again').textContent = 'Реванш';
