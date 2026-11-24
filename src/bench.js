@@ -304,3 +304,155 @@ window.__flip = {
     return L.join('\n');
   },
 };
+
+/* ── R-02: balance bench — bot players drive P1 through the real input path, the AI drives P2 as in a quick fight ──
+   __bot.run(policy, diff, n, o) → { rows, csv, summary, sec }: n quick fights of `policy` vs the AI at `diff` ('easy' | 'normal' | 'hard').
+   Policies (BOT_POL): masher (random punches), jabspam, turtle (block + counter), mover (back off + jab). They play the way a player
+   does — press() / setBlock() / P1.moveDir, P1.moveLat — once per frame, with a reaction delay on the decisions that answer him.
+   The fight runs on __tick's frame() with nothing drawn; the cutscenes are off (OPT.cine) and skipped (introSkip / cineSkip),
+   the minute in the corner is integrated without simulating it (botCornerFF), the fight ends at fightOver (no replay, no purse, no save).
+   Fast mode (o.lite, default on): the parts of frame() that only draw or record — camera, crowd, HUD, location sync, blood FX,
+   trails, audio, the replay buffer, popups — are stubbed out for the run (BOT_LITE) and put back after it.
+   o: { dt = 1/30 (s per frame; frame() clamps at 0.05), seed (1; fight i uses seed + i for the bot's and the game's random stream —
+        rr is seedable in this build), loc ('gym'), rounds (ROUNDS), len (ROUND_LEN, s), lite (true), log (fn per fight),
+        stopAt (s of the round clock: stop there and leave the fight as it is — to take a look, e.g. a tools/shot.sh js shot) }.
+   tools/test/balance.py is the wrapper (parallel pages, CSV, the policy × difficulty table). */
+const BOT_COLS = ['policy', 'diff', 'seed', 'result', 'how', 'round', 'dur', 'p1_thr', 'p1_land', 'p1_blk', 'p1_dmg', 'p2_thr', 'p2_land', 'p2_blk', 'p2_dmg', 'kd_p1', 'kd_p2', 'hp1', 'hp2', 'cards', 'ms'];
+const botRng = s => { s = (Math.abs(s | 0) % 2147483646) + 1; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; };
+const BOT_REACH = 1.15;   // m between the men: the AI's own inReach is 1.13 − adv + 0.07 (08_ai_flow.js)
+/* one press of a punch through press(); body / power are what S / W held down would have given (punchMod) */
+function botPunch(b, name, body = false, pow = false) { const n0 = Q.length; press('punch', name); if (Q.length > n0) { const q = Q[Q.length - 1]; q.body = body; q.pow = pow; } }
+const BOT_POL = {
+  // random punches as fast as the keys allow, walks in, never defends
+  masher(b, c) {
+    P1.moveDir = c.dist > BOT_REACH - 0.05 ? c.fwd : 0;
+    if (G.t >= b.next) { b.next = G.t + 0.12 + b.r() * 0.33; botPunch(b, PN[(b.r() * PN.length) | 0], b.r() < 0.2, b.r() < 0.1); }
+  },
+  // the jab, again and again, from just inside its reach
+  jabspam(b, c) {
+    P1.moveDir = c.dist > BOT_REACH - 0.1 ? c.fwd : 0;
+    if (G.t >= b.next && c.dist < BOT_REACH + 0.1) { b.next = G.t + 0.26 + b.r() * 0.12; botPunch(b, 'jab'); }
+  },
+  // the guard up all the time; when his punch is spent (blocked or missed) it drops for a cross / a hook back, then goes up again
+  turtle(b, c) {
+    P1.moveDir = c.dist > BOT_REACH + 0.05 ? c.fwd * 0.7 : 0;
+    if (b.ctr) {   // the counter: guard down until our punch has gone through
+      if (G.t >= b.ctr.at && !b.ctr.sent) { b.ctr.sent = true; setBlock(false); botPunch(b, b.r() < 0.6 ? 'cross' : 'hookL'); if (b.r() < 0.4) b.ctr.two = G.t + 0.3; }
+      if (b.ctr.two && G.t >= b.ctr.two) { b.ctr.two = 0; botPunch(b, b.r() < 0.5 ? 'hookL' : 'cross'); }
+      if ((b.ctr.sent && !P1.cur && !Q.length && !b.ctr.two && G.t > b.ctr.at + 0.15) || G.t > b.ctr.at + 1.5) b.ctr = null;
+      return;
+    }
+    setBlock(true);
+    // his punch has resolved (on the guard or into the air): that is the opening
+    const o = P2;
+    if (o.cur && o.resolved && b.seen !== o.punchId && c.dist < BOT_REACH + 0.15) { b.seen = o.punchId; if (b.r() < 0.85) b.ctr = { at: G.t + 0.14 + b.r() * 0.12, sent: false, two: 0 }; }
+  },
+  // hit and run: stays just outside his reach and circles off the ropes; every 0.8–2 s steps in behind a jab (sometimes two),
+  // then backs off again; a jab back at him when he walks in. (Pure running is no test: he follows at 1.15 m/s, you back off at
+  // 1.5 m/s — a bot that only retreats gets 0–1 punches thrown in 10 min and a draw.)
+  mover(b, c) {
+    const near = edgeDist(ringPt(P1.group.position, _v1)) < 0.9;
+    if (G.t >= b.latT) { b.latT = G.t + 0.6 + b.r() * 1.2; b.lat = near || b.r() < 0.35 ? (b.r() < 0.5 ? -1 : 1) : 0; }
+    P1.moveLat = b.lat;
+    if (b.ph === 'in') {   // stepping in: the jab goes as soon as he is inside its reach
+      P1.moveDir = c.fwd;
+      if (c.dist < BOT_REACH - 0.02 && P1.canAct()) { botPunch(b, 'jab'); if (b.r() < 0.35) b.two = G.t + 0.3; b.ph = 'out'; b.hitAt = G.t; b.next = G.t + 0.8 + b.r() * 1.2; }
+      else if (G.t > b.next + 1.2) { b.ph = 'out'; b.next = G.t + 0.5; }
+      return;
+    }
+    if (b.two && G.t >= b.two) { b.two = 0; botPunch(b, 'jab'); }
+    if (G.t < b.hitAt + 0.4) P1.moveDir = 0;   // planted while the jab goes out
+    else P1.moveDir = c.dist < BOT_REACH + 0.3 ? -c.fwd : c.dist > BOT_REACH + 0.6 ? c.fwd * 0.6 : 0;
+    if (P2.cur && b.seen !== P2.punchId) { b.seen = P2.punchId; if (c.dist < BOT_REACH && b.r() < 0.5) b.two = G.t + 0.18 + b.r() * 0.1; }   // he walks in: jab him on the way
+    if (G.t >= b.next) b.ph = 'in';
+  },
+};
+/* the parts of frame() that only draw or record (nothing in the fight reads them back); stubbed in fast mode */
+const BOT_LITE = () => {
+  const keep = { camUpdate, locSync, crowdTick, hudUpdate, resTick, perfTick, trailTick, recFrame, hlTick, popup, msg, wearTick, FXu: FX.update, MISTu: MIST.update, AUu: AUDIO.tick };
+  const nop = () => {};
+  camUpdate = locSync = crowdTick = hudUpdate = resTick = perfTick = trailTick = recFrame = hlTick = popup = msg = wearTick = nop; FX.update = MIST.update = AUDIO.tick = nop;
+  // Fighter.simulate is ~85 % of a frame and nearly all of it is looks (shorts cloth, hair, jiggle, the face, clothes, gear matrices);
+  // what the fight reads back is the world matrices, the wounds (Flesh.tick → cutCheck) and the attachment points (ribs: body shots)
+  for (const F of [P1, P2]) F.simulate = function (dt) { this.group.updateMatrixWorld(true); this.flesh.tick(dt); this.updateColliders(); };
+  return () => { ({ camUpdate, locSync, crowdTick, hudUpdate, resTick, perfTick, trailTick, recFrame, hlTick, popup, msg, wearTick } = keep); FX.update = keep.FXu; MIST.update = keep.MISTu; AUDIO.tick = keep.AUu;
+    for (const F of [P1, P2]) { delete F.simulate; F.simReset = true; } };
+};
+/* the minute in the corner, integrated in 40 slices (corner() compounds the cuts per call, as the per-frame break does) */
+function botCornerFF() { for (let i = 0; i < 40; i++) for (const F of [P1, P2]) corner(F, 1 / 40); G.breakT = 0; }
+const botCtx = () => ({ fwd: Math.sign(P2.group.position.x - P1.group.position.x) || 1, dist: Math.abs(P2.group.position.x - P1.group.position.x) });
+function botFight(policy, diff, o, seed) {
+  const pol = BOT_POL[policy]; if (!pol) throw new Error('policy? ' + policy + ' — ' + Object.keys(BOT_POL).join(', '));
+  const dt = o.dt || 1 / 30, b = { r: botRng(seed * 7919 + 13), next: 0, latT: 0, lat: 0, seen: -1, ctr: null, hitAt: -9, mash: 0, ph: 'out', two: 0 };
+  rr = botRng(seed * 104729 + 7);   // the game's own random stream (AI, crits, ragdoll): same seed → same fight, as far as frame() is deterministic
+  G.mode = 'quick'; G.diff = diff; G.loc = o.loc || 'gym';
+  let res = null; const fo = fightOver; fightOver = (win, draw, how = 'dec') => { res = { win, draw, how }; };
+  const T0 = performance.now(); let stop = false;
+  try {
+    rollOpponent(); startFight(true);
+    let fightT = 0, guard = 0; const maxF = Math.ceil((ROUNDS * (ROUND_LEN + BREAK_LEN + 40) + 60) / dt);
+    while (!res && guard++ < maxF) {
+      if (o.stopAt && fightT >= o.stopAt && G.state === 'fight') { stop = true; break; }   // to look at a bot mid-fight: the fight is left as it is
+      if (G.state === 'intro' || G.state === 'rend' || (G.state === 'replay' && RP.hl)) introSkip();
+      if (G.state === 'break' && !G.doc && G.breakT > 0) botCornerFF();
+      if (G.state === 'fight') {
+        pol(b, botCtx());
+        fightT += G.hitstop > 0 ? 0 : dt * G.slow;   // the round clock: what stateTick takes off G.roundT
+      } else {
+        P1.moveDir = P1.moveLat = 0; if (P1.blocking) setBlock(false); b.ctr = null;
+        if (G.state === 'kd' && G.kd && G.kd.def === P1 && G.t >= b.mash) { b.mash = G.t + 0.14 + b.r() * 0.08; press('punch', 'jab'); }   // down: mash to get up, as a player does
+      }
+      window.__tick(1, dt);
+    }
+    return { policy, diff, seed, result: stop ? 'stopped' : !res ? 'timeout' : res.draw ? 'draw' : res.win ? 'win' : 'loss', how: res ? res.how : '-', round: G.round, dur: +fightT.toFixed(1),
+      p1_thr: P1.fs.thr, p1_land: P1.fs.land, p1_blk: P1.fs.blk, p1_dmg: +P1.fs.dmg.toFixed(1), p2_thr: P2.fs.thr, p2_land: P2.fs.land, p2_blk: P2.fs.blk, p2_dmg: +P2.fs.dmg.toFixed(1),
+      kd_p1: P1.kdCount || 0, kd_p2: P2.kdCount || 0, hp1: Math.round(P1.hp), hp2: Math.round(P2.hp), cards: (G.cards || []).map(c => c.join('-')).join(' '), ms: Math.round(performance.now() - T0) };
+  } finally {
+    fightOver = fo; rr = Math.random; if (!stop) { P1.moveDir = P1.moveLat = 0; setBlock(false); Q.length = 0; }
+  }
+}
+const botCSV = rows => [BOT_COLS.join(',')].concat(rows.map(r => BOT_COLS.map(k => String(r[k]).replace(/,/g, ';')).join(','))).join('\n');
+/* the roadmap's table: share of wins, mean duration (s of the round clock), share of knockouts (ko + tko, either way) */
+function botSummary(rows) {
+  const g = {};
+  for (const r of rows) (g[r.policy + '|' + r.diff] = g[r.policy + '|' + r.diff] || []).push(r);
+  return Object.entries(g).map(([k, a]) => {
+    const [policy, diff] = k.split('|'), n = a.length, m = f => +(a.reduce((s, r) => s + f(r), 0) / n).toFixed(2), sum = f => a.reduce((s, r) => s + f(r), 0);
+    return { policy, diff, n, win: m(r => r.result === 'win'), draw: m(r => r.result === 'draw'), dur: +m(r => r.dur).toFixed(1), ko: m(r => r.how !== 'dec'),
+      koFor: m(r => r.result === 'win' && r.how !== 'dec'), koAg: m(r => r.result === 'loss' && r.how !== 'dec'),
+      acc1: +(sum(r => r.p1_land) / Math.max(1, sum(r => r.p1_thr))).toFixed(2), acc2: +(sum(r => r.p2_land) / Math.max(1, sum(r => r.p2_thr))).toFixed(2) };
+  });
+}
+window.__bot = {
+  policies: Object.keys(BOT_POL), BOT_POL, COLS: BOT_COLS, csv: botCSV, summary: botSummary,
+  run(policy = 'masher', diff = 'normal', n = 1, o = {}) {
+    const T0 = performance.now(), rows = [], save = { cine: OPT.cine, shake: OPT.shake, rounds: ROUNDS, len: ROUND_LEN, mode: G.mode, diff: G.diff, loc: G.loc };
+    OPT.cine = false; OPT.shake = false; if (o.rounds) ROUNDS = o.rounds; if (o.len) ROUND_LEN = o.len;
+    const unlite = o.lite === false ? () => {} : BOT_LITE();
+    try {
+      for (let i = 0; i < n; i++) { const r = botFight(policy, diff, o, (o.seed ?? 1) + i); rows.push(r); if (o.log) o.log(r); }
+    } finally {
+      unlite(); OPT.cine = save.cine; OPT.shake = save.shake; ROUNDS = save.rounds; ROUND_LEN = save.len; G.diff = save.diff; G.loc = save.loc; G.mode = save.mode;
+    }
+    return { rows, csv: botCSV(rows), summary: botSummary(rows), sec: +((performance.now() - T0) / 1000).toFixed(1) };
+  },
+  // where the time of a frame goes: wraps the steps of frame() for `frames` frames of a masher fight (ms per frame)
+  prof(frames = 300, dt = 1 / 30, lite = true) {
+    const T = {}, wrap = (k, f) => function (...a) { const t = performance.now(); try { return f.apply(this, a); } finally { T[k] = (T[k] || 0) + performance.now() - t; } };
+    G.mode = 'quick'; G.diff = 'normal'; const cine = OPT.cine; OPT.cine = false; startFight(true); for (let i = 0; i < 90 && G.state !== 'fight'; i++) { introSkip(); window.__tick(1, dt); }
+    const unlite = lite ? BOT_LITE() : () => {};
+    const fns = { playerInput, ai, aimFor, headFrames, kdTick, stateTick, ropeTick, bagStep, recFrame, camUpdate, locSync, crowdTick, hudUpdate, trailTick, wearTick };
+    playerInput = wrap('playerInput', fns.playerInput); ai = wrap('ai', fns.ai); aimFor = wrap('aimFor', fns.aimFor); headFrames = wrap('headFrames', fns.headFrames); kdTick = wrap('kdTick', fns.kdTick);
+    stateTick = wrap('stateTick', fns.stateTick); ropeTick = wrap('ropeTick', fns.ropeTick); bagStep = wrap('bagStep', fns.bagStep); recFrame = wrap('recFrame', fns.recFrame); camUpdate = wrap('camUpdate', fns.camUpdate);
+    locSync = wrap('locSync', fns.locSync); crowdTick = wrap('crowdTick', fns.crowdTick); hudUpdate = wrap('hudUpdate', fns.hudUpdate); trailTick = wrap('trailTick', fns.trailTick); wearTick = wrap('wearTick', fns.wearTick);
+    const om = []; for (const F of [P1, P2]) for (const m of ['update', 'simulate', 'armClear']) { om.push([F, m, Object.hasOwn(F, m) ? F[m] : null]); F[m] = wrap(m, F[m]); }
+    const fx = [FX.update, MIST.update]; FX.update = wrap('FX.update', fx[0]); MIST.update = wrap('MIST.update', fx[1]);
+    const b = { r: botRng(5), next: 0 }, t0 = performance.now();
+    for (let i = 0; i < frames; i++) { if (G.state === 'fight') BOT_POL.masher(b, botCtx()); window.__tick(1, dt); }
+    const tot = performance.now() - t0;
+    ({ playerInput, ai, aimFor, headFrames, kdTick, stateTick, ropeTick, bagStep, recFrame, camUpdate, locSync, crowdTick, hudUpdate, trailTick, wearTick } = fns);
+    for (const [F, m, own] of om) { if (own) F[m] = own; else delete F[m]; } FX.update = fx[0]; MIST.update = fx[1]; unlite(); OPT.cine = cine; Q.length = 0;
+    const out = { frame: +(tot / frames).toFixed(3), state: G.state }; for (const k of Object.keys(T).sort((a, c) => T[c] - T[a])) out[k] = +(T[k] / frames).toFixed(3);
+    return out;
+  },
+};

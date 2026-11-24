@@ -5,6 +5,7 @@
 #   bash tools/shot.sh /tmp/shots/x.jpg js "document.getElementById('go').click(); __tick(400, 1/60);"
 #   bash tools/shot.sh /tmp/shots/t.jpg tut   # issue 45: run tools/tut_test.py (all steps, desktop keys + touch PointerEvents)
 #   bash tools/shot.sh /tmp/shots/mp.jpg mp   # issue 49: run tools/test/mp_test.py (two pages, real PeerJS P2P)
+#   bash tools/shot.sh /tmp/b.csv balance -p masher -d normal -n 30   # R-02: tools/test/balance.py (bots vs the AI, CSV + table)
 # then look at the JPG with the Read tool.  Takes 1-4 minutes (software rendering).
 set -e
 cd "$(dirname "$0")/.."
@@ -14,6 +15,8 @@ python3 src/assemble.py >/dev/null
 if [ "${2:-}" = "tut" ]; then exec python3 tools/tut_test.py; fi
 [ -e node_modules ] || { [ -d /home/claude/cc/node_modules ] && ln -s /home/claude/cc/node_modules node_modules; }
 [ -d node_modules/three ] || npm i --no-save --silent three@0.160.0 cannon-es@0.20.0 >/dev/null
+# R-02: the balance bench — bots vs the AI, CSV to $1, the table to stdout (tools/test/balance.py; its own http.server)
+if [ "${2:-}" = "balance" ]; then exec python3 tools/test/balance.py --csv "$1" "${@:3}"; fi
 # one server per checkout (worktrees run side by side): the port comes from this directory's path
 PORT=${SHOT_PORT:-$((8700 + $(pwd | cksum | cut -d' ' -f1) % 200))}
 curl -sf -o /dev/null http://localhost:$PORT/gtest.html || { (python3 -m http.server $PORT >/dev/null 2>&1 &); sleep 1; }
