@@ -67,6 +67,7 @@ function startSpar() { if (G.mode === 'career') { G.diff = G.userDiff; rollOppon
 function startQuick() { if (G.mode === 'career') { G.diff = G.userDiff; rollOpponent(); } G.mode = 'quick'; startFight(true); }
 function startFight(fromMode) {
   if (fromMode !== true) { if (G.mode === 'career') return startCareer(); if (G.mode === 'bag') return startBag(); if (G.mode === 'spar') return startSpar(); if (G.mode === 'story') return storyAgain(); }
+  G.cel = null;   // R-13: no celebration left over from the last bout (09b_cine.js)
   hintFightStart(); window.goFull && window.goFull();   // touch: full screen + landscape (12_ui.js)   // control hints: the first three bouts are the learning ones (12_ui.js)
   for (const F of [P1, P2]) F.sparGear(G.mode === 'spar' || (G.mode === 'net' && NET.cfg.spar));   // a P2P host may pick «Спарринг» (18_net.js)
   // the opponent dresses for the place: a random street outfit outside the gym, trunks in it
@@ -154,7 +155,7 @@ function decision() {
   const t = G.cards.reduce((s, c) => [s[0] + c[0], s[1] + c[1]], [0, 0]);
   G.state = 'result'; $('pad').hidden = true;
   const win = t[0] > t[1], draw = t[0] === t[1];
-  G.winner = win || draw ? P1 : P2; G.loser = G.winner.other;
+  G.winner = win || draw ? P1 : P2; G.loser = G.winner.other; celStart(draw ? null : G.winner, 0.3);   // R-13: the winner's pose (09b_cine.js)
   fightOver(win, draw);
   $('r-title').textContent = draw ? 'Ничья' : win ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (draw ? '' : win ? 'win' : 'lose');
   $('r-sub').textContent = `решение судей ${t[0]}–${t[1]} · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false;
@@ -165,7 +166,7 @@ function cutCheck() {
     if (w.kind !== 'cut' || w.sev < 0.85 || pvp('blood')) continue;   // «Кровавая бойня»: no doctor
     const near = Math.min(w.p.distanceTo(F.flesh.u.uEyeL.value), w.p.distanceTo(F.flesh.u.uEyeR.value)) / F.flesh.U; if (near > 0.045) continue;
     if (!F.cutLook) { F.cutLook = true; msg('Врач смотрит рассечение'); G.state = 'break'; G.breakT = 3.5; G.doc = true; corner(F, 0.35); return; }
-    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; fightOver(A === P1, false, 'tko'); $('pad').hidden = true; if (NET.role) return netResult();   // P2P: the shared result (the guest was left hanging)
+    if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; celStart(A, 0.3); fightOver(A === P1, false, 'tko'); $('pad').hidden = true; if (NET.role) return netResult();   // P2P: the shared result (the guest was left hanging)
       $('r-title').textContent = A === P1 ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (A === P1 ? 'win' : 'lose');
       $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false; msg('Стоп! Рассечение', 'ko'); return; }
   }

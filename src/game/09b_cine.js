@@ -33,13 +33,7 @@ function stareCam(k) {
 Fighter.prototype.cineLayer = function () {
   const B = this.bones, t = G.t, P = this.ph || 0;
   if (G.state === 'ko' || G.state === 'result') {
-    // (issue 46) the winner's short gesture while the camera holds the downed man: chest opens, chin up,
-    // both arms lift a little, then settle. A pose layer, so it rides on top of the live idle animation.
-    if (G.winner === this) {
-      const a = G.t - (G.koCine || G.koT), u = sstep(0.25, 1.0, a) * (1 - 0.35 * sstep(2.2, 3.4, a));
-      this.rot(B.CC_Base_Spine02, -0.09 * u, 0, 0); this.rot(this.head, -0.14 * u, 0, 0);
-      for (const S of ['L', 'R']) this.rot(B[`CC_Base_${S}_Upperarm`], -0.08 * u, 0, (S === 'L' ? 1 : -1) * 0.55 * u);
-    }
+    if (celOf(this)) celLayer(this);   // R-13: the winner backs off and celebrates (below)
     this.cc.updateMatrixWorld(true);
     return;
   }
@@ -56,6 +50,88 @@ Fighter.prototype.cineLayer = function () {
   }
   this.cc.updateMatrixWorld(true);
 };
+
+/* ── the winner (R-13) ──
+   G.cel = { W: the winner, pose, face, arm, t0, walkAt, poseT, w, gap, walking }, set by celStart on every result with a winner
+   (knockout, count-out, the doctor's stoppage, the judges; not a draw, not the bag). After the follow-up window of a knockout the
+   winner backs off the man on the floor (footwork → celWalk: 2–3 long steps, like the referee sends him away at a knockdown) until
+   his front foot is CEL.pelvis from the downed man's pelvis and CEL.clear from every joint of his; then one of three poses blends in:
+   'up' both arms up, 'fist' one fist up and the other hand on the belt, 'hips' both hands on the belt with heavy breathing (his
+   stamina was under 30 % at the end). Face: Face.x roar / smirk (03_flesh_face.js via celOf). The crowd cheers when the pose lands
+   and again when the result screen shows. Only the live man is posed — the replay (REC) plays back the frames as they were.
+   Debug: window.__celPose = 'up' | 'fist' | 'hips' forces the pose of the next result. */
+// s after the knockout the walk starts (while followOK still holds, the follow-up wins in footwork); m front foot ↔ his pelvis; m front foot ↔ his
+// nearest joint; m/s back (0.8 left a 1.5 m walk — a man who fell toward him — unfinished on the result screen); m a foot lags before it
+// steps (0.09 in the fight shuffle), s a step (0.18); s the walk may take at most; m still to go when the pose may start; s the pose blends in
+const CEL = { walkAt: 0.9, pelvis: 1.1, clear: 0.28, v: 1.1, reach: 0.24, step: 0.26, wait: 2.0, early: 0.12, blend: 0.55 };
+const _celA = new V3(), _celB = new V3(), _celT = new V3(), _celP = new V3(), _celH = new V3(), _celQ = [new Quat(), new Quat(), new Quat(), new Quat()];
+function celStart(W, walkAt = CEL.walkAt) {
+  if (!W || BAG.on) { G.cel = null; return; }
+  const want = window.__celPose, pose = want || (W.stamina < 30 ? 'hips' : rr() < 0.5 ? 'up' : 'fist');
+  G.cel = { W, pose, face: pose === 'up' ? 'roar' : pose === 'hips' ? 'smirk' : rr() < 0.5 ? 'roar' : 'smirk', arm: rr() < 0.7 ? 'R' : 'L',
+    t0: G.t, walkAt, poseT: null, w: 0, gap: 0, walking: false, res: false };
+}
+const celOf = F => { const C = G.cel; return C && C.W === F && (G.state === 'ko' || G.state === 'result') && !BAG.on ? C : null; };
+/* how far (m, < 0 = too close) the winner's front foot is from where it may stand: off the downed man's pelvis by CEL.pelvis and
+   off all his joints by CEL.clear. fwd = the winner's facing on the fight line; C.dir = +1 when the man lies in front of him (the winner
+   backs off), −1 when a forward fall put him behind (the winner steps forward, away from him) */
+function celGap(F, fwd) {
+  const L = F.other, x0 = F.group.position.x, z0 = F.group.position.z;
+  _celA.setFromMatrixPosition(L.hip.matrixWorld); const d = (_celA.x - x0) * fwd >= 0 ? 1 : -1; fwd *= d; G.cel.dir = d;
+  const sp = (_celA.x - x0) * fwd;
+  let front = 0; for (const i of [10, 11, 13, 14]) front = Math.max(front, (F.jp[i].x - x0) * fwd);   // the feet and toes nearest to him
+  // a point off the line by dz needs only √(R² − dz²) along it (a man thrown sideways is already out of the way)
+  const need = (s, dz, R) => s - front - Math.sqrt(Math.max(0, R * R - dz * dz));
+  let gap = need(sp, _celA.z - z0, CEL.pelvis);
+  for (let i = 0; i <= 15; i++) { _celA.setFromMatrixPosition((i < 15 ? L.rb[i] : L.head).matrixWorld); const s = (_celA.x - x0) * fwd; if (s > -0.25) gap = Math.min(gap, need(s, _celA.z - z0, CEL.clear)); }
+  return gap;
+}
+// the target of footwork (adv) while he backs off, or null when the walk is not on
+function celWalk(F, a, fwd) {
+  const C = celOf(F); if (!C || G.t - C.t0 < C.walkAt || F.rag.on || F.gu) { if (C) C.walking = false; return null; }
+  C.gap = celGap(F, fwd);
+  if (C.movT == null || Math.abs(a - C.adv0) > 1e-3) C.movT = G.t; C.adv0 = a;   // stuck: the ropes behind him (footwork stops him there)
+  C.walking = (C.gap < -0.02 && G.t - C.movT < 0.3) || Math.abs(F.advV || 0) > 0.12;
+  return a + C.dir * Math.min(0, C.gap);
+}
+function celLayer(F) {
+  const C = G.cel, B = F.bones, a = G.t - C.t0, t = G.t, P = F.ph || 0;
+  if (C.poseT == null && a > C.walkAt + 0.15 && !followOK(F) && (!C.walking || C.gap > -CEL.early || a > C.walkAt + CEL.wait)) {
+    C.poseT = G.t; sfx.roar(0.7); CROWD.heat = Math.max(CROWD.heat, 0.45);
+    if (LOC.crowd) LOC.crowd.cheer(0.9, F.headNow, 2.5, 0);
+  }
+  if (G.state === 'result' && !C.res) { C.res = true; if (LOC.crowd) LOC.crowd.cheer(0.8, F.headNow, 2, 0); sfx.roar(0.5); }
+  const w = C.w = C.poseT == null ? 0 : sstep(0, CEL.blend, G.t - C.poseT), hips = C.pose === 'hips';
+  // (issue 46) the first moment, while the camera holds the downed man: chest opens, chin up, both arms lift a little; the pose takes over
+  const u = sstep(0.25, 1.0, a) * (1 - w);
+  if (u > 0.001) { F.rot(B.CC_Base_Spine02, -0.09 * u, 0, 0); F.rot(F.head, -0.14 * u, 0, 0); for (const S of ['L', 'R']) F.rot(B[`CC_Base_${S}_Upperarm`], -0.08 * u, 0, (S === 'L' ? 1 : -1) * 0.55 * u); }
+  if (w <= 0.001) return;
+  // the trunk: proud and tall (arms up / fist), or bent a little over the hands on the belt with the chest heaving
+  const br = Math.sin(t * 4.6 + P);
+  if (hips) {
+    F.rot(B.CC_Base_Waist, 0.09 * w, 0, 0); F.rot(B.CC_Base_Spine02, (0.05 + 0.05 * br) * w, 0, 0); F.rot(F.head, (0.12 + 0.04 * br) * w, 0.05 * w * Math.sin(t * 0.6 + P), 0);
+    for (const S of ['L', 'R']) F.rot(B[`CC_Base_${S}_Clavicle`] || B[`CC_Base_${S}_Upperarm`], 0, 0, (S === 'L' ? 1 : -1) * 0.07 * w * br);
+  } else {
+    F.rot(B.CC_Base_Spine02, -0.12 * w, 0, 0); F.rot(F.head, (C.pose === 'up' ? -0.24 : -0.12) * w, 0.06 * w * Math.sin(t * 0.5 + P), 0);
+  }
+  F.cc.updateMatrixWorld(true);
+  const hc = F.group.worldToLocal(F.head.getWorldPosition(_celH)), pump = Math.max(0, Math.sin((G.t - C.poseT) * 7)) * (1 - sstep(1.2, 1.9, G.t - C.poseT));   // the fist pumps two or three times as it goes up
+  for (const S of ['L', 'R']) {
+    const side = S === 'L' ? 1 : -1, up = C.pose === 'up' || (C.pose === 'fist' && C.arm === S);
+    const A = B[`CC_Base_${S}_Upperarm`], Fn = B[`CC_Base_${S}_Forearm`], H = B[`CC_Base_${S}_Hand`];
+    const q0a = F.mquat(A, _celQ[0]), q0f = F.mquat(Fn, _celQ[1]), sh = F.mpos(A, _celA);
+    if (up && C.pose === 'up') { _celT.set(side * 0.17, 0.44 + 0.02 * Math.sin(t * 3 + P + side), 0.07).add(sh); _celP.set(side * 0.42, 0.1, -0.12).add(sh); }
+    else if (up) { _celT.set(side * 0.06, 0.46 - 0.1 * pump, 0.11).add(sh); _celP.set(side * 0.38, 0.05, 0).add(sh); }
+    else {   // the hand on the belt: wrist at the side of the waist, elbow out to the side and back
+      const hp = F.mpos(F.hip, _celB);
+      _celT.set(hp.x + side * 0.2, hp.y + 0.1 + (hips ? 0.012 * br : 0), hp.z - 0.02); _celP.set(side * 0.5, -0.24, -0.2).add(sh);
+    }
+    F.ikPole(A, Fn, H, _celT, _celP); F.cc.updateMatrixWorld(true);
+    const q1a = F.mquat(A, _celQ[2]), q1f = F.mquat(Fn, _celQ[3]);
+    F.setMQuat(A, q0a.slerp(q1a, w)); F.cc.updateMatrixWorld(true); F.setMQuat(Fn, q0f.slerp(q1f, w)); F.cc.updateMatrixWorld(true);
+    if (up) { F.guardHand(S, H, Fn, hc, w); F.cc.updateMatrixWorld(true); }   // a fist on the line of the forearm, knuckles out
+  }
+}
 
 /* ── end of a round: the faces ── */
 function roundCine(after) {

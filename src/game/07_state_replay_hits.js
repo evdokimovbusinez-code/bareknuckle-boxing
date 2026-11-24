@@ -410,7 +410,7 @@ function kdTick(dt) {
 }
 function countOut(K) {
   const D = K.def, A = K.att; D.ko = true; G.state = 'ko'; G.koT = K.t0; G.koCine = G.t; G.koTitle = false;
-  G.winner = A; G.loser = D; G.fallSnd = true; G.kd = null;
+  G.winner = A; G.loser = D; G.fallSnd = true; G.kd = null; celStart(A, 0.3);   // R-13: the man has been down ten seconds — no follow-up window to wait for
   if (D.rag.on) D.rag.prof.conscious = false;   // he stops trying
   else D.collapse();
   fightOver(A === P1, false, 'ko');
@@ -426,7 +426,7 @@ function knockout(att, def, dir, power, name, fwd, forced, bodyArg) {
   def.doomed = null;
   const body = !!bodyArg;
   def.ko = true; G.state = 'ko'; G.koT = G.t; G.koCine = G.t; G.koTitle = false;
-  AI.fol = 0; G.winner = att; G.loser = def; G.fallSnd = false;
+  AI.fol = 0; G.winner = att; G.loser = def; G.fallSnd = false; celStart(att);   // R-13: he backs off and celebrates (09b_cine.js)
   // keep the fall in the side-on plane: mostly away from the attacker, a little toward/away from camera
   // momentum check: a punch (~5–9 kg effective mass at 8–10 m/s) can give the 5 kg head several m/s, but the whole 80 kg body well under 1 m/s.
   // The fall itself comes from the legs giving way under the body's own lean; the punch only tips it and whips the head.

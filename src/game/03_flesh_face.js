@@ -242,7 +242,7 @@ class Face {
   }
   update(dt) {
     const F = this.F; if (G.state === 'replay' || NET.guest) return;   // issue 49: the guest's lids come from the snapshot, like a replay
-    this.t += dt; const ko = F.rag.on && F.rag.mode === 'ko' && !F.rag.prof.conscious, dz = F.daze || 0, tired = Math.max(clamp((40 - F.stamina) / 40, 0, 1), G.state === 'rend' ? F.pant || 0 : 0);   // (the end-of-round close-up: mouth breathing)
+    this.t += dt; const ko = F.rag.on && F.rag.mode === 'ko' && !F.rag.prof.conscious, dz = F.daze || 0, CL = celOf(F), tired = Math.max(clamp((40 - F.stamina) / 40, 0, 1), G.state === 'rend' ? F.pant || 0 : 0, CL && CL.pose === 'hips' ? 0.85 * CL.w : 0);   // (the end-of-round close-up / the winner with his hands on the belt: mouth breathing; CL = R-13, 09b_cine.js)
     if (ko) this.koT += dt; else this.koT = 0;
     // blinks
     if (!ko) { if ((this.blinkT -= dt) < 0) { this.blink(); this.blinkT = (dz > 0.2 ? 1 : 2) + rr() * 4; } }
@@ -263,7 +263,7 @@ class Face {
     let jt = F.cur ? 0 : 0.012;   // clenched when punching
     if (tired > 0 && !ko) { this.breath += dt * (5 + 3 * tired); jt = T.fm ? tired * (0.012 + 0.085 * Math.max(0, Math.sin(this.breath))) : 0.035 * tired + 0.05 * tired * (0.5 + 0.5 * Math.sin(this.breath)); }   // (with the shapes: lips close to blow out, cheeks puffed)
     if (dz > 0.3 && !ko) jt = Math.max(jt, 0.05 * dz);
-    const roar = G.state === 'result' && G.winner === F && !BAG.on, show = G.state === 'menu' && F === P1 && UI.mouth && UI.scr === 'creator';
+    const roar = CL ? CL.face === 'roar' && CL.w > 0.3 : G.state === 'result' && G.winner === F && !BAG.on, show = G.state === 'menu' && F === P1 && UI.mouth && UI.scr === 'creator';
     if (T.fm && roar) jt = Math.max(jt, 0.24 + 0.04 * Math.sin(this.t * 3.1));   // the roar: mouth wide
     if (show) jt = 0.045;   // teeth just apart on the gum shield
     if (ko) { const gl = _fv1.set(0, -1, 0).applyQuaternion(_fq2.copy(D).invert()); jt = 0.07 + 0.22 * clamp(-gl.y * 0.8 - gl.z * 0.6, 0, 1); }
@@ -279,7 +279,7 @@ class Face {
       tgt.focus = up && !menu ? (F.blockW > 0.5 ? 0.9 : 0.6) * (1 - stare) : menu ? 0.12 : 0;
       tgt.effort = up ? Math.max(punch ? 1 : 0, F.blockW > 0.5 ? 0.25 : 0, grit ? 0.5 : 0) : 0;
       tgt.pain = Math.max(hurt * 1.2, grit ? 0.6 : 0); tgt.daze = up && dz > 0.3 ? dz : 0; tgt.tired = up && tired > 0.2 ? tired : 0;
-      tgt.smirk = F === G.smirker ? stare : 0; tgt.mean = F !== G.smirker ? stare : 0; tgt.roar = roar ? 1 : 0;
+      tgt.smirk = F === G.smirker ? stare : CL && CL.face === 'smirk' ? CL.w : 0; tgt.mean = F !== G.smirker ? stare : 0; tgt.roar = roar ? 1 : 0;
       tgt.sad = G.state === 'result' && G.loser === F && !ko && !BAG.on ? 1 : 0; tgt.slack = ko ? 1 : 0; tgt.show = show ? 1 : 0;
       if (P) X.arm = P.arm === 'L' ? 0.35 : -0.35;
       if (hurt > 0.05) X.side = this.hitSide;
@@ -293,7 +293,8 @@ class Face {
     if (dz > 0.3) tg = tg.map((v, i) => v * (1 - dz * 0.7) + [-0.3, 0.6, 0, -0.3, 0, 0.3][i] * dz * 0.7);
     if (tired > 0.3) tg[1] = Math.max(tg[1], 0.4 * tired);
     if (ko) tg = [-0.2, 0.15, 0, -0.2, 0, 0.2];
-    if (G.state === 'result' && G.winner === F) tg = [0.9, 0, 0.9, 0.3, 0.9, 0.5];   // the roar
+    if (roar) tg = [0.9, 0, 0.9, 0.3, 0.9, 0.5];   // the roar
+    else if (CL && CL.face === 'smirk' && CL.w > 0.3) tg = [0.55, 0, 0.1, 0.6, 0.05, 0];   // the winner's half-smile (as the stare-down smirk below)
     if (G.state === 'intro' && G.stare > 0.01) tg = tg.map((v, i) => v + ((F === G.smirker ? [0.55, 0, 0.1, 0.6, 0.05, 0] : [0.85, 0, 0.3, -0.05, 0.25, 0])[i] - v) * G.stare);   // the stare-down: one man's jaw set, the other half-smiling
     if (F.gu || (F.rag.on && F.rag.prof && F.rag.prof.conscious)) tg = [0.6, 0.7, 0.8, -0.5, 0.6, 0.3];   // grimace getting up
     for (let i = 0; i < 6; i++) EM[i] += (tg[i] - EM[i]) * Math.min(1, dt * (hurt > 0.5 ? 25 : 8));
