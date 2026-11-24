@@ -14,21 +14,13 @@ const staticMesh = (g, m) => { const o = new THREE.Mesh(g, m); o.matrixAutoUpdat
 const BALE_N = 21, BALE_R = 3.0, BALE_LOW = [0, 5, 11, 15, 16];   // 21 bales of 0.9 m close a 6 m circle; these stacks have one tier only
 
 const LOCS = {
-  /* the boxing ring in a dark hall: a big soft top light on a rig straight above the ring, the canvas throws a little cool light
-     back up under the chin and the brows, a few far lamps give the background depth */
+  /* the boxing ring in a hall full of people: a big soft top light on a truss straight above the ring, the canvas throws a little
+     cool light back up under the chin and the brows; the stands, the truss, the haze cones and the camera flashes are the set
+     of 13a_loc_gym.js (R-08: `steps`, `build`, `sync`, `flash`). The fog starts behind the ring and swallows the far rows
+     (it was 7 → 15 m while there was nothing to see out there). */
   gym: {
-    id: 'gym', label: 'Зал', desc: 'Боксёрский ринг в тёмном зале', bound: { kind: 'square', half: 2.2 }, ring: true, wall: null,
-    light: { bg: '#0a0c11', fog: ['#0a0c11', 7, 15], exposure: 0.92, hemi: ['#8ea3cc', '#1b1510', 0.42], key: ['#fff0dc', 52], rim: ['#86b6ff', 2.6], rim2: ['#ffb27a', 1.8], fill: ['#ffffff', 0.5] },
-    build() {
-      const g = new THREE.Group();
-      const top = new THREE.SpotLight('#fff6ea', 26, 11, 0.95, 0.9, 1.6); top.position.set(0, 6.2, 0.4); top.target.position.set(0, 0.6, 0); g.add(top, top.target);
-      const bounce = new THREE.DirectionalLight('#6f86c2', 0.32); bounce.position.set(0.2, -1, 0.8); scene.add(bounce); this.world = [bounce];
-      const lampG = new THREE.SphereGeometry(0.035, 6, 4), N = 46, lamps = new THREE.InstancedMesh(lampG, new THREE.MeshBasicMaterial({ color: '#ffe2b0', fog: false }), N), m4 = new M4();
-      for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2 + rr() * 0.1, r = 10 + rr() * 5, y = 1.7 + rr() * 2.9;
-        m4.makeScale(1, 1, 1).setPosition(Math.cos(a) * r, y, Math.sin(a) * r - 2); lamps.setMatrixAt(i, m4); lamps.setColorAt(i, new THREE.Color().setHSL(0.09 + rr() * 0.05, 0.6, 0.35 + rr() * 0.4)); }
-      g.add(lamps);
-      return g;
-    },
+    id: 'gym', label: 'Зал', desc: 'Боксёрский ринг, полные трибуны', bound: { kind: 'square', half: 2.2 }, ring: true, wall: null,
+    light: { bg: '#0a0c11', fog: ['#0a0c11', 8, 27], exposure: 0.92, hemi: ['#8ea3cc', '#1b1510', 0.42], key: ['#fff0dc', 52], rim: ['#86b6ff', 2.6], rim2: ['#ffb27a', 1.8], fill: ['#ffffff', 0.5] },
   },
   /* underground car park, after the first Top Dog night (27.12.2019, the car park under Moscow City): a 6 m circle of hay bales in
      the driving aisle, cold fluorescent light, concrete, columns, parked cars in the bays, dark corners.

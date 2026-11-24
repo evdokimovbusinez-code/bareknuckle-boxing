@@ -23,6 +23,9 @@ const CROWD_LOOK = {
   // the warehouse: balaclavas and skull masks, dark clothes
   masked: { head: [[CW_BALA, 0.28], [CW_HOOD | CW_BALA, 0.2], [CW_BALA | CW_SKULL, 0.18], [CW_HOOD | CW_BALA | CW_SKULL, 0.14], [CW_HOOD, 0.08], [CW_CAP | CW_BUZZ, 0.05], [CW_BEANIE | CW_BALA, 0.07]], phone: 0.12, tee: 0.04,
     top: ['#0e0f11', '#15171b', '#1b1d22', '#23262b', '#2a1416', '#1a2030', '#2b2d31', '#1c2a1e'] },
+  // the hall (R-08): an evening crowd in dark clothes — silhouettes against the back light; few hoods, many phones
+  gym: { head: [[CW_HAIR, 0.34], [CW_BUZZ, 0.2], [0, 0.06], [CW_AFRO, 0.04], [CW_HAIR | CW_BUN, 0.08], [CW_CAP | CW_HAIR, 0.1], [CW_CAP | CW_BUZZ, 0.08], [CW_BEANIE | CW_HAIR, 0.04], [CW_HOOD, 0.06]], phone: 0.2, tee: 0.28,
+    top: ['#0f1114', '#15171b', '#1b1d22', '#1d2230', '#23262b', '#2b2d31', '#2a1416', '#1c2a1e', '#3a3d42', '#4a1c1f', '#1f3557', '#55585d', '#8a8478'] },
 };
 const CW_BOT = ['#1b2230', '#27364f', '#34496b', '#15161a', '#2a2b2e', '#3a3d42', '#4a4433', '#566b8a', '#20241c'];
 const CW_SKIN = ['#e6bfa3', '#dcae8e', '#d0a07e', '#c48d69', '#a9754f', '#8b5b3c', '#6e4630', '#5a3825', '#4a301f', '#3c2619'];   // from pale to very dark
@@ -324,7 +327,8 @@ if (gtao) {
 
 const _cwFr = new THREE.Frustum(), _cwM = new M4(), _cwI = new M4(), _cwS = new THREE.Sphere(), _cwV = new V3(), _cwQ = new Quat(), _cwSc = new V3(), _cwUp = new V3(0, 1, 0);
 function makeCrowd(o = {}) {
-  const { shape = 'circle', w = 6, h = 6, rows = 3, density = 1, look = 'street', step = 0.56, gap = 0.58, rise = [0, 0.2, 0.42], keep = null, max = 120, seed = 11, squat = 0 } = o;   // squat: the share of the front row that sits on its haunches
+  const { shape = 'circle', w = 6, h = 6, rows = 3, density = 1, look = 'street', step = 0.56, gap = 0.58, rise = [0, 0.2, 0.42], keep = null, max = 120, seed = 11, squat = 0, crate = true, sectors = 12, pad = 1.5 } = o;   // sectors / pad: how finely the crowd is split for frustum culling, the margin of a sector's sphere (R-08: a big crowd wants more, smaller sectors)
+  //   // squat: the share of the front row that sits on its haunches; crate: false = the back rows stand on real risers (exact `rise`, no crate under the feet)
   const r0 = o.r ?? (shape === 'rect' ? 0.6 : 3.7);   // circle: radius of the front row; rect: how far the front row stands from the w × h rectangle
   const R = locRng(seed), PI = Math.PI, L = CROWD_LOOK[look] || CROWD_LOOK.street, pick = a => a[(R() * a.length) | 0];
   // the line row k stands on: s (metres along it) → [x, z, outward normal x, z]
@@ -352,7 +356,7 @@ function makeCrowd(o = {}) {
     }
   }
   ppl.sort((a, b) => a.rank - b.rank); if (ppl.length > max) ppl.length = max;   // GFX.crowd shows the first part of this list: the front row thins last
-  const N = ppl.length, NG = Math.max(1, Math.min(12, Math.round(N / 10)));
+  const N = ppl.length, NG = Math.max(1, Math.min(sectors, Math.round(N / (sectors > 12 ? 6 : 10))));
   const sMat = new Float32Array(N * 16), sCol = new Float32Array(N * 8), sVar = new Float32Array(N * 8), m4 = new M4(), col = new THREE.Color();
   const groups = Array.from({ length: NG }, () => ({ c: new V3(), n: 0, rad: 0, sphere: new THREE.Sphere(), vis: true }));
   // a palette colour with a little variation of its own, as packed sRGB bytes
@@ -360,7 +364,7 @@ function makeCrowd(o = {}) {
   ppl.forEach((p, i) => {
     const cl = Math.hypot(p.x, p.z) || 1; let fx = -p.nx * 0.5 - p.x / cl * 0.5, fz = -p.nz * 0.5 - p.z / cl * 0.5;   // facing: inward, at the middle of the floor
     p.yaw = Math.atan2(fx, fz) + (R() - 0.5) * 0.5; const sy = 0.92 + R() * 0.15, sx = sy * (0.94 + R() * 0.14), up = rise[Math.min(p.row, rise.length - 1)] || 0;
-    p.y = up ? up * (0.85 + R() * 0.3) : 0; p.sy = sy;
+    p.y = up ? (crate ? up * (0.85 + R() * 0.3) : up) : 0; p.sy = sy;
     m4.compose(_cwV.set(p.x, p.y, p.z), _cwQ.setFromAxisAngle(_cwUp, p.yaw), _cwSc.set(sx, sy, sx)).toArray(sMat, i * 16);
     let hk = R(), mask = L.head[0][0]; for (const [bits, wgt] of L.head) { if (hk < wgt) { mask = bits; break; } hk -= wgt; }
     const skinI = Math.min(CW_SKIN.length - 1, (R() ** 2.2 * CW_SKIN.length) | 0);
@@ -377,7 +381,7 @@ function makeCrowd(o = {}) {
       alt = v < 0.3 ? pose : v < 0.52 ? 'shout' : v < 0.74 ? 'clap' : v < 0.9 ? 'pump' : v < 0.95 ? 'hips' : 'crossed';
       mir = R() < 0.5 ? 1 : 0;
     }
-    if (up) mask |= CW_CRATE;
+    if (up && crate) mask |= CW_CRATE;
     const dark = skinI >= 5, hair = R() < 0.08 ? CW_HAIRC[4] : dark ? pick(['#16120f', '#101010', '#0c0a09']) : pick(CW_HAIRC);
     const hat = mask & CW_BALA ? pick(['#0c0c0e', '#17181b', '#101216']) : mask & CW_CAP ? pick(CW_CAPC) : R() < 0.5 ? pick(CW_CAPC) : pick(L.top);
     const build = R() + R() - 1, belly = R() < 0.2 + 0.2 * build ? 0.5 + R() * 0.8 : R() * 0.3;
@@ -403,7 +407,7 @@ function makeCrowd(o = {}) {
   ppl.forEach((p, i) => { sVar[i * 8 + 2] = CW_ID[p.pose] + (p.tee ? 32 : 0); sVar[i * 8 + 6] = CW_ID[p.alt]; sVar[i * 8 + 7] = p.mir; });
   for (const G of groups) if (G.n) G.c.multiplyScalar(1 / G.n);
   for (const p of ppl) { const G = groups[p.g]; G.rad = Math.max(G.rad, Math.hypot(p.x - G.c.x, p.z - G.c.z)); }
-  for (const G of groups) G.sphere.set(G.c, G.rad + 1.5);
+  for (const G of groups) G.sphere.set(G.c, G.rad + pad);
 
   const base = CROWD.geo || (CROWD.geo = crowdGeo()), geo = new THREE.BufferGeometry();
   for (const k of ['position', 'normal', 'color', 'aP', 'aQ']) geo.setAttribute(k, base.attributes[k]);

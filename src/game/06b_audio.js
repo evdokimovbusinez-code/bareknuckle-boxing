@@ -17,10 +17,11 @@ const AUDIO = (() => {
   let musicEl = null, musicG = null, musicI = -1, musicStarted = false, musicWant = -1, armed = false;
   const loops = {};                                  // key -> { src, g, name }
   const AMBMAP = {                                  // real room tone under the synthesised bed
-    gym: null, boxgym: null,                        // the crowd loop (sfx.crowd) is the hall
+    gym: 'ambGym', boxgym: null,                    // R-08: a full hall hums all the time (sfx.crowd, the reactions, rides on top)
     yard: 'ambOutdoor', tires: 'ambWind', parking: 'ambIndoor',
     warehouse: 'ambWind', metro: 'ambIndoor',
   };
+  const AMBVOL = { gym: 0.12 };                     // the hall's bed sits well under the reactive crowd loop (0.34 × level); the others play at 0.42
   const CREDITS = [
     ['Punch', 'qubodup', 'CC0', 'https://opengameart.org/content/punch'],
     ['37 hits/punches', 'Independent.nu (ljudbank)', 'CC0', 'https://opengameart.org/content/37-hitspunches'],
@@ -120,7 +121,7 @@ const AUDIO = (() => {
     if (state !== 'ready') return;
     const name = AMBMAP[wantAmb];
     if (!name) { if (loops.loc) { fadeOut(loops.loc); delete loops.loc; } return; }
-    loopVoice('loc', name, 0.42);
+    loopVoice('loc', name, AMBVOL[wantAmb] ?? 0.42);
   }
 
   /* ── streaming music: never decoded, one element reused for the whole playlist ── */
