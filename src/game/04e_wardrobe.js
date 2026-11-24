@@ -321,6 +321,7 @@ function wearDress(F, L) {
   if (tp.tex) { const m = S['t_' + tp.mid] || (S['t_' + tp.mid] = shellMesh(F, 'shirt', tp)); m.visible = true; topTint(m, tp); }
   wearSlot(F, 'shoes', sh.top ? sh.key : null, () => shoeMesh(F, sh), ['st_' + sh.key]);
   const bm = wearSlot(F, 'belt', bl.buckle && bt.belt ? bl.mid + bt.cut : null, () => beltMesh(F, bt.cut, bl)); if (bm) { bm.material.color.set(bl.c); bm.userData = S.bottom.m.userData; }
+  W.clothBottom = clothDress(F, L);   // issue 86: garments from Blender of the other categories (04j_cloth_asset.js)
   // head and eyes: rigid, in the head frame
   const G2 = F.gear, Wr = G2.wear || (G2.wear = {});
   for (const [cat, v, make] of [['head', W.head, () => new THREE.Mesh(hatGeo(F, W.head.hat), new THREE.MeshPhysicalMaterial({ map: hatTex(W.head), roughness: 0.92, sheen: 0.3, sheenRoughness: 0.8, side: THREE.DoubleSide, envMapIntensity: 0.5, alphaTest: HATS[W.head.hat].hole ? 0.5 : 0 }))],   // (a balaclava's eye slit is cut by alpha)

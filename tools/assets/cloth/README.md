@@ -1,5 +1,49 @@
 # Одежда: конвейер и состояние
 
+## Как добавить свою вещь (#86)
+1. **Файл.** Моделишь в Blender на теле игры (`CC_Base_Body` + скелет `CC3_Base_Plus` — возьми их из `user/tshirt_src.blend`),
+   в любой позе (T, A, своя: скелет должен стоять в той позе, в которой сшита вещь). Две модели:
+   `<id>_high` (детальная, для запекания складок) и `<id>_low` (игровая). Пример: `police_shirt_high`, `police_shirt_low`.
+   В одном файле может быть несколько вещей — каждая пара обработается отдельно. Файл клади в `tools/assets/cloth/user/`.
+2. **Свойства** (на `<id>_low`: Object Properties → Custom Properties). Без них будут умолчания и предупреждение в отчёте.
+   | свойство | пример | что |
+   |---|---|---|
+   | `cat` | `top` | категория: `top` / `bottom` / `head` / `shoes` / `belt` / `hands` |
+   | `name` | `рубашка ППС` | название в магазине |
+   | `price` | `400` | цена, ₽ |
+   | `colors` | `navy,black,grey` | цвета из палитры игры (`WCOL` в `src/game/04e_wardrobe.js`); первый — по умолчанию |
+   | `rigid` | `CC_Base_Head` | вещь целиком на одной кости (кепка, каска). Для `head` — по умолчанию |
+   | `base` | `long` | (верх) процедурный крой, который виден, пока файл грузится или если не загрузился |
+3. **Запуск.** Локально (нужен `pip install bpy==5.3.0`, Python 3.13) одной командой:
+   `python3 tools/assets/cloth/garment.py tools/assets/cloth/user/police.blend` (или `--id police_shirt` — одна вещь),
+   потом `bash tools/check.sh` (вещь попадает в `index.html`). Через бота — issue с заголовком `[assets] Вещь: police.blend`
+   и `@claude` в тексте (бот запускает то же как `python3 tools/assets/ cloth/garment.py tools/assets/cloth/user/police.blend`).
+4. **Что выходит:** `assets/cloth/<id>.glb`, `<id>_n.webp` (складки), `<id>_lo.glb` (≤ 3000 треугольников, для графики «низкая»),
+   `<id>_c.webp` (если вещь разноцветная), запись в `assets/cloth/items.json`; проверочные картинки `preview/<id>_uv.png`
+   (раскладка UV, треугольники от зелёного = без искажений до красного ≥ 20%) и `preview/<id>_checker_*.png` (шахматка на вещи).
+5. **Что смотреть в отчёте** (строки `WARN` — главное):
+   - `uv distortion`: area / sides **p95 ≤ 5%** — хорошо. Если своя UV хуже — конвейер перераспакует сам (по твоим швам, если они
+     помечены, иначе по островам Smart UV), напишет до/после и сколько островов. На шахматке клетки должны быть квадратными и одного размера.
+   - `penetration`: доля вершин вещи внутри тела — **< 1%**, иначе кожа будет пробивать ткань. Отодвинь ткань от тела в этих местах.
+   - `armature round trip`: **OK** (< 1 мм) — перевод в A-позу точен.
+   - `bend shoulder / knee / hip`: вывернутые треугольники при ударе / сгибе колена. Десятки на тысячи — норма; сотни — плохая сетка на сгибе.
+   - `low poly`: какая сетка ушла в игру. Если `_low` — это `_high` под модификатором Decimate, берётся ретопология QuadriFlow
+     (`--low file` — заставить взять свою).
+
+Пример (футболка):
+```
+python3 tools/assets/cloth/garment.py tools/assets/cloth/user/tshirt_src.blend --id tee
+  auto: tshirt_low is tshirt_high under a Decimate modifier (no retopo …) -> QuadriFlow
+  own uv: none
+  final (angle based / 66 deg) uv distortion: area p50 2.7% p95 10.7% max 61% | sides p50 1.4% p95 5.3% max 87% | 15 islands
+  armature round trip (rest mesh re-posed onto the source): max error 0.001 mm OK
+  penetration: garment vertices inside the body — as made 0.00%, bind A-pose 0.00% OK
+  quad bend shoulder (L_Upperarm +80 deg): 17 / 2643 triangles flipped
+  tee  top  футболка (ткань)  tris 11430 / lo 2940  261 KB …
+```
+Свойства можно задать и без Blender: `--meta '{"cat":"top","name":"футболка (ткань)","price":150,"colors":"white,black,grey"}'`
+(так футболке заданы `item: teeCloth` — id в игре, чтобы старые сохранения её узнали).
+
 ## Что лежит здесь
 | Файл | Что |
 |---|---|
@@ -14,6 +58,8 @@
 | `user_tee.py` | ручная футболка → игра: веса с тела, обратный скиннинг T-поза → bind A-поза, экспорт `assets/tee_hand.json` (запуск — в шапке файла) |
 | `tee_game.py` | **#57, всё в одном:** веса, обратный скиннинг + проверки (Armature-модификатор, ткань в теле, удар плечом 80° для Decimate и QuadriFlow), Smart UV, запекание normal 1024 → `assets/cloth/tee.glb`, `tee_n.webp` (запуск — в шапке файла). AO с #81 не печётся: пятна от двух слоёв ткани, а складки и контакт с телом и так затеняет экранный AO игры |
 | `tee_lo.js` | **#81:** лёгкая футболка для графики «низкая»: `tee.glb` прорежена до ≤ 3000 треугольников схлопыванием рёбер в вершину (uv не меняются → та же `tee_n.webp`) → `assets/cloth/tee_lo.glb`. Запускается в отладочной странице (команда — в шапке файла): `bpy` у бота нет |
+| `garment.py` | **#86, любая вещь:** `.blend` → `assets/cloth/<id>.glb`, `_n.webp`, `_lo.glb`, `items.json` + отчёт и картинки проверки (см. «Как добавить свою вещь»). Заменяет `tee_game.py` и `tee_lo.js` для новых вещей; футболка тоже собирается им (`--id tee`) |
+| `render.py checker <id>` | шахматка по UV (+ карта нормалей) на GLB вещи → `preview/<id>_checker_front/side/back/close.png` |
 | `user/tshirt_src.blend` | **футболка, сделанная вручную в Blender** (лучшая на сейчас): `tshirt_high` (21,6k тр.), `tshirt_low` (1,9k, Decimate), тело CC3 + скелет `CC3_Base_Plus` |
 
 `out/` в .gitignore — пересоздаётся скриптами.

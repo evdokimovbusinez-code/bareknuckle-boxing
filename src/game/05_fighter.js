@@ -405,7 +405,7 @@ class Fighter {
   dress(L) {
     const G2 = this.gear, U = this.flesh.u.uGear.value, W = wearDress(this, L), bt = W.bottom, tp = W.top, sh = W.shoes;   // 04e_wardrobe.js: the meshes of what he wears (model + colour from the registry)
     // loose trousers / long shorts are their own mesh (04d_street.js) and cover the hips completely: the boxing trunks (cloth) are hidden under them
-    G2.pants = bt.cut ? G2.shells.bottom.m : null; G2.top = tp.cut ? G2.shells.top.m : null; if (this.shorts.mesh.visible === !!bt.cut) this.simReset = true; this.shorts.mesh.visible = !bt.cut;   // (R-23: hidden trunks are not simulated — re-seat them when they come back)
+    G2.pants = bt.cut ? G2.shells.bottom.m : null; G2.top = tp.cut ? G2.shells.top.m : null; const cov = !!(bt.cut || W.clothBottom); if (this.shorts.mesh.visible === cov) this.simReset = true; this.shorts.mesh.visible = !cov;   // (a Blender bottom covers them too, issue 86) (R-23: hidden trunks are not simulated — re-seat them when they come back)
     if (!bt.cut) { const S0 = wearShorts(bt); paintShorts(this.shortsCanvas, S0); if (this.isPlayer) socPatch(this.shortsCanvas); this.shortsTex.needsUpdate = true; this.shortsMat.sheenColor.set(S0.sheen); }
     U.set(bt.cut ? PANT_CUTS[bt.cut].skin : 0, sh.top || 0,   /* x: the legs' skin is not drawn above this height (cm) */ G2.top ? G2.top.userData.D.skinHi : tp.tex ? GEAR.neck - 1 : 0, G2.top ? G2.top.userData.D.skinA : tp.sleeve || 0);   // z: the trunk's skin is not drawn below this height, w: the arm's up to this `a` (04f_tops.js)
     this.flesh.u.uGearT.value = G2.top ? G2.top.userData.D.skinLo : 0;
