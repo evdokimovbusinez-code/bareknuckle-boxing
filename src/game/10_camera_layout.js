@@ -1,6 +1,142 @@
 /* ───────── camera ───────── */
 const camP = new V3(1.2, 1.4, 3), camL = new V3(0, 1, 0), _cp = new V3(), _cl = new V3(); let camCut = true, camClock = 0;
 const FLY_R = 6.3, FLY_H = 2.25;   // m: where the intro fly-round starts — behind the back row of the crowd, over its heads (under the parking's ceiling)
+
+/* ───────── R-03: the corner posts and the winner must not cover the fight ─────────
+   camClear(dt): the 4 corner posts of the ring (RINGSET, ring frame) against the sight lines camera → target (the middle of the pair,
+   each man's head, chest and pelvis — so in kd / ko / result the downed man's head and pelvis too). A post whose axis comes within
+   CC_R of a sight line, between the camera and the target, blocks it. The wanted camera is then swung on an arc about the look point
+   (yaw up to ±CC_YAW, eased — no jump). In kd / ko / result the arc may go to ±CC_KO and also weighs the standing man covering the
+   downed one (ccWinCover: nearer the camera and within CC_NDC on screen; the downed man's side is preferred), and ccFit keeps both
+   men whole in the shot. camFade(dt) is the fallback on the real camera: a post (and its turnbuckle pad) whose screen box still
+   crosses a head, torso or gloves box in front of it fades to CC_OP. Debug: window.__camOff = true → the camera as it was before. */
+const CC_R = 0.35, CC_YAW = 25 * Math.PI / 180, CC_KO = 40 * Math.PI / 180, CC_NDC = 0.2, CC_OP = 0.15, CC_TOP = 1.45, CC_PAD = 0.09;
+const CC = { yaw: 0, want: 0, st: '', posts: null, tg: Array.from({ length: 7 }, () => new V3()) };
+const _ccO = new V3(), _ccA = new V3(), _ccB = new V3(), _ccC = new V3(), _ccD = new V3(), _ccF = new V3(), _ccR = new V3(), _ccU = new V3();
+function ccPosts() {   // the 4 posts + their pads, found once in RINGSET by their geometry; own materials so one can fade alone
+  if (CC.posts) return CC.posts;
+  const by = new Map();
+  for (const o of RINGSET.children) {
+    const g = o.geometry; if (!g || g.type !== 'CylinderGeometry' || !o.isMesh) continue;
+    const r = g.parameters.radiusTop; if (Math.abs(r - 0.05) > 1e-3 && Math.abs(r - 0.09) > 1e-3) continue;   // post 0.05, pad 0.09 (ropes are 0.02)
+    const key = Math.round(o.position.x * 10) + ',' + Math.round(o.position.z * 10);
+    if (!by.has(key)) by.set(key, { x: o.position.x, z: o.position.z, m: [], op: 1, w: new V3() });
+    o.material = o.material.clone(); by.get(key).m.push(o);
+  }
+  return (CC.posts = [...by.values()]);
+}
+function ccPostsWorld() {   // world position of each post foot (RINGSET may be slid inside ARENA, see 13e_loc_boxgym.js)
+  const P = ccPosts(); RINGSET.updateWorldMatrix(true, false);
+  for (const p of P) p.w.set(p.x, 0, p.z).applyMatrix4(RINGSET.matrixWorld);
+  return P;
+}
+// how close the post axis (foot x, z; 0 … CC_TOP high) comes to the sight line cp → t; Infinity unless it stands between them
+function ccGap(p, cp, t) {
+  const dx = t.x - cp.x, dz = t.z - cp.z, L2 = dx * dx + dz * dz; if (L2 < 1e-6) return Infinity;
+  const s = ((p.x - cp.x) * dx + (p.z - cp.z) * dz) / L2; if (s <= 0 || s >= 1) return Infinity;
+  const y = cp.y + (t.y - cp.y) * s;
+  return Math.hypot(cp.x + dx * s - p.x, cp.z + dz * s - p.z, Math.max(0, y - CC_TOP));
+}
+function ccTargets() {   // the middle of the pair, then per man: head, chest (between the shoulders), pelvis (between the thighs)
+  const T = CC.tg; let i = 1;
+  for (const F of [P1, P2]) { const j = F.jp; T[i++].copy(F.headNow); T[i++].addVectors(j[2], j[3]).multiplyScalar(0.5); T[i++].addVectors(j[0], j[1]).multiplyScalar(0.5); }
+  T[0].addVectors(T[2], T[5]).multiplyScalar(0.5);
+  return T;
+}
+// NDC of P seen from cp looking at cl (the real projection: camera.fov / aspect); z = depth along the view, ≤ 0 behind
+function ccNdc(P, cp, cl, out) {
+  const f = _ccF.subVectors(cl, cp).normalize(), r = _ccR.crossVectors(f, _ccU.set(0, 1, 0)).normalize(), u = _ccU.crossVectors(r, f);
+  const d = _ccD.subVectors(P, cp), z = d.dot(f), ty = Math.tan(camera.fov * Math.PI / 360);
+  return out.set(d.dot(r) / (Math.max(0.05, z) * ty * camera.aspect), d.dot(u) / (Math.max(0.05, z) * ty), z);
+}
+// a > 0 carries the camera (it sits at +z) towards +x
+const ccOrbit = (cp, cl, a, out) => { const dx = cp.x - cl.x, dz = cp.z - cl.z, c = Math.cos(a), s = Math.sin(a); return out.set(cl.x + dx * c + dz * s, cp.y, cl.z - dx * s + dz * c); };
+// a point of a fighter: −1 pelvis (between the thighs), −2 chest (between the shoulders), −3 head, else a joint jp[i]
+function ccPt(F, i, out) { const j = F.jp; return i === -1 ? out.addVectors(j[0], j[1]).multiplyScalar(0.5) : i === -2 ? out.addVectors(j[2], j[3]).multiplyScalar(0.5) : i === -3 ? out.copy(F.headNow) : out.copy(j[i]); }
+/* the down man covered by the standing man, seen from cp? 0 … 1 (1 = dead on). The task's test is the standing man's pelvis within
+   CC_NDC of the down man's head and nearer the camera — but from a camera 1.1–1.5 m up the pelvis projects ~0.9 NDC above a head lying
+   on the canvas, so what really hides him are the legs: pelvis, chest, knees and feet of the standing man against the down man's
+   head (full weight), chest and pelvis (0.6) */
+const CC_WJ = [-1, -2, 9, 12, 10, 13], CC_LJ = [[-3, 1], [-2, 0.6], [-1, 0.6]], _ccW = CC_WJ.map(() => new V3());
+function ccWinCover(cp, cl, W, L) {
+  CC_WJ.forEach((i, n) => ccNdc(ccPt(W, i, _ccC), cp, cl, _ccW[n])); let cov = 0;
+  for (const [i, w] of CC_LJ) {
+    const h = ccNdc(ccPt(L, i, _ccC), cp, cl, _ccB);
+    for (const q of _ccW) if (q.z < h.z) cov = Math.max(cov, w * (1 - Math.hypot(q.x - h.x, q.y - h.y) / CC_NDC));
+  }
+  return cov;
+}
+/* keep whole men in the shot (kd / ko / result): every joint and the crown of each man in Fs inside the NDC frame ±CC_FX ×
+   [CC_FB, CC_FT] (the top keeps clear of the HUD bars). A body past an edge first slides the shot (camera and look point together) by
+   the overshoot, then the camera backs off along its view until all fit — both continuous, so the eased camera never jumps */
+const CC_FX = 0.86, CC_FT = 0.72, CC_FB = -0.86, _ccE = new V3(), _ccS = new V3();
+function ccFit(cp, cl, Fs) {
+  const tx = Math.tan(camera.fov * Math.PI / 360) * camera.aspect, ty = tx / camera.aspect;
+  for (let it = 0; it < 2; it++) {
+    const f = _ccF.subVectors(cl, cp).normalize(), r = _ccR.crossVectors(f, _ccU.set(0, 1, 0)).normalize(), u = _ccU.crossVectors(r, f);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, zs = 0, n = 0;
+    const each = fn => { for (const F of Fs) { for (const p of F.jp) fn(p); _ccE.copy(F.headNow); _ccE.y += 0.14; fn(_ccE); } };   // joints + the crown
+    each(p => { const d = _ccD.subVectors(p, cp), z = Math.max(0.3, d.dot(f)), nx = d.dot(r) / (z * tx), ny = d.dot(u) / (z * ty);
+      x0 = Math.min(x0, nx); x1 = Math.max(x1, nx); y0 = Math.min(y0, ny); y1 = Math.max(y1, ny); zs += z; n++; });
+    if (x0 >= -CC_FX && x1 <= CC_FX && y0 >= CC_FB && y1 <= CC_FT) return;
+    const zm = zs / n, cy = (CC_FT + CC_FB) / 2;
+    const sx = x0 < -CC_FX && x1 > CC_FX ? (x0 + x1) / 2 : x0 < -CC_FX ? x0 + CC_FX : x1 > CC_FX ? x1 - CC_FX : 0;
+    const sy = y0 < CC_FB && y1 > CC_FT ? (y0 + y1) / 2 - cy : y0 < CC_FB ? y0 - CC_FB : y1 > CC_FT ? y1 - CC_FT : 0;
+    _ccS.copy(r).multiplyScalar(sx * zm * tx).addScaledVector(u, sy * zm * ty); cp.add(_ccS); cl.add(_ccS);
+    let back = 0;
+    each(p => { const d = _ccD.subVectors(p, cp), z = d.dot(f), yr = d.dot(u);
+      back = Math.max(back, Math.max(Math.abs(d.dot(r)) / (CC_FX * tx), yr > 0 ? yr / (CC_FT * ty) : -yr / (-CC_FB * ty)) - z); });
+    cp.addScaledVector(f, -Math.min(back, 3)); cp.y = Math.max(0.4, cp.y);
+  }
+}
+/* swing the wanted camera _cp about _cl (k ≥ 1e3 = a scripted move: left alone). down = [winner, loser] in kd / ko / result */
+function camClear(dt, down, fit) {
+  if (fit) ccFit(_cp, _cl, fit);
+  const vis = RINGSET.visible;
+  if (!vis && !down) CC.want = 0; else {
+    const P = vis ? ccPostsWorld() : [], T = ccTargets(), lim = down ? CC_KO : CC_YAW;
+    // the down man's side (+1 = towards +x): the task sends the camera there; the other way is allowed too, at a small price
+    const side = down ? Math.sign(ccPt(down[1], -1, _ccD).x - ccPt(down[0], -1, _ccC).x) || 1 : 0;
+    let best = 0, bc = Infinity;
+    for (let i = -16; i <= 16; i++) {
+      const a = i / 16 * lim, cp = ccOrbit(_cp, _cl, a, _ccO);
+      let blk = 0; for (const p of P) for (const t of T) { const g = ccGap(p.w, cp, t); if (g < CC_R) blk += 1 - g / CC_R; }
+      const cov = down ? ccWinCover(cp, _cl, down[0], down[1]) : 0;
+      // the standing man weighs more than a post (a post can still fade in camFade, he can't); then: small swings, and stay put
+      const c = 10 * blk + 15 * cov + 0.6 * Math.abs(a) / CC_YAW + 0.5 * Math.abs(a - CC.yaw) / CC_YAW + (down && a * side < 0 ? 0.3 : 0);
+      if (c < bc) { bc = c; best = a; }
+    }
+    CC.want = best;
+  }
+  CC.yaw = camCut ? CC.want : CC.yaw + (CC.want - CC.yaw) * (1 - Math.exp(-dt * 2.5));
+  if (Math.abs(CC.yaw) > 1e-4) ccOrbit(_cp, _cl, CC.yaw, _cp);
+  if (fit) ccFit(_cp, _cl, fit);   // the swing turned the view: fit again
+}
+/* the fallback on the real camera: a post whose screen box crosses a head / torso box in front of it fades (fast, not a pop) */
+function ccBox(pts, r, cp, cl, out) {   // screen box of points padded by r metres
+  out[0] = out[1] = Infinity; out[2] = out[3] = -Infinity; let z = Infinity;
+  for (const p of pts) { const n = ccNdc(p, cp, cl, _ccA), ty = Math.tan(camera.fov * Math.PI / 360), ez = r / (Math.max(0.05, n.z) * ty);
+    out[0] = Math.min(out[0], n.x - ez / camera.aspect); out[2] = Math.max(out[2], n.x + ez / camera.aspect); out[1] = Math.min(out[1], n.y - ez); out[3] = Math.max(out[3], n.y + ez); z = Math.min(z, n.z); }
+  out[4] = z; return out;
+}
+const CC_BOX = Array.from({ length: 6 }, () => []), _ccPts = [new V3(), new V3()];
+function camFade(dt) {
+  if (!RINGSET.visible) return;
+  const P = ccPostsWorld(), cp = camera.position, cl = camL, boxes = CC_BOX; let n = 0;
+  // head, torso and the gloves (a post standing between the two men hides the exchange itself); the boxes are a few cm wider than
+  // the body parts and the pad: the fade starts before the post actually slides over someone
+  for (const F of [P1, P2]) { const j = F.jp; ccBox([F.headNow], 0.2, cp, cl, boxes[n++]); ccBox([j[0], j[1], j[2], j[3], j[4]], 0.16, cp, cl, boxes[n++]); ccBox([j[6], j[8]], 0.12, cp, cl, boxes[n++]); }
+  const pb = [];
+  for (const p of P) {
+    _ccPts[0].set(p.w.x, 0, p.w.z); _ccPts[1].set(p.w.x, CC_TOP, p.w.z); ccBox(_ccPts, CC_PAD + 0.06, cp, cl, pb);
+    let hit = false;
+    if (pb[4] > 0.05) for (let i = 0; i < n; i++) { const b = boxes[i]; if (pb[4] < b[4] && pb[0] < b[2] && pb[2] > b[0] && pb[1] < b[3] && pb[3] > b[1]) { hit = true; break; } }
+    // fades out in ~0.05 s — at once within 1.2 m of the lens (such a post is a blur sweeping across the screen) — and comes back in ~0.4 s
+    const want = hit ? CC_OP : 1; p.op = camCut ? want : p.op + (want - p.op) * (1 - Math.exp(-dt * (hit ? (pb[4] < 1.2 ? 400 : 60) : 6))); if (Math.abs(p.op - want) < 0.01) p.op = want;
+    for (const m of p.m) { const M = m.material, tr = p.op < 0.999; if (M.transparent !== tr) { M.transparent = tr; M.depthWrite = !tr; M.needsUpdate = true; } M.opacity = p.op; }
+  }
+}
+window.__camClear = { CC, ccGap, ccTargets, ccWinCover, ccPostsWorld, endReplay: () => endReplay() };   // debug (docs/audit/scenarios/camera.js)
 function camUpdate(dt) {
   camClock += dt; let k = 4;
   // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
@@ -59,11 +195,21 @@ function camUpdate(dt) {
       const a = lerp(G.flyA * (1 - 0.035 * pre), Math.atan2(_cp.x, _cp.z), e), R = lerp(FLY_R, Math.hypot(_cp.x, _cp.z), e);
       _cp.set(R * Math.sin(a), lerp(FLY_H, _cp.y, e), R * Math.cos(a)); _cl.set(_cl.x * e, lerp(1.2, _cl.y, e), 0); k = 1e3;
     } }
+  // R-03: swing the wanted camera off the corner posts (and, with a man down, off the standing man); scripted moves are left alone
+  const st = G.state;
+  if (CC.st === 'replay' && st === 'result') camCut = true;   // the replay is over: cut straight to the framed result shot, no slow glide out of the replay
+  CC.st = st;
+  const down = st === 'kd' && G.kd ? [G.kd.att, G.kd.def] : (st === 'ko' || st === 'result') && G.loser && G.winner ? [G.winner, G.loser] : null;
+  // whole men in the shot: the standing man joins once the push-in on the fall is over (kd: after 1 s; ko: from the two-shot reveal)
+  const fit = !down ? null : st === 'result' || (st === 'kd' ? G.t - G.kd.t0 > 1 : G.t - G.koCine > 1.45) ? down : [down[1]];
+  if (k < 1e3 && !window.__camOff && st !== 'menu' && st !== 'rend' && st !== 'talk' && !(st === 'intro' && G.stareT && G.introT >= 0 && G.introT < G.stareT - 0.6)) camClear(dt, down, fit);
+  else CC.yaw = CC.want = 0;
   if (camCut) { camP.copy(_cp); camL.copy(_cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * k); camP.lerp(_cp, a); camL.lerp(_cl, a); }
   camera.position.copy(camP); if (!OPT.shake) G.shake = 0;   // settings: camera shake off
   if (G.shake > 0.0005 && dt > 0) { camera.position.x += (rr() - 0.5) * G.shake; camera.position.y += (rr() - 0.5) * G.shake; G.shake *= Math.exp(-dt * 9); }
   camera.lookAt(camL);
+  if (!window.__camOff) camFade(dt);   // R-03 fallback (debug: window.__camOff = true — the old camera, for before / after): a post still in front of a head / torso goes see-through
 }
 const HUD_BARS = ['h1', 'g1', 'h2', 'g2', 's1', 's2'].map(id => ({ el: $(id), v: -1 }));   // the DOM is touched only when a bar really changes
 function hudBar(i, v) { const b = HUD_BARS[i]; v = Math.round(clamp(v, 0, 1) * 1000); if (b.v !== v) { b.v = v; b.el.style.transform = `scaleX(${(v / 1000).toFixed(3)})`; } }
