@@ -1,0 +1,21 @@
+name: Smoke
+# R-01 smoke set (audit scenarios, desktop + phone) on every push to main — catches a merge that breaks the game
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['src/**', 'tools/test/**', 'docs/audit/scenarios/**', '.github/workflows/smoke.yml']
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13' }
+      - run: pip install playwright && npm i --no-save --silent three@0.160.0 cannon-es@0.20.0
+      - run: bash tools/check.sh
+      - run: mkdir -p /tmp/shots && bash tools/shot.sh /tmp/shots/s.jpg smoke
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: smoke-shots, path: /tmp/shots }
