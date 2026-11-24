@@ -64,9 +64,11 @@ const WLEG = { tankB: ['tank', 'black'], teeW: ['tee', 'white'], teeB: ['tee', '
 const wRng = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
 const wLum = c => { const k = new THREE.Color(c); return 0.3 * k.r + 0.6 * k.g + 0.1 * k.b; };
 const wInk = c => wLum(c) > 0.3 ? '#17181c' : '#ecebe6';
+const WALIAS = { teeHand: 'teeCloth' };   // retired item ids → the item that replaced them (issue 57: the hand-made tee, now from a GLB)
 function wearGet(L, cat) {
   let x = L[cat];
   if (typeof x === 'string') x = WLEG[x] ? { id: WLEG[x][0], color: WLEG[x][1] } : { id: x };
+  if (x && WALIAS[x.id]) x = { ...x, id: WALIAS[x.id] };
   if (!x || !x.id) x = { id: cat === 'bottom' ? 'shorts' : 'none' };
   if (x.id === 'shorts' && !x.color) x = { id: 'shorts', color: L.shorts || 'red' };
   return x;

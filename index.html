@@ -4276,9 +4276,11 @@ const WLEG = { tankB: ['tank', 'black'], teeW: ['tee', 'white'], teeB: ['tee', '
 const wRng = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
 const wLum = c => { const k = new THREE.Color(c); return 0.3 * k.r + 0.6 * k.g + 0.1 * k.b; };
 const wInk = c => wLum(c) > 0.3 ? '#17181c' : '#ecebe6';
+const WALIAS = { teeHand: 'teeCloth' };   // retired item ids → the item that replaced them (issue 57: the hand-made tee, now from a GLB)
 function wearGet(L, cat) {
   let x = L[cat];
   if (typeof x === 'string') x = WLEG[x] ? { id: WLEG[x][0], color: WLEG[x][1] } : { id: x };
+  if (x && WALIAS[x.id]) x = { ...x, id: WALIAS[x.id] };
   if (!x || !x.id) x = { id: cat === 'bottom' ? 'shorts' : 'none' };
   if (x.id === 'shorts' && !x.color) x = { id: 'shorts', color: L.shorts || 'red' };
   return x;
@@ -4652,15 +4654,19 @@ const TOP_CUTS = {
   // rig: no shell of its own, only the pieces laid over the surface (plate bags, cummerbund, straps); the surface is the tee's + 3 mm
   vest: { hem: 93, cl: 1.5, fit: 0.93, neck: [8.4, 6.5, -0.5, 2], rib: 2, sl: 0, rig: 1, fab: 'cordura', under: 'tee' },
 };
-/* hand-made tops: modelled in Blender; low poly + normal map baked from the high one by tools/assets/cloth/bake_tee.py -> assets/tee_hand_n.png,
-   weights + bind pose by user_tee.py -> assets/tee_hand.json (body geometry frame: cm, z up; bones by name). Until the file has arrived the cut is the procedural one it is based on (`hand`). */
-const HAND_TOP = {};
-TOP_CUTS.teeHand = { ...TOP_CUTS.tee, hand: 'tee' };
-const HAND_N = { tee: new THREE.TextureLoader().load('assets/tee_hand_n.png', undefined, undefined, e => console.warn('tee_hand_n.png', e)) };   // loaded with the mesh, not when first worn
-HAND_N.tee.anisotropy = 4;
-fetch('assets/tee_hand.json').then(r => { if (!r.ok) throw new Error('tee_hand.json ' + r.status); return r.json(); }).then(d => { HAND_TOP.tee = d; }).catch(e => console.warn(e));
-function handGeo(F, cut) {
-  const key = 'tg_' + cut, base = TOP_CUTS[cut].hand, d = HAND_TOP[base]; if (GEAR[key]) return GEAR[key]; if (!d) return topGeo(F, base);
+/* hand-made tops: modelled in Blender. The game asset is assets/cloth/tee.glb (+ tee_n / tee_ao.webp) by tools/assets/cloth/tee_game.py, read by
+   04j_cloth_asset.js; the older JSON export (bake_tee.py -> assets/tee_hand_n.png, user_tee.py -> assets/tee_hand.json: body geometry frame, cm,
+   z up; bones by name) is only fetched when the GLB fails (handLoad). Until either has arrived the cut is the procedural one it is based on (`hand`). */
+const HAND_TOP = {}, HAND_N = {};
+let handLoading = null;
+function handLoad() {
+  if (handLoading) return handLoading;
+  HAND_N.tee = new THREE.TextureLoader().load('assets/tee_hand_n.png', undefined, undefined, e => console.warn('tee_hand_n.png', e)); HAND_N.tee.anisotropy = 4;
+  return handLoading = fetch('assets/tee_hand.json').then(r => { if (!r.ok) throw new Error('tee_hand.json ' + r.status); return r.json(); }).then(d => { HAND_TOP.tee = d; }).catch(e => console.warn(e));
+}
+// d: the mesh in the body geometry frame { pos, idx (array or index attribute), nrm, tan, uv, bones, si, sw }; key: its cache slot in GEAR
+function handGeo(F, cut, d = HAND_TOP[TOP_CUTS[cut].hand], key = 'tg_' + cut) {
+  const base = TOP_CUTS[cut].hand; if (GEAR[key]) return GEAR[key]; if (!d) return topGeo(F, base);
   const names = GEAR.names, bi = d.bones.map(nm => { const b = names.indexOf(nm); if (b < 0) throw new Error('hand top: no bone ' + nm); return b; });
   const n = d.pos.length / 3, z0 = topEnv(F).z0, P = d.pos; let hem = 1e9;
   for (let i = 0; i < n; i++) hem = Math.min(hem, P[i * 3 + 2]);
@@ -4669,7 +4675,7 @@ function handGeo(F, cut) {
   // normals and MikkTSpace tangents from Blender: the normal map was baked against exactly these (three's own would put dents on every uv seam)
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setIndex(d.idx);
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(d.nrm, 3)); geo.setAttribute('tangent', new THREE.Float32BufferAttribute(d.tan, 4));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(d.uv, 2)); geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(d.si.map(i => bi[i]), 4)); geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(d.sw, 4));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(d.uv, 2)); geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(Array.from(d.si, i => bi[i]), 4)); geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(d.sw, 4));
   geo.setAttribute('aSw', new THREE.Float32BufferAttribute(asw, 2)); geo.setAttribute('aCut', new THREE.Float32BufferAttribute(acut, 1));
   geo.userData = { ...topGeo(F, base).userData, hand: base, skinLo: hem - z0 + 2 };   // the skin and the trunks are hidden as under the procedural cut, down to this hem
   return GEAR[key] = geo;
@@ -4691,6 +4697,7 @@ function topEnv(F) {
   return GEAR.tenv = { P, z0 };
 }
 function topGeo(F, cut) {
+  if (TOP_CUTS[cut].cloth) return clothGeo(F, cut);   // 04j_cloth_asset.js
   if (TOP_CUTS[cut].hand) return handGeo(F, cut);
   const key = 'tg_' + cut; if (GEAR[key]) return GEAR[key];
   const C = TOP_CUTS[cut], { P, z0 } = topEnv(F), TAU = Math.PI * 2, N = 28, KD = 9, zC = 138, LD = 16, names = GEAR.names, gh = GEAR.gh;
@@ -4854,7 +4861,7 @@ function topGeo(F, cut) {
    v 0.62 … 0.98 around (0.71 = the crook of the elbow, 0.8 = the seam under the arm); hood (bag → rim → inside): u, v 0.64 … 0.98; cords: the
    strip at u > 0.98; a jacket has its lapel (u 0.64 … 0.8) and collar (u 0.81 … 0.97) where the hood is */
 function topTex(v, geo) {
-  const C = TOP_CUTS[v.cut]; if (C.rig) return vestTex(v); if (geo.userData.hand) return handTex(v, geo.userData.hand);
+  const C = TOP_CUTS[v.cut]; if (C.rig) return vestTex(v); if (geo.userData.cloth) return clothTex(v, geo.userData.cloth); if (geo.userData.hand) return handTex(v, geo.userData.hand);
   const D = geo.userData, W = 1024, H = 1024, X = u => u * W, Y = t => (1 - t) * H, TV = z => 0.6 * (z <= D.zC ? z - C.hem : D.zC - C.hem + (z - D.zC) * D.fk) / D.VS, XS = s => 0.6 * (s - D.s0) / D.sT * W;
   const path = (g, pts) => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); }, fleece = C.fab === 'fleece', leather = C.fab === 'leather', yR = Y(D.vRib), y6 = Y(0.6), ySl = Y(0.98), ySh = Y(0.62);
   const ribs = (g, x0, y0, x1, y1, a) => { g.strokeStyle = `rgba(0,0,0,${a})`; g.lineWidth = 1.5; for (let x = x0; x < x1; x += 5) { g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y1); g.stroke(); } };
@@ -4973,8 +4980,8 @@ function vestTex(v) {
   return { map, nmap };
 }
 function topMesh(F, v, host, U0) {
-  const geo = topGeo(F, v.cut), { map, nmap } = topTex(v, geo), C = TOP_CUTS[v.cut], fl = C.fab === 'fleece', le = C.fab === 'leather', ns = geo.userData.hand || le ? 1 : fl ? 1.1 : 0.85;   // a baked map is drawn at its own strength
-  const mat = new THREE.MeshPhysicalMaterial({ map, normalMap: nmap, normalScale: new THREE.Vector2(ns, ns), roughness: le ? 0.5 : fl ? 0.96 : 0.9, sheen: le ? 0 : fl ? 0.45 : C.rig ? 0.1 : 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color(v.c).multiplyScalar(1.3),
+  const geo = topGeo(F, v.cut), { map, nmap, ao } = topTex(v, geo), C = TOP_CUTS[v.cut], fl = C.fab === 'fleece', le = C.fab === 'leather', ns = geo.userData.hand || le ? 1 : fl ? 1.1 : 0.85;   // a baked map is drawn at its own strength
+  const mat = new THREE.MeshPhysicalMaterial({ map, normalMap: nmap, normalScale: new THREE.Vector2(ns, ns), aoMap: ao || null, roughness: le ? 0.5 : fl ? 0.96 : 0.9, sheen: le ? 0 : fl ? 0.45 : C.rig ? 0.1 : 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color(v.c).multiplyScalar(1.3),
     clearcoat: le ? 0.3 : 0, clearcoatRoughness: 0.42, side: THREE.DoubleSide, envMapIntensity: le ? 0.9 : 0.5, alphaTest: C.fab === 'mesh' ? 0.5 : 0 });   // leather: a waxed, slightly glossy hide (a clear coat over a rougher base)
   const U = U0 || { uSwA: { value: new V3() }, uSwB: { value: new V3() } }, zip = C.open ? 1 : 0;
   mat.onBeforeCompile = s => { Object.assign(s.uniforms, U);
@@ -5007,7 +5014,6 @@ function topTick(F, m, dt) {
 Object.assign(ITEMS, {
   tank: { cat: 'top', label: 'майка-алкоголичка', model: { cut: 'tank' }, colors: ['white', 'black', 'grey'], price: 0, tags: ['street', 'basic'] },
   tee: { cat: 'top', label: 'футболка', model: { cut: 'tee' }, colors: ['white', 'black', 'grey'], nat: wNat({ white: '#e9e6df', grey: '#9a9ca2' }), price: 150, tags: ['street', 'basic'] },
-  teeHand: { cat: 'top', label: 'футболка (ручная)', model: { cut: 'teeHand' }, colors: ['white', 'black', 'grey'], nat: wNat({ white: '#e9e6df', grey: '#9a9ca2' }), price: 0, tags: ['street', 'basic'] },
   teeSD: { cat: 'top', label: 'футболка', model: { cut: 'tee', decal: { f: [0, 17, 21] } }, colors: ['black', 'white', 'wine'], price: 350, tags: ['street'], brand: 'STRAY DOGS' },
   teeOv: { cat: 'top', label: 'футболка oversize', model: { cut: 'teeOv', decal: { b: [0, 20, 26] } }, colors: ['black', 'sand', 'olive'], price: 400, tags: ['street'], brand: 'GUTTERWAVE' },
   long: { cat: 'top', label: 'лонгслив', model: { cut: 'long' }, colors: ['black', 'white', 'navy'], price: 300, tags: ['street', 'basic'] },
@@ -5799,6 +5805,79 @@ function knuxPads(F, mat) {   // rigid: world = Hand.matrixWorld × local geomet
     m.matrixAutoUpdate = false; m.castShadow = m.receiveShadow = true; scene.add(m); list.push({ m, b, rel: new M4() }); }
   return list;
 }
+/* ───────── cloth assets: the hand-made tee as a GLB (issue 57) ─────────
+   tools/assets/cloth/tee_game.py (Blender) writes assets/cloth/tee.glb: one mesh in the bind A-pose (metres, Y-up), KHR_mesh_quantization
+   (int16 positions + the node's dequantisation transform, int8 normals / MikkTSpace tangents from Blender, uint16 uv with glTF's v down),
+   JOINTS_0 = index into primitive.extras.bones (CC_Base_* names) → mapped by name onto the fighter's own skeleton; no textures inside:
+   tee_n.webp (tangent-space normal map, baked from the high poly) and tee_ao.webp (its ambient occlusion) sit beside it.
+   The mesh is put into the body geometry frame (cm, z up: geo = 100 · (x, −z, y)) and goes through handGeo / topMesh (04f_tops.js) like
+   the procedural tops: a THREE.SkinnedMesh bound to F.body's skeleton and bind matrix, the hem on the topTick spring.
+   If the GLB does not load, the cut falls back silently: the older JSON export (handLoad), then the procedural `tee`. */
+const CLOTH = { tee: null, st: {} };   // st[base]: 'load' | 'ok' | 'fail', plus the numbers for the report (ms, bytes, verts, tris)
+const CLOTH_FILES = { tee: 'assets/cloth/tee' };
+TOP_CUTS.teeCloth = { ...TOP_CUTS.tee, hand: 'tee', cloth: 'tee' };
+
+// a parsed glTF → the handGeo record (body geometry frame)
+function clothFromGLTF(gltf) {
+  let mesh = null; gltf.scene.traverse(o => { if (o.isMesh && !mesh) mesh = o; });
+  if (!mesh) throw new Error('cloth: no mesh');
+  gltf.scene.updateMatrixWorld(true);
+  const g = mesh.geometry, A = g.attributes, n = A.position.count, M = mesh.matrixWorld, bones = (g.userData && g.userData.bones) || mesh.userData.bones;
+  if (!bones || !A.skinIndex || !A.skinWeight || !A.normal || !A.tangent || !A.uv) throw new Error('cloth: the GLB lacks bones / skin / normals / tangents / uv');
+  const pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3), tan = new Float32Array(n * 4), uv = new Float32Array(n * 2), si = new Uint16Array(n * 4), sw = new Float32Array(n * 4), v = new V3();
+  for (let i = 0; i < n; i++) {
+    v.fromBufferAttribute(A.position, i).applyMatrix4(M); pos[i * 3] = 100 * v.x; pos[i * 3 + 1] = -100 * v.z; pos[i * 3 + 2] = 100 * v.y;
+    v.fromBufferAttribute(A.normal, i).normalize(); nrm[i * 3] = v.x; nrm[i * 3 + 1] = -v.z; nrm[i * 3 + 2] = v.y;
+    v.set(A.tangent.getX(i), A.tangent.getY(i), A.tangent.getZ(i)).normalize(); tan[i * 4] = v.x; tan[i * 4 + 1] = -v.z; tan[i * 4 + 2] = v.y; tan[i * 4 + 3] = A.tangent.getW(i) < 0 ? -1 : 1;
+    uv[i * 2] = A.uv.getX(i); uv[i * 2 + 1] = A.uv.getY(i);
+    for (let k = 0; k < 4; k++) { si[i * 4 + k] = A.skinIndex.getComponent(i, k); sw[i * 4 + k] = A.skinWeight.getComponent(i, k); }
+  }
+  for (let i = 0; i < n; i++) { const s = sw[i * 4] + sw[i * 4 + 1] + sw[i * 4 + 2] + sw[i * 4 + 3] || 1; for (let k = 0; k < 4; k++) sw[i * 4 + k] /= s; }   // (uint8 weights: exact sums)
+  const ix = g.index.array, idx = new THREE.BufferAttribute(n > 65535 ? new Uint32Array(ix) : new Uint16Array(ix), 1);
+  return { pos, nrm, tan, uv, idx, bones, si, sw, tris: ix.length / 3, verts: n };
+}
+// the GLB bytes + its two maps → CLOTH[base]; dressed fighters are re-dressed
+async function clothParse(base, buf, nmap, ao) {
+  const gltf = await new GLTFLoader().parseAsync(buf, '');
+  const d = clothFromGLTF(gltf); d.n = nmap; d.ao = ao; CLOTH[base] = d;
+  for (const k in GEAR) if (k.startsWith('tgc_')) { GEAR[k].dispose(); delete GEAR[k]; }
+  clothRedress();
+  return d;
+}
+const CLOTH_AO = false;
+function clothLoad(base) {
+  const t0 = performance.now(), f = CLOTH_FILES[base], st = CLOTH.st[base] = { s: 'load' }, tl = new THREE.TextureLoader();
+  const tex = file => tl.loadAsync(file).then(t => { t.flipY = false; t.anisotropy = 4; return t; });   // glTF uv: v runs down
+  return Promise.all([fetch(f + '.glb').then(r => { if (!r.ok) throw new Error(f + '.glb ' + r.status); return r.arrayBuffer(); }), tex(f + '_n.webp'), CLOTH_AO ? tex(f + '_ao.webp') : null])   // the first AO bake came out blotchy (camouflage patches) — off until re-baked
+    .then(([buf, n, ao]) => clothParse(base, buf, n, ao).then(d => { Object.assign(st, { s: 'ok', ms: Math.round(performance.now() - t0), bytes: buf.byteLength, verts: d.verts, tris: d.tris }); console.info(`cloth ${base}: ${d.tris} tris, ${(buf.byteLength / 1024).toFixed(0)} KB, ${st.ms} ms`); }))
+    .catch(e => { st.s = 'fail'; st.err = String(e); console.info('cloth ' + base + ': no GLB, the older export / procedural cut', e); handLoad().then(clothRedress); });
+}
+clothLoad('tee');
+
+function clothGeo(F, cut) {
+  const base = TOP_CUTS[cut].cloth, d = CLOTH[base], key = 'tgc_' + cut;
+  if (!d) return handGeo(F, cut);   // not (yet) loaded: the JSON export, else the procedural cut
+  if (GEAR[key]) return GEAR[key];
+  const geo = handGeo(F, cut, d, key);
+  geo.userData = { ...geo.userData, cloth: base };
+  return geo;
+}
+// plain dyed cotton (the folds are in the baked maps) + the GLB's normal and AO maps
+function clothTex(v, base) {
+  const d = CLOTH[base], t = handTex(v, base);
+  return { map: t.map, nmap: d.n, ao: d.ao };
+}
+// an asset that arrives after the fighters were dressed: drop their cloth top so the next dress builds it from the new mesh
+function clothRedress() {
+  let FS = []; try { FS = [P1, P2]; } catch (e) { return; }
+  for (const F of FS) { const s = F && F.gear && F.gear.shells.top; if (s && s.key && TOP_CUTS[(ITEMS[s.key.split('_')[0]] || {}).model?.cut]?.cloth && F.gear.look) { s.key = '~'; F.dress(F.gear.look); } }
+}
+
+Object.assign(ITEMS, {
+  teeCloth: { cat: 'top', label: 'футболка (ткань)', model: { cut: 'teeCloth' }, colors: ['white', 'black', 'grey'], nat: wNat({ white: '#e9e6df', grey: '#9a9ca2' }), price: 150, tags: ['street', 'basic'] },
+});
+ITEMS.teeCloth.id = 'teeCloth';
+window.__cloth = { CLOTH, clothParse, clothLoad, clothRedress };
 /* ───────── fighter ───────── */
 // scratch for the per-frame fighter code (walk, ik, pose, plantFeet, armClear): nothing there allocates
 const _walkQ = [], _ik1 = new Quat(), _ik2 = new Quat(), _ik3 = new Quat(), _po1 = new V3(), _po2 = new V3(), _po3 = new V3(), _po4 = new V3(), _poq1 = new Quat(), _poq2 = new Quat();
