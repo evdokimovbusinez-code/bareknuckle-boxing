@@ -317,7 +317,7 @@ window.__flip = {
         rr is seedable in this build), loc ('gym'), rounds (ROUNDS), len (ROUND_LEN, s), lite (true), log (fn per fight),
         stopAt (s of the round clock: stop there and leave the fight as it is — to take a look, e.g. a tools/shot.sh js shot) }.
    tools/test/balance.py is the wrapper (parallel pages, CSV, the policy × difficulty table). */
-const BOT_COLS = ['policy', 'diff', 'seed', 'result', 'how', 'round', 'dur', 'p1_thr', 'p1_land', 'p1_blk', 'p1_dmg', 'p2_thr', 'p2_land', 'p2_blk', 'p2_dmg', 'kd_p1', 'kd_p2', 'hp1', 'hp2', 'cards', 'ms'];
+const BOT_COLS = ['policy', 'diff', 'seed', 'result', 'how', 'round', 'dur', 'p1_thr', 'p1_land', 'p1_blk', 'p1_dmg', 'p2_thr', 'p2_land', 'p2_blk', 'p2_dmg', 'kd_p1', 'kd_p2', 'hp1', 'hp2', 'cards', 'p1_rnd', 'p2_rnd', 'ms'];
 const botRng = s => { s = (Math.abs(s | 0) % 2147483646) + 1; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; };
 const BOT_REACH = 1.15;   // m between the men: the AI's own inReach is 1.13 − adv + 0.07 (08_ai_flow.js)
 /* one press of a punch through press(); body / power are what S / W held down would have given (punchMod) */
@@ -391,6 +391,7 @@ function botFight(policy, diff, o, seed) {
   try {
     rollOpponent(); startFight(true);
     let fightT = 0, guard = 0; const maxF = Math.ceil((ROUNDS * (ROUND_LEN + BREAK_LEN + 40) + 60) / dt);
+    const rs = [], rsSnap = () => { rs[Math.max(0, G.round - 1)] = [P1.fs.thr, P1.fs.land, P2.fs.thr, P2.fs.land]; };   // R-10: thrown / landed at the end of each round (cumulative)
     while (!res && guard++ < maxF) {
       if (o.stopAt && fightT >= o.stopAt && G.state === 'fight') { stop = true; break; }   // to look at a bot mid-fight: the fight is left as it is
       if (G.state === 'intro' || G.state === 'rend' || (G.state === 'replay' && RP.hl)) introSkip();
@@ -402,11 +403,13 @@ function botFight(policy, diff, o, seed) {
         P1.moveDir = P1.moveLat = 0; if (P1.blocking) setBlock(false); b.ctr = null;
         if (G.state === 'kd' && G.kd && G.kd.def === P1 && G.t >= b.mash) { b.mash = G.t + 0.14 + b.r() * 0.08; press('punch', 'jab'); }   // down: mash to get up, as a player does
       }
-      window.__tick(1, dt);
+      window.__tick(1, dt); rsSnap();
     }
+    // per round 'thrown:landed', space-separated — the bench compares round 1 with round 2 (R-10: the AI learns the jab)
+    const rnd = j => Array.from(rs, (c, i) => { const p = rs[i - 1] || [0, 0, 0, 0]; c = c || p; return (c[j] - p[j]) + ':' + (c[j + 1] - p[j + 1]); }).join(' ');
     return { policy, diff, seed, result: stop ? 'stopped' : !res ? 'timeout' : res.draw ? 'draw' : res.win ? 'win' : 'loss', how: res ? res.how : '-', round: G.round, dur: +fightT.toFixed(1),
       p1_thr: P1.fs.thr, p1_land: P1.fs.land, p1_blk: P1.fs.blk, p1_dmg: +P1.fs.dmg.toFixed(1), p2_thr: P2.fs.thr, p2_land: P2.fs.land, p2_blk: P2.fs.blk, p2_dmg: +P2.fs.dmg.toFixed(1),
-      kd_p1: P1.kdCount || 0, kd_p2: P2.kdCount || 0, hp1: Math.round(P1.hp), hp2: Math.round(P2.hp), cards: (G.cards || []).map(c => c.join('-')).join(' '), ms: Math.round(performance.now() - T0) };
+      kd_p1: P1.kdCount || 0, kd_p2: P2.kdCount || 0, hp1: Math.round(P1.hp), hp2: Math.round(P2.hp), cards: (G.cards || []).map(c => c.join('-')).join(' '), p1_rnd: rnd(0), p2_rnd: rnd(2), ms: Math.round(performance.now() - T0) };
   } finally {
     fightOver = fo; rr = Math.random; if (!stop) { P1.moveDir = P1.moveLat = 0; setBlock(false); Q.length = 0; }
   }
@@ -424,15 +427,17 @@ function botSummary(rows) {
   });
 }
 window.__bot = {
-  policies: Object.keys(BOT_POL), BOT_POL, COLS: BOT_COLS, csv: botCSV, summary: botSummary,
+  policies: Object.keys(BOT_POL), BOT_POL, COLS: BOT_COLS, csv: botCSV, summary: botSummary, AI_MEM, mem: () => AI.mem,
   run(policy = 'masher', diff = 'normal', n = 1, o = {}) {
     const T0 = performance.now(), rows = [], save = { cine: OPT.cine, shake: OPT.shake, rounds: ROUNDS, len: ROUND_LEN, mode: G.mode, diff: G.diff, loc: G.loc };
     OPT.cine = false; OPT.shake = false; if (o.rounds) ROUNDS = o.rounds; if (o.len) ROUND_LEN = o.len;
-    const unlite = o.lite === false ? () => {} : BOT_LITE();
+    const unlite = o.lite === false ? () => {} : BOT_LITE(), mem0 = Object.assign({}, AI_MEM), react0 = Object.assign({}, REACT);
+    // R-10: try other values of the AI's memory constants (AI_MEM) or of the hit reactions (REACT) for this run (balance.py --tune JSON)
+    for (const [k, v] of Object.entries(o.tune || {})) { if (k in AI_MEM) AI_MEM[k] = v; else if (k in REACT) REACT[k] = v; else throw new Error('tune? ' + k); }
     try {
       for (let i = 0; i < n; i++) { const r = botFight(policy, diff, o, (o.seed ?? 1) + i); rows.push(r); if (o.log) o.log(r); }
     } finally {
-      unlite(); OPT.cine = save.cine; OPT.shake = save.shake; ROUNDS = save.rounds; ROUND_LEN = save.len; G.diff = save.diff; G.loc = save.loc; G.mode = save.mode;
+      unlite(); Object.assign(AI_MEM, mem0); Object.assign(REACT, react0); OPT.cine = save.cine; OPT.shake = save.shake; ROUNDS = save.rounds; ROUND_LEN = save.len; G.diff = save.diff; G.loc = save.loc; G.mode = save.mode;
     }
     return { rows, csv: botCSV(rows), summary: botSummary(rows), sec: +((performance.now() - T0) / 1000).toFixed(1) };
   },

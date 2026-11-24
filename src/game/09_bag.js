@@ -80,7 +80,7 @@ function startFight(fromMode) {
   P1.stat = PROF.stats; P1.sig = PROF.sig; P2.stat = lvlStats(G.mode === 'career' ? Math.min(5, Math.floor(G.career * 0.7)) : G.mode === 'story' ? (storyCh().fight.lvl ?? 0) : ({ easy: 0, normal: 1, hard: 2 })[G.diff] || 0); P2.sig = SIGS[(rr() * SIGS.length) | 0].id;
   $('n1').textContent = myName();
   P1.resetState(); P2.resetState(); P2.speed = DIFFS[G.diff].speed * (1 + 0.035 * SK(P2, 'spd')) * (G.mode === 'story' ? storyCh().fight.speed ?? 1 : 1); P1.speed = 1.5 * (1 + 0.035 * SK(P1, 'spd'));
-  FX.clearAir(); REC.frames.length = 0; REC.events.length = 0; wearReset(); Q.length = 0; AI.blockUntil = 0; AI.t = 1.0 + rr(); AI.combo = 0; AI.dodgeAt = 0;
+  FX.clearAir(); REC.frames.length = 0; REC.events.length = 0; wearReset(); Q.length = 0; AI.blockUntil = 0; AI.t = 1.0 + rr(); AI.combo = 0; AI.dodgeAt = 0; aiMemReset();   // R-10: a new man, a new read
   /* the intro runs on G.introT: [−card − fly, −fly) the opponent's card (career), [−fly, 0) the camera flies round the place and
      its crowd (street locations), [0, 1.25) «Готовься», then the referee's clap (the bell in the gym) starts the round */
   { const street = !LOC.ring && G.mode !== 'bag' && G.mode !== 'spar' && !LOC.noFly;   // noFly (the bar, #51): from outside a tight room would read as a dollhouse

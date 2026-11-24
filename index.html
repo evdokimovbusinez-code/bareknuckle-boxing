@@ -6333,7 +6333,8 @@ class Fighter {
       let tgt;
       if (!fight) tgt = 0;
       else if (this === P2 && !NET.host) {   // he keeps his range (a P2P guest's man holds where the guest left him — he was pulled back to 1.13 m): closes if you back off (a little slower than you can retreat), steps off if crowded
-        const want = 1.13 - AI.style.adv - (this.cur && !this.release ? 0.08 : 0) + (this.daze > 0.5 ? 0.12 * this.daze : 0) + (AI.backT > G.t ? 0.45 : 0);
+        // R-10: AI.open — the man never defends: he stays in his face instead of giving ground (08_ai_flow.js, AI_MEM.oIn)
+        const op = AI.open || 0, want = 1.13 - AI.style.adv - (this.cur && !this.release ? 0.08 : 0) + (this.daze > 0.5 ? 0.12 * this.daze : 0) + (AI.backT > G.t ? 0.45 * (1 - op) : 0) - AI_MEM.oIn * op;
         tgt = a + (dist - want);
       } else { if (this.hold == null) this.hold = a; tgt = this.hold + (this.cur && !this.release ? 0.09 : 0); }
       if (G.state === 'kd' && G.kd && G.kd.att === this) tgt = a + (dist - 1.6);   // the referee sends him away while the other man is counted
@@ -6371,7 +6372,7 @@ class Fighter {
     // power shot: sits down on it — slower, heavier, costs more breath; and the arms get heavy as the tank empties: the more
     // you throw on empty, the slower and softer every punch gets
     this.heavy = !!this.powerNext; this.powerNext = false;
-    this.fatK = 0.88 + 0.12 * sstep(0, 55, this.stamina); this.punchK = (0.45 + 0.55 * sstep(0, 45, this.stamina)) * (this.heavy ? 1.45 : 1);
+    this.fatK = 0.88 + 0.12 * sstep(0, 55, this.stamina); this.punchK = lerp(REACT.gas, 1, sstep(0, 45, this.stamina)) * (this.heavy ? 1.45 : 1);   // R-10: REACT.gas, the floor on empty (was 0.45)
     // (fatigue was 0.42…1 and daze −30 %: a tired cross took 0.7 s to land; now tiredness mostly costs power and accuracy — punchK, aimJit)
     this.tsBase = this.speed * this.fatK * (this.heavy ? 0.9 : 1) * (P.slow || 1) * (1 - 0.1 * this.daze) * (this.sig && sigOf(n) === this.sig ? 1.08 : 1);
     const wind = (P.impact - P.start) / (PUNCH_T[n] || (P.impact - P.start)); this.tsWind = 1 + (wind - 1) * (this === P1 ? 1 : AI_SNAP);
@@ -6406,7 +6407,7 @@ class Fighter {
       s.hp.v += (dm.z * 6.0 - dm.y * 5.0) * k; s.hr.v -= dm.x * 6.5 * k; s.hy.v += dm.x * 7.5 * k;
       s.sp.v += (dm.z * 2.4 - dm.y * 1.2) * k * kt; s.sr.v -= dm.x * 2.2 * k * kt; s.hz.v += dm.z * 1.5 * k * kt;
       if (this.cur && !this.resolved) this.cur = null;
-      this.stunUntil = G.t + (name === 'jab' ? 0.14 : 0.27) * (1 + this.daze);
+      this.stunUntil = G.t + (name === 'jab' ? 0.14 : 0.27) * (1 + this.daze) * (rx?.stunK ?? 1);   // R-10: stunK — a punch thrown on empty staggers less (resolveHit)
       return;
     }
 
@@ -6418,7 +6419,7 @@ class Fighter {
 
     // face: a power-scaled pain grimace + blink; the 4th+ of a series unfocuses the gaze and buckles the legs («поплыл»)
     this.face.hit((body ? eff * 0.4 : eff) * (light ? 0.45 : 1), !body && (type === 'hook' || type === 'upper'), hp);
-    if (combo >= REACT.dazeAt) {
+    if (combo >= REACT.dazeAt && (rx?.stunK ?? 1) >= 0.6) {   // R-10: a gassed man's arm punches (stunK) don't buckle the legs, however many
       this.daze = Math.min(1, Math.max(this.daze, 0.5 + 0.08 * (combo - REACT.dazeAt)));
       this.wobble = Math.max(this.wobble, 0.6 + 0.1 * (combo - REACT.dazeAt));
     }
@@ -6467,8 +6468,8 @@ class Fighter {
       bodyDeg: +(Math.abs(dSP) * wB * 57.3).toFixed(1),
       step: +(this.knock || 0).toFixed(2),
     };
-    if (this.cur && !this.resolved) this.cur = null;
-    this.stunUntil = G.t + (name === 'jab' ? 0.14 : 0.27) * (1 + this.daze);
+    if (this.cur && !this.resolved && !rx?.keep) this.cur = null;   // R-10: rx.keep — his punch was nearly there, it lands weakened (resolveHit)
+    this.stunUntil = G.t + (name === 'jab' ? 0.14 : 0.27) * (1 + this.daze) * (rx?.stunK ?? 1);   // R-10: see the blocked branch
   }
 
   /* —— per-frame —— */
@@ -7448,6 +7449,10 @@ const REACT = {
   light: 0.55,     // power at/below which a non-power shot is just a nod + a blink (a feeler jab)
   deflate: 0.5,    // s: a body shot leaves him winded, hands down, elbow tucked this long
   backStep: 0.14,  // extra knock-back per hit from the 2nd one on (he starts retreating)
+  tired: 0.35,     // R-10: stun after a punch thrown on empty (punchK 0.45) — × this; fresh (punchK ≥ 0.85) × 1. Was × 1 for all
+  kdCaught: 0.45,  // R-10: knockdown severity added when he walked onto the punch (was 0)
+  kdGassed: 0.45, // R-10: … and when his tank is empty (0 → this as stamina 20 → 0; was 0)
+  gas: 0.2,       // R-10: punchK (power) of a punch thrown at 0 stamina, rising to 1 at 45 (Fighter.startPunch; was 0.45)
 };
 const DIFFS = { easy: { label: 'Лёгкий', dodge: 0.18, read: 0.5, gap: 1.9, speed: 1.0, toAI: 1.25, toMe: 0.75 }, normal: { label: 'Норм', dodge: 0.4, read: 0.7, gap: 1.35, speed: 1.15, toAI: 1, toMe: 1 }, hard: { label: 'Жёсткий', dodge: 0.6, read: 0.86, gap: 0.95, speed: 1.3, toAI: 0.9, toMe: 1.15 } };
 const G = { state: 'load', t: 0, real: 0, hitstop: 0, slow: 1, slowT: 0, shake: 0, koT: 0, koCine: 0, koTitle: false, introT: 0, winner: null, loser: null, wins: 0, losses: 0, diff: 'normal', fallSnd: false };
@@ -7686,6 +7691,7 @@ function resolveHit(att, name, contact) {
   }
   dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (sparOn() ? 0.6 : 1) * (pvp('glass') ? 2.2 : pvp('blood') ? 1.25 : 1);   // 16 oz and a helmet; P2P modes (00a_net_state.js)
   if (window.__dmgLog) window.__dmgLog.push([def === P1 ? 1 : 2, +dmg.toFixed(1), name, counter ? 'C' : '', caught ? 'K' : '', blocked ? 'B' : '', evading ? 'E' : '', +G.t.toFixed(1)]);
+  if (att === P2) aiMemHit(blocked);   // R-10: three in a row on his guard → the AI waits for his counter (08_ai_flow.js)
   if (att.fs) { if (blocked) att.fs.blk++; else { att.fs.land++; if (P.type !== 'straight' || name === 'cross') att.fs.pow++; if (att.sig && sigOf(name) === att.sig) att.fs.sig++; } att.fs.dmg += dmg; }
   def.hp = Math.max(0, def.hp - dmg); def.hpCap = Math.max(def.hp, def.hpCap - dmg * (blocked ? 0.15 : 0.4)); def.hitT = G.t; if (G.rd) G.rd[att === P1 ? 0 : 1] += blocked ? dmg * 0.3 : dmg;
   const fwd = Math.sign(def.group.position.x - att.group.position.x), dir = new V3(fwd, 0.15, 0);
@@ -7702,7 +7708,9 @@ function resolveHit(att, name, contact) {
     def.rxLast = G.t; combo = def.rxN;
     mult = Math.min(1 + REACT.step * (combo - 1), REACT.max);
   }
-  const rx = { mult, combo, heavy: !!isPow, power, rib: att.ribIdx | 0 };
+  // R-10: a punch thrown on an empty tank (punchK 0.45 at 0 stamina, 05_fighter.js startPunch) staggers less — the stun after it is
+  // ×REACT.tired … ×1 (punchK 0.45 … 0.85). Was ×1 always: a gassed man mashing arm punches stun-locked a fresh one
+  const rx = { mult, combo, heavy: !!isPow, power, rib: att.ribIdx | 0, stunK: lerp(((window.__tw || {}).tired ?? REACT.tired), 1, sstep(REACT.gas, 0.85, att.punchK ?? 1)) };
   // a feeler jab (light, clean, no power): a nod + a blink only — it must not rock him back a step (issue 44 / req. 4)
   const light = !blocked && !body && !isPow && power < REACT.light;
   if (!blocked) { const was = def.daze; def.daze = Math.min(1, def.daze + power * 0.13 + (def.hp < 30 ? 0.1 : 0)); if (was < 0.55 && def.daze >= 0.55) popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'поплыл', 'crit'); }
@@ -7710,7 +7718,8 @@ function resolveHit(att, name, contact) {
   else if (blocked) popup(pos, 'блок', 'dodge');
   // direction: how the knuckles were travelling at contact
   { const kn = att.knuckle(_v4); if (att.kOld) { _v3.copy(kn).sub(att.kOld); if (_v3.lengthSq() > 1e-6) dir.lerp(_v3.normalize(), 0.6).normalize(); } }
-  if (body) { def.stamina = Math.max(0, def.stamina - 18); popup(pos, 'по корпусу', 'dodge'); }
+  // R-10: a body shot thrown on an empty tank takes about half the breath (×0.5 at stunK 0.35; was 18 always)
+  if (body) { def.stamina = Math.max(0, def.stamina - 18 * Math.min(1, rx.stunK + 0.15)); popup(pos, 'по корпусу', 'dodge'); }
   // debug hook (issue 41): one row per punch that lands on a guard
   if (blocked && window.__blk && window.__blk.log) window.__blk.log.push({
     kind: name, pow: !!isPow, dmg: +dmg.toFixed(2),
@@ -7718,8 +7727,11 @@ function resolveHit(att, name, contact) {
   def.lastContact = pos.clone();
   if (caught) {   // his own punch: knocked off line if it was early, landing weakened if it was nearly there
     const dp = PUNCH[def.cur], td = def.act[def.cur].time;
-    if (td < dp.impact - 0.1 || power > 1.0) { def.cancelPunch(); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.2, 0)), 'сбил', 'dodge'); }
-    else def.dmgMul = 0.55;
+    // R-10: an arm punch thrown on empty (rx.stunK < 0.6) no longer knocks his punch off line or weakens it; and the «nearly there» one really
+    // goes on now (rx.keep) — takeHit used to drop every unresolved punch, so the ×0.55 below never landed
+    if (rx.stunK < 0.6) rx.keep = true;   // a gassed arm punch: his own goes through as it was
+    else if (td < dp.impact - 0.1 || power > 1.0) { def.cancelPunch(); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.2, 0)), 'сбил', 'dodge'); }
+    else { def.dmgMul = 0.55; rx.keep = true; }
   }
   if (G.t - (att.lastLand || -9) < 0.2 || G.t - (def.lastLand || -9) < 0.2) { if (!G.tradeT || G.t - G.tradeT > 1) { G.tradeT = G.t; popup(_v4.lerpVectors(att.headNow, def.headNow, 0.5).add(_v5.set(0, 0.3, 0)), 'размен!', 'crit'); G.slow = 0.3; G.slowT = 0.35; } }
   // the step back grows with the series (a clean shot is scaled by `mult`); from the 2nd hit on he also starts retreating.
@@ -7732,7 +7744,10 @@ function resolveHit(att, name, contact) {
     def.hitLog = (def.hitLog || []).filter(t => G.t - t < 1.6); def.hitLog.push(G.t);
     if (power > 0.85 && !body && rr() < 0.7) def.shakeT = G.t;
     if (def === P2) {
-      if (def.hitLog.length >= 3 && rr() < 0.75) { const T = 0.8 + rr() * 0.7; def.shellT = G.t + T; AI.blockUntil = Math.max(AI.blockUntil, G.t + T); AI.backT = G.t + T + 0.3; AI.lat = (rr() < 0.5 ? -1 : 1) * 0.9; AI.latT = T; AI.t = Math.max(AI.t, T); }
+      // R-10: against a man who never defends (aiOpen, 08_ai_flow.js) shelling up under his volume loses — he fires back instead
+      const open = aiOpen() * aiRead();
+      if (def.hitLog.length >= 3 && open > 0.3) { if (rr() < open * AI_MEM.oShell) AI.t = Math.min(AI.t, 0.1); }
+      else if (def.hitLog.length >= 3 && rr() < 0.75) { const T = 0.8 + rr() * 0.7; def.shellT = G.t + T; AI.blockUntil = Math.max(AI.blockUntil, G.t + T); AI.backT = G.t + T + 0.3; AI.lat = (rr() < 0.5 ? -1 : 1) * 0.9; AI.latT = T; AI.t = Math.max(AI.t, T); }
       else if (power > 0.9) AI.backT = G.t + 0.5 + rr() * 0.4;
     } else if (def.hitLog.length >= 3) def.shellT = G.t + 0.45;
   }
@@ -7780,7 +7795,9 @@ function resolveHit(att, name, contact) {
   // knockdowns and "his legs went": a clean shot to an already shaken, tiring man can put him down without putting him out
   if (!blocked && !body && G.state === 'fight' && !window.__noKD) {
     // a fresh man is very rarely dropped by one shot: knockdowns come from accumulated damage (or a clean counter)
-    const sev = power * 0.85 + def.daze * 0.55 + (counter ? 0.3 : 0) + (1 - def.hp / 100) * 0.45 + (evading ? 0.2 : 0) - 0.6 * (def.hp / 100) ** 2 - 0.05 * SK(def, 'chin');
+    // R-10: + walking onto it (caught) and + an empty tank (no legs left under him) — REACT.kdCaught / kdGassed (were 0)
+    const sev = power * 0.85 + def.daze * 0.55 + (counter ? 0.3 : 0) + (1 - def.hp / 100) * 0.45 + (evading ? 0.2 : 0) - 0.6 * (def.hp / 100) ** 2 - 0.05 * SK(def, 'chin')
+      + (caught ? REACT.kdCaught : 0) + REACT.kdGassed * (1 - sstep(0, 20, def.stamina));
     if (rr() < clamp((sev - 1.2) * 0.65, 0, 0.5)) return knockdown(att, def, dir, power, name, fwd, sev);
     if (sev > 0.85 && rr() < 0.55) { def.wobble = Math.max(def.wobble, 0.9 + 0.9 * rr()); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'повело', 'crit'); }
   }
@@ -8079,26 +8096,87 @@ const STYLES = {
   counter: { label: 'контрпанчер', gap: 1.35, w: { jab: 4, cross: 3.5, hookL: 2.5, hookR: 1.2, upperL: 1.4, upperR: 1.8, over: 0.6 }, dodge: 1.35, block: 0.9, combo: 0.3, trade: 0.12, feint: 0.16, body: 0.12, adv: -0.06, counter: 0.6 },
   pressure: { label: 'прессинг', gap: 0.9, w: { jab: 3.5, cross: 3, hookL: 2.6, hookR: 2, upperL: 1.2, upperR: 1.2, over: 1 }, dodge: 0.8, block: 0.8, combo: 0.8, trade: 0.35, feint: 0.1, body: 0.35, adv: 0.06, counter: 0.25 },
 };
-const AI = { lat: 0, latT: 0, backT: 0, t: 1.2, combo: 0, seen: -1, dodgeAt: 0, dodgeType: 'duck', blockUntil: 0, feintAt: 0, style: STYLES.brawler };
+const AI = { lat: 0, latT: 0, backT: 0, t: 1.2, combo: 0, seen: -1, dodgeAt: 0, dodgeType: 'duck', blockUntil: 0, feintAt: 0, style: STYLES.brawler, mem: null };
+/* ── R-10: the AI remembers the player's habits ──
+   AI.mem.a — a sliding window of his last AI_MEM.win actions: { k: 'p' a punch (n, body) | 'd' a slip / duck / lean (ty, aft = within
+   AI_MEM.aft s of his own punch) | 'b' the guard goes up, t }. Over the fight it learns from them:
+   · fam[n] — how well it knows a punch he keeps repeating (≥ repN of his last rep): + learn per repeat, + corner between rounds;
+     a known punch is slipped (the right way) or blocked more often — aiRead() · fam[n] of the way from his base odds to the top ones;
+   · guard — the share of the time his guard is up (EMA over guardT s): a man who lives behind it gets body shots, hooks and
+     power shots (the guard breaks under BLK.breakSta stamina — resolveHit; a body shot costs him 18 stamina, blocked or not);
+   · blkRow — the AI's punches in a row that hit his guard: after AI_MEM.blkRow it stops feeding the guard and waits for his
+     counter (holds its punches ctrWait s, stays alert ctrT s) — slips it and fires back (counterUntil ×1.5 damage);
+   · open — he neither blocks nor slips (the masher): no point shelling up under his volume — the AI fires back into his punches
+     (a man hit while throwing takes ×1.25, resolveHit `caught`), throws more often, counters off its slips, stays in his face.
+     The o* constants are the odds / amounts it moves toward as open → 1: oDodge / oBlock / oTrade — answer to his punch
+     (slip / guard / fire back), oGap — the pause between its punches shrinks ×(1 − oGap), oCtr — counter at once after a slip,
+     oShell — share of the «three clean ones → cover up» reactions replaced by firing back, oSta — the stamina it still punches
+     with (16 otherwise), oIn — m closer it stands (Fighter.footwork), oPow — power-shot odds added while he is gassed.
+     Tuned on the R-02 bench (masher: was 100 / 100 / 100 % bot wins on easy / normal / hard);
+   · aft — he slips after his own punches: the AI's next punch is the one that beats his usual slip.
+   The strength of all of it is aiRead() = DIFFS[diff].read mapped 0.5 / 0.7 / 0.86 → 0.22 / 0.65 / 1 (easy / normal / hard).
+   Reset per fight in startFight (aiMemReset); aiMemHit is called by resolveHit for every punch of the AI that reaches him. */
+const AI_MEM = { win: 20, rep: 6, repN: 3, learn: 0.002, corner: 0.7, aft: 0.8, guardT: 4, blkRow: 3, ctrT: 2.5, ctrWait: 1.0,
+  oDodge: 0.2, oTrade: 0.9, oBlock: 0, oGap: 0.4, oCtr: 0.5, oShell: 1, oSta: 12, oIn: 0.1, oPow: 0.5 };
+const aiRead = () => clamp((DIFFS[G.diff].read - 0.4) / 0.46, 0, 1);
+function aiMemReset() { AI.open = 0; AI.mem = { a: [], fam: {}, guard: 0, blkRow: 0, ctrT: 0, pid: -1, dObj: null, blk: false, lastP: -9, round: 1, ctrN: 0 }; }
+function aiMemPush(e) { const a = AI.mem.a; a.push(e); if (a.length > AI_MEM.win) a.shift(); }
+function aiRep(n) { const a = AI.mem.a; let c = 0, k = 0; for (let i = a.length - 1; i >= 0 && k < AI_MEM.rep; i--) if (a[i].k === 'p') { k++; if (a[i].n === n) c++; } return c; }
+/* 1 = he never defends (no guard, no slips in the window), 0 = he does it all the time */
+function aiOpen() {
+  const M = AI.mem, a = M.a; if (a.length < 8) return 0; let d = 0; for (const e of a) if (e.k !== 'p') d++;
+  return clamp(1 - 4 * d / a.length, 0, 1) * (1 - sstep(0.1, 0.35, M.guard));
+}
+/* his usual slip after his own punch (≥ half of his last slips came right after a punch), or null */
+function aiAfter() {
+  const ds = AI.mem.a.filter(e => e.k === 'd'); if (ds.length < 3) return null;
+  const af = ds.filter(e => e.aft); if (af.length * 2 < ds.length) return null;
+  const c = {}; for (const e of af) c[e.ty] = (c[e.ty] || 0) + 1; return Object.keys(c).sort((x, y) => c[y] - c[x])[0];
+}
+function aiMemTick(dt, pl) {
+  const M = AI.mem || (aiMemReset(), AI.mem);
+  if (M.round !== G.round) {   // the corner: what he kept doing gets talked over between rounds
+    M.round = G.round; M.blkRow = 0; M.ctrT = 0;
+    for (const n in M.fam) if (M.fam[n] > 0.02) M.fam[n] = Math.min(1, M.fam[n] + AI_MEM.corner);
+  }
+  M.guard += ((pl.blocking ? 1 : 0) - M.guard) * Math.min(1, dt / AI_MEM.guardT);
+  if (pl.blocking && !M.blk) aiMemPush({ k: 'b', t: G.t }); M.blk = !!pl.blocking;
+  if (pl.dodge && pl.dodge !== M.dObj) { M.dObj = pl.dodge; aiMemPush({ k: 'd', ty: pl.dodge.type, t: G.t, aft: G.t - M.lastP < AI_MEM.aft }); }
+  if (pl.cur && M.pid !== pl.punchId) {
+    M.pid = pl.punchId; M.lastP = G.t; aiMemPush({ k: 'p', n: pl.cur, body: !!pl.bodyShot, t: G.t });
+    if (aiRep(pl.cur) >= AI_MEM.repN) M.fam[pl.cur] = Math.min(1, (M.fam[pl.cur] || 0) + AI_MEM.learn);
+  }
+}
+/* one punch of the AI reached him: on his guard or clean (from resolveHit) */
+function aiMemHit(blocked) {
+  const M = AI.mem; if (!M) return;
+  if (!blocked) { M.blkRow = 0; return; }
+  if (++M.blkRow >= AI_MEM.blkRow) { M.blkRow = 0; M.ctrT = G.t + AI_MEM.ctrT; M.ctrN++; AI.combo = 0; }   // stop feeding the guard: wait for his counter
+}
 function ai(dt) {
   if (window.__tutOn) return;   // (issue 45) the sparring partner stands and waits (his slow block-step punches come from tutTick)
   if (NET.host) return netHostAI(dt);   // issue 49: P2 is the guest's man, not the AI
   if (BAG.on) { AI.t = 9; return; }
   const me = P2, pl = P1, D = DIFFS[G.diff], S = AI.style;
+  aiMemTick(dt, pl);
   if (me.doomed || me.liver || me.wind > G.t) return;
   me.blocking = G.t < AI.blockUntil;
+  const M = AI.mem, A = aiRead(), open = AI.open = aiOpen() * A;
   // a feint: the shoulder twitches, the punch never comes
   if (AI.feintAt && G.t >= AI.feintAt) { AI.feintAt = 0; if (me.cur && !me.resolved) me.cancelPunch(); }
   if (pl.cur && AI.seen !== pl.punchId) {
     AI.seen = pl.punchId;
     const n = pl.cur, P = PUNCH[n], react = Math.max(0, (P.impact - P.start) / pl.speed - 0.17 - rr() * 0.08);
-    if (rr() < D.dodge * S.dodge * (me.cur ? 0.25 : 1) * (1 - 0.6 * me.daze)) {
-      const good = rr() < D.read, ok = pl.bodyShot ? ['lean'] : EV[n], all = ['slipL', 'slipR', 'duck', 'lean'];
+    // R-10: a punch he keeps repeating is seen coming (fam), and so is his counter after three of ours on his guard (ctrT)
+    const known = Math.max(aiRep(n) >= AI_MEM.repN ? A * (M.fam[n] || 0) : 0, M.ctrT > G.t ? 0.85 * A : 0);
+    const kd = Math.max(known, open), pD = D.dodge * S.dodge, pB = D.dodge * 0.6 * S.block, busy = (me.cur ? 0.25 : 1) * (1 - 0.6 * me.daze);
+    if (rr() < (pD + Math.max(0, (open > known ? AI_MEM.oDodge : 0.8) - pD) * kd) * busy) {
+      const good = rr() < D.read + (1 - D.read) * known, ok = pl.bodyShot ? ['lean'] : EV[n], all = ['slipL', 'slipR', 'duck', 'lean'];
       AI.dodgeType = good ? ok[(rr() * ok.length) | 0] : all[(rr() * 4) | 0]; AI.dodgeAt = G.t + react;
-    } else if (rr() < S.trade * (1 - 0.4 * me.daze) && me.canAct() && me.stamina > 12) {
+    } else if (rr() < (S.trade + (AI_MEM.oTrade - S.trade) * open) * (1 - 0.4 * me.daze) && me.canAct() && me.stamina > lerp(12, AI_MEM.oSta, open)) {
       // he doesn't get out of the way — he fires back: the exchange
       const pick = rr() < 0.5 ? (rr() < 0.5 ? 'hookL' : 'hookR') : rr() < 0.6 ? 'cross' : 'over'; me.wantBody = false; me.startPunch(pick); AI.t = 0.25;
-    } else if (rr() < D.dodge * 0.6 * S.block) AI.blockUntil = G.t + react + 0.45;
+    } else if (rr() < pB + Math.max(0, 0.9 - pB) * known + Math.max(0, AI_MEM.oBlock - pB) * open) AI.blockUntil = G.t + react + 0.45;
   }
   if (AI.dodgeAt && G.t >= AI.dodgeAt) { AI.dodgeAt = 0; if (me.canAct() || me.canChain()) me.startDodge(AI.dodgeType); }
   AI.t -= dt;
@@ -8118,16 +8196,19 @@ function ai(dt) {
   const dist = Math.abs(pl.group.position.x - me.group.position.x), inReach = dist < 1.13 - S.adv + 0.07;
   const free = (me.canAct() || (AI.combo && me.canChain())) && inReach;
   if (free && !AI.dodgeAt && !me.blocking) {
-    const counter = me.counterUntil > G.t;
-    if ((AI.t <= 0 || (counter && rr() < S.counter * 0.4)) && me.stamina > 16) {
-      const w = Object.assign({}, S.w), pd = pl.dodge && pl.dodge.type;
+    const counter = me.counterUntil > G.t, waits = M.ctrT - AI_MEM.ctrT + AI_MEM.ctrWait > G.t && !counter;   // R-10: after three on his guard he waits for the man's counter
+    if ((AI.t <= 0 || (counter && rr() < S.counter * 0.4 + AI_MEM.oCtr * Math.max(open, M.ctrT > G.t ? A : 0))) && me.stamina > lerp(16, AI_MEM.oSta, open) && !waits) {   // R-10: he is as empty as I am — punch anyway
+      if (counter) M.ctrT = 0;
+      const w = Object.assign({}, S.w), pd = (pl.dodge && pl.dodge.type) || (pl.cur && pl.resolved && aiAfter());   // R-10: his usual slip after his punch
       if (pd === 'duck') { w.upperL += 3; w.upperR += 3; } if (pd === 'slipL' || pd === 'slipR') { w.hookL += 2; w.over += 2; } if (pd === 'lean') { w.cross += 3; w.over += 2; }
       if (counter) { w.hookL += 2; w.upperR += 1; } if (pl.daze > 0.4) { w.over += 1.5; w.hookR += 1.5; }
+      const shell = A * sstep(0.45, 0.8, M.guard);   // R-10: he lives behind his guard → around it (hooks), under it (body), through it (power)
+      if (shell) { w.hookL += 3 * shell; w.hookR += 3 * shell; w.jab *= 1 - 0.6 * shell; }
       let tot = 0; for (const k of PN) tot += w[k]; let r = rr() * tot, pick = 'jab'; for (const k of PN) { r -= w[k]; if (r <= 0) { pick = k; break; } }
-      me.wantBody = (PUNCH[pick].type === 'straight' || PUNCH[pick].type === 'hook') && rr() < S.body;
-      me.powerNext = rr() < (S === STYLES.brawler ? 0.3 : 0.15) * (pl.daze > 0.4 ? 2 : 1); me.startPunch(pick);
+      me.wantBody = (PUNCH[pick].type === 'straight' || PUNCH[pick].type === 'hook') && rr() < S.body + (0.55 - S.body) * shell;
+      me.powerNext = rr() < (S === STYLES.brawler ? 0.3 : 0.15) * (pl.daze > 0.4 ? 2 : 1) + 0.4 * shell + AI_MEM.oPow * open * (1 - sstep(10, 25, pl.stamina)); me.startPunch(pick);   // R-10: sit down on it vs a gassed, open man
       if (!AI.combo && rr() < S.feint) { AI.feintAt = G.t + 0.07 + rr() * 0.05; AI.t = 0.35 + rr() * 0.3; return; }
-      if (AI.combo > 0) { AI.combo--; AI.t = 0; } else { AI.combo = rr() < S.combo ? (rr() < 0.45 ? 2 : 1) : 0; AI.t = AI.combo ? 0 : D.gap * S.gap * (0.55 + rr() * 0.95) * (pl.daze > 0.5 ? 0.6 : 1); }
+      if (AI.combo > 0) { AI.combo--; AI.t = 0; } else { AI.combo = rr() < S.combo ? (rr() < 0.45 ? 2 : 1) : 0; AI.t = AI.combo ? 0 : D.gap * S.gap * (0.55 + rr() * 0.95) * (pl.daze > 0.5 ? 0.6 : 1) * (1 - AI_MEM.oGap * open); }
     }
   }
 }
@@ -8251,7 +8332,7 @@ function startFight(fromMode) {
   P1.stat = PROF.stats; P1.sig = PROF.sig; P2.stat = lvlStats(G.mode === 'career' ? Math.min(5, Math.floor(G.career * 0.7)) : G.mode === 'story' ? (storyCh().fight.lvl ?? 0) : ({ easy: 0, normal: 1, hard: 2 })[G.diff] || 0); P2.sig = SIGS[(rr() * SIGS.length) | 0].id;
   $('n1').textContent = myName();
   P1.resetState(); P2.resetState(); P2.speed = DIFFS[G.diff].speed * (1 + 0.035 * SK(P2, 'spd')) * (G.mode === 'story' ? storyCh().fight.speed ?? 1 : 1); P1.speed = 1.5 * (1 + 0.035 * SK(P1, 'spd'));
-  FX.clearAir(); REC.frames.length = 0; REC.events.length = 0; wearReset(); Q.length = 0; AI.blockUntil = 0; AI.t = 1.0 + rr(); AI.combo = 0; AI.dodgeAt = 0;
+  FX.clearAir(); REC.frames.length = 0; REC.events.length = 0; wearReset(); Q.length = 0; AI.blockUntil = 0; AI.t = 1.0 + rr(); AI.combo = 0; AI.dodgeAt = 0; aiMemReset();   // R-10: a new man, a new read
   /* the intro runs on G.introT: [−card − fly, −fly) the opponent's card (career), [−fly, 0) the camera flies round the place and
      its crowd (street locations), [0, 1.25) «Готовься», then the referee's clap (the bell in the gym) starts the round */
   { const street = !LOC.ring && G.mode !== 'bag' && G.mode !== 'spar' && !LOC.noFly;   // noFly (the bar, #51): from outside a tight room would read as a dollhouse
