@@ -915,7 +915,7 @@ class Fighter {
     // between exchanges a fighter recovers part of what he took (breath, legs, head clears) — but the damage that stays (swelling,
     // cuts, the brain's accumulated shake) lowers the ceiling he can come back to
     if (G.state === 'fight' && !this.ko && G.t - this.hitT > 1.6 && this.hp < this.hpCap) this.hp = Math.min(this.hpCap, this.hp + dt * (this.stamina > 40 ? 2 : 1));
-    if (this.liver && G.t >= this.liver.t && G.state === 'fight') { const L = this.liver; this.liver = null; knockdown(L.att, this, L.dir, 0.5, L.name, L.fwd, 1.2, 'liver'); }
+    if (this.liver && G.t >= this.liver.t && G.state === 'fight') { const L = this.liver; this.liver = null; knockdown(L.att, this, L.dir, 0.5, L.name, L.fwd, 1.2, 'liver'); if (G.kdHit && G.kdHit.def === this && L.t0 != null) G.kdHit.t = L.t0; }   // R-15: a count-out replays the liver punch, not the fold
     if (this.liver) { this.wobble = Math.max(this.wobble, 0.6); }
     if (this.doomed && G.t >= this.doomed.t && G.state === 'fight') { const D = this.doomed; this.lastContact = this.headNow.clone(); knockout(D.att, this, D.dir, 0.4, D.name, D.fwd, true); }
     if (this.doomed && !this.ko) { this.knock = (this.knock || 0) + dt * 0.25; this.wobble = Math.max(this.wobble, 2); }   // backing up on rubber legs
