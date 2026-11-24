@@ -3,12 +3,13 @@
   python3 tools/test/smoke.py [OUT.jpg] [--only menu,fight] [--vp desk,phone]
   bash tools/shot.sh /tmp/shots/s.jpg smoke          (the same, after rebuilding gtest.html)
 
-Runs menu.js, fight.js, modes.js, phone.js at 1280×720 (desk) and 740×360 touch (phone), each in a fresh browser context
+Runs menu.js, fight.js, modes.js, phone.js, result.js (R-09) at 1280×720 (desk) and 740×360 touch (phone), each in a fresh browser context
 (clean localStorage, so the first-visit offer and the default profile are what a new player gets). Fails (exit code 1) on:
   · any `pageerror` (an uncaught exception, also one thrown inside a click handler) or `console.error`;
   · the game not loading (the `.err` box) or a scenario that throws / times out;
   · a state a scenario must reach and did not (`fight`, `kd`, `ko`, `replay`, `result`, `talk` — see NEED);
-  · a menu screen that did not open (menu.js logs `tag:visible screens`, the tag's own screen must be among them).
+  · a menu screen that did not open (menu.js logs `tag:visible screens`, the tag's own screen must be among them);
+  · R-09: the result card check of result.js (overlapping texts, a font / button too small, a head under the card) logs FAIL.
 Every value G.state takes is recorded through a setter put on G.state, so a state that lasts one frame inside __tick(n) counts.
 Prints a table per run: time, states reached, the smallest tap target over all frames (CSS px, buttons / inputs / swatches)
 and the simulation step (ms per __tick frame, no rendering). Frames: OUT-desk-fight-f4.jpg, … ; OUT itself = the last frame.
@@ -22,11 +23,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 from shot import settle  # noqa: E402  (the CSS-transition wait of tools/shot.py)
 
-SCEN = ['menu', 'fight', 'modes', 'phone']
+SCEN = ['menu', 'fight', 'modes', 'phone', 'result']
 VPS = {'desk': (1280, 720, False), 'phone': (740, 360, True)}
 # states each scenario must pass through (G.state); the union covers fight, kd, ko, replay, result, talk
 NEED = {'menu': [], 'fight': ['fight', 'kd', 'ko', 'replay', 'result'], 'modes': ['fight', 'talk', 'result'],
-        'phone': ['fight', 'ko', 'result']}
+        'phone': ['fight', 'ko', 'result'], 'result': ['fight', 'ko', 'replay', 'result']}
 # console lines that are not errors of the game: Chrome/SwiftShader chatter (+ the browser's own /favicon.ico 404, by URL)
 IGNORE = ('GL Driver Message', 'GPU stall due to ReadPixels', 'KHR_parallel_shader_compile')
 MENU_SCR = {'main': 'menu', 'main2': 'menu', 'train': 'menu'}   # menu.js tag → the element that must be visible (else id = tag)
@@ -98,6 +99,8 @@ async def run_one(b, url, base, ext, vp, sc, fmt):
                 dead = [e for e in (r['log'] or '').split(' | ') if ':' in e
                         and MENU_SCR.get(e.split(':')[0], e.split(':')[0]) not in e.split(':', 1)[1].split(',')]
                 if dead: r['fail'].append('screen did not open: ' + ', '.join(dead))
+            if sc == 'result' and 'FAIL' in (r['log'] or ''):   # R-09: overlapping texts, small fonts / buttons, heads under the card
+                r['fail'].append('result card: ' + r['log'].split('FAIL', 1)[1][:300])
     except Exception as e:   # a throw in the scenario itself, a timeout, a crashed page
         r['fail'].append(f'{type(e).__name__}: {str(e).splitlines()[0][:300] if str(e) else ""}')
     await asyncio.sleep(0.2)   # late console messages

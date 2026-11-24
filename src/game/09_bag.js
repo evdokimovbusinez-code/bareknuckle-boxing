@@ -36,7 +36,7 @@ function bagEnd() {
   $('r-title').textContent = rec ? 'Рекорд!' : 'Время'; $('r-title').className = 'rt win';
   $('r-sub').textContent = `очки ${BAG.score} · попаданий ${BAG.hits} · лучшая серия ×${BAG.best} · рекорд ${G.bagBest}`;
   $('r-car').textContent = (BAG.score >= 900 ? 'Готов к титулу' : BAG.score >= 600 ? 'Боевая форма' : BAG.score >= 350 ? 'Неплохо — добавь серий' : 'Разминка') + (bp ? ` · +${bp} ${bp === 1 ? 'очко' : 'очка'} бойцу` : ' · 400+ очков дают очко бойцу');
-  $('r-again').textContent = 'Ещё раз'; $('r-replay').hidden = true; $('result').hidden = false;
+  $('r-again').textContent = 'Ещё раз'; $('r-replay').hidden = true; G.res = { bag: 1, score: BAG.score, best: BAG.best, pts: bp }; resultOpen();
 }
 function updateMenu() {
   renderStats();
@@ -158,7 +158,7 @@ function decision() {
   G.winner = win || draw ? P1 : P2; G.loser = G.winner.other; celStart(draw ? null : G.winner, 0.3);   // R-13: the winner's pose (09b_cine.js)
   fightOver(win, draw);
   $('r-title').textContent = draw ? 'Ничья' : win ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (draw ? '' : win ? 'win' : 'lose');
-  $('r-sub').textContent = `решение судей ${t[0]}–${t[1]} · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false;
+  $('r-sub').textContent = `решение судей ${t[0]}–${t[1]} · счёт ${G.wins} : ${G.losses}`; resultOpen();
 }
 // a cut over the eye that keeps running into it: the referee calls time for the doctor; if it can't be controlled, the fight is stopped
 function cutCheck() {
@@ -168,7 +168,7 @@ function cutCheck() {
     if (!F.cutLook) { F.cutLook = true; msg('Врач смотрит рассечение'); G.state = 'break'; G.breakT = 3.5; G.doc = true; corner(F, 0.35); return; }
     if (w.sev > 0.97) { const A = F.other; F.ko = true; G.state = 'result'; G.winner = A; G.loser = F; celStart(A, 0.3); fightOver(A === P1, false, 'tko'); $('pad').hidden = true; if (NET.role) return netResult();   // P2P: the shared result (the guest was left hanging)
       $('r-title').textContent = A === P1 ? 'Победа' : 'Поражение'; $('r-title').className = 'rt ' + (A === P1 ? 'win' : 'lose');
-      $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; $('result').hidden = false; msg('Стоп! Рассечение', 'ko'); return; }
+      $('r-sub').textContent = `остановлено врачом: рассечение · счёт ${G.wins} : ${G.losses}`; resultOpen(); return; }   // (R-09: no «Стоп!» over the card — the line under the title says it)
   }
 }
 function stateTick(dtReal) {

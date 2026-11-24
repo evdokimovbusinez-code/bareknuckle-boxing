@@ -68,10 +68,11 @@ const careerLoc = () => { const id = LADDER[Math.min(G.career, LADDER.length - 1
 // «Склад · аншлаг»: the place of career fight i as the menu, the card and the result screen name it
 const careerPlace = (i = G.career) => { const L = LADDER[Math.min(i, LADDER.length - 1)]; return (LOCS[L.loc] ? LOCS[L.loc].label : LOC.label) + (L.champ ? ' · аншлаг' : ''); };
 function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | 'tko' (the doctor stops it) — the purse depends on it
+  G.res = null;   // R-09: the big numbers of the result card (07c_result.js)
   if (NET.role) { NET.over = { win, draw, how }; return; }   // issue 49: a P2P bout pays nothing and does not touch the career
   fightTable();
   const stage = Math.min(G.career, LADDER.length - 1), before = careerWins();
-  if (draw) { const p = payOut(false, true, how, stage, before); p.soc = socFight(false, true, how, stage); payShow(p); save(); return; }
+  if (draw) { const p = payOut(false, true, how, stage, before); p.soc = socFight(false, true, how, stage); payShow(p); G.res = resOf(p, 0); save(); return; }
   if (win) G.wins++; else G.losses++;
   let t = '', pts = 0;
   if (G.mode === 'story') { const ch = storyCh();   // issue 51: a story chapter — clear it, the purse is in purse(), the outro comes after the replay
@@ -82,10 +83,12 @@ function fightOver(win, draw, how = 'dec') {   // how: 'dec' (judges) | 'ko' | '
     else t = `карьера ${G.career}/${LADDER.length} · ${LADDER[G.career].nm} ещё стоит на пути — ${careerPlace()}`;
   } else if (win) pts = 1;
   if (pts) { PROF.pts += pts; t += (t ? ' · ' : '') + `+${pts} ${pts === 1 ? 'очко' : 'очка'} бойцу`; }
-  { const p = payOut(win, false, how, stage, before); p.soc = socFight(win, false, how, stage); payShow(p); }   // the purse (07b_economy.js) and the followers (15_social.js) onto the result screen
+  { const p = payOut(win, false, how, stage, before); p.soc = socFight(win, false, how, stage); payShow(p); G.res = resOf(p, pts); }   // the purse (07b_economy.js) and the followers (15_social.js) onto the result screen
   save(); const c = $('r-car'); if (c) c.textContent = t;
   const a = $('r-again'); if (a) a.textContent = G.mode === 'story' ? (win ? 'Дальше' : 'Ещё раз') : G.mode === 'career' && win && G.career < LADDER.length ? 'Следующий бой' : G.mode === 'career' && !win ? 'Ещё раз' : 'Реванш';
 }
+// R-09: what the three big numbers of the result card count up to (07c_result.js); a mode that pays nothing shows no ₽
+const resOf = (p, pts) => ({ cash: ['career', 'quick', 'story'].includes(G.mode) ? p.total : null, fans: p.soc ? p.soc.total : null, pts });
 const D_SEP = 1.15;
 
 const elMsg = $('msg'), elPops = $('pops');
@@ -192,7 +195,7 @@ function endReplay() {
   G.state = 'result'; $('rec').hidden = true; $('bar-t').hidden = $('bar-b').hidden = true;
   const win = G.winner === P1; $('r-title').textContent = win ? 'Победа' : 'Нокаут'; $('r-title').className = 'rt ' + (win ? 'win' : 'lose');
   $('r-sub').textContent = `${win ? 'соперник на полу' : 'ты на полу'} · счёт ${G.wins} : ${G.losses}`;
-  if (!storyOut(win)) $('result').hidden = false;   // issue 51: a story bout plays its outro dialog first, the result screen after it
+  if (!storyOut(win)) resultOpen();   // issue 51: a story bout plays its outro dialog first, the result screen after it
 }
 
 /* ───────── hits ───────── */

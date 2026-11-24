@@ -70,28 +70,28 @@ function ccWinCover(cp, cl, W, L) {
    [CC_FB, CC_FT] (the top keeps clear of the HUD bars). A body past an edge first slides the shot (camera and look point together) by
    the overshoot, then the camera backs off along its view until all fit — both continuous, so the eased camera never jumps */
 const CC_FX = 0.86, CC_FT = 0.72, CC_FB = -0.86, _ccE = new V3(), _ccS = new V3();
-function ccFit(cp, cl, Fs) {
+function ccFit(cp, cl, Fs, FX = CC_FX) {   // FX: the half width of the frame (R-09: narrower beside the result card, resWin)
   const tx = Math.tan(camera.fov * Math.PI / 360) * camera.aspect, ty = tx / camera.aspect;
-  for (let it = 0; it < 2; it++) {
+  for (let it = 0, N = FX < CC_FX ? 3 : 2; it < N; it++) {   // a narrow window (the result card) takes a third pass to settle
     const f = _ccF.subVectors(cl, cp).normalize(), r = _ccR.crossVectors(f, _ccU.set(0, 1, 0)).normalize(), u = _ccU.crossVectors(r, f);
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, zs = 0, n = 0;
     const each = fn => { for (const F of Fs) { for (const p of F.jp) fn(p); _ccE.copy(F.headNow); _ccE.y += 0.14; fn(_ccE); } };   // joints + the crown
     each(p => { const d = _ccD.subVectors(p, cp), z = Math.max(0.3, d.dot(f)), nx = d.dot(r) / (z * tx), ny = d.dot(u) / (z * ty);
       x0 = Math.min(x0, nx); x1 = Math.max(x1, nx); y0 = Math.min(y0, ny); y1 = Math.max(y1, ny); zs += z; n++; });
-    if (x0 >= -CC_FX && x1 <= CC_FX && y0 >= CC_FB && y1 <= CC_FT) return;
+    if (x0 >= -FX && x1 <= FX && y0 >= CC_FB && y1 <= CC_FT) return;
     const zm = zs / n, cy = (CC_FT + CC_FB) / 2;
-    const sx = x0 < -CC_FX && x1 > CC_FX ? (x0 + x1) / 2 : x0 < -CC_FX ? x0 + CC_FX : x1 > CC_FX ? x1 - CC_FX : 0;
+    const sx = x0 < -FX && x1 > FX ? (x0 + x1) / 2 : x0 < -FX ? x0 + FX : x1 > FX ? x1 - FX : 0;
     const sy = y0 < CC_FB && y1 > CC_FT ? (y0 + y1) / 2 - cy : y0 < CC_FB ? y0 - CC_FB : y1 > CC_FT ? y1 - CC_FT : 0;
     _ccS.copy(r).multiplyScalar(sx * zm * tx).addScaledVector(u, sy * zm * ty); cp.add(_ccS); cl.add(_ccS);
     let back = 0;
     each(p => { const d = _ccD.subVectors(p, cp), z = d.dot(f), yr = d.dot(u);
-      back = Math.max(back, Math.max(Math.abs(d.dot(r)) / (CC_FX * tx), yr > 0 ? yr / (CC_FT * ty) : -yr / (-CC_FB * ty)) - z); });
+      back = Math.max(back, Math.max(Math.abs(d.dot(r)) / (FX * tx), yr > 0 ? yr / (CC_FT * ty) : -yr / (-CC_FB * ty)) - z); });
     cp.addScaledVector(f, -Math.min(back, 3)); cp.y = Math.max(0.4, cp.y);
   }
 }
 /* swing the wanted camera _cp about _cl (k ≥ 1e3 = a scripted move: left alone). down = [winner, loser] in kd / ko / result */
-function camClear(dt, down, fit) {
-  if (fit) ccFit(_cp, _cl, fit);
+function camClear(dt, down, fit, FX) {
+  if (fit) ccFit(_cp, _cl, fit, FX);
   const vis = RINGSET.visible;
   if (!vis && !down) CC.want = 0; else {
     const P = vis ? ccPostsWorld() : [], T = ccTargets(), lim = down ? CC_KO : CC_YAW;
@@ -162,6 +162,7 @@ function camKick(dt) {
 window.__hitFeel = { HITK, SHK, HS_LOG, hitStop };   // debug (R-04): the constants, the shake state, the recent freezes
 function camUpdate(dt) {
   camClock += dt; let k = 4;
+  const rw = resView(dt, camCut || CC.st !== G.state);   // R-09: the result card covers the right — the frame is skewed and narrowed to the space left of it (07c_result.js)
   // debug/screenshots: window.__camHold = { p: [x, y, z], l: [x, y, z] } pins the camera (world metres)
   if (window.__camHold) { const h = window.__camHold; camera.position.set(h.p[0], h.p[1], h.p[2]); camera.lookAt(h.l[0], h.l[1], h.l[2]); camP.copy(camera.position); camL.set(h.l[0], h.l[1], h.l[2]); return; }
   if (NET.guest && NET.started) return netGuestCam(dt, _cp, _cl);   // issue 49: the guest sees the fight from behind his own man
@@ -226,7 +227,7 @@ function camUpdate(dt) {
   const down = st === 'kd' && G.kd ? [G.kd.att, G.kd.def] : (st === 'ko' || st === 'result') && G.loser && G.winner ? [G.winner, G.loser] : null;
   // whole men in the shot: the standing man joins once the push-in on the fall is over (kd: after 1 s; ko: from the two-shot reveal)
   const fit = !down ? null : st === 'result' || (st === 'kd' ? G.t - G.kd.t0 > 1 : G.t - G.koCine > 1.45) ? down : [down[1]];
-  if (k < 1e3 && !window.__camOff && st !== 'menu' && st !== 'rend' && st !== 'talk' && !(st === 'intro' && G.stareT && G.introT >= 0 && G.introT < G.stareT - 0.6)) camClear(dt, down, fit);
+  if (k < 1e3 && !window.__camOff && st !== 'menu' && st !== 'rend' && st !== 'talk' && !(st === 'intro' && G.stareT && G.introT >= 0 && G.introT < G.stareT - 0.6)) camClear(dt, down, fit, rw ? rw.h : CC_FX);
   else CC.yaw = CC.want = 0;
   if (camCut) { camP.copy(_cp); camL.copy(_cl); camCut = false; }
   else { const a = 1 - Math.exp(-dt * k); camP.lerp(_cp, a); camL.lerp(_cl, a); }

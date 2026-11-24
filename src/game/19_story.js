@@ -183,7 +183,7 @@ function storyOut(win) {
   if (G.storyOut) return false;
   G.storyOut = true;
   const lines = win ? ch.outro : ch.outroLose;
-  storyTalk(lines, () => { G.state = 'result'; camCut = true; show('result', true); });
+  storyTalk(lines, () => { G.state = 'result'; camCut = true; resultOpen(); });
   return true;
 }
 /* «Реванш / Дальше» on the result screen (r-again routes here through startFight's dispatch) */
