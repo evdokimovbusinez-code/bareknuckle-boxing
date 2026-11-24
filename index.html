@@ -111,8 +111,9 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 @keyframes pop{0%{opacity:0;transform:scale(.4) rotate(-4deg)}14%{opacity:1;transform:scale(1.12) rotate(1.5deg)}24%{transform:scale(.97) rotate(-.6deg)}34%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
 .pops{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .popn{position:absolute;transform:translate(-50%,-50%);font-family:var(--display);font-weight:900;font-size:clamp(20px,4.5vmin,36px);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.6);animation:fly .8s ease-out forwards;white-space:nowrap}
-.popn.crit{color:var(--gold);font-size:clamp(26px,6vmin,48px)}
-.popn.dodge{color:#9fd0ff;font-size:clamp(16px,3.4vmin,26px);letter-spacing:.06em}
+.popn.crit{color:var(--gold);font-size:clamp(24px,5.4vmin,42px);text-shadow:0 2px 0 rgba(0,0,0,.6),0 0 14px rgba(226,177,74,.4)}
+.popn.ctr{color:#ff6b3d;font-size:clamp(30px,7vmin,56px);text-shadow:0 2px 0 rgba(0,0,0,.65),0 0 18px rgba(255,90,40,.55)}
+.popn.dodge{color:rgba(196,214,232,.6);font-weight:700;font-size:clamp(12px,2.5vmin,17px);letter-spacing:.08em;text-shadow:0 1px 0 rgba(0,0,0,.55)}
 @keyframes fly{0%{opacity:0;transform:translate(-50%,-20%) scale(.5) rotate(-8deg)}18%{opacity:1;transform:translate(-50%,-80%) scale(1.25) rotate(4deg)}35%{transform:translate(-50%,-100%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-190%) scale(.95)}}
 
 /* pad */
@@ -7552,11 +7553,44 @@ const D_SEP = 1.15;
 
 const elMsg = $('msg'), elPops = $('pops');
 function msg(text, cls = '') { elMsg.className = 'msg ' + cls; elMsg.textContent = text; void elMsg.offsetWidth; elMsg.classList.add('show'); }
+/* R-05: captions over the fight without the noise. A caption belongs to the man it is nearest to (world x — the men stand on the
+   x line); at most POP.per live on one man (so ≤ 4 on screen): a new one takes the place of the oldest of its own kind there
+   (a number replaces a number, a word a word) that matters no more than itself, else of the oldest that matters no more than itself,
+   else a new number still replaces the oldest number, anything else is dropped. Priority by class: `dodge` (мимо, блок, уклон,
+   по корпусу, сбил — small and pale) 0, `hit` (a plain damage number) 1, `crit` (events; a power shot's number — gold, bigger) and
+   `ctr` (a counter's number — red-orange, biggest) 2. The same text twice is shown once (the old one goes). A caption that would
+   cover a live one goes under it instead.
+   No caption flies above the bottom of #hud + POP.gap px: the whole flight counts (the `fly` keyframes lift the box's top edge up to
+   1.875 of its height above where it starts — POP.rise). Damage under POP.min is not shown at all (resolveHit). */
+const POP = { per: 2, life: 820, gap: 8, rise: 1.9, min: 3, live: [] };
+const POP_PRIO = { dodge: 0, hit: 1, crit: 2, ctr: 2 };
+const elHud = $('hud');
+function popRemove(p) { const i = POP.live.indexOf(p); if (i >= 0) POP.live.splice(i, 1); p.el.remove(); }
 function popup(pos, text, cls) {
   if (NET.host) netCapturePopup(pos, text, cls);   // issue 49: captions are sent with the next snapshot
+  const who = P1 && P2 && Math.abs(pos.x - P2.group.position.x) < Math.abs(pos.x - P1.group.position.x) ? 1 : 0;
+  const num = /^\d/.test(text), prio = POP_PRIO[cls] != null ? POP_PRIO[cls] : 1;
+  const same = POP.live.find(p => p.el.textContent === text); if (same) popRemove(same);   // «блок пробит» twice = once, the fresh one
+  const mine = POP.live.filter(p => p.who === who);   // oldest first
+  if (mine.length >= POP.per) {
+    const old = mine.find(p => p.num === num && p.prio <= prio) || mine.find(p => p.prio <= prio) || (num && mine.find(p => p.num));
+    if (!old) return;
+    popRemove(old);
+  }
   const v = _v6.copy(pos).project(camera), el = document.createElement('div');
-  el.className = 'popn ' + cls; el.textContent = text; el.style.left = ((v.x * 0.5 + 0.5) * VW).toFixed(0) + 'px'; el.style.top = ((1 - (v.y * 0.5 + 0.5)) * VH - 26).toFixed(0) + 'px';
-  elPops.appendChild(el); setTimeout(() => el.remove(), 820);
+  el.className = 'popn ' + cls; el.textContent = text; elPops.appendChild(el);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  const top = elHud.hidden ? 0 : elHud.offsetTop + elHud.offsetHeight;
+  let x = (v.x * 0.5 + 0.5) * VW, y = Math.max((1 - (v.y * 0.5 + 0.5)) * VH - 26, top + POP.gap + POP.rise * h);
+  x = Math.min(Math.max(x, w * 0.5), VW - w * 0.5);
+  // in flight a box covers about [top − h, top] (keyframe 35 %): if that meets a live caption (either man's — the contact point
+  // is between them), go just under it (only ever down, so the #hud clamp above holds)
+  for (let k = 0, moved = true; moved && k < 4; k++) { moved = false;
+    for (const o of POP.live) if (Math.abs(o.x - x) < (o.w + w) * 0.5 && y > o.y - o.h && y - h < o.y) { y = o.y + h + 2; moved = true; } }
+  y = Math.min(y, VH - h);
+  el.style.left = x.toFixed(0) + 'px'; el.style.top = y.toFixed(0) + 'px';
+  const p = { el, who, num, prio, x, y, w, h }; POP.live.push(p);
+  setTimeout(() => popRemove(p), POP.life);
 }
 const flashEl = $('flash');
 function flash() { flashEl.classList.remove('on'); void flashEl.offsetWidth; flashEl.classList.add('on'); }
@@ -7838,7 +7872,8 @@ function resolveHit(att, name, contact) {
   if (blocked) sfx.block(bforce, breakIt ? 1.8 : 1); else sfx.thud(power, body);   // dull/short on gloves, louder on a break
   if (knux) sfx.knux(power, blocked);   // issue 52: the brass ring over the punch
   EVT.emit('hit', { pos, power, blocked });
-  popup(pos, String(Math.round(dmg)), counter ? 'crit' : 'hit');
+  // R-05: chip damage (< 3, mostly into the guard) has no number; a counter is red and the biggest, a clean power shot gold
+  if (Math.round(dmg) >= POP.min) popup(pos, String(Math.round(dmg)), counter ? 'ctr' : isPow && !blocked ? 'crit' : 'hit');
   // feel it: the screen edge flushes red when you are hit, the phone kicks on what you land and harder on what you take
   if (def === P1 && !blocked) { const h = $('hurt'); if (h) { h.style.setProperty('--k', power); h.classList.remove('on'); void h.offsetWidth; h.classList.add('on'); } }
   try { if (navigator.vibrate) navigator.vibrate(blocked ? 8 : def === P1 ? 25 + 40 * power : 10 + 18 * power); } catch (e) {}

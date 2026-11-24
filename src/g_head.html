@@ -111,8 +111,9 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 @keyframes pop{0%{opacity:0;transform:scale(.4) rotate(-4deg)}14%{opacity:1;transform:scale(1.12) rotate(1.5deg)}24%{transform:scale(.97) rotate(-.6deg)}34%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
 .pops{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .popn{position:absolute;transform:translate(-50%,-50%);font-family:var(--display);font-weight:900;font-size:clamp(20px,4.5vmin,36px);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.6);animation:fly .8s ease-out forwards;white-space:nowrap}
-.popn.crit{color:var(--gold);font-size:clamp(26px,6vmin,48px)}
-.popn.dodge{color:#9fd0ff;font-size:clamp(16px,3.4vmin,26px);letter-spacing:.06em}
+.popn.crit{color:var(--gold);font-size:clamp(24px,5.4vmin,42px);text-shadow:0 2px 0 rgba(0,0,0,.6),0 0 14px rgba(226,177,74,.4)}
+.popn.ctr{color:#ff6b3d;font-size:clamp(30px,7vmin,56px);text-shadow:0 2px 0 rgba(0,0,0,.65),0 0 18px rgba(255,90,40,.55)}
+.popn.dodge{color:rgba(196,214,232,.6);font-weight:700;font-size:clamp(12px,2.5vmin,17px);letter-spacing:.08em;text-shadow:0 1px 0 rgba(0,0,0,.55)}
 @keyframes fly{0%{opacity:0;transform:translate(-50%,-20%) scale(.5) rotate(-8deg)}18%{opacity:1;transform:translate(-50%,-80%) scale(1.25) rotate(4deg)}35%{transform:translate(-50%,-100%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-190%) scale(.95)}}
 
 /* pad */
