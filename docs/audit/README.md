@@ -11,6 +11,9 @@ bash tools/shot.sh /tmp/shots/loc.jpg  js "window.__locs = ['metro']; return awa
 bash tools/shot.sh /tmp/shots/mp.jpg mp
 ```
 
+Дымовой набор (R-01): `bash tools/shot.sh /tmp/shots/s.jpg smoke` — `menu`, `fight`, `modes`, `phone` на 1280×720 и 740×360 touch,
+код ≠ 0 при ошибке в странице или недостигнутом состоянии (`tools/test/smoke.py`).
+
 Сценарий — одно выражение `(async () => { … })()`; кадры сохраняются как `ИМЯ-метка.jpg`, строка `JS RESULT:` — журнал состояний и замеров.
 Бои случайны: кадры от прогона к прогону отличаются.
 
