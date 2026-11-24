@@ -354,6 +354,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .shc .nw{position:absolute;left:3px;top:3px;font:700 8px/1 var(--mono);font-style:normal;letter-spacing:.08em;text-transform:uppercase;background:var(--neon);color:#fff;padding:2px 4px;border-radius:2px;box-shadow:0 1px 3px rgba(0,0,0,.5)}
 .shc .pr small{min-height:0;margin-left:7px;font:700 8.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#8fd49a;vertical-align:1px}
 .shc .pr.no{color:rgba(226,177,74,.6)}
+.sw button em.nw{font:700 7px/1 var(--mono);font-style:normal;letter-spacing:.06em;text-transform:uppercase;background:var(--neon);color:#fff;padding:1px 3px;border-radius:2px;margin-left:4px;vertical-align:middle}
+.sw button.pat{background-size:cover;min-width:34px}
 .sw button.nw{position:relative}.sw button.nw::after{content:'';position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--neon)}
 .sw button.txt.lock{opacity:.7}.sw button.txt.lock::after{content:none}.sw button.txt .pr{font-size:9px;letter-spacing:.04em;opacity:.8;color:var(--gold)}
 .btn:disabled{opacity:.55;cursor:default;box-shadow:none}.btn.pri:disabled{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.2)}
@@ -745,8 +747,10 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           </div>
           <div class="cpane" data-cat="wear" hidden>
             <div class="fld"><span>что</span><div class="sw" id="o-wcat"></div></div>
+            <div class="fld"><span>порядок</span><div class="sw" id="o-wsort"></div></div>
             <div class="fld"><span>модель</span><div class="sw" id="o-wmodel"></div></div>
             <div class="fld"><span>цвет</span><div class="sw" id="o-wcolor"></div></div>
+            <div class="fld"><span>узор</span><div class="sw" id="o-wpat"></div></div>
             <div class="wnote" id="o-wnote"></div>
           </div>
           <div class="cpane" data-cat="hands" hidden>
@@ -774,8 +778,10 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="ptitle"><small>одежда и экипировка</small>Магазин<b class="cash" id="sh-cash"></b></div>
       <div class="pbody">
         <div class="fld"><span>что</span><div class="sw" id="o-scat"></div></div>
+        <div class="fld"><span>порядок</span><div class="sw" id="o-ssort"></div></div>
         <div class="shgrid" id="o-sitems"></div>
         <div class="fld"><span>цвет</span><div class="sw" id="o-scolor"></div></div>
+        <div class="fld"><span>узор</span><div class="sw" id="o-spat"></div></div>
         <div class="wnote" id="o-snote"></div>
       </div>
       <div class="pfoot"><button class="btn" id="shop-back">Назад</button><button class="btn pri" id="sh-buy">Купить</button></div>
@@ -4171,7 +4177,7 @@ function pantsGeo(F, cut) {
   const nv = rings.length * (N + 1), pos = new Float32Array(nv * 6), nrm = new Float32Array(nv * 6), uv = new Float32Array(nv * 4), si = new Uint16Array(nv * 8), sw = new Float32Array(nv * 8), hem = new Float32Array(nv * 4), idx = [];
   rings.forEach((r, k) => {
     const h = r.h, t = sstep(crotch - 5, crotch + 3, h), gap = lerp(0.35, 0, t);
-    const cl = r.lip ? -0.9 : lerp(lerp(1.0, 1.7, sstep(crotch - 10, crotch + 6, h)), 0.55, sstep(top - 9, top - 3.5, h));
+    const cl = r.lip ? -0.9 : lerp(lerp(1.0, 1.7, sstep(crotch - 10, crotch + 6, h)), 0.55, sstep(top - 9, top - 3.5, h)) * (C.tight || 1);   // tight: cycling shorts
     const cx = r.cx, cy = r.cy - C.fwd * sstep(C.hem + 10, C.hem, h), a0 = TAU * jF / N;
     const aF = lerp(a0, Math.atan2(cy - (r.yF - cl * 0.9), cx - gap), t), aB = lerp(a0, Math.atan2(r.yB + cl * 0.9 - cy, cx - gap), t);
     const ang = []; for (let j = 0; j < N; j++) ang.push(j <= jF ? aF * j / jF : j >= jB ? TAU - aB * (N - j) / jF : lerp(aF, TAU - aB, (j - jF) / (jB - jF)));
@@ -4209,7 +4215,7 @@ function heightToNormal(c, k) {
 }
 // colour and normal map of a pair of trousers. u: 0 inseam · 0.15 fly (front midline) · 0.25 front of the leg · 0.5 outseam · 0.75 back · 0.85 seat seam; v: hem → waist
 function pantsTex(b, geo) {
-  const C = PANT_CUTS[b.cut], { top, crotch } = geo.userData, W = 512, H = 1024, X = u => u * W, Y = h => (1 - (h - C.hem) / (top - C.hem)) * H, cm = H / (top - C.hem), jeans = b.cut === 'jeans', sweat = b.cut === 'sweat', st = b.style;
+  const C = PANT_CUTS[b.cut], { top, crotch } = geo.userData, W = 512, H = 1024, X = u => u * W, Y = h => (1 - (h - C.hem) / (top - C.hem)) * H, cm = H / (top - C.hem), jeans = b.cut === 'jeans', sweat = b.cut === 'sweat' || !!C.elastic, st = b.style;
   const path = (g, pts) => { g.beginPath(); pts.forEach(([u, h], i) => i ? g.lineTo(X(u), Y(h)) : g.moveTo(X(u), Y(h))); };
   const map = GEAR['pt_' + b.id] || (GEAR['pt_' + b.id] = canvasTex(W, H, g => {
     const dark = new THREE.Color(b.c).getHSL({}).l < 0.2, thr = jeans ? (dark ? '#6a6b72' : '#c9973f') : dark ? '#3a3b42' : 'rgba(0,0,0,0.45)';
@@ -4217,7 +4223,7 @@ function pantsTex(b, geo) {
     const line = (pts, c, w) => { g.strokeStyle = c; g.lineWidth = w; path(g, pts); g.stroke(); };
     const box = (u0, h1, u1, h0, c) => { g.fillStyle = c; g.fillRect(X(u0), Y(h1), X(u1) - X(u0), Y(h0) - Y(h1)); };
     const fade = (u, h, ru, rh, a, c) => { const gr = g.createRadialGradient(0, 0, 0, 0, 0, 1); gr.addColorStop(0, `rgba(${c || '255,255,255'},${a})`); gr.addColorStop(1, `rgba(${c || '255,255,255'},0)`); g.save(); g.translate(X(u), Y(h)); g.scale(ru * W, rh * cm); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 1, 0, 7); g.fill(); g.restore(); };
-    g.fillStyle = b.c; g.fillRect(0, 0, W, H); if (b.pat) camoPaint(g, W, H, 1.5);
+    g.fillStyle = b.c; g.fillRect(0, 0, W, H); if (b.pat) patPaint(b, g, W, H, 1.5);
     if (jeans) for (let y = -W; y < H; y += 3) { g.strokeStyle = `rgba(${rr() < 0.5 ? '255,255,255' : '0,0,0'},${0.02 + rr() * 0.035})`; g.lineWidth = 1.1; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y + W); g.stroke(); }
     if (st === 'cargo') { g.strokeStyle = 'rgba(255,255,255,0.05)'; g.lineWidth = 1; for (let x = 0; x < W; x += 9) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y = 0; y < H; y += 9) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } }
     if (st === 'bball') { g.fillStyle = 'rgba(255,255,255,0.05)'; for (let y = 0; y < H; y += 6) for (let x = (y / 6 % 2) * 3; x < W; x += 6) g.fillRect(x, y, 1.6, 1.6); }
@@ -4256,8 +4262,9 @@ function pantsTex(b, geo) {
       if (st === 'cargo') { const a = C.hem + 5, t2 = C.hem + 22; box(0.39, t2, 0.61, a, 'rgba(0,0,0,0.08)'); stitch([[0.39, t2], [0.61, t2], [0.61, a], [0.39, a], [0.39, t2]]); box(0.385, t2 + 0.6, 0.615, t2 - 5, 'rgba(0,0,0,0.13)'); stitch([[0.385, t2 - 5], [0.615, t2 - 5]]);
         line([[0.5, t2 - 5], [0.5, a]], 'rgba(0,0,0,0.35)', 2); g.fillStyle = '#1c1c1a'; g.beginPath(); g.arc(X(0.5), Y(t2 - 3), 3.5, 0, 7); g.fill(); }
     }
+    if (C.deco || b.rip) pantsDeco(g, b, C, { X, Y, cm, box, line, stitch, top, crotch, W, H });   // 04l_wardrobe3.js
   }));
-  const nk = 'pn_' + b.cut + (st || ''), nmap = GEAR[nk] || (GEAR[nk] = (() => {
+  const nk = 'pn_' + b.cut + (st || '') + (b.rip ? 'r' : ''), nmap = GEAR[nk] || (GEAR[nk] = (() => {
     const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.fillStyle = '#808080'; g.fillRect(0, 0, W, H); g.lineCap = 'round'; g.lineJoin = 'round';
     const ridge = (pts, w, a, dk) => { for (const f of [1, 0.6, 0.3]) { g.strokeStyle = `rgba(${dk ? '0,0,0' : '255,255,255'},${a})`; g.lineWidth = w * f; path(g, pts); g.stroke(); } };
     // an accordion fold around the leg: strongest at `u0`, wavy
@@ -4276,12 +4283,13 @@ function pantsTex(b, geo) {
     else { ridge([[0, top - 2.2], [1, top - 2.2]], 2.6 * cm, 0.16); ridge([[0, top - 4.3], [1, top - 4.3]], 4, 0.3, 1); for (const o of [0, 0.7]) ridge([[0.29, top - 4.2 - o], [0.3, top - 9 - o], [0.35, top - 12 - o], [0.5, top - 13.5 - o]], 3, 0.2, 1);
       ridge([[0.6, top - 14], [0.79, top - 14], [0.785, top - 25], [0.695, top - 28], [0.605, top - 25], [0.6, top - 14]], 4, 0.2, 1); ridge([[0.5, top - 8.8], [0.85, top - 11.8]], 4, 0.2, 1);
       if (st === 'cargo') { const a = C.hem + 5, t2 = C.hem + 22; g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(X(0.39), Y(t2), 0.22 * W, (t2 - a) * cm); ridge([[0.39, t2], [0.61, t2], [0.61, a], [0.39, a], [0.39, t2]], 5, 0.25, 1); ridge([[0.385, t2 - 5], [0.615, t2 - 5]], 5, 0.3, 1); } }
+    if (b.rip) pantsDecoN(g, b, C, { ridge, X, Y, top });
     return heightToNormal(c, jeans ? 5 : 6);
   })());
   return { map, nmap };
 }
 function pantsMesh(F, b) {
-  const geo = pantsGeo(F, b.cut), { map, nmap } = pantsTex(b, geo), jeans = b.cut === 'jeans', shiny = b.style === 'bball';
+  const geo = pantsGeo(F, b.cut), { map, nmap } = pantsTex(b, geo), jeans = b.cut === 'jeans', shiny = b.style === 'bball' || !!PANT_CUTS[b.cut].shiny;
   const mat = new THREE.MeshPhysicalMaterial({ map, normalMap: nmap, normalScale: new THREE.Vector2(jeans ? 0.6 : 0.9, jeans ? 0.6 : 0.9), roughness: shiny ? 0.55 : jeans ? 0.82 : 0.93, sheen: shiny ? 0.6 : 0.3, sheenRoughness: shiny ? 0.4 : 0.8, sheenColor: new THREE.Color(b.c).multiplyScalar(1.4), side: THREE.DoubleSide, envMapIntensity: 0.5 });
   const U = { uHemL: { value: new V3() }, uHemR: { value: new V3() } };
   mat.onBeforeCompile = s => { Object.assign(s.uniforms, U);
@@ -4346,7 +4354,7 @@ function shoeGeo(F, top) {
 function shoeTex(f) {
   return GEAR['st_' + f.id] || (GEAR['st_' + f.id] = canvasTex(512, 512, (g, W) => {
     const lace = f.lace || '#f2f0ea', sole = f.sole, dk = 'rgba(0,0,0,0.35)';
-    g.fillStyle = f.c; g.fillRect(0, 0, W, W); if (f.pat) camoPaint(g, W, W, 0.8);
+    g.fillStyle = f.c; g.fillRect(0, 0, W, W); if (f.pat) patPaint(f, g, W, W, 0.8);
     for (let i = 0; i < 6000; i++) { g.fillStyle = `rgba(${rr() < 0.5 ? '0,0,0' : '255,255,255'},${rr() * (f.canvas ? 0.09 : 0.04)})`; g.fillRect(rr() * W, rr() * W, 1.6, 1.6); }
     // the foot: y 0…256 (sole · inner side · top 128 · outer side · sole)
     g.fillStyle = sole; g.fillRect(0, 0, W, 60); g.fillRect(0, 196, W, 60); g.fillStyle = dk; g.fillRect(0, 59, W, 2); g.fillRect(0, 195, W, 2);
@@ -4366,6 +4374,7 @@ function shoeTex(f) {
     g.fillStyle = f.tab || 'rgba(0,0,0,0.25)'; g.fillRect(366, 256, 36, 256); g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 256, W, 9);
     if (f.patch) for (const x of [0, W]) { g.fillStyle = f.patch; g.beginPath(); g.arc(x, 330, 26, 0, 7); g.fill(); g.strokeStyle = f.c; g.lineWidth = 3; g.beginPath(); g.arc(x, 330, 19, 0, 7); g.stroke(); }
     if (f.boot) { g.fillStyle = f.boot; g.fillRect(236, 256, 40, 256); }
+    if (f.deco) shoeDeco(g, f, W);   // 04l_wardrobe3.js: high tops, combat boots, slides over socks
   }));
 }
 function shoeMesh(F, f) {
@@ -4462,7 +4471,9 @@ function itemVar(cat, sel) {
   let it = ITEMS[sel.id]; if (!it || it.cat !== cat) { if (cat !== 'bottom') return { mid: 'none', key: null }; it = ITEMS.shorts; }
   const col = wearColor(it, sel.color || it.colors[0]), v = { ...it.model, ...col, mid: it.id, colId: col.id, brand: it.brand, item: it };
   if (it.model.auto && !(it.nat && it.nat[col.id])) v.stripe = wLum(col.c) > 0.3 ? '#55575e' : '#e8e6e0';
-  v.key = v.id = it.id + '_' + col.id; return v;
+  const pt = !col.pat && wearPatOk(it) && sel.pat; if (pt) { if (pt === 'solid') delete v.pat; else v.pat = pt; }   // the pattern chosen for it (04l_wardrobe3.js); a camo colour wins
+  if (!v.c2) v.c2 = wLum(v.c) > 0.3 ? '#1b1c20' : '#ecebe6';   // the second colour: stripes, trims, numbers
+  v.key = v.id = it.id + '_' + col.id + (v.pat && v.pat !== it.model.pat && !col.pat ? '_' + v.pat : pt === 'solid' && it.model.pat ? '_solid' : ''); return v;
 }
 function wearShorts(v) {
   const S = SHORTS_LOOKS.find(x => x.id === v.colId && x.main === v.c); if (S) return S;
@@ -4557,10 +4568,12 @@ function hatGeo(F, kind) {
   const rot = (P.visor || 0) * D, az = u => (u - 0.5) * 2 * Math.PI + rot;   // u = 0.5: the front of the hat
   const surf = (a, v, o) => { dirAY(a, P.lo(fold(a)), e); o.copy(e).lerp(up, v).normalize(); return o.multiplyScalar(hr.s(o) + P.gap + P.th(fold(a), v)); };
   const uvs = (g, u0, v0, ku, kv) => { const t = g.attributes.uv; for (let i = 0; i < t.count; i++) t.setXY(i, u0 + t.getX(i) * ku, v0 + t.getY(i) * kv); return g; };
-  parts.push(uvs(gridGeo((u, v, o) => surf(az(u), v, o), 56, 14, { c: O }), 0, 0, 1, 0.75));
+  const vm = P.vmax || 1;   // a band (headband) covers only the lower part of the crown
+  parts.push(uvs(gridGeo((u, v, o) => surf(az(u), v * vm, o), 56, P.vmax ? 4 : 14, { c: O }), 0, 0, 1, 0.75));
+  if (P.brim) parts.push(uvs(gridGeo((u, v, o) => { surf(az(u), 0.02, o); const r = Math.hypot(o.x, o.z) || 1; return o.set(o.x * (1 + v * P.brim / r), o.y - v * P.brim * 0.42 - 0.2, o.z * (1 + v * P.brim / r)); }, 56, 4, { c: new V3(0, 30, 0) }), 0, 0.76, 1, 0.24));   // a bucket hat's brim, all round, sloping down
   if (P.visor !== undefined) {   // the peak: the front edge carried forward, rounded, a little bent down at the sides
     const f = new V3(Math.sin(rot), -0.2, Math.cos(rot)).normalize();
-    parts.push(uvs(gridGeo((u, v, o) => { const s = 2 * u - 1; surf(rot + s * 62 * D, 0.03, o); return o.addScaledVector(f, v * 7.4 * Math.sqrt(Math.max(0, 1 - s * s * 0.86)) - 0.3).setY(o.y - v * (0.5 + 0.9 * s * s)); }, 20, 6, { c: new V3(0, -30, 0), inv: true }), 0, 0.76, 1, 0.24));
+    parts.push(uvs(gridGeo((u, v, o) => { const s = 2 * u - 1; surf(rot + s * 62 * D, 0.03, o); return o.addScaledVector(f, v * 7.4 * Math.sqrt(Math.max(0, 1 - s * s * 0.86)) - 0.3).setY(o.y - v * (0.5 + (P.flat ? 0 : 0.9) * s * s)); }, 20, 6, { c: new V3(0, -30, 0), inv: true }), 0, 0.76, 1, 0.24));
     parts.push(uvs(gridGeo((u, v, o) => o.set(Math.sin(u * 6.283) * Math.sin(v * 1.2) * 0.75, hr.s(up) + P.gap + 0.1 + Math.cos(v * 1.2) * 0.35, Math.cos(u * 6.283) * Math.sin(v * 1.2) * 0.75), 8, 3, { c: new V3(0, 5, 0) }), 0.02, 0.6, 0.01, 0.01));   // the button
   }
   if (P.knot) {   // the knot at the back and its two ends
@@ -4573,12 +4586,13 @@ function hatGeo(F, kind) {
 // the hat's texture, colour baked in: crown in the lower 3/4 (u = 0.5 is its front), the peak in the top quarter
 function hatTex(v) {
   return canvasTex(512, 256, (g, W, H) => {
-    const ink = wInk(v.c), kind = v.hat; g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) camoPaint(g, W, H, 0.6);
+    const ink = wInk(v.c), kind = v.hat; g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) patPaint(v, g, W, H, 0.6);
     for (let i = 0; i < 5000; i++) { g.fillStyle = `rgba(${rr() < 0.5 ? '0,0,0' : '255,255,255'},${rr() * 0.07})`; g.fillRect(rr() * W, rr() * H, 1.5, 1.5); }
     const Y = t => H - t * H * 0.75;   // crown: t = 0 the edge … 1 the top
     if (kind === 'beanie') { for (let x = 0; x < W; x += 6) { g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(x, 0, 2, H); g.fillStyle = 'rgba(255,255,255,0.07)'; g.fillRect(x + 3, 0, 1.5, H); } g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, Y(0.27), W, 3);
       if (v.brand) { g.fillStyle = ink; g.fillRect(W / 2 - 30, Y(0.22), 60, Y(0.05) - Y(0.22)); brandLogo(g, v.brand, W / 2, (Y(0.22) + Y(0.05)) / 2, 30, v.c, 'mark'); } }
     else if (kind === 'bandana') { g.fillStyle = ink; for (let y = 8; y < H; y += 22) for (let x = (y % 44 ? 0 : 11); x < W; x += 22) { g.globalAlpha = 0.75; g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill(); g.globalAlpha = 0.5; g.beginPath(); g.ellipse(x + 9, y + 9, 5, 2, 0.8, 0, 7); g.stroke(); } g.globalAlpha = 1; g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, Y(0.04), W, 3); }
+    else if (HATS[kind].deco) hatDeco(g, v, W, H, Y, ink);   // 04l_wardrobe3.js: balaclava, bucket hat, headband
     else { g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 2; for (let k = 0; k < 6; k++) { const x = (k + 0.5) * W / 6 + (k < 3 ? -1 : 1) * 0; g.beginPath(); g.moveTo(x, Y(0)); g.lineTo(x, Y(1)); g.stroke(); } g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, Y(0.035), W, 2.5);
       g.fillStyle = v.c; g.fillRect(W / 2 - 38, Y(0.5), 76, Y(0.08) - Y(0.5)); if (v.brand) brandLogo(g, v.brand, W / 2, Y(0.3), 70, ink, 'stack');
       g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, 0, W, H * 0.24); g.strokeStyle = 'rgba(255,255,255,0.14)'; g.lineWidth = 1.2; for (const o of [10, 16, 22]) { g.beginPath(); g.moveTo(0, H * 0.24 - o * 2); g.lineTo(W, H * 0.24 - o * 2); g.stroke(); } }
@@ -4697,7 +4711,7 @@ function wearDress(F, L) {
   const bm = wearSlot(F, 'belt', bl.buckle && bt.belt ? bl.mid + bt.cut : null, () => beltMesh(F, bt.cut, bl)); if (bm) { bm.material.color.set(bl.c); bm.userData = S.bottom.m.userData; }
   // head and eyes: rigid, in the head frame
   const G2 = F.gear, Wr = G2.wear || (G2.wear = {});
-  for (const [cat, v, make] of [['head', W.head, () => new THREE.Mesh(hatGeo(F, W.head.hat), new THREE.MeshPhysicalMaterial({ map: hatTex(W.head), roughness: 0.92, sheen: 0.3, sheenRoughness: 0.8, side: THREE.DoubleSide, envMapIntensity: 0.5 }))],
+  for (const [cat, v, make] of [['head', W.head, () => new THREE.Mesh(hatGeo(F, W.head.hat), new THREE.MeshPhysicalMaterial({ map: hatTex(W.head), roughness: 0.92, sheen: 0.3, sheenRoughness: 0.8, side: THREE.DoubleSide, envMapIntensity: 0.5, alphaTest: HATS[W.head.hat].hole ? 0.5 : 0 }))],   // (a balaclava's eye slit is cut by alpha)
     ['eyes', W.eyes, () => new THREE.Mesh(glassGeo(F, W.eyes).all, glassMat(W.eyes))]]) {
     const cur = Wr[cat]; if (cur && cur.key === v.key) continue;
     if (cur) { wearBack(cur); scene.remove(cur.m); if (cur.m.material.map !== GEAR.t_crack) cur.m.material.map.dispose(); cur.m.material.dispose(); Wr[cat] = null; }
@@ -4782,13 +4796,16 @@ window.__wear = { ITEMS, WCOL, BRANDS, hit: (who, power = 1) => { const F = who 
 function wearUI() {
   const cat = UI.wcat || (UI.wcat = 'top'), sel = () => wearGet(LOOK, cat), none = WNONE[cat];
   swatches('o-wcat', WCATS.map(c => ({ id: c, label: WCAT_LABEL[c] })), () => cat, v => { UI.wcat = v; wearUI(); if (UI.scr === 'creator') setView(v === 'head' || v === 'eyes' ? VIEW_FACE : VIEW_FULL); }, true, true);
-  const items = wearItems(cat), list = [...(none ? [{ id: 'none', label: none }] : []), ...items.map(i => ({ id: i.id, label: i.label }))];
+  swatches('o-wsort', WSORT, () => UI.wsort || 'all', v => { UI.wsort = v; setTimeout(wearUI, 0); }, true, true);   // order: as listed / new first / cheapest first (04l_wardrobe3.js)
+  const items = wearSort(wearItems(cat), UI.wsort), list = [...(none ? [{ id: 'none', label: none }] : []), ...items.map(i => ({ id: i.id, label: i.label }))];
   swatches('o-wmodel', list, () => sel().id, v => { if (v !== 'none' && !itemOwned(v)) { setTimeout(() => { wearUI(); shopOpen(cat, v); }, 0); return; }   // not owned: the shop opens on it
     LOOK[cat] = v === 'none' ? { id: 'none' } : { id: v, color: ITEMS[v].colors[0] }; setTimeout(wearUI, 0); }, true);
   [...$('o-wmodel').children].forEach((b, i) => { const it = ITEMS[list[i].id]; if (it && !itemOwned(it.id)) { b.classList.add('lock'); b.title = it.reward ? 'награда: ' + it.reward + '-я победа в карьере' : 'купить в магазине'; const s = document.createElement('small'); s.className = 'pr'; s.textContent = it.reward ? '🔒 бой ' + it.reward : '🔒 ' + cash(it.price); b.append(s); }
-    if (it && it.brand) { const im = document.createElement('img'); im.src = brandIcon(it.brand); im.alt = ''; b.prepend(im); const s = document.createElement('small'); s.textContent = it.brand; b.append(s); } });
+    if (it && it.brand) { const im = document.createElement('img'); im.src = brandIcon(it.brand); im.alt = ''; b.prepend(im); const s = document.createElement('small'); s.textContent = it.brand; b.append(s); }
+    if (it && wearFresh(it)) { const n = document.createElement('em'); n.className = 'nw'; n.textContent = 'новое'; b.append(n); } });
   const it = ITEMS[sel().id], cols = it && it.cat === cat ? wearColors(it).map(id => { const c = wearColor(it, id); return { id, c: c.c, label: c.label || id, pat: c.pat }; }) : [];
-  swatches('o-wcolor', cols, () => sel().color || (it && it.colors[0]), v => { LOOK[cat] = { id: it.id, color: v }; });
+  swatches('o-wcolor', cols, () => sel().color || (it && it.colors[0]), v => { LOOK[cat] = { ...sel(), id: it.id, color: v }; });
+  wearPatRow('o-wpat', it && it.cat === cat ? it : null, sel, v => { LOOK[cat] = { ...sel(), pat: v }; });
   [...$('o-wcolor').children].forEach((b, i) => { b.title = cols[i].label; if (cols[i].pat) b.style.backgroundImage = `url(${GEAR.camoUrl || (GEAR.camoUrl = (() => { const c = document.createElement('canvas'); c.width = c.height = 48; camoPaint(c.getContext('2d'), 48, 48, 0.35); return c.toDataURL(); })())})`; if (it && i === it.colors.length - 1) b.style.marginRight = '10px'; });
   $('o-wnote').textContent = !it || it.cat !== cat ? '' : (it.brand ? it.brand + ' · ' : '') + (cat === 'belt' && !itemVar('bottom', wearGet(LOOK, 'bottom')).belt ? 'ремень виден на джинсах и карго' : itemTag(it));
 }
@@ -4897,11 +4914,12 @@ function topGeo(F, cut) {
   const T1 = T0.filter(i => { const z = P[i + 2] - zC; return z < 0 || Math.atan2(z, Math.hypot(P[i], P[i + 1] - cyC)) < eC(azOf(P[i], P[i + 1])) + 0.03; });   // (nothing above the collar: the neck stays out of the outline)
   // —— torso rows: [{ p, w } × N], v, hem sway ——
   const dirs = []; for (let j = 0; j < N; j++) { const a = TAU * j / N; dirs.push([-Math.cos(a), -Math.sin(a), a]); }   // column 0 = his right side, N/4 = front, N/2 = left, 3N/4 = back
-  const n = Math.ceil((zC - C.hem) / 3), VS = zC - C.hem + LD, rows = [], cw1 = Math.cos(0.16), cw2 = Math.cos(0.12);
+  const n = Math.ceil((zC - C.hem) / (C.quilt ? 1.5 : 3)), VS = zC - C.hem + LD, rows = [], cw1 = Math.cos(0.16), cw2 = Math.cos(0.12);
   const cyl = []; for (let k = 0; k <= n; k++) { const h = C.hem + (zC - C.hem) * k / n, cy = lerp(cyAt(h), cyC, sstep(zC - 14, zC, h)), W = [], env = dirs.map(d => { const m = new Map(); W.push(m); return cone(T1, 0, cy, h, d[0], d[1], 0, cw1, m); }); cyl.push({ h, cy, env, W }); }
   const Rch = dirs.map((d, j) => Math.max(...cyl.filter(r => r.h > 114 && r.h < 128.5).map(r => r.env[j])));   // the chest proper, below the armpits (with the shoulders in it the trunk was a barrel)
   for (const r of cyl) { const clh = lerp(lerp(C.cl, Math.max(C.cl, 2.8), sstep(GEAR.top + 7, GEAR.top + 1, r.h)), 4.4, sstep(GEAR.top - 3, GEAR.top - 9, r.h)) * (C.slim || 1),   /* (over the trunks: their cloth is baggy below the waistband) */ band = C.band && r.h < C.hem + C.band + 0.5;
-    r.rad = sm(sm(r.env.map((e, j) => (band ? e + clh : Math.max(e + clh, (Rch[j] + C.cl) * lerp(C.fit, 1, sstep(C.hem, zC - 6, r.h))))))); }
+    r.rad = sm(sm(r.env.map((e, j) => (band ? e + clh : Math.max(e + clh, (Rch[j] + C.cl) * lerp(C.fit, 1, sstep(C.hem, zC - 6, r.h)))))));
+    if (C.quilt) { const f = ((r.h - C.hem) / C.quilt) % 1; r.rad = r.rad.map(x => x + 1.3 * Math.pow(Math.sin(Math.PI * f), 0.7) - 0.6); } }   // a puffer's baffles (04l_wardrobe3.js)
   cyl.forEach((r, k) => { const mk = dr => dirs.map((d, j) => ({ p: [d[0] * (r.rad[j] - dr), r.cy + d[1] * (r.rad[j] - dr), r.h + dr * 0.7], w: top4(r.W[j]) })), sw = Math.pow(sstep(C.hem + 18, C.hem, r.h), 1.5) * (C.band ? 0.5 : 1);
     if (!k) rows.push({ pts: mk(1), v: 0, sw }); rows.push({ pts: mk(0), v: 0.6 * (r.h - C.hem) / VS, sw }); });
   const topR = cyl[n], ecj = dirs.map(d => eC(d[2])), ray = (d, e) => [d[0] * Math.cos(e), d[1] * Math.cos(e), Math.sin(e)];
@@ -4982,12 +5000,12 @@ function topGeo(F, cut) {
       const wob = 0.4 * Math.sin(u * 5.3 + v * 7) * Math.sin(v * 11 + u * 2) * g * (1 - rim);
       return { a: B + u * cr(Ks, v), k: cr(Kk, v), off: lerp(-0.5, cr(Ko, v) + wob, gg), oh: cr(Kh, v) * fr * rim, oz: cr(Kz, v) * fr - 1.2 * g * sstep(0.5, 0.1, v) * sstep(0, 0.1, v), s2: gg * lerp(1, 0.3, sstep(0.3, 0.9, v)) }; }, [0.64, 0.64, 0.97, 0.98]);
     // the cords: thin tubes from the eyelets down the chest, with a metal tip
-    for (const sg of [-1, 1]) { const a = HP + sg * 0.3, NC = 12, rad = 0.33, base = pos.length / 3;
+    if (C.cords !== 0) for (const sg of [-1, 1]) { const a = HP + sg * 0.3, NC = 12, rad = 0.33, base = pos.length / 3;
       for (let i = 0; i <= NC; i++) { const t = i / NC, q = surf(a + sg * 0.05 * t, drop(a, Kc - 1.2, (sg > 0 ? 21 : 18.5) * t), 0.8 * sstep(0, 0.15, t) + rad), tx = [-q.n[1], q.n[0]], tl = Math.hypot(tx[0], tx[1]) || 1, r2 = rad * (t > 0.86 ? 1.3 : 1); let f = 0;
         for (let j = 0; j <= 5; j++) { const ph = TAU * j / 5, c = Math.cos(ph) * r2, sn = Math.sin(ph) * r2 / tl, vi = add([q.p[0] + q.n[0] * c + tx[0] * sn, q.p[1] + q.n[1] * c + tx[1] * sn, q.p[2] + q.n[2] * c], 0.979 + 0.016 * j / 5, lerp(0.98, 0.64, t), q.w, 0, 0.85 * Math.pow(t, 1.5), 50); if (!j) f = vi; else if (j === 5) seams.push([f, vi]); } }
       quads(base, NC + 1, 6); }
     // the kangaroo pocket: a second layer over the belly (it takes the torso's own part of the texture), tucked under at its border
-    patch(18, 9, (u, v) => { const W = v < 0.476 ? 0.85 : lerp(0.85, 0.63, (v - 0.476) / 0.524), e = edge(u, v, 0.14, 0.12);
+    if (C.pocket !== 0) patch(18, 9, (u, v) => { const W = v < 0.476 ? 0.85 : lerp(0.85, 0.63, (v - 0.476) / 0.524), e = edge(u, v, 0.14, 0.12);
       return { a: HP + u * W, k: kOf(lerp(98, 119, v)), off: lerp(-0.3, 0.55 + 0.55 * (1 - u * u) * Math.pow(Math.sin(Math.PI * v), 0.7), e) }; });
   }
   if (C.open) {
@@ -5040,7 +5058,7 @@ function topTex(v, geo) {
   const map = GEAR['tt_' + v.key] || (GEAR['tt_' + v.key] = canvasTex(W, H, g => {
     const dark = wLum(v.c) < 0.3, thr = dark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.3)', ink = wInk(v.c);
     const line = (pts, c, w) => { g.strokeStyle = c; g.lineWidth = w; path(g, pts); g.stroke(); }, stitch = pts => { g.setLineDash([5, 3.5]); line(pts, thr, 1.6); g.setLineDash([]); };
-    g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) camoPaint(g, W, H, 1.5);
+    g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) patPaint(v, g, W, H, 1.5);
     for (let i = 0; i < 26000; i++) { g.fillStyle = `rgba(${rr() < 0.5 ? '0,0,0' : '255,255,255'},${rr() * (fleece ? 0.12 : 0.05)})`; g.fillRect(rr() * W, rr() * H, 1.6, 1.6); }
     if (leather) for (let i = 0; i < 260; i++) { const x = rr() * W, y = rr() * H, r = 14 + rr() * 60, gr = g.createRadialGradient(x, y, 0, x, y, r), c = rr() < 0.5 ? '255,255,255' : '0,0,0'; gr.addColorStop(0, `rgba(${c},${0.02 + rr() * 0.04})`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }   // the hide is uneven
     if (C.fab === 'rib') ribs(g, 0, y6, W, H, 0.1);
@@ -5067,6 +5085,7 @@ function topTex(v, geo) {
       stitch([[X(0.787), Y(0.64)], [X(0.787), Y(0.98)]]); stitch([[X(0.775), Y(0.64)], [X(0.775), Y(0.98)]]);   // the lapel's free edge
       g.fillStyle = '#b9bcc4'; g.beginPath(); g.arc(X(0.755), Y(0.9), 7, 0, 7); g.fill(); g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.arc(X(0.755), Y(0.9), 3, 0, 7); g.fill();   // its snap
       for (const o of [0, 7]) stitch([[X(0.816) + o, Y(0.66)], [X(0.816) + o, Y(0.955) + o], [X(0.964) - o, Y(0.955) + o], [X(0.964) - o, Y(0.66)]]); }
+    if (C.deco || v.num) topDeco(g, v, C, D, { X, Y, TV, XS, W, H, line, stitch, ySl, ySh, yR, y6, ink, dark });   // 04l_wardrobe3.js: plackets, zips, stripes, numbers, quilting
     if (v.decal && v.brand) { const cmx = W / D.circ; for (const [k, u0] of [['f', 0.25], ['b', 0.75]]) { const d = v.decal[k]; if (d) brandLogo(g, v.brand, X(u0) + d[0] * cmx, Y(TV(GEAR.neck - d[1])), d[2] * cmx, ink, d[2] < 12 ? 'mark' : 'stack'); } }
     if (C.fab === 'mesh') { g.globalCompositeOperation = 'destination-out'; g.fillStyle = '#000'; const y0 = yR + 5, y1 = Y(TV(C.hem + 2.4)); let o = 0; for (let y = y0; y < y1; y += 8.5, o ^= 1) for (let x = o * 5; x < W; x += 10) { g.beginPath(); g.arc(x, y, 3.1, 0, 7); g.fill(); } g.globalCompositeOperation = 'source-over'; }
   }));
@@ -5100,6 +5119,7 @@ function topTex(v, geo) {
       for (let y = ySl; y < ySh; y += 5) { g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 2; g.beginPath(); g.moveTo(X(0.975), y); g.lineTo(W, y + 4); g.stroke(); } }
     if (leather) { for (const sm of seams) ridge(sm, 6, 0.3, 1); for (const z of zips) { ridge(z, 12, 0.3, 1); ridge(z, 4, 0.5); }
       ridge([[X(0.787), Y(0.64)], [X(0.787), Y(0.98)]], 4, 0.3, 1); ridge([[X(0.816), Y(0.66)], [X(0.816), Y(0.955)], [X(0.964), Y(0.955)], [X(0.964), Y(0.66)]], 4, 0.3, 1); }
+    if (C.deco) topDecoN(g, C, D, { X, Y, TV, XS, W, H, ridge, ySl, ySh, yR });
     return heightToNormal(c, 6);
   })());
   return { map, nmap };
@@ -5115,7 +5135,7 @@ function vestTex(v) {
   const vel = { x0: PX(RF, 0.19), x1: PX(RF, 0.81), y0: PY(RF, 0.76), y1: PY(RF, 0.56) }, velB = { x0: PX(RB, 0.3), x1: PX(RB, 0.7), y0: PY(RB, 0.74), y1: PY(RB, 0.52) }, drag = { x0: PX(RB, 0.35), x1: PX(RB, 0.65), y0: PY(RB, 0.93), y1: PY(RB, 0.84) };
   const map = GEAR['tt_' + v.key] || (GEAR['tt_' + v.key] = canvasTex(W, H, g => {
     const dk = a => `rgba(0,0,0,${a})`, lt = a => `rgba(255,255,255,${a})`, lite = wLum(v.c) > 0.3, thr = lite ? dk(0.35) : lt(0.14);
-    g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) camoPaint(g, W, H, 1.2);
+    g.fillStyle = v.c; g.fillRect(0, 0, W, H); if (v.pat) patPaint(v, g, W, H, 1.2);
     for (let i = 0; i < 30000; i++) { g.fillStyle = (rr() < 0.5 ? dk : lt)(rr() * 0.07); g.fillRect(rr() * W, rr() * H, 2, 1.2); }
     g.strokeStyle = dk(0.05); g.lineWidth = 1; for (let x = -H; x < W; x += 4) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + H, H); g.stroke(); }   // the weave
     const rect = (q, c) => { g.fillStyle = c; g.fillRect(q.x0, q.y0, q.x1 - q.x0, q.y1 - q.y0); }, frame = (q, c, w, d = 0) => { g.strokeStyle = c; g.lineWidth = w; g.strokeRect(q.x0 + d, q.y0 + d, q.x1 - q.x0 - 2 * d, q.y1 - q.y0 - 2 * d); };
@@ -5148,9 +5168,9 @@ function vestTex(v) {
 }
 function topMesh(F, v, host, U0) {
   const geo = topGeo(F, v.cut), { map, nmap, ao } = topTex(v, geo), C = TOP_CUTS[v.cut], fl = C.fab === 'fleece', le = C.fab === 'leather', ns = geo.userData.hand || le ? 1 : fl ? 1.1 : 0.85;   // a baked map is drawn at its own strength
-  const mat = new THREE.MeshPhysicalMaterial({ map, normalMap: nmap, normalScale: new THREE.Vector2(ns, ns), aoMap: ao || null, roughness: le ? 0.5 : fl ? 0.96 : 0.9, sheen: le ? 0 : fl ? 0.45 : C.rig ? 0.1 : 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color(v.c).multiplyScalar(1.3),
-    clearcoat: le ? 0.3 : 0, clearcoatRoughness: 0.42, side: THREE.DoubleSide, envMapIntensity: le ? 0.9 : 0.5, alphaTest: C.fab === 'mesh' ? 0.5 : 0 });   // leather: a waxed, slightly glossy hide (a clear coat over a rougher base)
-  const U = U0 || { uSwA: { value: new V3() }, uSwB: { value: new V3() } }, zip = C.open ? 1 : 0;
+  const sy = FAB_GLOSS[C.fab], mat = new THREE.MeshPhysicalMaterial({ map, normalMap: nmap, normalScale: new THREE.Vector2(ns, ns), aoMap: ao || null, roughness: sy ? sy[0] : le ? 0.5 : fl ? 0.96 : 0.9, sheen: sy ? sy[1] : le ? 0 : fl ? 0.45 : C.rig ? 0.1 : 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color(v.c).multiplyScalar(1.3),
+    clearcoat: sy ? sy[2] : le ? 0.3 : 0, clearcoatRoughness: 0.42, side: THREE.DoubleSide, envMapIntensity: le ? 0.9 : 0.5, alphaTest: C.fab === 'mesh' ? 0.5 : 0 });   // leather: a waxed, slightly glossy hide (a clear coat over a rougher base)
+  const U = U0 || { uSwA: { value: new V3() }, uSwB: { value: new V3() } }, zip = C.open && !C.btn ? 1 : 0;   // (a shirt's open front has buttons, not teeth)
   mat.onBeforeCompile = s => { Object.assign(s.uniforms, U);
     s.vertexShader = 'attribute vec2 aSw; attribute float aCut; varying float vCut; varying float vZc; uniform vec3 uSwA; uniform vec3 uSwB;\n' + s.vertexShader.replace('#include <skinning_vertex>', '#include <skinning_vertex>\n transformed += aSw.x * uSwA + aSw.y * uSwB; vCut = aCut; vZc = position.z;');
     s.fragmentShader = 'varying float vCut; varying float vZc;\n' + s.fragmentShader.replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n if ( vCut < 0.0 ) discard;')
@@ -6095,6 +6115,266 @@ function batonOff(F, out) {
 }
 const _batonK = new V3();
 const batonArm = (F, n) => !!(F.gear && F.gear.baton) && PUNCH[n] && PUNCH[n].arm === BATON.arm;
+/* ───────── wardrobe ×3 (issue 84): more cuts, a pattern for any cloth, sort and «новое» ─────────
+   Everything here reuses the generators of 04f_tops.js (topGeo / topTex), 04d_street.js (pantsGeo / pantsTex / shoeGeo / shoeTex) and
+   04e_wardrobe.js (hatGeo / hatTex): a new cut is a row of parameters, its look is a `deco` painter called from those textures.
+   · tops: polo, raglan long sleeve, open flannel shirt over a tee (btn: buttons, not a zip), track jacket, bomber, windbreaker with a hood,
+     puffer vest (quilt: baffles bulge out of the torso rows) over a long sleeve, mesh tee, pullover hood (pocket / cords: 0), football jersey (num);
+   · bottoms: track pants, long cargo, ripped jeans (rip), bermudas, cycling shorts (tight: the clearance is scaled down), boxing tights with a belt;
+   · shoes: high tops, combat boots, low canvas shoes, slides over socks, tall boxing boots;
+   · head: balaclava (the eye slit is cut by alpha: HATS.hole), bucket hat (brim), headband (vmax: only a band of the crown), flat-peak cap,
+     a bandana folded into a band; more gum shield colours;
+   · patterns (WPAT): solid, stripe, check, camo, tie-dye, brand monogram — `pat` of a look entry ({ id, color, pat }), or an item's default
+     (model.pat); painted by patPaint into the item's own canvas (key = item + colour + pattern, see itemVar);
+   · the shop and the creator sort their lists (WSORT: as listed / new first / cheapest first); `v: 3` marks the items of this update. */
+const FAB_GLOSS = { nylon: [0.42, 0.55, 0.2], puffer: [0.36, 0.5, 0.35], tricot: [0.5, 0.65, 0.1], poly: [0.62, 0.5, 0], pique: [0.94, 0.3, 0], flannel: [0.97, 0.5, 0] };   // [roughness, sheen, clear coat]
+const WPAT = [{ id: 'solid', label: 'однотон' }, { id: 'stripe', label: 'полоска' }, { id: 'check', label: 'клетка' }, { id: 'camo', label: 'камуфляж' }, { id: 'tiedye', label: 'тай-дай' }, { id: 'logo', label: 'лого' }];
+const WSORT = [{ id: 'all', label: 'все' }, { id: 'new', label: 'новые' }, { id: 'cheap', label: 'дешёвые' }];
+// which items take a pattern: cloth with a canvas of its own (not leather, not the hand-made / GLB tee, not the boxing trunks)
+function wearPatOk(it) {
+  if (!it || !it.model) return false; const m = it.model;
+  if (it.cat === 'top') { const C = m.cut && TOP_CUTS[m.cut]; return !!C && !C.cloth && !C.hand && C.fab !== 'leather'; }
+  return (it.cat === 'bottom' && !!m.cut) || (it.cat === 'head' && !!m.hat) || (it.cat === 'shoes' && !!m.top);
+}
+function wearPatRow(id, it, sel, set) {
+  const el = $(id); if (!el) return; const ok = wearPatOk(it); el.parentElement.hidden = !ok; el.textContent = ''; if (!ok) return;
+  swatches(id, WPAT, () => { const s = sel(); return s.color === 'camo' ? 'camo' : s.pat || it.model.pat || 'solid'; }, set, true);
+}
+const wearFresh = it => !!(PROF.seen && !PROF.seen[it.id] && it.price && (!it.reward || itemOwned(it.id)));   // «новое»: as the shop's (R-21)
+function wearSort(a, sort, fresh) {
+  const ix = new Map(a.map((it, i) => [it.id, i])), nw = it => (fresh ? fresh.has(it.id) : wearFresh(it)) ? 1 : 0;
+  if (sort === 'new') return [...a].sort((x, y) => nw(y) - nw(x) || (y.v || 0) - (x.v || 0) || ix.get(x.id) - ix.get(y.id));
+  if (sort === 'cheap') return [...a].sort((x, y) => (x.reward && !itemOwned(x.id) ? 1 : 0) - (y.reward && !itemOwned(y.id) ? 1 : 0) || x.price - y.price || ix.get(x.id) - ix.get(y.id));
+  return a;
+}
+
+/* —— patterns: painted over the base colour, before the grain; s = scale (px per cm differ per canvas) —— */
+function patPaint(v, g, w, h, s = 1) {
+  const p = v.pat, c2 = v.c2 || wInk(v.c);
+  if (p === 'camo') return camoPaint(g, w, h, s);
+  if (p === 'stripe') { const P = 30 * s; g.fillStyle = c2; for (let y = 0; y < h; y += P) g.fillRect(0, y, w, P * 0.42); return; }
+  if (p === 'check') {   // tartan: dark bands both ways (darker where they cross) + thin lines of the second colour
+    const P = 84 * s; g.fillStyle = 'rgba(0,0,0,0.3)'; for (let x = 0; x < w; x += P) g.fillRect(x, 0, P * 0.42, h); for (let y = 0; y < h; y += P) g.fillRect(0, y, w, P * 0.42);
+    g.fillStyle = c2; g.globalAlpha = 0.6; for (let x = P * 0.7; x < w; x += P) g.fillRect(x, 0, 2.5 * s, h); for (let y = P * 0.7; y < h; y += P) g.fillRect(0, y, w, 2.5 * s); g.globalAlpha = 1;
+    g.strokeStyle = 'rgba(0,0,0,0.12)'; g.lineWidth = 1; for (let x = -h; x < w; x += 4) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + h, h); g.stroke(); } return; }   // (the twill)
+  if (p === 'tiedye') {   // spirals out of three knots, three hues about the colour, white where the dye did not get in
+    const q = 4, cw = Math.ceil(w / q), ch = Math.ceil(h / q), cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+    const x = cv.getContext('2d'), im = x.createImageData(cw, ch), d = im.data, o = new THREE.Color(v.c).getHSL({}), R = wRng(19);
+    const pal = [0, 0.3, 0.62].map(dh => new THREE.Color().setHSL((o.h + dh) % 1, Math.max(0.6, o.s), clamp(o.l, 0.38, 0.55)));
+    const K = [0, 1, 2].map(() => [R() * cw, R() * ch]), sc = 26 * s / q;
+    for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
+      let best = 1e9, a = 0; for (const [kx, ky] of K) { let dx = i - kx; dx -= Math.round(dx / cw) * cw; const dy = j - ky, r = Math.hypot(dx, dy); if (r < best) { best = r; a = Math.atan2(dy, dx); } }
+      const t = a / 6.2832 * 3 + best / sc + 0.4 * Math.sin(best / sc * 2.3), k = ((Math.floor(t) % 3) + 3) % 3, f = t - Math.floor(t), c = pal[k], wh = sstep(0.82, 0.97, f) * 0.75, n = (i * 4 + j * cw * 4);
+      d[n] = lerp(c.r * 255, 245, wh); d[n + 1] = lerp(c.g * 255, 243, wh); d[n + 2] = lerp(c.b * 255, 238, wh); d[n + 3] = 255; }
+    x.putImageData(im, 0, 0); g.imageSmoothingEnabled = true; g.drawImage(cv, 0, 0, w, h); return; }
+  if (p === 'logo') { const b = v.brand || 'STRAY DOGS', P = 64 * s; g.globalAlpha = 0.32; for (let y = 0, r = 0; y < h + P; y += P, r++) for (let x = (r % 2) * P / 2; x < w + P; x += P) brandMark(g, b, x, y, P * 0.2, c2); g.globalAlpha = 1; }
+}
+
+/* —— tops —— */
+Object.assign(TOP_CUTS, {
+  polo: { hem: 92, cl: 1.2, fit: 0.94, neck: [7.4, 4.5, -1, 2], rib: 3.4, sl: 19, ease: [1.5, 2.0], fab: 'pique', deco: 'polo' },
+  raglan: { ...TOP_CUTS.long, deco: 'raglan' },
+  flannel: { hem: 95, cl: 1.7, fit: 1.0, neck: [9.2, 8.5, -1.5, 2], rib: 1.2, sl: 58, ease: [1.2, 0.8], cuff: 5, open: [6, 7.5], lap: 116, lapW: 5, fab: 'flannel', btn: 1, under: 'under', deco: 'flannel' },
+  trackJ: { hem: 92, cl: 1.3, fit: 0.93, band: 5, neck: [8.2, 3.5, -1.5, 2], rib: 4.2, sl: 57, ease: [1.1, 0.7], cuff: 5, fab: 'tricot', deco: 'track' },
+  bomber: { hem: 94, cl: 2.2, fit: 1.04, band: 7, neck: [8.8, 6.5, -0.5, 2], rib: 2.8, sl: 57.5, ease: [1.6, 1.2], cuff: 6, fab: 'nylon', deco: 'bomber' },
+  wind: { hem: 90, cl: 2.4, fit: 1.06, neck: [9.6, 7.5, -1, 2], rib: 1.6, sl: 57, ease: [2.0, 1.4], cuff: 3, hood: 1, pocket: 0, fab: 'nylon', deco: 'wind' },
+  puffer: { hem: 92, cl: 3.0, fit: 1.06, neck: [8.6, 4, -1.5, 2], rib: 3.2, sl: 0, arm: [26, 2.5, 146, 16, 19, 15], quilt: 8, fab: 'puffer', under: 'long', deco: 'puffer' },
+  meshTee: { hem: 92, cl: 1.4, fit: 0.97, neck: [8.6, 7, -0.5, 2], rib: 1.8, sl: 17, ease: [1.6, 2.2], fab: 'mesh' },
+  hoodPO: { hem: 86, cl: 1.8, fit: 1.04, band: 7, neck: [9.6, 7.5, -1, 2], rib: 2.4, sl: 58, ease: [1.5, 1.0], cuff: 7, hood: 1, pocket: 0, cords: 0, fab: 'fleece' },
+  jersey: { hem: 91, cl: 1.6, fit: 1.0, neck: [8.2, 12, -0.5, 1.1], rib: 1.8, sl: 21, ease: [1.8, 2.4], fab: 'poly', deco: 'jersey' },
+});
+// colour map details of a cut (o: the painter's helpers of topTex; torso u 0.25 = front, 0.75 = back; sleeve x = XS(cm from the shoulder))
+function topDeco(g, v, C, D, o) {
+  const { X, Y, TV, XS, W, line, stitch, ySl, ySh, yR, y6 } = o, Z = z => Y(TV(z)), cmu = 1 / D.circ, k = C.deco, c2 = v.c2;
+  const zip = (z0, z1, pull) => { line([[X(0.25), Z(z0)], [X(0.25), z1]], 'rgba(0,0,0,0.6)', 9); g.setLineDash([2.5, 2]); line([[X(0.25), Z(z0)], [X(0.25), z1]], '#b4b7bf', 3.6); g.setLineDash([]); if (pull) { g.fillStyle = '#c9ccd2'; g.fillRect(X(0.25) - 4, z1 + 2, 8, 16); } };
+  const btn = (x, y, r = 5) => { g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.arc(x, y + 1, r + 1, 0, 7); g.fill(); g.fillStyle = '#e8e4da'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x - 2, y - 1, 1.5, 1.5); g.fillRect(x + 1, y - 1, 1.5, 1.5); };
+  const sleeveBand = (s0, s1, c) => { g.fillStyle = c; g.fillRect(XS(s0), ySl, XS(s1) - XS(s0), ySh - ySl); };
+  if (k === 'polo') { const hw = 1.7 * cmu * W, yb = Z(D.zC - 8); g.fillStyle = 'rgba(0,0,0,0.07)'; g.fillRect(X(0.25) - hw, y6, 2 * hw, yb - y6); stitch([[X(0.25) - hw, y6], [X(0.25) - hw, yb], [X(0.25) + hw, yb], [X(0.25) + hw, y6]]); for (let i = 0; i < 3; i++) btn(X(0.25), lerp(yR + 14, yb - 10, i / 2), 4.5);
+    sleeveBand(C.sl - 2.6, C.sl, 'rgba(0,0,0,0.12)'); g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 1.5; for (let y = ySl; y < ySh; y += 5) { g.beginPath(); g.moveTo(XS(C.sl - 2.6), y); g.lineTo(X(0.6), y); g.stroke(); } }
+  if (k === 'raglan') { g.fillStyle = c2; g.fillRect(0, ySl, X(0.6), ySh - ySl);
+    for (const u of [0, 0.5, 1]) { g.beginPath(); g.moveTo(X(u - 0.05), Z(D.zC - 5)); g.lineTo(X(u + 0.05), Z(D.zC - 5)); g.lineTo(X(u + 0.15), y6); g.lineTo(X(u - 0.15), y6); g.closePath(); g.fill(); }
+    g.fillStyle = 'rgba(0,0,0,0.1)'; g.fillRect(0, y6, W, yR - y6); }
+  if (k === 'flannel') { for (const sg of [-1, 1]) { const u = 0.25 + sg * 0.085, hw = 6 * cmu, a = Z(D.zC - 22), b = Z(D.zC - 9); g.fillStyle = 'rgba(0,0,0,0.08)'; g.fillRect(X(u - hw), b, 2 * hw * W, a - b); stitch([[X(u - hw), b], [X(u - hw), a], [X(u + hw), a], [X(u + hw), b]]);
+      line([[X(u - hw), b], [X(u + hw), b]], 'rgba(0,0,0,0.35)', 2); line([[X(u - hw), b + 22], [X(u + hw), b + 22]], 'rgba(0,0,0,0.3)', 2); btn(X(u), b + 16, 4); }
+    sleeveBand(C.sl - C.cuff, C.sl, 'rgba(0,0,0,0.08)'); btn(XS(C.sl - 2.5), Y(0.88), 4); }
+  if (k === 'track') { g.fillStyle = c2; g.fillRect(0, y6, W, yR - y6);
+    for (const u of [0, 0.5, 1]) for (const d of [-0.014, 0.008]) g.fillRect(X(u + d), y6, 0.006 * W, Z(C.hem + C.band) - y6);   // stripes down the sides
+    for (const v0 of [0.632, 0.65, 0.952, 0.97]) g.fillRect(0, Y(v0), XS(C.sl - C.cuff), 7);   // and along the top of the sleeves
+    zip(C.hem, y6 - 2, 1); }
+  if (k === 'bomber') { for (const [y0, y1] of [[Z(C.hem + C.band), Z(C.hem)], [y6, yR]]) for (const f of [0.3, 0.6]) { g.fillStyle = c2; g.fillRect(0, lerp(y0, y1, f) - 3, W, 6); }
+    { const x0 = XS(9), x1 = XS(17), y0 = Y(0.95), y1 = Y(0.87); g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x0, y0, x1 - x0, y1 - y0); stitch([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]); line([[x0 + 6, y0 + 7], [x1 - 6, y0 + 7]], '#b4b7bf', 3); }   // the sleeve pocket
+    zip(C.hem, y6 - 2, 1); }
+  if (k === 'wind') { const a = Z(D.zC - 14), b = Z(D.zC + 0.5); g.fillStyle = c2; g.fillRect(0, b, W, a - b); g.fillStyle = 'rgba(255,255,255,0.85)'; g.fillRect(0, a, W, 5); g.fillStyle = c2; g.fillRect(XS(12), ySl, XS(26) - XS(12), ySh - ySl);
+    zip(D.zC - 18, y6 - 2, 1); }
+  if (k === 'puffer') { for (let z = C.hem + C.quilt; z < D.zC + 8; z += C.quilt) { line([[0, Z(z)], [W, Z(z)]], 'rgba(0,0,0,0.42)', 3); stitch([[0, Z(z) - 4], [W, Z(z) - 4]]); }
+    zip(C.hem, y6 - 2, 1); g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(0, y6, W, yR - y6); }
+  if (k === 'jersey') { g.fillStyle = c2; g.fillRect(0, y6, W, yR - y6); sleeveBand(C.sl - 5, C.sl - 3.2, c2); sleeveBand(C.sl - 2.4, C.sl - 1.2, c2);
+    for (const u of [0.5 - 0.01, 0, 1 - 0.01]) g.fillRect(X(u), Z(D.zC - 2), 0.02 * W, Z(C.hem) - Z(D.zC - 2)); }
+  if (v.num !== undefined) {   // the number: small on the chest, big on the back (outlined)
+    for (const [u, z, hcm] of [[0.25 + 0.06, D.zC - 12, 9], [0.75, D.zC - 14, 24]]) { const px = hcm * cmu * W * 1.25; g.font = `900 ${px}px "Arial Black", Arial, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.lineWidth = px * 0.09; g.strokeStyle = wLum(c2) > 0.3 ? '#17181c' : '#ecebe6'; g.strokeText(String(v.num), X(u), Z(z)); g.fillStyle = c2; g.fillText(String(v.num), X(u), Z(z)); } }
+}
+// normal map details (zips, baffles, pockets)
+function topDecoN(g, C, D, o) {
+  const { X, Y, TV, XS, W, ridge, ySl, ySh, yR } = o, Z = z => Y(TV(z)), k = C.deco;
+  if (k === 'track' || k === 'bomber' || k === 'puffer') ridge([[X(0.25), Z(C.hem)], [X(0.25), Y(0.6)]], 10, 0.3, 1);
+  if (k === 'wind') ridge([[X(0.25), Z(D.zC - 18)], [X(0.25), Y(0.6)]], 10, 0.3, 1);
+  if (k === 'puffer') for (let z = C.hem + C.quilt; z < D.zC + 8; z += C.quilt) ridge([[0, Z(z)], [W, Z(z)]], 14, 0.4, 1);
+  if (k === 'flannel') for (const sg of [-1, 1]) { const u = 0.25 + sg * 0.085, hw = 6 / D.circ; ridge([[X(u - hw), Z(D.zC - 9)], [X(u - hw), Z(D.zC - 22)], [X(u + hw), Z(D.zC - 22)], [X(u + hw), Z(D.zC - 9)]], 4, 0.25, 1); }
+  if (k === 'polo') ridge([[X(0.25), Y(0.6)], [X(0.25), Z(D.zC - 8)]], 6, 0.2, 1);
+}
+
+/* —— bottoms —— */
+Object.assign(PANT_CUTS, {
+  trackP: { hem: 6, skin: 11, elastic: 1, shiny: 1, deco: 'track', prof: [[5, 8.2], [30, 8.6], [49, 8.6], [66, 10], [84, 10.8]], sway: 0.9, fwd: 1, swayH: 26 },
+  cargoL: { hem: 6, skin: 12, deco: 'cargoL', prof: [[5, 9.8], [30, 10], [49, 10], [66, 10.8], [84, 11.4]], sway: 1, fwd: 1.4, swayH: 24 },
+  bermuda: { hem: 47, skin: 54, deco: 'bermuda', prof: [[43, 11.8], [66, 11.8], [84, 11.8]], sway: 1.1, fwd: 0, swayH: 14 },
+  bike: { hem: 55, skin: 56.5, elastic: 1, shiny: 1, tight: 0.25, deco: 'bike', prof: [[55, 0], [84, 0]], sway: 0, fwd: 0, swayH: 4 },
+  trico: { hem: 47, skin: 53, elastic: 1, shiny: 1, deco: 'trico', prof: [[47, 10.5], [66, 11.2], [84, 11.6]], sway: 0.8, fwd: 0, swayH: 12 },
+});
+function pantsDeco(g, b, C, o) {
+  const { X, Y, box, line, stitch, top, crotch, W } = o, k = C.deco, c2 = b.c2;
+  if (k === 'track') { box(0.455, top - 4.6, 0.475, C.hem, c2); box(0.525, top - 4.6, 0.545, C.hem, c2); box(0.49, top - 4.6, 0.51, C.hem, c2);
+    line([[0.5, C.hem], [0.5, C.hem + 16]], 'rgba(0,0,0,0.6)', 6); g.setLineDash([2, 2]); line([[0.5, C.hem], [0.5, C.hem + 16]], '#b4b7bf', 2.4); g.setLineDash([]); }
+  if (k === 'cargoL' || k === 'bermuda') {
+    if (k === 'cargoL') { g.strokeStyle = 'rgba(255,255,255,0.05)'; g.lineWidth = 1; for (let x = 0; x < W; x += 9) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, o.H); g.stroke(); } }
+    const a = k === 'cargoL' ? 48 : C.hem + 6, t2 = a + (k === 'cargoL' ? 19 : 14);   // the side pocket with its flap
+    box(0.39, t2, 0.61, a, 'rgba(0,0,0,0.08)'); stitch([[0.39, t2], [0.61, t2], [0.61, a], [0.39, a], [0.39, t2]]); box(0.385, t2 + 0.6, 0.615, t2 - 5, 'rgba(0,0,0,0.14)'); stitch([[0.385, t2 - 5], [0.615, t2 - 5]]);
+    line([[0.45, a], [0.45, t2 - 5]], 'rgba(0,0,0,0.3)', 2); line([[0.55, a], [0.55, t2 - 5]], 'rgba(0,0,0,0.3)', 2); g.fillStyle = '#1c1c1a'; g.beginPath(); g.arc(X(0.5), Y(t2 - 3), 3.5, 0, 7); g.fill();
+    if (k === 'cargoL') { box(0, C.hem + 3, 1, C.hem, 'rgba(0,0,0,0.12)'); line([[0.47, C.hem + 3], [0.47, C.hem + 9]], 'rgba(0,0,0,0.4)', 2); }   // ankle tabs
+    else { box(0, C.hem + 3.5, 1, C.hem, 'rgba(0,0,0,0.1)'); line([[0, C.hem + 3.5], [1, C.hem + 3.5]], 'rgba(0,0,0,0.45)', 2); stitch([[0, C.hem + 2.8], [1, C.hem + 2.8]]); } }   // the turn-up
+  if (k === 'bike') { box(0.43, top - 4.6, 0.57, C.hem, c2); box(0.445, top - 4.6, 0.555, C.hem, b.c); box(0, C.hem + 2.5, 1, C.hem, c2);
+    if (b.brand) { g.save(); g.translate(X(0.42), Y((C.hem + top) / 2 - 4)); g.rotate(-Math.PI / 2); brandLogo(g, b.brand, 0, 0, 22 * o.cm, c2, 'word'); g.restore(); } }
+  if (k === 'trico') { box(0, top, 1, top - 9, c2); line([[0, top - 9], [1, top - 9]], 'rgba(0,0,0,0.45)', 2.5); stitch([[0, top - 1], [1, top - 1]]); stitch([[0, top - 8.3], [1, top - 8.3]]);
+    if (b.brand) brandLogo(g, b.brand, X(0.32), Y(top - 4.5), 0.2 * W, wInk(c2), 'word');
+    box(0.47, top - 9, 0.53, C.hem, c2); box(0, C.hem + 2.4, 1, C.hem, c2); }
+  if (b.rip) {   // rips: the weft threads stay across the hole, a frayed edge round it
+    for (const [u, h, ru, rh] of [[0.26, 50, 0.07, 3.2], [0.3, 63, 0.05, 2.0], [0.2, 72, 0.035, 1.3], [0.72, 46, 0.04, 1.6]]) {
+      g.fillStyle = 'rgba(40,32,28,0.75)'; g.beginPath(); g.ellipse(X(u), Y(h), ru * W, rh * o.cm, 0, 0, 7); g.fill();
+      g.strokeStyle = 'rgba(238,236,228,0.9)'; g.lineWidth = 1.6; for (let y = -rh; y <= rh; y += 0.45) { const hw = ru * Math.sqrt(Math.max(0, 1 - (y / rh) ** 2)) * 1.05; g.beginPath(); g.moveTo(X(u - hw), Y(h + y)); g.quadraticCurveTo(X(u), Y(h + y + (rr() - 0.5) * 0.4), X(u + hw), Y(h + y)); g.stroke(); }
+      g.strokeStyle = 'rgba(225,225,230,0.7)'; g.lineWidth = 1; for (let i = 0; i < 40; i++) { const a = rr() * 6.283, x = X(u) + Math.cos(a) * ru * W, y = Y(h) + Math.sin(a) * rh * o.cm; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rr() - 0.5) * 8, y + (rr() - 0.5) * 8); g.stroke(); } } }
+}
+function pantsDecoN(g, b, C, o) {
+  const { ridge } = o;
+  if (b.rip) for (const [u, h] of [[0.26, 50], [0.3, 63], [0.2, 72], [0.72, 46]]) { ridge([[u - 0.06, h], [u + 0.06, h]], 18, 0.12, 1); }
+}
+
+/* —— shoes: the upper half of the canvas is the foot (y 60…196 the upper, 128 = over the laces), the lower half the collar (top edge at y 256) —— */
+function shoeDeco(g, f, W) {
+  const k = f.deco, dk = 'rgba(0,0,0,0.35)';
+  if (k === 'hi') {   // high tops: a padded collar, a panel, an ankle patch
+    g.fillStyle = f.c2; g.fillRect(0, 256, W, 34); g.fillStyle = dk; g.fillRect(0, 289, W, 2);
+    g.strokeStyle = f.c2; g.lineWidth = 12; g.lineCap = 'round'; for (const [y0, y1] of [[180, 150], [76, 106]]) { g.beginPath(); g.moveTo(120, y0); g.quadraticCurveTo(250, y1 + (y0 > y1 ? 8 : -8), 390, y1); g.stroke(); }
+    for (const x of [0, W]) { g.fillStyle = '#f1eee6'; g.beginPath(); g.arc(x, 360, 28, 0, 7); g.fill(); g.fillStyle = f.c; g.beginPath(); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5 - Math.PI / 2, r = i % 2 ? 8 : 19; g.lineTo(x + Math.cos(a) * r, 360 + Math.sin(a) * r); } g.fill(); } }
+  if (k === 'boot') {   // combat boots: a lug sole, toe and heel caps, hooks up the shaft, a pull loop
+    g.fillStyle = '#18181a'; g.fillRect(0, 0, W, 60); g.fillRect(0, 196, W, 60); g.fillStyle = '#2a2a2d'; for (let x = 0; x < W; x += 22) { g.fillRect(x, 18, 12, 26); g.fillRect(x + 6, 212, 12, 26); }
+    g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(400, 60, 112, 136); g.fillRect(0, 60, 80, 136); g.strokeStyle = 'rgba(255,255,255,0.12)'; g.setLineDash([4, 3]); g.lineWidth = 1.5; g.strokeRect(402, 62, 108, 132); g.strokeRect(2, 62, 76, 132); g.setLineDash([]);
+    g.fillStyle = '#8d8f94'; for (let y = 272; y < 500; y += 28) for (const x of [104, 152]) { g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); }
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(372, 256, 24, 40); }
+  if (k === 'slide') {   // slides over socks: the sock everywhere above the sole, one wide strap across the instep
+    const sock = f.sock || '#efeee9'; g.fillStyle = sock; g.fillRect(0, 60, W, 136); g.fillRect(0, 256, W, 256);
+    g.strokeStyle = 'rgba(0,0,0,0.07)'; g.lineWidth = 2; for (let x = 0; x < W; x += 6) { g.beginPath(); g.moveTo(x, 256); g.lineTo(x, 512); g.stroke(); }
+    g.fillStyle = f.c; for (const y of [272, 292]) g.fillRect(0, y, W, 10);
+    g.fillStyle = f.c; g.fillRect(180, 60, 170, 136); if (f.pat) { g.save(); g.beginPath(); g.rect(180, 60, 170, 136); g.clip(); patPaint(f, g, W, W, 0.8); g.restore(); } g.fillStyle = dk; g.fillRect(180, 60, 3, 136); g.fillRect(347, 60, 3, 136);
+    if (f.brand) brandLogo(g, f.brand, 265, 128, 120, wInk(f.c), 'word');
+    g.fillStyle = f.sole; g.fillRect(0, 0, W, 60); g.fillRect(0, 196, W, 60); }
+  if (k === 'boxhi') {   // tall boxing boots: a side panel and a stripe up the shaft
+    g.fillStyle = f.c2; g.fillRect(150, 256, 60, 256); g.fillRect(300, 256, 60, 256); g.fillStyle = dk; g.fillRect(0, 300, W, 2); g.fillRect(0, 420, W, 2); }
+}
+
+/* —— head —— */
+Object.assign(HATS, {
+  balaclava: { lo: () => -10.5, gap: 0.35, th: () => 0.3, deco: 1, hole: 1 },
+  panama: { lo: a => 3.4 - 0.9 * gsm(60, 170, a), gap: 0.9, th: (a, v) => 0.3 + 0.5 * gsm(0.6, 1, v), brim: 5.5, deco: 1 },
+  headband: { lo: a => 3.0 - 1.4 * gsm(40, 170, a), gap: 0.35, th: () => 0.6, vmax: 0.16, deco: 1 },
+  bandB: { lo: a => 3.4 - 1.4 * gsm(40, 170, a), gap: 0.35, th: () => 0.15, vmax: 0.2, knot: 1, deco: 1 },
+  capF: { ...HATS.cap, flat: 1 },
+});
+function hatDeco(g, v, W, H, Y, ink) {
+  const k = v.hat;
+  if (k === 'balaclava') {
+    for (let x = 0; x < W; x += 5) { g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(x, 0, 2, H); }
+    const e = Math.asin(0.98), sE = -Math.sin(e), cE = Math.cos(e);   // the lower edge: straight down (HATS.balaclava.lo)
+    for (let y = Math.floor(Y(1)); y < H; y++) { const t = (H - y) / (H * 0.75), el = Math.atan2(sE * (1 - t) + t, cE * (1 - t)) * 180 / Math.PI, q = (el - 5) / 10;   // the eye slit: elevation −5°…15°, ±40° about the face
+      if (Math.abs(q) < 1) { const hw = 40 / 360 * W * Math.sqrt(1 - q * q); g.clearRect(W / 2 - hw, y, 2 * hw, 1); } }
+  } else if (k === 'panama') {
+    g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 1.5; g.setLineDash([4, 3]); for (let y = 6; y < H * 0.24; y += 9) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } for (const t of [0.12, 0.3, 0.5]) { g.beginPath(); g.moveTo(0, Y(t)); g.lineTo(W, Y(t)); g.stroke(); } g.setLineDash([]);
+    g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, Y(0.09), W, 3);
+    if (v.brand) brandLogo(g, v.brand, W / 2, Y(0.22), 50, ink, 'row');
+  } else if (k === 'headband') {
+    for (let i = 0; i < 6000; i++) { g.fillStyle = `rgba(${rr() < 0.5 ? '0,0,0' : '255,255,255'},${rr() * 0.14})`; g.fillRect(rr() * W, rr() * H, 2.2, 2.2); }   // terry
+    g.fillStyle = v.c2; g.fillRect(0, Y(0.95), W, Y(0.8) - Y(0.95)); g.fillRect(0, Y(0.2), W, Y(0.05) - Y(0.2));
+    if (v.brand) brandLogo(g, v.brand, W / 2, Y(0.5), 40, ink, 'mark');
+  } else if (k === 'bandB') {
+    g.fillStyle = ink; for (let y = 8; y < H; y += 22) for (let x = (y % 44 ? 0 : 11); x < W; x += 22) { g.globalAlpha = 0.75; g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill(); g.globalAlpha = 0.5; g.beginPath(); g.ellipse(x + 9, y + 9, 5, 2, 0.8, 0, 7); g.stroke(); } g.globalAlpha = 1;
+  }
+}
+GUARDS.push({ id: 'green', c: '#2fae5a', label: 'зелёная' }, { id: 'pink', c: '#e07a9c', label: 'розовая' }, { id: 'orange', c: '#e8742a', label: 'оранжевая' }, { id: 'white', c: '#f2f1ec', label: 'белая' }, { id: 'purple', c: '#6a3aa8', label: 'фиолетовая' });
+
+/* —— the items —— */
+const W3 = { v: 3 };
+Object.assign(ITEMS, Object.fromEntries(Object.entries({
+  // tops
+  polo: { cat: 'top', label: 'поло', model: { cut: 'polo' }, colors: ['white', 'navy', 'red'], price: 350, tags: ['street', 'basic'] },
+  poloRL: { cat: 'top', label: 'поло', model: { cut: 'polo', decal: { f: [-8, 15, 6] } }, colors: ['black', 'white', 'olive'], price: 600, reward: 2, tags: ['street'], brand: 'REDLINE' },
+  raglan: { cat: 'top', label: 'лонгслив-реглан', model: { cut: 'raglan' }, colors: ['white', 'grey', 'sand'], price: 320, tags: ['street', 'basic'] },
+  flannel: { cat: 'top', label: 'фланелевая рубашка', model: { cut: 'flannel', pat: 'check' }, colors: ['red', 'navy', 'olive'], price: 650, tags: ['street'] },
+  flannelB: { cat: 'top', label: 'фланель «лесоруб»', model: { cut: 'flannel', pat: 'check', c2: '#1b1c20', uc: '#1b1c20' }, colors: ['red', 'yellow', 'blue'], price: 800, reward: 3, tags: ['street'], brand: 'CONCRETE SAINTS' },
+  trackJ: { cat: 'top', label: 'олимпийка', model: { cut: 'trackJ', decal: { f: [-8, 15, 6] } }, colors: ['navy', 'black', 'red'], price: 700, tags: ['street'], brand: 'COLDBLOOD' },
+  trackJR: { cat: 'top', label: 'олимпийка «ретро»', model: { cut: 'trackJ', c2: '#e0b92e' }, colors: ['blue', 'wine', 'olive'], price: 900, reward: 5, tags: ['street'] },
+  bomber: { cat: 'top', label: 'бомбер', model: { cut: 'bomber', c2: '#d9641e', decal: { b: [0, 20, 22] } }, colors: ['olive', 'black', 'navy'], price: 1400, tags: ['street'], brand: 'BLACKOUT SUPPLY' },
+  wind: { cat: 'top', label: 'ветровка', model: { cut: 'wind' }, colors: ['blue', 'red', 'olive'], price: 850, tags: ['street'], brand: 'GUTTERWAVE' },
+  puffer: { cat: 'top', label: 'жилетка-пуховик', model: { cut: 'puffer', uc: '#2b2e36' }, colors: ['black', 'red', 'sand'], price: 1100, reward: 6, tags: ['street'], brand: 'AFTERHOURS' },
+  meshTee: { cat: 'top', label: 'футболка-сетка', model: { cut: 'meshTee' }, colors: ['black', 'white', 'red'], price: 260, tags: ['street'] },
+  hoodPO: { cat: 'top', label: 'свитшот с капюшоном', model: { cut: 'hoodPO', decal: { f: [0, 18, 20] } }, colors: ['grey', 'black', 'sand'], price: 650, tags: ['street'], brand: 'STRAY DOGS' },
+  jersey: { cat: 'top', label: 'футбольная джерси', model: { cut: 'jersey', num: 10 }, colors: ['red', 'blue', 'yellow'], price: 500, tags: ['street'] },
+  jersey7: { cat: 'top', label: 'джерси «7»', model: { cut: 'jersey', num: 7, pat: 'stripe' }, colors: ['white', 'black'], nat: wNat({ white: '#ecebe6', black: '#1b1c20' }, { white: { c2: '#b3202c' }, black: { c2: '#e0b92e' } }), price: 750, reward: 4, tags: ['street'], brand: 'LOW BLOW' },
+  teeStripe: { cat: 'top', label: 'тельняшка', model: { cut: 'tee', pat: 'stripe' }, colors: ['white', 'black'], nat: wNat({ white: '#ecebe6' }, { white: { c2: '#1d2a4a' } }), price: 200, tags: ['street', 'basic'] },
+  teeTie: { cat: 'top', label: 'футболка тай-дай', model: { cut: 'teeOv', pat: 'tiedye' }, colors: ['pink', 'blue', 'yellow'], price: 450, tags: ['street'] },
+  teeLogo: { cat: 'top', label: 'футболка-монограмма', model: { cut: 'tee', pat: 'logo' }, colors: ['black', 'sand', 'wine'], price: 750, tags: ['street'], brand: 'IRON JAW' },
+  // bottoms
+  trackP: { cat: 'bottom', label: 'спортивные с лампасами', model: { cut: 'trackP', c2: '#ecebe6' }, colors: ['black', 'navy', 'red'], price: 500, tags: ['street'] },
+  cargoL: { cat: 'bottom', label: 'карго длинные', model: { cut: 'cargoL', belt: 1 }, colors: ['olive', 'sand', 'black', 'camo'], price: 550, tags: ['street'], brand: 'BLACKOUT SUPPLY' },
+  jeansR: { cat: 'bottom', label: 'рваные джинсы', model: { cut: 'jeans', belt: 1, rip: 1 }, colors: ['worn', 'indigo', 'black'], nat: ITEMS.jeans.nat, price: 450, tags: ['street'] },
+  bermuda: { cat: 'bottom', label: 'бермуды', model: { cut: 'bermuda', belt: 1 }, colors: ['sand', 'navy', 'olive'], price: 300, tags: ['street', 'basic'] },
+  bermudaC: { cat: 'bottom', label: 'бермуды в клетку', model: { cut: 'bermuda', belt: 1, pat: 'check' }, colors: ['red', 'navy', 'olive'], price: 380, reward: 2, tags: ['street'] },
+  bike: { cat: 'bottom', label: 'велосипедки', model: { cut: 'bike' }, colors: ['black', 'navy', 'red'], price: 280, tags: ['street', 'ring'], brand: 'REDLINE' },
+  trico: { cat: 'bottom', label: 'трико боксёрское', model: { cut: 'trico', c2: '#d6a640' }, colors: ['red', 'blue', 'black', 'white'], price: 600, tags: ['ring', 'street'], brand: 'IRON JAW' },
+  sweatTie: { cat: 'bottom', label: 'спортивки тай-дай', model: { cut: 'sweat', pat: 'tiedye' }, colors: ['pink', 'blue', 'yellow'], price: 400, reward: 1, tags: ['street'] },
+  // shoes
+  hiTop: { cat: 'shoes', label: 'высокие кроссовки', model: { sole: '#f4f2ec', top: 15, lace: '#ffffff', deco: 'hi', c2: '#ecebe6' }, colors: ['red', 'black', 'blue'], price: 650, tags: ['street'] },
+  combat: { cat: 'shoes', label: 'берцы', model: { sole: '#18181a', top: 19, lace: '#141416', tab: '#111113', deco: 'boot' }, colors: ['black', 'brown', 'sand'], price: 900, reward: 3, tags: ['street'], brand: 'BLACKOUT SUPPLY' },
+  kedsLo: { cat: 'shoes', label: 'кеды низкие', model: { sole: '#f1eee6', top: 7.5, cap: '#f1eee6', band: '#2f55b5', canvas: 1, lace: '#f4f2ec' }, colors: ['white', 'red', 'black'], price: 220, tags: ['street', 'basic'] },
+  slides: { cat: 'shoes', label: 'шлёпанцы с носками', model: { sole: '#202124', top: 21, deco: 'slide', sock: '#efeee9' }, colors: ['black', 'red', 'navy'], price: 180, tags: ['street'], brand: 'STRAY DOGS' },
+  bootsHi: { cat: 'shoes', label: 'боксёрки высокие', model: { sole: '#d9d4c8', top: 26, boot: '#f2f0ea', lace: '#f2f0ea', deco: 'boxhi', c2: '#d6a640' }, colors: ['red', 'blue', 'black'], price: 800, tags: ['ring'], brand: '16OZ' },
+  // head
+  balaclava: { cat: 'head', label: 'балаклава', model: { hat: 'balaclava', off: [0.85, 0.2] }, colors: ['black', 'olive', 'red'], price: 350, tags: ['street'] },
+  panama: { cat: 'head', label: 'панама', model: { hat: 'panama', off: [0.5, 0.85] }, colors: ['sand', 'black', 'olive'], price: 280, tags: ['street'], brand: 'AFTERHOURS' },
+  headband: { cat: 'head', label: 'повязка на голову', model: { hat: 'headband', off: [0.9, 0.2] }, colors: ['white', 'red', 'black'], price: 150, tags: ['street', 'ring'], brand: 'REDLINE' },
+  bandB: { cat: 'head', label: 'бандана-повязка', model: { hat: 'bandB', off: [0.95, 0.2] }, colors: ['black', 'red', 'navy'], price: 140, tags: ['street'] },
+  capF: { cat: 'head', label: 'снэпбэк', model: { hat: 'capF', off: [0.6, 0.75], logo: 'front' }, colors: ['black', 'red', 'olive'], price: 400, reward: 2, tags: ['street'], brand: 'LOW BLOW' },
+  // printed versions of the cuts (the same model, another print: they read as other things, not as a recolour)
+  poloSt: { cat: 'top', label: 'поло в полоску', model: { cut: 'polo', pat: 'stripe' }, colors: ['white', 'navy', 'red'], price: 420, tags: ['street'] },
+  longSt: { cat: 'top', label: 'лонгслив в полоску', model: { cut: 'long', pat: 'stripe' }, colors: ['white', 'black', 'red'], price: 380, tags: ['street'] },
+  sweatChk: { cat: 'top', label: 'свитшот в клетку', model: { cut: 'sweatshirt', pat: 'check' }, colors: ['wine', 'navy', 'olive'], price: 600, reward: 5, tags: ['street'] },
+  hoodTie: { cat: 'top', label: 'худи тай-дай', model: { cut: 'hoodPO', pat: 'tiedye' }, colors: ['blue', 'pink', 'orange'], price: 800, tags: ['street'] },
+  trackJLg: { cat: 'top', label: 'олимпийка-монограмма', model: { cut: 'trackJ', pat: 'logo' }, colors: ['black', 'navy', 'wine'], price: 1100, reward: 7, tags: ['street'], brand: 'REDLINE' },
+  windCamo: { cat: 'top', label: 'ветровка камуфляж', model: { cut: 'wind', pat: 'camo' }, colors: ['olive', 'black'], price: 950, tags: ['street'], brand: 'BLACKOUT SUPPLY' },
+  jersey99: { cat: 'top', label: 'джерси «99»', model: { cut: 'jersey', num: 99, pat: 'logo' }, colors: ['black', 'blue', 'red'], price: 900, tags: ['street'], brand: 'GUTTERWAVE' },
+  tankCamo: { cat: 'top', label: 'майка камуфляж', model: { cut: 'tank', pat: 'camo' }, colors: ['olive', 'black'], price: 220, tags: ['street'] },
+  bikeCamo: { cat: 'bottom', label: 'велосипедки камуфляж', model: { cut: 'bike', pat: 'camo' }, colors: ['olive', 'black'], price: 340, tags: ['street'] },
+  trackPLg: { cat: 'bottom', label: 'спортивки-монограмма', model: { cut: 'trackP', pat: 'logo', c2: '#ecebe6' }, colors: ['black', 'navy'], price: 750, reward: 4, tags: ['street'], brand: 'COLDBLOOD' },
+  bermudaSt: { cat: 'bottom', label: 'бермуды в полоску', model: { cut: 'bermuda', belt: 1, pat: 'stripe' }, colors: ['white', 'navy', 'sand'], price: 360, tags: ['street'] },
+  tricoSt: { cat: 'bottom', label: 'трико в полоску', model: { cut: 'trico', pat: 'stripe', c2: '#ecebe6' }, colors: ['red', 'blue', 'black'], price: 700, reward: 3, tags: ['ring', 'street'], brand: 'IRON JAW' },
+  panamaCamo: { cat: 'head', label: 'панама камуфляж', model: { hat: 'panama', off: [0.5, 0.85], pat: 'camo' }, colors: ['olive', 'sand'], price: 320, tags: ['street'] },
+  panamaTie: { cat: 'head', label: 'панама тай-дай', model: { hat: 'panama', off: [0.5, 0.85], pat: 'tiedye' }, colors: ['pink', 'blue'], price: 340, tags: ['street'] },
+  capChk: { cat: 'head', label: 'кепка в клетку', model: { hat: 'cap', off: [0.6, 0.75], pat: 'check' }, colors: ['red', 'navy', 'sand'], price: 360, tags: ['street'] },
+  beanieSt: { cat: 'head', label: 'бини в полоску', model: { hat: 'beanie', off: [0.8, 0.4], pat: 'stripe' }, colors: ['red', 'navy', 'yellow'], price: 260, tags: ['street'] },
+  slidesLg: { cat: 'shoes', label: 'шлёпанцы-монограмма', model: { sole: '#202124', top: 21, deco: 'slide', sock: '#efeee9', pat: 'logo' }, colors: ['black', 'wine'], price: 300, tags: ['street'], brand: 'AFTERHOURS' },
+  hiTopChk: { cat: 'shoes', label: 'высокие кеды в клетку', model: { sole: '#f4f2ec', top: 15, lace: '#ffffff', deco: 'hi', c2: '#ecebe6', canvas: 1, pat: 'check' }, colors: ['red', 'navy'], price: 600, tags: ['street'] },
+}).map(([k, it]) => [k, { ...it, ...W3 }])));
+for (const k in ITEMS) ITEMS[k].id = k;
+ITEMS.guard.colors = GUARDS.map(x => x.id);
 /* ───────── fighter ───────── */
 // scratch for the per-frame fighter code (walk, ik, pose, plantFeet, armClear): nothing there allocates
 const _walkQ = [], _ik1 = new Quat(), _ik2 = new Quat(), _ik3 = new Quat(), _po1 = new V3(), _po2 = new V3(), _po3 = new V3(), _po4 = new V3(), _poq1 = new Quat(), _poq2 = new Quat();
@@ -14083,8 +14363,10 @@ function shopRender() {
   $('sh-cash').textContent = cash(PROF.cash); $('shop-lbl') && ($('shop-lbl').textContent = cash(PROF.cash));
   swatches('o-scat', SHOP_CATS.map(c => ({ id: c, label: WCAT_LABEL[c] })), () => cat, v => { SHOP.cat = v; shopRender(); setView(v === 'head' || v === 'eyes' ? VIEW_FACE : v === 'hands' ? SHOP_HANDS : VIEW_FULL); }, true, true);
   if (SHOP.shown) { SHOP.shown.add(cat); shopCatMarks(); }
+  swatches('o-ssort', WSORT, () => SHOP.sort || 'all', v => { SHOP.sort = v; setTimeout(shopRender, 0); }, true, true);   // order of the cards (04l_wardrobe3.js)
   const box = $('o-sitems'); box.textContent = ''; SHOP.sel = cur; if (UI.scr === 'shop' || SHOP.snap) thQueue(cat);
-  shopList(cat).forEach((it, i) => {
+  const all = shopList(cat), none = all.filter(i => i.id === 'none');
+  [...none, ...wearSort(all.filter(i => i.id !== 'none'), SHOP.sort, SHOP.fresh)].forEach((it, i) => {
     const own = it.free || itemOwned(it.id), b = document.createElement('button'); b.type = 'button'; b.className = 'shc' + (own ? ' own' : it.reward ? ' lock' : '');
     b.setAttribute('aria-pressed', String(it.id === cur));
     const th = document.createElement('i'), k = thKey(cat, it.id), u = TH.mem.get(k); th.className = 'th'; th.dataset.k = k; if (u) th.style.backgroundImage = `url(${u})`; b.append(th);   // R-21: the picture (thStep fills it in)
@@ -14100,7 +14382,8 @@ function shopRender() {
     box.appendChild(b);
   });
   const it = ITEMS[cur], cols = cat !== 'hands' && it && it.cat === cat ? wearColors(it).map(id => { const c = wearColor(it, id); return { id, c: c.c, label: c.label || id, pat: c.pat }; }) : [];
-  swatches('o-scolor', cols, () => wearGet(LOOK, cat).color || (it && it.colors[0]), v => { LOOK[cat] = { id: it.id, color: v }; });
+  swatches('o-scolor', cols, () => wearGet(LOOK, cat).color || (it && it.colors[0]), v => { LOOK[cat] = { ...wearGet(LOOK, cat), id: it.id, color: v }; });
+  wearPatRow('o-spat', cat !== 'hands' && it && it.cat === cat ? it : null, () => wearGet(LOOK, cat), v => { LOOK[cat] = { ...wearGet(LOOK, cat), pat: v }; });
   [...$('o-scolor').children].forEach((b, i) => { b.title = cols[i].label; if (cols[i].pat) b.style.backgroundImage = `url(${GEAR.camoUrl || (GEAR.camoUrl = (() => { const c = document.createElement('canvas'); c.width = c.height = 48; camoPaint(c.getContext('2d'), 48, 48, 0.35); return c.toDataURL(); })())})`; if (i === it.colors.length - 1) b.style.marginRight = '10px'; });
   $('o-scolor').parentElement.hidden = !cols.length;
   // the buy button: what it says depends on the item

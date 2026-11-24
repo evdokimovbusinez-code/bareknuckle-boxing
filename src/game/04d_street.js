@@ -56,7 +56,7 @@ function pantsGeo(F, cut) {
   const nv = rings.length * (N + 1), pos = new Float32Array(nv * 6), nrm = new Float32Array(nv * 6), uv = new Float32Array(nv * 4), si = new Uint16Array(nv * 8), sw = new Float32Array(nv * 8), hem = new Float32Array(nv * 4), idx = [];
   rings.forEach((r, k) => {
     const h = r.h, t = sstep(crotch - 5, crotch + 3, h), gap = lerp(0.35, 0, t);
-    const cl = r.lip ? -0.9 : lerp(lerp(1.0, 1.7, sstep(crotch - 10, crotch + 6, h)), 0.55, sstep(top - 9, top - 3.5, h));
+    const cl = r.lip ? -0.9 : lerp(lerp(1.0, 1.7, sstep(crotch - 10, crotch + 6, h)), 0.55, sstep(top - 9, top - 3.5, h)) * (C.tight || 1);   // tight: cycling shorts
     const cx = r.cx, cy = r.cy - C.fwd * sstep(C.hem + 10, C.hem, h), a0 = TAU * jF / N;
     const aF = lerp(a0, Math.atan2(cy - (r.yF - cl * 0.9), cx - gap), t), aB = lerp(a0, Math.atan2(r.yB + cl * 0.9 - cy, cx - gap), t);
     const ang = []; for (let j = 0; j < N; j++) ang.push(j <= jF ? aF * j / jF : j >= jB ? TAU - aB * (N - j) / jF : lerp(aF, TAU - aB, (j - jF) / (jB - jF)));
@@ -94,7 +94,7 @@ function heightToNormal(c, k) {
 }
 // colour and normal map of a pair of trousers. u: 0 inseam · 0.15 fly (front midline) · 0.25 front of the leg · 0.5 outseam · 0.75 back · 0.85 seat seam; v: hem → waist
 function pantsTex(b, geo) {
-  const C = PANT_CUTS[b.cut], { top, crotch } = geo.userData, W = 512, H = 1024, X = u => u * W, Y = h => (1 - (h - C.hem) / (top - C.hem)) * H, cm = H / (top - C.hem), jeans = b.cut === 'jeans', sweat = b.cut === 'sweat', st = b.style;
+  const C = PANT_CUTS[b.cut], { top, crotch } = geo.userData, W = 512, H = 1024, X = u => u * W, Y = h => (1 - (h - C.hem) / (top - C.hem)) * H, cm = H / (top - C.hem), jeans = b.cut === 'jeans', sweat = b.cut === 'sweat' || !!C.elastic, st = b.style;
   const path = (g, pts) => { g.beginPath(); pts.forEach(([u, h], i) => i ? g.lineTo(X(u), Y(h)) : g.moveTo(X(u), Y(h))); };
   const map = GEAR['pt_' + b.id] || (GEAR['pt_' + b.id] = canvasTex(W, H, g => {
     const dark = new THREE.Color(b.c).getHSL({}).l < 0.2, thr = jeans ? (dark ? '#6a6b72' : '#c9973f') : dark ? '#3a3b42' : 'rgba(0,0,0,0.45)';
@@ -102,7 +102,7 @@ function pantsTex(b, geo) {
     const line = (pts, c, w) => { g.strokeStyle = c; g.lineWidth = w; path(g, pts); g.stroke(); };
     const box = (u0, h1, u1, h0, c) => { g.fillStyle = c; g.fillRect(X(u0), Y(h1), X(u1) - X(u0), Y(h0) - Y(h1)); };
     const fade = (u, h, ru, rh, a, c) => { const gr = g.createRadialGradient(0, 0, 0, 0, 0, 1); gr.addColorStop(0, `rgba(${c || '255,255,255'},${a})`); gr.addColorStop(1, `rgba(${c || '255,255,255'},0)`); g.save(); g.translate(X(u), Y(h)); g.scale(ru * W, rh * cm); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 1, 0, 7); g.fill(); g.restore(); };
-    g.fillStyle = b.c; g.fillRect(0, 0, W, H); if (b.pat) camoPaint(g, W, H, 1.5);
+    g.fillStyle = b.c; g.fillRect(0, 0, W, H); if (b.pat) patPaint(b, g, W, H, 1.5);
     if (jeans) for (let y = -W; y < H; y += 3) { g.strokeStyle = `rgba(${rr() < 0.5 ? '255,255,255' : '0,0,0'},${0.02 + rr() * 0.035})`; g.lineWidth = 1.1; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y + W); g.stroke(); }
     if (st === 'cargo') { g.strokeStyle = 'rgba(255,255,255,0.05)'; g.lineWidth = 1; for (let x = 0; x < W; x += 9) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); } for (let y = 0; y < H; y += 9) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } }
     if (st === 'bball') { g.fillStyle = 'rgba(255,255,255,0.05)'; for (let y = 0; y < H; y += 6) for (let x = (y / 6 % 2) * 3; x < W; x += 6) g.fillRect(x, y, 1.6, 1.6); }
@@ -141,8 +141,9 @@ function pantsTex(b, geo) {
       if (st === 'cargo') { const a = C.hem + 5, t2 = C.hem + 22; box(0.39, t2, 0.61, a, 'rgba(0,0,0,0.08)'); stitch([[0.39, t2], [0.61, t2], [0.61, a], [0.39, a], [0.39, t2]]); box(0.385, t2 + 0.6, 0.615, t2 - 5, 'rgba(0,0,0,0.13)'); stitch([[0.385, t2 - 5], [0.615, t2 - 5]]);
         line([[0.5, t2 - 5], [0.5, a]], 'rgba(0,0,0,0.35)', 2); g.fillStyle = '#1c1c1a'; g.beginPath(); g.arc(X(0.5), Y(t2 - 3), 3.5, 0, 7); g.fill(); }
     }
+    if (C.deco || b.rip) pantsDeco(g, b, C, { X, Y, cm, box, line, stitch, top, crotch, W, H });   // 04l_wardrobe3.js
   }));
-  const nk = 'pn_' + b.cut + (st || ''), nmap = GEAR[nk] || (GEAR[nk] = (() => {
+  const nk = 'pn_' + b.cut + (st || '') + (b.rip ? 'r' : ''), nmap = GEAR[nk] || (GEAR[nk] = (() => {
     const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.fillStyle = '#808080'; g.fillRect(0, 0, W, H); g.lineCap = 'round'; g.lineJoin = 'round';
     const ridge = (pts, w, a, dk) => { for (const f of [1, 0.6, 0.3]) { g.strokeStyle = `rgba(${dk ? '0,0,0' : '255,255,255'},${a})`; g.lineWidth = w * f; path(g, pts); g.stroke(); } };
     // an accordion fold around the leg: strongest at `u0`, wavy
@@ -161,12 +162,13 @@ function pantsTex(b, geo) {
     else { ridge([[0, top - 2.2], [1, top - 2.2]], 2.6 * cm, 0.16); ridge([[0, top - 4.3], [1, top - 4.3]], 4, 0.3, 1); for (const o of [0, 0.7]) ridge([[0.29, top - 4.2 - o], [0.3, top - 9 - o], [0.35, top - 12 - o], [0.5, top - 13.5 - o]], 3, 0.2, 1);
       ridge([[0.6, top - 14], [0.79, top - 14], [0.785, top - 25], [0.695, top - 28], [0.605, top - 25], [0.6, top - 14]], 4, 0.2, 1); ridge([[0.5, top - 8.8], [0.85, top - 11.8]], 4, 0.2, 1);
       if (st === 'cargo') { const a = C.hem + 5, t2 = C.hem + 22; g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(X(0.39), Y(t2), 0.22 * W, (t2 - a) * cm); ridge([[0.39, t2], [0.61, t2], [0.61, a], [0.39, a], [0.39, t2]], 5, 0.25, 1); ridge([[0.385, t2 - 5], [0.615, t2 - 5]], 5, 0.3, 1); } }
+    if (b.rip) pantsDecoN(g, b, C, { ridge, X, Y, top });
     return heightToNormal(c, jeans ? 5 : 6);
   })());
   return { map, nmap };
 }
 function pantsMesh(F, b) {
-  const geo = pantsGeo(F, b.cut), { map, nmap } = pantsTex(b, geo), jeans = b.cut === 'jeans', shiny = b.style === 'bball';
+  const geo = pantsGeo(F, b.cut), { map, nmap } = pantsTex(b, geo), jeans = b.cut === 'jeans', shiny = b.style === 'bball' || !!PANT_CUTS[b.cut].shiny;
   const mat = new THREE.MeshPhysicalMaterial({ map, normalMap: nmap, normalScale: new THREE.Vector2(jeans ? 0.6 : 0.9, jeans ? 0.6 : 0.9), roughness: shiny ? 0.55 : jeans ? 0.82 : 0.93, sheen: shiny ? 0.6 : 0.3, sheenRoughness: shiny ? 0.4 : 0.8, sheenColor: new THREE.Color(b.c).multiplyScalar(1.4), side: THREE.DoubleSide, envMapIntensity: 0.5 });
   const U = { uHemL: { value: new V3() }, uHemR: { value: new V3() } };
   mat.onBeforeCompile = s => { Object.assign(s.uniforms, U);
@@ -231,7 +233,7 @@ function shoeGeo(F, top) {
 function shoeTex(f) {
   return GEAR['st_' + f.id] || (GEAR['st_' + f.id] = canvasTex(512, 512, (g, W) => {
     const lace = f.lace || '#f2f0ea', sole = f.sole, dk = 'rgba(0,0,0,0.35)';
-    g.fillStyle = f.c; g.fillRect(0, 0, W, W); if (f.pat) camoPaint(g, W, W, 0.8);
+    g.fillStyle = f.c; g.fillRect(0, 0, W, W); if (f.pat) patPaint(f, g, W, W, 0.8);
     for (let i = 0; i < 6000; i++) { g.fillStyle = `rgba(${rr() < 0.5 ? '0,0,0' : '255,255,255'},${rr() * (f.canvas ? 0.09 : 0.04)})`; g.fillRect(rr() * W, rr() * W, 1.6, 1.6); }
     // the foot: y 0…256 (sole · inner side · top 128 · outer side · sole)
     g.fillStyle = sole; g.fillRect(0, 0, W, 60); g.fillRect(0, 196, W, 60); g.fillStyle = dk; g.fillRect(0, 59, W, 2); g.fillRect(0, 195, W, 2);
@@ -251,6 +253,7 @@ function shoeTex(f) {
     g.fillStyle = f.tab || 'rgba(0,0,0,0.25)'; g.fillRect(366, 256, 36, 256); g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 256, W, 9);
     if (f.patch) for (const x of [0, W]) { g.fillStyle = f.patch; g.beginPath(); g.arc(x, 330, 26, 0, 7); g.fill(); g.strokeStyle = f.c; g.lineWidth = 3; g.beginPath(); g.arc(x, 330, 19, 0, 7); g.stroke(); }
     if (f.boot) { g.fillStyle = f.boot; g.fillRect(236, 256, 40, 256); }
+    if (f.deco) shoeDeco(g, f, W);   // 04l_wardrobe3.js: high tops, combat boots, slides over socks
   }));
 }
 function shoeMesh(F, f) {

@@ -34,8 +34,10 @@ function shopRender() {
   $('sh-cash').textContent = cash(PROF.cash); $('shop-lbl') && ($('shop-lbl').textContent = cash(PROF.cash));
   swatches('o-scat', SHOP_CATS.map(c => ({ id: c, label: WCAT_LABEL[c] })), () => cat, v => { SHOP.cat = v; shopRender(); setView(v === 'head' || v === 'eyes' ? VIEW_FACE : v === 'hands' ? SHOP_HANDS : VIEW_FULL); }, true, true);
   if (SHOP.shown) { SHOP.shown.add(cat); shopCatMarks(); }
+  swatches('o-ssort', WSORT, () => SHOP.sort || 'all', v => { SHOP.sort = v; setTimeout(shopRender, 0); }, true, true);   // order of the cards (04l_wardrobe3.js)
   const box = $('o-sitems'); box.textContent = ''; SHOP.sel = cur; if (UI.scr === 'shop' || SHOP.snap) thQueue(cat);
-  shopList(cat).forEach((it, i) => {
+  const all = shopList(cat), none = all.filter(i => i.id === 'none');
+  [...none, ...wearSort(all.filter(i => i.id !== 'none'), SHOP.sort, SHOP.fresh)].forEach((it, i) => {
     const own = it.free || itemOwned(it.id), b = document.createElement('button'); b.type = 'button'; b.className = 'shc' + (own ? ' own' : it.reward ? ' lock' : '');
     b.setAttribute('aria-pressed', String(it.id === cur));
     const th = document.createElement('i'), k = thKey(cat, it.id), u = TH.mem.get(k); th.className = 'th'; th.dataset.k = k; if (u) th.style.backgroundImage = `url(${u})`; b.append(th);   // R-21: the picture (thStep fills it in)
@@ -51,7 +53,8 @@ function shopRender() {
     box.appendChild(b);
   });
   const it = ITEMS[cur], cols = cat !== 'hands' && it && it.cat === cat ? wearColors(it).map(id => { const c = wearColor(it, id); return { id, c: c.c, label: c.label || id, pat: c.pat }; }) : [];
-  swatches('o-scolor', cols, () => wearGet(LOOK, cat).color || (it && it.colors[0]), v => { LOOK[cat] = { id: it.id, color: v }; });
+  swatches('o-scolor', cols, () => wearGet(LOOK, cat).color || (it && it.colors[0]), v => { LOOK[cat] = { ...wearGet(LOOK, cat), id: it.id, color: v }; });
+  wearPatRow('o-spat', cat !== 'hands' && it && it.cat === cat ? it : null, () => wearGet(LOOK, cat), v => { LOOK[cat] = { ...wearGet(LOOK, cat), pat: v }; });
   [...$('o-scolor').children].forEach((b, i) => { b.title = cols[i].label; if (cols[i].pat) b.style.backgroundImage = `url(${GEAR.camoUrl || (GEAR.camoUrl = (() => { const c = document.createElement('canvas'); c.width = c.height = 48; camoPaint(c.getContext('2d'), 48, 48, 0.35); return c.toDataURL(); })())})`; if (i === it.colors.length - 1) b.style.marginRight = '10px'; });
   $('o-scolor').parentElement.hidden = !cols.length;
   // the buy button: what it says depends on the item

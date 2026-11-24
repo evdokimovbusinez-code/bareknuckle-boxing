@@ -354,6 +354,8 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
 .shc .nw{position:absolute;left:3px;top:3px;font:700 8px/1 var(--mono);font-style:normal;letter-spacing:.08em;text-transform:uppercase;background:var(--neon);color:#fff;padding:2px 4px;border-radius:2px;box-shadow:0 1px 3px rgba(0,0,0,.5)}
 .shc .pr small{min-height:0;margin-left:7px;font:700 8.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#8fd49a;vertical-align:1px}
 .shc .pr.no{color:rgba(226,177,74,.6)}
+.sw button em.nw{font:700 7px/1 var(--mono);font-style:normal;letter-spacing:.06em;text-transform:uppercase;background:var(--neon);color:#fff;padding:1px 3px;border-radius:2px;margin-left:4px;vertical-align:middle}
+.sw button.pat{background-size:cover;min-width:34px}
 .sw button.nw{position:relative}.sw button.nw::after{content:'';position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--neon)}
 .sw button.txt.lock{opacity:.7}.sw button.txt.lock::after{content:none}.sw button.txt .pr{font-size:9px;letter-spacing:.04em;opacity:.8;color:var(--gold)}
 .btn:disabled{opacity:.55;cursor:default;box-shadow:none}.btn.pri:disabled{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.2)}
@@ -745,8 +747,10 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
           </div>
           <div class="cpane" data-cat="wear" hidden>
             <div class="fld"><span>что</span><div class="sw" id="o-wcat"></div></div>
+            <div class="fld"><span>порядок</span><div class="sw" id="o-wsort"></div></div>
             <div class="fld"><span>модель</span><div class="sw" id="o-wmodel"></div></div>
             <div class="fld"><span>цвет</span><div class="sw" id="o-wcolor"></div></div>
+            <div class="fld"><span>узор</span><div class="sw" id="o-wpat"></div></div>
             <div class="wnote" id="o-wnote"></div>
           </div>
           <div class="cpane" data-cat="hands" hidden>
@@ -774,8 +778,10 @@ h1{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(28px,6.5v
       <div class="ptitle"><small>одежда и экипировка</small>Магазин<b class="cash" id="sh-cash"></b></div>
       <div class="pbody">
         <div class="fld"><span>что</span><div class="sw" id="o-scat"></div></div>
+        <div class="fld"><span>порядок</span><div class="sw" id="o-ssort"></div></div>
         <div class="shgrid" id="o-sitems"></div>
         <div class="fld"><span>цвет</span><div class="sw" id="o-scolor"></div></div>
+        <div class="fld"><span>узор</span><div class="sw" id="o-spat"></div></div>
         <div class="wnote" id="o-snote"></div>
       </div>
       <div class="pfoot"><button class="btn" id="shop-back">Назад</button><button class="btn pri" id="sh-buy">Купить</button></div>
