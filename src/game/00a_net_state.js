@@ -14,7 +14,15 @@ const NET = {
   oAway: false, awayI: 0,   // R-26: the opponent's tab is hidden (banner #net-away); our keep-alive timer while ours is
   stat: { snaps: 0, recv: 0, bytes: 0, max: 0, ins: 0, closes: 0 },
   tmp: null,
+  // R-25: the guest predicts his own man. seq = number of the last press / block change sent; on the host ack = the last one it
+  // consumed, hs = the last one it started (both go back in every snapshot, `k`); now = this page's clock (sum of frame dt),
+  // off / jit = the host's clock against ours and how much the arrivals wander (→ the adaptive buffer `buf`);
+  // lag / lagQ = debug: every inbound message is held for `lag` seconds (__mp.lag(ms))
+  seq: 0, ack: 0, hs: 0, bAck: 0, now: 0, off: 0, jit: 0, lag: 0, lagQ: [],
+  pr: { q: [], ok: [], on: false, conf: false, w: 0, curS: 0, maxS: 0, maxAt: -9, last: null, run: false, L: null, S: null, off: false,
+    stat: { n: 0, back: 0, late: 0 } },
 };
+const NET_PR = { up: 0.05, down: 0.08, hold: 0.65, lost: 1.5, bufMin: 0.06, bufMax: 0.16 };   // R-25: blend in / roll back (s), a press waits this long for its turn, an unanswered one is forgotten; buffer limits (s)
 const NET_PEER_URL = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
 const NET_ICE = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' },
