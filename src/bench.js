@@ -466,3 +466,40 @@ window.__bot = {
 };
 // R-05 (docs/audit/scenarios/popups.js): seed the game's random stream (rr) so a before / after pair of shots replays the same AI / hit rolls (0 = unseeded again)
 window.__rrSeed = s => { rr = s ? botRng(s) : Math.random; };
+/* R-23 (docs/audit/scenarios/simprof.js): where the CPU time of one simulation step goes. Wraps the steps of frame(), every method of
+   Fighter / Ragdoll / XWorld / XBody / Flesh / Face / PS / ShortsCloth, three's updateMatrixWorld (outermost calls only) and cannon's
+   World.step for `frames` steps of whatever state the game is in. Self time = own time minus the wrapped callees; the tiny helpers in
+   SKIP stay unwrapped (their time goes to the caller). Returns { ms, rows: [[name, self ms / step, calls / step]], groups, table }. */
+window.__simProf = (frames = 600, dt = 1 / 60, mem = false) => {
+  // mem = true: the same table for the garbage made (kB of JS heap per step instead of ms; needs --enable-precise-memory-info; a sample
+  // with a GC inside is dropped, the heap counter moves in allocation-buffer steps — so read it as shares, over ≥ 600 frames)
+  const T = {}, N = {}, st = [], undo = [], clock = mem ? () => performance.memory.usedJSHeapSize / 1024 : () => performance.now();
+  const wrap = (k, f) => function () { const t0 = clock(); st.push(0); try { return f.apply(this, arguments); } finally { const el = Math.max(0, clock() - t0), ch = st.pop(); T[k] = (T[k] || 0) + Math.max(0, el - ch); N[k] = (N[k] || 0) + 1; if (st.length) st[st.length - 1] += el; } };
+  const SKIP = /^(constructor|bpos|mpos|mquat|setMQuat|rot|walk|knuckle|canAct|canChain)$/;
+  const cls = (name, C) => { const P = C.prototype; for (const m of Object.getOwnPropertyNames(P)) { if (SKIP.test(m) || typeof Object.getOwnPropertyDescriptor(P, m).value !== 'function') continue; const f = P[m]; P[m] = wrap(name + '.' + m, f); undo.push(() => { P[m] = f; }); } };
+  cls('Fighter', Fighter); cls('Ragdoll', Ragdoll); cls('XWorld', XWorld); cls('XBody', XBody); cls('Flesh', Flesh); cls('Face', Face); cls('PS', PS); cls('ShortsCloth', ShortsCloth);
+  const FN = 'playerInput ai aiFollow aimFor headFrames armSegs bodyCaps closeTick closeSep kdTick stateTick ropeTick bagStep recFrame camUpdate locSync crowdTick hudUpdate trailTick wearTick wearPose pantsTick topTick renderHair renderTubes resTick perfTick resolveHit clearPt clearSeg clearHead clearUpper bodyOverlap hlTick netTick'.split(' ');
+  const orig = {}; for (const k of FN) { try { orig[k] = eval(k); eval(k + ' = wrap(k, orig[k])'); } catch (e) { delete orig[k]; } }
+  const fx = [FX.update, MIST.update]; FX.update = wrap('FX.update', fx[0]); MIST.update = wrap('MIST.update', fx[1]);
+  const O3 = THREE.Object3D.prototype, umw = O3.updateMatrixWorld, umwW = wrap('three.updateMatrixWorld', umw); let ud = 0;
+  O3.updateMatrixWorld = function (force) { if (ud) return umw.call(this, force); ud++; try { return umwW.call(this, force); } finally { ud--; } };
+  const cw = CANNON.World.prototype.step; CANNON.World.prototype.step = wrap('cannon.World.step', cw);
+  const t0 = clock(); let all = 0;
+  try { st.push(0); if (mem) { for (let i = 0; i < frames; i++) { const a = clock(); window.__tick(1, dt); all += Math.max(0, clock() - a); } } else { window.__tick(frames, dt); all = clock() - t0; } }
+  finally {
+    for (const u of undo) u(); for (const k in orig) eval(k + ' = orig[k]'); FX.update = fx[0]; MIST.update = fx[1]; O3.updateMatrixWorld = umw; CANNON.World.prototype.step = cw;
+  }
+  T['frame() itself + unwrapped'] = Math.max(0, all - st.pop()); N['frame() itself + unwrapped'] = frames;
+  const GROUPS = [['рэгдолл стоячих реакций (cannon-es)', /^(Ragdoll\.|cannon\.)/], ['рэгдолл нокаута (XWorld / XBody)', /^X(World|Body)\./],
+    ['ткань / волосы (PS, ShortsCloth, одежда)', /^(PS\.|ShortsCloth\.|renderHair|renderTubes|pantsTick|topTick|wearPose|wearTick|Fighter\.(simulate|updateColliders))/],
+    ['Flesh / Face', /^(Flesh|Face)\./], ['толпа', /^crowdTick/], ['three updateMatrixWorld', /^three\./],
+    ['Fighter.update + IK + руки / корпус', /^(Fighter\.|headFrames|armSegs|bodyCaps|clear|closeSep|closeTick|bodyOverlap|aimFor)/],
+    ['ИИ / ввод / удары', /^(ai|aiFollow|playerInput|resolveHit|kdTick|stateTick)$/], ['прочее (камера, HUD, запись повтора, FX)', /./]];
+  const rows = Object.keys(T).sort((a, b) => T[b] - T[a]).map(k => [k, T[k] / frames, N[k] / frames]);
+  const groups = GROUPS.map(g => [g[0], 0]); for (const r of rows) groups[GROUPS.findIndex(g => g[1].test(r[0]))][1] += r[1];
+  const ms = all / frames, pc = v => (100 * v / ms).toFixed(1).padStart(5) + ' %';
+  const table = (mem ? 'GARBAGE, kB of heap per step (read "ms" as kB): ' : 'step ') + ms.toFixed(3) + ' ms (profiler on), state ' + G.state + ', gfx ' + GFX.level + '\n'
+    + groups.sort((a, b) => b[1] - a[1]).map(g => g[1].toFixed(3).padStart(7) + ' ms ' + pc(g[1]) + '  ' + g[0]).join('\n') + '\n--- self time per function (ms / step, share, calls / step)\n'
+    + rows.filter(r => r[1] > ms * 0.004).map(r => r[1].toFixed(3).padStart(7) + ' ' + pc(r[1]) + ' ' + r[2].toFixed(1).padStart(6) + '  ' + r[0]).join('\n');
+  return { ms, rows, groups, table };
+};

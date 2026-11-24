@@ -335,7 +335,7 @@ class Ragdoll {
         const a = Math.PI * q.t / q.T, b = Math.PI * Math.min(q.t + h, q.T) / q.T, k = (Math.cos(a) - Math.cos(b)) / 2 / h;
         q.b.applyForce(_v4.copy(q.J).multiplyScalar(k), q.r); q.t += h;
       }
-    });
+    });   // (R-23: a coarser substep for this on the low preset — XWorld.step's third argument — was tried and taken back: it is the only change that touches the fight itself, and it saves ≤ 0.1 ms)
     for (const d of defs) {   // leash: never further from the animated pose than a fighter would let himself be moved
       if (d.kin) continue; const b = d.body, mx = RAG_MAXDEV[d.key] || 0.3, dot = Math.abs(b.quaternion.dot(d.qa)), ang = 2 * Math.acos(Math.min(1, dot));
       if (ang > mx) { const qb = _hq.copy(b.quaternion); b.quaternion.copy(d.qa).slerp(qb, mx / ang); b.angularVelocity.multiplyScalar(0.5); }

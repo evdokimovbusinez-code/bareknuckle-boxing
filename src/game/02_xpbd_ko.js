@@ -3,6 +3,8 @@
    floor contacts does not converge in a few Gauss–Seidel sweeps — joints drift apart, stops get pushed through, feet pop off the floor.
    XPBD with many small substeps (one sweep each) solves joints, stops and contacts as position constraints: exact, stiff and stable. */
 const _xq1 = new Quat(), _xq2 = new Quat(), _xq3 = new Quat(), _xa = new V3(), _xb = new V3(), _xc = new V3(), _xd = new V3(), _xe = new V3(), _xR = new THREE.Matrix3(), _xRt = new THREE.Matrix3(), _xM4 = new M4();
+// R-23: scratch of the contact loops (they used to clone a vector per contact per 1/960 s substep), the empty debug-tweak object, limOf's pair
+const _xf = new V3(), _xg = new V3(), _TW0 = {}, _lim2 = [0, 0];
 class XBody {
   constructor(mass, sph, pos, quat) {   // sph: [[offset from the COM in the body frame, radius]]
     this.mass = mass; this.invMass = mass ? 1 / mass : 0;
@@ -70,9 +72,11 @@ const ROPE = { T: 2600, R: 0.02, max: 0.32, mu: 0.4, damp: 9, kMax: 3e4 };
 const _r1 = new V3(), _r2 = new V3(), _r3 = new V3(), _r4 = new V3(), _r5 = new V3(), _rq = new Quat();
 const XP = { sub: 1 / 960, muS: 0.75, muD: 0.6, linDamp: 0.05, angDamp: 0.35, rollDamp: 5 };
 class XWorld {
-  constructor(R) { this.R = R; this.planes = []; this.obst = []; this.contacts = []; this.pairs = []; this.t = 0; this.k = 0; }
-  step(dt, pre) {
-    const n = Math.max(1, Math.ceil(dt / XP.sub - 1e-6)), h = dt / n, B = this.bodies;
+  constructor(R) { this.R = R; this.planes = []; this.obst = []; this.contacts = []; this.pairs = []; this.t = 0; this.k = 0; this.pool = []; this.pn = 0; }
+  // R-23: a contact record for solveVel, taken from a pool that solve() rewinds (was a fresh object + cloned vectors per contact per substep)
+  con(L, b, r, n, ln, mu, damp) { const o = this.pool[this.pn] || (this.pool[this.pn] = { b: null, r: new V3(), n: new V3(), ln: 0, mu: undefined, damp: undefined }); this.pn++; o.b = b; o.r.copy(r); o.n.copy(n); o.ln = ln; o.mu = mu; o.damp = damp; L.push(o); }
+  step(dt, pre, sub = XP.sub) {   // sub: the substep (R-23: the standing hit reaction asks for a coarser one on the low preset)
+    const n = Math.max(1, Math.ceil(dt / sub - 1e-6)), h = dt / n, B = this.bodies;
     for (let s = 0; s < n; s++) {
       pre(h);
       for (const b of B) {   // integrate
@@ -104,7 +108,7 @@ class XWorld {
     }
   }
   solve(h) {
-    const R = this.R, C = this.contacts; C.length = 0;
+    const R = this.R, C = this.contacts; C.length = 0; this.pn = 0;
     for (const b of this.bodies) b.contact = 0;
     // joints: the pivots coincide
     for (const d of R.defs) {
@@ -115,7 +119,7 @@ class XWorld {
     }
     // muscle tone: a compliant drive toward the target posture. Stiffness k = I·ω² with I the articulated (reduced) inertia about the
     // joint, compliance α = 1/k — implicit, so it stays stable however stiff, and the joint constraints carry it through the whole limb
-    const TW = window.__tw || {}, G0 = RAG_GAIN;
+    const TW = window.__tw || _TW0, G0 = RAG_GAIN;
     for (const d of R.defs) {
       if (!d.p || !d.toneW) continue; const P = d.p.body, Q = d.body;
       const D = _xq1.copy(P.quaternion).multiply(_xq2.copy(d.qPbind).invert()), tl = d.tgt.length();
@@ -127,7 +131,7 @@ class XWorld {
       // soft limits: past the anatomical range a much stiffer spring pulls back (the hard stop below is the bone block)
       const J = jointGeo(d, P.quaternion, Q.quaternion); d.inLim = 0;
       for (let i = 0; i < 3; i++) {
-        const c = J.c[i]; if (c !== c) continue; const [lo, hi] = limOf(d, i, J.c), ex = c > hi ? hi - c : c < lo ? lo - c : 0; if (!ex) continue;
+        const c = J.c[i]; if (c !== c) continue; const lm = limOf(d, i, J.c), lo = lm[0], hi = lm[1], ex = c > hi ? hi - c : c < lo ? lo - c : 0; if (!ex) continue;
         const lw = (TW.lk ?? 1.6) * G0.lim * (d.key === 'waist' || d.key === 'chest' || d.key.startsWith('thigh') ? 1.7 : d.key.startsWith('shin') || d.key.startsWith('farm') || d.key.startsWith('foot') ? 2 : 1.2);
         xAng(Q, P, _v6.copy(J.n[i]).multiplyScalar(ex), 1 / (d.Ieff * lw * lw), h); d.inLim = Math.max(d.inLim, lw);
         if (window.__viol) { const kk = d.key + 'FST'[i]; window.__viol[kk] = Math.max(window.__viol[kk] || 0, Math.abs(ex) / D2R); }
@@ -141,23 +145,25 @@ class XWorld {
       for (const d of R.defs) {
         if (!d.p || !d.Ieff) continue; const P = d.p.body, Q = d.body;
         // passive damping per joint, ~critical for the limb swinging as a pendulum under gravity (√(g/L)): feet and forearms are short and fast
-        const pk = d.key.startsWith('foot') ? (TW.cf ?? 3) : d.key.startsWith('farm') ? (TW.ca ?? 2) : d.key === 'neck' || d.key === 'head' ? 1.6 : 1;
+        const kc = d.kc ?? (d.kc = d.key.startsWith('foot') ? 0 : d.key.startsWith('farm') ? 1 : d.key === 'neck' || d.key === 'head' ? 2 : 3);   // R-23: the joint's class is looked up once (was 2 startsWith per joint per substep)
+        const pk = kc === 0 ? (TW.cf ?? 3) : kc === 1 ? (TW.ca ?? 2) : kc === 2 ? 1.6 : 1;
         const c = d.Ieff * (2 * zT * (d.toneW || 0) + cPass * pk + (d.inLim ? 2 * zL * d.inLim : 0)); if (c <= 0) continue;
         rotVec(_xq1.copy(Q.quaternion).multiply(_xq2.copy(Q.prevQ).invert()), _v5); rotVec(_xq1.copy(P.quaternion).multiply(_xq2.copy(P.prevQ).invert()), _v6);
         xAng(Q, P, _v5.sub(_v6).negate(), h / c, h);
       } }
     // anatomical hard stops (swing–twist), exact
     for (const d of R.defs) {
-      if (!d.p || TW.noLimX || R.mode === 'hit') continue; const P = d.p.body, Q = d.body;
+      if (!d.p || TW.noLimX || R.mode === 'hit') continue; const P = d.p.body, Q = d.body; let J = null;
       for (let i = 0; i < 3; i++) {
-        const J = jointGeo(d, P.quaternion, Q.quaternion), c = J.c[i], cp = d.cPrev[i]; d.cPrev[i] = c; if (c !== c) continue;
+        if (!J) J = jointGeo(d, P.quaternion, Q.quaternion);   // R-23: measured again only after a stop has turned the bodies (was: once per axis — the same numbers three times)
+        const c = J.c[i], cp = d.cPrev[i]; d.cPrev[i] = c; if (c !== c) continue;
         if (cp === cp && Math.abs(c - cp) > 0.35) continue;   // a 20° jump within one substep is a measurement switch, not motion
-        const [lo, hi] = limOf(d, i, J.c), m = hi - lo < 0.35 ? RAG_HARD * 0.5 : RAG_HARD;
+        const lm = limOf(d, i, J.c), lo = lm[0], hi = lm[1], m = hi - lo < 0.35 ? RAG_HARD * 0.5 : RAG_HARD;
         const sl = d.slack ? d.slack[i] : 0, H = hi + m + Math.max(0, sl), L = lo - m - Math.max(0, -sl);
         const tgt = c > H ? H : c < L ? L : c, del = clamp(tgt - c, -0.1, 0.1); if (!del) continue;   // a stop removes at most ~3° per substep (a bigger jump is a measurement wrap, not motion)
         const n = _v4.copy(J.n[i]).multiplyScalar(del);   // turning the child by +δ about n[i] moves this angle by +δ
         if (TW.log) { const kk = d.key + 'FST'[i]; const L = TW.log[kk] || (TW.log[kk] = { n: 0, max: 0, first: this.t.toFixed(3), seq: [] }); L.n++; L.max = Math.max(L.max, Math.abs(del) * 57.3); if (L.seq.length < 12) L.seq.push(+(del * 57.3).toFixed(2)); }
-        xAng(Q, P, n, 0, h);
+        xAng(Q, P, n, 0, h); J = null;
       }
     }
     // floor and ropes
@@ -165,7 +171,7 @@ class XWorld {
       const r = b.shapes[i].radius, c = b.sphere(i, _v5);
       for (const pl of this.planes) {
         const dist = _v6.copy(c).sub(pl.p).dot(pl.n) - r; if (dist >= 0) continue;
-        const rA = _xd.copy(c).addScaledVector(pl.n, -r).sub(b.position).clone();
+        const rA = _xf.copy(c).addScaledVector(pl.n, -r).sub(b.position);
         const ln = xPos(b, null, _v6.copy(pl.n).multiplyScalar(-dist), rA, null, pl.k && !TW.hardFloor ? 1 / pl.k : 0, h); b.contact = 1;
         // static friction: undo the slide of the contact point during this substep while friction can hold it
         const pc = _v6.copy(b.shapeOffsets[i]).applyQuaternion(b.quaternion).add(b.position).addScaledVector(pl.n, -r);
@@ -174,7 +180,7 @@ class XWorld {
         const rA2 = _v5.copy(b.shapeOffsets[i]).applyQuaternion(b.quaternion).addScaledVector(pl.n, -r);
         const dl = dp.length(); let lt = 0;
         if (dl > 1e-9) { lt = dl / b.genW(rA2, _xb.copy(dp).multiplyScalar(1 / dl)); if (lt < XP.muS * ln) xPos(b, null, dp.negate(), rA2, null, 0, h); }
-        C.push({ b, r: rA2.clone(), n: pl.n, ln });
+        this.con(C, b, rA2, pl.n, ln);
         break;
       }
     }
@@ -196,7 +202,7 @@ class XWorld {
           const k = Math.min(ROPE.kMax, ROPE.T / (Ln * t * (1 - t))) / rp.nPrev;
           l += xPos(b, null, _r5.copy(dv).multiplyScalar(Math.min(defl, ROPE.max)), rA, null, 1 / k, h);
           rp.n++; if (defl > rp.best) { rp.best = Math.min(defl, ROPE.max + 0.02); rp.s = t; rp.dv.copy(dv); }
-          RC.push({ b, r: rA.clone(), n: dv.clone(), ln: l });
+          this.con(RC, b, rA, dv, l);
         }
       }
       if (rp.best > 0) { const S = rp.src; S.hit = S.hit || new V3(); S.hit.copy(rp.dv).transformDirection(this.R.F.group.matrixWorld).multiplyScalar(-rp.best); S.s = rp.s; }
@@ -218,7 +224,7 @@ class XWorld {
           else { const dx = c.x - wl.c.x, dz = c.z - wl.c.z; d = Math.hypot(dx, dz); if (d < 1e-6) continue; R0 = W.r; ox = dx / d; oz = dz / d; }
           if (d + r <= R0) continue;
           // the crowd behind the bales (W.back = the line of their chests): what hangs over the top is held there, softly — people give, but nobody is passed through
-          if (W.back && !b.low && d + r > W.back) { const n = _r3.set(-ox, 0, -oz), rA = _r4.copy(n).multiplyScalar(-r).add(c).sub(b.position), l = xPos(b, null, _r5.copy(n).multiplyScalar(d + r - W.back), rA, null, 2 / W.k, h); RC.push({ b, r: rA.clone(), n: n.clone(), ln: l, mu: W.mu, damp: W.damp }); }
+          if (W.back && !b.low && d + r > W.back) { const n = _r3.set(-ox, 0, -oz), rA = _r4.copy(n).multiplyScalar(-r).add(c).sub(b.position), l = xPos(b, null, _r5.copy(n).multiplyScalar(d + r - W.back), rA, null, 2 / W.k, h); this.con(RC, b, rA, n, l, W.mu, W.damp); }
           const y = c.y - wl.c.y, top = b.low ? 1e3 : W.top(l3.x, l3.z), out = b.low ? 1e3 : R0 + W.d;
           // nearest point of the box section to the sphere centre → contact normal (radial part nr, vertical part ny) and depth
           const qr = clamp(d, R0, out), qy = Math.min(y, top), er = d - qr, ey = y - qy, e = Math.hypot(er, ey); let nr, ny, pen, soft = false;
@@ -228,14 +234,14 @@ class XWorld {
           if (soft && pen > W.give) l += xPos(b, null, _r5.copy(n).multiplyScalar(pen - W.give), rA, null, 0, h);
           l += xPos(b, null, _r5.copy(n).multiplyScalar(soft ? Math.min(pen, W.give) : pen), rA, null, (soft ? wl.nPrev : 0.25) / W.k, h);
           if (soft) wl.n++; else if (ny > 0.5) b.contact = 1;
-          RC.push({ b, r: rA.clone(), n: n.clone(), ln: l, mu: W.mu, damp: W.damp });
+          this.con(RC, b, rA, n, l, W.mu, W.damp);
         }
       }
     }
     // self-collision and the opponent (frictionless)
-    for (const [A, Bb] of (TW.noSelf ? [] : this.pairs)) {
+    if (!TW.noSelf) for (let pi = 0, PR = this.pairs; pi < PR.length; pi++) { const A = PR[pi][0], Bb = PR[pi][1];
       if (A.position.distanceTo(Bb.position) > A.bound + Bb.bound) continue;
-      for (let i = 0; i < A.shapes.length; i++) { const ca = A.sphere(i, _v5).clone(), ra = A.shapes[i].radius;
+      for (let i = 0; i < A.shapes.length; i++) { const ca = A.sphere(i, _xg), ra = A.shapes[i].radius;
         for (let j = 0; j < Bb.shapes.length; j++) {
           const cb = Bb.sphere(j, _v6), rb = Bb.shapes[j].radius, dv = _xd.copy(ca).sub(cb), L = dv.length(), pen = ra + rb - L;
           if (pen <= 0 || L < 1e-6) continue; dv.multiplyScalar(1 / L);
@@ -256,7 +262,7 @@ class XWorld {
       const b = k.b, v = _v1.copy(b.angularVelocity).cross(k.r).add(b.velocity), vn = v.dot(k.n), vt = _v2.copy(v).addScaledVector(k.n, -vn), lt = vt.length();
       const dv = _v3.set(0, 0, 0);
       if (lt > 1e-6) dv.addScaledVector(vt, -Math.min(XP.muD * k.ln / h, lt) / lt);
-      if (vn < 0) dv.addScaledVector(k.n, -vn * ((window.__tw || {}).hardFloor ? 1 : CANVAS.damp)); else if (vn > 0.6) dv.addScaledVector(k.n, 0.6 - vn);   // resolving a penetration must not launch the limb
+      if (vn < 0) dv.addScaledVector(k.n, -vn * ((window.__tw || _TW0).hardFloor ? 1 : CANVAS.damp)); else if (vn > 0.6) dv.addScaledVector(k.n, 0.6 - vn);   // resolving a penetration must not launch the limb
       const L = dv.length(); if (L < 1e-9) continue;
       const n = _v4.copy(dv).multiplyScalar(1 / L), w = b.genW(k.r, n);
       b.applyImpulse(n.multiplyScalar(L / w), k.r);
@@ -348,7 +354,7 @@ const RAG_HIT = ['pelvis', 'waist', 'chest', 'neck', 'head'];   // arms stay on 
 const RAG_HITW = 34;
 const RAG_HARD = 6 * D2R;
 // joint range that depends on the pose: the tibia can rotate only once the knee is bent (none when straight, ~±30° at 90°)
-function limOf(d, i, c) { const L = d.lim[i]; if (i === 2 && d.key.startsWith('shin')) { const a = (3 + 27 * sstep(5 * D2R, 80 * D2R, -(c[0] || 0))) * D2R; return [-a, a]; } return L; }   // soft zone past a limit before the hard stop
+function limOf(d, i, c) { const L = d.lim[i]; if (i === 2 && (d.shin ?? (d.shin = d.key.startsWith('shin')))) { const a = (3 + 27 * sstep(5 * D2R, 80 * D2R, -(c[0] || 0))) * D2R; _lim2[0] = -a; _lim2[1] = a; return _lim2; } return L; }   // R-23: the pair is a scratch — read it at once   // soft zone past a limit before the hard stop
 const RAG_MAXDEV = { waist: 5 * D2R, chest: 8 * D2R, neck: 18 * D2R, head: 28 * D2R, uarmL: 22 * D2R, uarmR: 22 * D2R, farmL: 26 * D2R, farmR: 26 * D2R };
 // standing drive frequencies (rad/s, on the articulated inertia): a fighter's trunk is braced, the neck less so, the arms are held up
 const HIT_W = { waist: 26, chest: 26, neck: 17, head: 14, uarmL: 18, uarmR: 18, farmL: 18, farmR: 18 };   // a standing fighter never leaves his pose by more than this   // rad/s: how hard a standing fighter's muscles track the animation

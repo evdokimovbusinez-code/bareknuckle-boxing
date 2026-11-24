@@ -36,7 +36,8 @@ async def main():
     w, h = (int(v) for v in vp.split('x'))
     fmt = {'type': 'jpeg', 'quality': 80} if out.lower().endswith(('.jpg', '.jpeg')) else {}
     async with async_playwright() as p:
-        b = await p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'])
+        b = await p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist',
+                                                                                    '--enable-precise-memory-info', '--js-flags=--expose-gc'])   # R-23: performance.memory in real bytes + window.gc() for docs/audit/scenarios/simprof.js
         pg = await b.new_page(viewport={'width': w, 'height': h}, has_touch=touch, is_mobile=touch)
         logs = []
         pg.on('console', lambda m: logs.append(f'{m.type}: {m.text}') if m.type in ('error', 'warning') else None)

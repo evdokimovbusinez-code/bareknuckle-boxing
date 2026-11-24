@@ -23,6 +23,36 @@ const _ghYt = new V3(), _ghZt = new V3(), _ghXt = new V3(), _ghTo = new V3();
 const _ghMc = new M4(), _ghMt = new M4(), _ghQd = new Quat(), _ghQc = new Quat(), _ghQn = new Quat();
 // extra knuckle curl (the fight clips leave the fingers half open): one delta quaternion per hand, shared by its four fingers
 const _clQ = new Quat(), _clQc = new Quat(), _clQn = new Quat();
+/* R-23: the trunks' render mesh as an indexed geometry — one vertex per (cloth particle, uv) pair instead of three per triangle.
+   ShortsCloth.render copies map.length vertices every frame and the GPU buffers are uploaded again: several times less of both.
+   Same triangles, same per-particle normals — the picture does not change. */
+function clothIndex(S) {
+  const uv0 = S.geo.attributes.uv, m0 = S.map, nv = m0.length, key = new Map(), part = [], uv = [], idx = new Uint32Array(nv);
+  for (let i = 0; i < nv; i++) {
+    const u = uv0.getX(i), v = uv0.getY(i), k = m0[i] + '|' + u + '|' + v; let id = key.get(k);
+    if (id === undefined) { id = part.length; key.set(k, id); part.push(m0[i]); uv.push(u, v); }
+    idx[i] = id;
+  }
+  const g = new THREE.BufferGeometry(), n = part.length;
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(n * 3), 3).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2));
+  g.setIndex(new THREE.BufferAttribute(n > 65535 ? idx : new Uint16Array(idx), 1));
+  S.nv0 = nv; S.map = Int32Array.from(part); S.geo = g; S.mesh.geometry = g; S.render();
+}
+/* R-23: on the low preset the hair cards have no physics — the cut keeps its rest shape on the head. The cards are then built in the
+   head's own frame (again every 30 frames and on a reset, in case the cut changed) and the mesh rides the head matrix.
+   Was: every card derived again in world space each frame (3 square roots a point). Other presets: as before, world space. */
+const _hI = new M4();
+function hairDraw(H, still, reset) {
+  const m = H.mesh;
+  if (!still) { if (H.loc) { H.loc = false; m.matrix.identity(); m.matrixAutoUpdate = true; m.matrixWorldNeedsUpdate = true; } renderHair(H); return; }
+  if (!H.loc || reset || (H.locN = (H.locN | 0) + 1) % 30 === 0) {
+    const p = H.ps.p, f = H.frame; H.ps.p = H.ps.L; H.frame = _hI; try { renderHair(H); } finally { H.ps.p = p; H.frame = f; }
+    H.loc = true; m.matrixAutoUpdate = false;
+  }
+  m.matrix.copy(H.frame); m.matrixWorldNeedsUpdate = true;
+}
 function simCarry(S, M) { for (const A of [S.p, S.o]) for (let k = 0; k < A.length; k += 3) { _hcV.fromArray(A, k).applyMatrix4(M).toArray(A, k); } }
 function simPin(S) { const p = S.p, t = S.t, inv = S.inv; for (let i = 0, n = inv.length; i < n; i++) if (inv[i] === 0) { const k = 3 * i; p[k] = t[k]; p[k + 1] = t[k + 1]; p[k + 2] = t[k + 2]; } }
 /* ── the high block (issue 41) ──────────────────────────────────────────────────────────────────────────────
@@ -132,7 +162,7 @@ class Fighter {
     this.tails = [this.makeTail('L'), this.makeTail('R')];
     gearSetup(this); this.gear = { shells: {}, guard: guardMesh(), gloves: null, hg: null, spar: false };
     this.updateColliders();
-    this.shorts = new ShortsCloth(ssm, this);
+    this.shorts = new ShortsCloth(ssm, this); clothIndex(this.shorts);
     this.hair = buildHair(T.simRoots, { kind: 'hair', frame: this.headFrame, COL: C, np: 5 }); this.hair.frame = this.headFrame;
     for (let i = 0; i < this.hair.width.length; i++) this.hair.width[i] *= 1.35;
     scene.add(this.hair.mesh);
@@ -362,7 +392,7 @@ class Fighter {
   dress(L) {
     const G2 = this.gear, U = this.flesh.u.uGear.value, W = wearDress(this, L), bt = W.bottom, tp = W.top, sh = W.shoes;   // 04e_wardrobe.js: the meshes of what he wears (model + colour from the registry)
     // loose trousers / long shorts are their own mesh (04d_street.js) and cover the hips completely: the boxing trunks (cloth) are hidden under them
-    G2.pants = bt.cut ? G2.shells.bottom.m : null; G2.top = tp.cut ? G2.shells.top.m : null; this.shorts.mesh.visible = !bt.cut;
+    G2.pants = bt.cut ? G2.shells.bottom.m : null; G2.top = tp.cut ? G2.shells.top.m : null; if (this.shorts.mesh.visible === !!bt.cut) this.simReset = true; this.shorts.mesh.visible = !bt.cut;   // (R-23: hidden trunks are not simulated — re-seat them when they come back)
     if (!bt.cut) { const S0 = wearShorts(bt); paintShorts(this.shortsCanvas, S0); if (this.isPlayer) socPatch(this.shortsCanvas); this.shortsTex.needsUpdate = true; this.shortsMat.sheenColor.set(S0.sheen); }
     U.set(bt.cut ? PANT_CUTS[bt.cut].skin : 0, sh.top || 0,   /* x: the legs' skin is not drawn above this height (cm) */ G2.top ? G2.top.userData.D.skinHi : tp.tex ? GEAR.neck - 1 : 0, G2.top ? G2.top.userData.D.skinA : tp.sleeve || 0);   // z: the trunk's skin is not drawn below this height, w: the arm's up to this `a` (04f_tops.js)
     this.flesh.u.uGearT.value = G2.top ? G2.top.userData.D.skinLo : 0;
@@ -963,8 +993,9 @@ class Fighter {
     const HS = this.hsim || null;   // the simulated strands of the current cut (the classic cut, dreadlocks, pony tail, mullet) or none
     // the head jumped (a replay cut, a fall faster than the strands can follow): re-seat the hair instead of stretching it
     { const hp = _v1.setFromMatrixPosition(this.head.matrixWorld); if (this.lastHeadP && hp.distanceTo(this.lastHeadP) > (dt > 0 ? Math.max(0.12, 9 * dt) : 0.12)) this.simReset = true; (this.lastHeadP || (this.lastHeadP = new V3())).copy(hp); }
-    this.shorts.targets(); if (HS) HS.ps.targets(); for (const t of this.tails) t.ps.targets();
-    const still = GFX.level === 'low';
+    const SV = this.shorts.mesh.visible;   // R-23: trunks hidden under street trousers / long shorts — no targets, no solver, no redraw
+    if (SV) this.shorts.targets(); if (HS) HS.ps.targets(); for (const t of this.tails) t.ps.targets();
+    const still = GFX.level === 'low', hReset = this.simReset; let keepN = false;   // keepN (R-23): a frame the cloth solver skips redraws the trunks with the normals of the solved one
     if (this.simReset) {
       this.shorts.p.set(this.shorts.t); this.shorts.o.set(this.shorts.t); if (HS) HS.ps.reset(); for (const t of this.tails) t.ps.reset(); this.simReset = false;
     } else if (dt > 0) {
@@ -973,15 +1004,15 @@ class Fighter {
       this.simAcc = (this.simAcc || 0) + dt; this.simN = (this.simN || 0) + 1;
       if (GFX.simSkip < 2 || ((this.simN + (this.isPlayer ? 0 : 1)) & 1) === 0) {
         const sd = Math.min(this.simAcc, 0.05), steps = sd > (GFX.simSkip < 2 ? 0.02 : 0.04) ? 2 : 1, h = sd / steps; this.simAcc = 0;
-        for (let s = 0; s < steps; s++) { this.shorts.step(h); if (!still) { if (HS) HS.ps.step(h); for (const t of this.tails) t.ps.step(h); } }
-      } else { simPin(this.shorts); this.shorts.constrain();
+        for (let s = 0; s < steps; s++) { if (SV) this.shorts.step(h); if (!still) { if (HS) HS.ps.step(h); for (const t of this.tails) t.ps.step(h); } }
+      } else { if (SV) { simPin(this.shorts); this.shorts.constrain(); } keepN = true;
         if (!still && this._hfP && (HS || this.tails.length)) { _hcM.multiplyMatrices(this.headFrame, _hcI.copy(this._hfP).invert()); if (HS) simCarry(HS.ps, _hcM); for (const t of this.tails) simCarry(t.ps, _hcM); }
         if (HS) simPin(HS.ps); for (const t of this.tails) simPin(t.ps); }
     }
     (this._hfP || (this._hfP = new M4())).copy(this.headFrame);
     // GFX low: no hair physics at all — the cut sits on the head in its rest shape (saves the solver on weak phones)
     if (still) { if (HS) { HS.ps.p.set(HS.ps.t); HS.ps.o.set(HS.ps.t); } for (const t of this.tails) { t.ps.p.set(t.ps.t); t.ps.o.set(t.ps.t); } }
-    this.shorts.render(); if (HS) { if (HS.tube) renderTubes(HS); else renderHair(HS); }
+    if (SV) this.shorts.render(keepN); if (HS) { if (HS.tube) renderTubes(HS); else hairDraw(HS, still, hReset); }
     for (const t of this.tails) { t.geo.attributes.position.needsUpdate = true; t.geo.computeVertexNormals(); }
     _m1.multiplyMatrices(this.head.matrixWorld, HEAD.restInv);
     this.baseMesh.matrix.copy(_m1); this.beardMesh.matrix.copy(_m1); this.baseMesh.matrixWorldNeedsUpdate = this.beardMesh.matrixWorldNeedsUpdate = true;
