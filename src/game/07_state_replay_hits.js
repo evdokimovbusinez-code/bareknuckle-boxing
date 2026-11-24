@@ -18,6 +18,10 @@ const REACT = {
   light: 0.55,     // power at/below which a non-power shot is just a nod + a blink (a feeler jab)
   deflate: 0.5,    // s: a body shot leaves him winded, hands down, elbow tucked this long
   backStep: 0.14,  // extra knock-back per hit from the 2nd one on (he starts retreating)
+  tired: 0.35,     // R-10: stun after a punch thrown on empty (punchK 0.45) — × this; fresh (punchK ≥ 0.85) × 1. Was × 1 for all
+  kdCaught: 0.45,  // R-10: knockdown severity added when he walked onto the punch (was 0)
+  kdGassed: 0.45, // R-10: … and when his tank is empty (0 → this as stamina 20 → 0; was 0)
+  gas: 0.2,       // R-10: punchK (power) of a punch thrown at 0 stamina, rising to 1 at 45 (Fighter.startPunch; was 0.45)
 };
 const DIFFS = { easy: { label: 'Лёгкий', dodge: 0.18, read: 0.5, gap: 1.9, speed: 1.0, toAI: 1.25, toMe: 0.75 }, normal: { label: 'Норм', dodge: 0.4, read: 0.7, gap: 1.35, speed: 1.15, toAI: 1, toMe: 1 }, hard: { label: 'Жёсткий', dodge: 0.6, read: 0.86, gap: 0.95, speed: 1.3, toAI: 0.9, toMe: 1.15 } };
 const G = { state: 'load', t: 0, real: 0, hitstop: 0, slow: 1, slowT: 0, shake: 0, koT: 0, koCine: 0, koTitle: false, introT: 0, winner: null, loser: null, wins: 0, losses: 0, diff: 'normal', fallSnd: false };
@@ -256,6 +260,7 @@ function resolveHit(att, name, contact) {
   }
   dmg *= (att === P1 ? DIFFS[G.diff].toAI : DIFFS[G.diff].toMe) * ((window.__tw || {}).dmgK ?? DMG_K) * (sparOn() ? 0.6 : 1) * (pvp('glass') ? 2.2 : pvp('blood') ? 1.25 : 1);   // 16 oz and a helmet; P2P modes (00a_net_state.js)
   if (window.__dmgLog) window.__dmgLog.push([def === P1 ? 1 : 2, +dmg.toFixed(1), name, counter ? 'C' : '', caught ? 'K' : '', blocked ? 'B' : '', evading ? 'E' : '', +G.t.toFixed(1)]);
+  if (att === P2) aiMemHit(blocked);   // R-10: three in a row on his guard → the AI waits for his counter (08_ai_flow.js)
   if (att.fs) { if (blocked) att.fs.blk++; else { att.fs.land++; if (P.type !== 'straight' || name === 'cross') att.fs.pow++; if (att.sig && sigOf(name) === att.sig) att.fs.sig++; } att.fs.dmg += dmg; }
   def.hp = Math.max(0, def.hp - dmg); def.hpCap = Math.max(def.hp, def.hpCap - dmg * (blocked ? 0.15 : 0.4)); def.hitT = G.t; if (G.rd) G.rd[att === P1 ? 0 : 1] += blocked ? dmg * 0.3 : dmg;
   const fwd = Math.sign(def.group.position.x - att.group.position.x), dir = new V3(fwd, 0.15, 0);
@@ -272,7 +277,9 @@ function resolveHit(att, name, contact) {
     def.rxLast = G.t; combo = def.rxN;
     mult = Math.min(1 + REACT.step * (combo - 1), REACT.max);
   }
-  const rx = { mult, combo, heavy: !!isPow, power, rib: att.ribIdx | 0 };
+  // R-10: a punch thrown on an empty tank (punchK 0.45 at 0 stamina, 05_fighter.js startPunch) staggers less — the stun after it is
+  // ×REACT.tired … ×1 (punchK 0.45 … 0.85). Was ×1 always: a gassed man mashing arm punches stun-locked a fresh one
+  const rx = { mult, combo, heavy: !!isPow, power, rib: att.ribIdx | 0, stunK: lerp(((window.__tw || {}).tired ?? REACT.tired), 1, sstep(REACT.gas, 0.85, att.punchK ?? 1)) };
   // a feeler jab (light, clean, no power): a nod + a blink only — it must not rock him back a step (issue 44 / req. 4)
   const light = !blocked && !body && !isPow && power < REACT.light;
   if (!blocked) { const was = def.daze; def.daze = Math.min(1, def.daze + power * 0.13 + (def.hp < 30 ? 0.1 : 0)); if (was < 0.55 && def.daze >= 0.55) popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'поплыл', 'crit'); }
@@ -280,7 +287,8 @@ function resolveHit(att, name, contact) {
   else if (blocked) popup(pos, 'блок', 'dodge');
   // direction: how the knuckles were travelling at contact
   { const kn = att.knuckle(_v4); if (att.kOld) { _v3.copy(kn).sub(att.kOld); if (_v3.lengthSq() > 1e-6) dir.lerp(_v3.normalize(), 0.6).normalize(); } }
-  if (body) { def.stamina = Math.max(0, def.stamina - 18); popup(pos, 'по корпусу', 'dodge'); }
+  // R-10: a body shot thrown on an empty tank takes about half the breath (×0.5 at stunK 0.35; was 18 always)
+  if (body) { def.stamina = Math.max(0, def.stamina - 18 * Math.min(1, rx.stunK + 0.15)); popup(pos, 'по корпусу', 'dodge'); }
   // debug hook (issue 41): one row per punch that lands on a guard
   if (blocked && window.__blk && window.__blk.log) window.__blk.log.push({
     kind: name, pow: !!isPow, dmg: +dmg.toFixed(2),
@@ -288,8 +296,11 @@ function resolveHit(att, name, contact) {
   def.lastContact = pos.clone();
   if (caught) {   // his own punch: knocked off line if it was early, landing weakened if it was nearly there
     const dp = PUNCH[def.cur], td = def.act[def.cur].time;
-    if (td < dp.impact - 0.1 || power > 1.0) { def.cancelPunch(); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.2, 0)), 'сбил', 'dodge'); }
-    else def.dmgMul = 0.55;
+    // R-10: an arm punch thrown on empty (rx.stunK < 0.6) no longer knocks his punch off line or weakens it; and the «nearly there» one really
+    // goes on now (rx.keep) — takeHit used to drop every unresolved punch, so the ×0.55 below never landed
+    if (rx.stunK < 0.6) rx.keep = true;   // a gassed arm punch: his own goes through as it was
+    else if (td < dp.impact - 0.1 || power > 1.0) { def.cancelPunch(); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.2, 0)), 'сбил', 'dodge'); }
+    else { def.dmgMul = 0.55; rx.keep = true; }
   }
   if (G.t - (att.lastLand || -9) < 0.2 || G.t - (def.lastLand || -9) < 0.2) { if (!G.tradeT || G.t - G.tradeT > 1) { G.tradeT = G.t; popup(_v4.lerpVectors(att.headNow, def.headNow, 0.5).add(_v5.set(0, 0.3, 0)), 'размен!', 'crit'); G.slow = 0.3; G.slowT = 0.35; } }
   // the step back grows with the series (a clean shot is scaled by `mult`); from the 2nd hit on he also starts retreating.
@@ -302,7 +313,10 @@ function resolveHit(att, name, contact) {
     def.hitLog = (def.hitLog || []).filter(t => G.t - t < 1.6); def.hitLog.push(G.t);
     if (power > 0.85 && !body && rr() < 0.7) def.shakeT = G.t;
     if (def === P2) {
-      if (def.hitLog.length >= 3 && rr() < 0.75) { const T = 0.8 + rr() * 0.7; def.shellT = G.t + T; AI.blockUntil = Math.max(AI.blockUntil, G.t + T); AI.backT = G.t + T + 0.3; AI.lat = (rr() < 0.5 ? -1 : 1) * 0.9; AI.latT = T; AI.t = Math.max(AI.t, T); }
+      // R-10: against a man who never defends (aiOpen, 08_ai_flow.js) shelling up under his volume loses — he fires back instead
+      const open = aiOpen() * aiRead();
+      if (def.hitLog.length >= 3 && open > 0.3) { if (rr() < open * AI_MEM.oShell) AI.t = Math.min(AI.t, 0.1); }
+      else if (def.hitLog.length >= 3 && rr() < 0.75) { const T = 0.8 + rr() * 0.7; def.shellT = G.t + T; AI.blockUntil = Math.max(AI.blockUntil, G.t + T); AI.backT = G.t + T + 0.3; AI.lat = (rr() < 0.5 ? -1 : 1) * 0.9; AI.latT = T; AI.t = Math.max(AI.t, T); }
       else if (power > 0.9) AI.backT = G.t + 0.5 + rr() * 0.4;
     } else if (def.hitLog.length >= 3) def.shellT = G.t + 0.45;
   }
@@ -350,7 +364,9 @@ function resolveHit(att, name, contact) {
   // knockdowns and "his legs went": a clean shot to an already shaken, tiring man can put him down without putting him out
   if (!blocked && !body && G.state === 'fight' && !window.__noKD) {
     // a fresh man is very rarely dropped by one shot: knockdowns come from accumulated damage (or a clean counter)
-    const sev = power * 0.85 + def.daze * 0.55 + (counter ? 0.3 : 0) + (1 - def.hp / 100) * 0.45 + (evading ? 0.2 : 0) - 0.6 * (def.hp / 100) ** 2 - 0.05 * SK(def, 'chin');
+    // R-10: + walking onto it (caught) and + an empty tank (no legs left under him) — REACT.kdCaught / kdGassed (were 0)
+    const sev = power * 0.85 + def.daze * 0.55 + (counter ? 0.3 : 0) + (1 - def.hp / 100) * 0.45 + (evading ? 0.2 : 0) - 0.6 * (def.hp / 100) ** 2 - 0.05 * SK(def, 'chin')
+      + (caught ? REACT.kdCaught : 0) + REACT.kdGassed * (1 - sstep(0, 20, def.stamina));
     if (rr() < clamp((sev - 1.2) * 0.65, 0, 0.5)) return knockdown(att, def, dir, power, name, fwd, sev);
     if (sev > 0.85 && rr() < 0.55) { def.wobble = Math.max(def.wobble, 0.9 + 0.9 * rr()); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'повело', 'crit'); }
   }

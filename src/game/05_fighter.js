@@ -410,7 +410,8 @@ class Fighter {
       let tgt;
       if (!fight) tgt = 0;
       else if (this === P2 && !NET.host) {   // he keeps his range (a P2P guest's man holds where the guest left him — he was pulled back to 1.13 m): closes if you back off (a little slower than you can retreat), steps off if crowded
-        const want = 1.13 - AI.style.adv - (this.cur && !this.release ? 0.08 : 0) + (this.daze > 0.5 ? 0.12 * this.daze : 0) + (AI.backT > G.t ? 0.45 : 0);
+        // R-10: AI.open — the man never defends: he stays in his face instead of giving ground (08_ai_flow.js, AI_MEM.oIn)
+        const op = AI.open || 0, want = 1.13 - AI.style.adv - (this.cur && !this.release ? 0.08 : 0) + (this.daze > 0.5 ? 0.12 * this.daze : 0) + (AI.backT > G.t ? 0.45 * (1 - op) : 0) - AI_MEM.oIn * op;
         tgt = a + (dist - want);
       } else { if (this.hold == null) this.hold = a; tgt = this.hold + (this.cur && !this.release ? 0.09 : 0); }
       if (G.state === 'kd' && G.kd && G.kd.att === this) tgt = a + (dist - 1.6);   // the referee sends him away while the other man is counted
@@ -447,7 +448,7 @@ class Fighter {
     // power shot: sits down on it — slower, heavier, costs more breath; and the arms get heavy as the tank empties: the more
     // you throw on empty, the slower and softer every punch gets
     this.heavy = !!this.powerNext; this.powerNext = false;
-    this.fatK = 0.88 + 0.12 * sstep(0, 55, this.stamina); this.punchK = (0.45 + 0.55 * sstep(0, 45, this.stamina)) * (this.heavy ? 1.45 : 1);
+    this.fatK = 0.88 + 0.12 * sstep(0, 55, this.stamina); this.punchK = lerp(REACT.gas, 1, sstep(0, 45, this.stamina)) * (this.heavy ? 1.45 : 1);   // R-10: REACT.gas, the floor on empty (was 0.45)
     // (fatigue was 0.42…1 and daze −30 %: a tired cross took 0.7 s to land; now tiredness mostly costs power and accuracy — punchK, aimJit)
     this.tsBase = this.speed * this.fatK * (this.heavy ? 0.9 : 1) * (P.slow || 1) * (1 - 0.1 * this.daze) * (this.sig && sigOf(n) === this.sig ? 1.08 : 1);
     const wind = (P.impact - P.start) / (PUNCH_T[n] || (P.impact - P.start)); this.tsWind = 1 + (wind - 1) * (this === P1 ? 1 : AI_SNAP);
@@ -482,7 +483,7 @@ class Fighter {
       s.hp.v += (dm.z * 6.0 - dm.y * 5.0) * k; s.hr.v -= dm.x * 6.5 * k; s.hy.v += dm.x * 7.5 * k;
       s.sp.v += (dm.z * 2.4 - dm.y * 1.2) * k * kt; s.sr.v -= dm.x * 2.2 * k * kt; s.hz.v += dm.z * 1.5 * k * kt;
       if (this.cur && !this.resolved) this.cur = null;
-      this.stunUntil = G.t + (name === 'jab' ? 0.14 : 0.27) * (1 + this.daze);
+      this.stunUntil = G.t + (name === 'jab' ? 0.14 : 0.27) * (1 + this.daze) * (rx?.stunK ?? 1);   // R-10: stunK — a punch thrown on empty staggers less (resolveHit)
       return;
     }
 
@@ -494,7 +495,7 @@ class Fighter {
 
     // face: a power-scaled pain grimace + blink; the 4th+ of a series unfocuses the gaze and buckles the legs («поплыл»)
     this.face.hit((body ? eff * 0.4 : eff) * (light ? 0.45 : 1), !body && (type === 'hook' || type === 'upper'), hp);
-    if (combo >= REACT.dazeAt) {
+    if (combo >= REACT.dazeAt && (rx?.stunK ?? 1) >= 0.6) {   // R-10: a gassed man's arm punches (stunK) don't buckle the legs, however many
       this.daze = Math.min(1, Math.max(this.daze, 0.5 + 0.08 * (combo - REACT.dazeAt)));
       this.wobble = Math.max(this.wobble, 0.6 + 0.1 * (combo - REACT.dazeAt));
     }
@@ -543,8 +544,8 @@ class Fighter {
       bodyDeg: +(Math.abs(dSP) * wB * 57.3).toFixed(1),
       step: +(this.knock || 0).toFixed(2),
     };
-    if (this.cur && !this.resolved) this.cur = null;
-    this.stunUntil = G.t + (name === 'jab' ? 0.14 : 0.27) * (1 + this.daze);
+    if (this.cur && !this.resolved && !rx?.keep) this.cur = null;   // R-10: rx.keep — his punch was nearly there, it lands weakened (resolveHit)
+    this.stunUntil = G.t + (name === 'jab' ? 0.14 : 0.27) * (1 + this.daze) * (rx?.stunK ?? 1);   // R-10: see the blocked branch
   }
 
   /* —— per-frame —— */

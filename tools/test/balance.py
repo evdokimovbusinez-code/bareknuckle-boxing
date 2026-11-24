@@ -34,6 +34,7 @@ def args():
     a.add_argument('--rounds', type=int, default=0, help='0 = the game\'s ROUNDS')
     a.add_argument('--len', type=float, default=0, help='round length, s; 0 = the game\'s ROUND_LEN')
     a.add_argument('--full', action='store_true', help='no fast mode: frame() as in the game (cloth, hair, camera, FX; ~6× slower)')
+    a.add_argument('--tune', default='', help='JSON: other values of AI_MEM (08_ai_flow.js) for this run, e.g. \'{"oDodge": 0.5}\'')
     a.add_argument('--csv', default='/tmp/balance.csv')
     a.add_argument('--md', default='', help='write the table (markdown) here too')
     return a.parse_args()
@@ -47,13 +48,27 @@ def prepare():
         subprocess.run('npm i --no-save --silent three@0.160.0 cannon-es@0.20.0', shell=True, cwd=ROOT, check=True)
 
 
+def racc(a):
+    """R-10: the bot's accuracy in round 1 → round 2, over the fights that got into round 2 (column p1_rnd = 'thr:land …' per round)"""
+    t, n = [[0, 0], [0, 0]], 0
+    for r in a:
+        rd = [tuple(int(x) for x in s.split(':')) for s in str(r.get('p1_rnd') or '').split()]
+        if len(rd) < 2 or rd[1][0] < 5: continue
+        n += 1
+        for i in (0, 1): t[i][0] += rd[i][0]; t[i][1] += rd[i][1]
+    if not n: return '—'
+    a1, a2 = t[0][1] / max(1, t[0][0]), t[1][1] / max(1, t[1][0])
+    return f'{a1:.0%} → {a2:.0%} (×{a2 / max(1e-9, a1):.2f}, {n})'
+
+
 def table(rows, pols, difs):
     """the roadmap's table: per policy × difficulty — wins, mean duration, knockouts (+ accuracy)"""
     by = {}
     for r in rows: by.setdefault((r['policy'], r['diff']), []).append(r)
     head = '| политика | ' + ' | '.join(f'{DIF_RU.get(d, d)}: победы · длит. · KO' for d in difs) + ' |'
     out = [head, '|---|' + '---|' * len(difs)]
-    det = ['', '| политика × сложность | n | победы | ничьи | KO за бота | KO против | все KO/TKO | длит., с | точность бота | точность ИИ | нокдауны бот / ИИ |', '|---|---|---|---|---|---|---|---|---|---|---|']
+    det = ['', '| политика × сложность | n | победы | ничьи | KO за бота | по очкам за бота | KO против | все KO/TKO | длит., с | точность бота | бот р1 → р2 (n) | точность ИИ | нокдауны бот / ИИ |',
+           '|---|---|---|---|---|---|---|---|---|---|---|---|---|']
     for p in pols:
         cells = []
         for d in difs:
@@ -64,7 +79,8 @@ def table(rows, pols, difs):
             cells.append(f'{win:.0%} · {dur:.0f} с · {ko:.0%}')
             acc = lambda k: sum(int(r[k + '_land']) for r in a) / max(1, sum(int(r[k + '_thr']) for r in a))
             det.append(f'| {p} · {DIF_RU.get(d, d)} | {n} | {win:.0%} | {m(lambda r: r["result"] == "draw"):.0%} | {m(lambda r: r["result"] == "win" and r["how"] != "dec"):.0%} | '
-                       f'{m(lambda r: r["result"] == "loss" and r["how"] != "dec"):.0%} | {ko:.0%} | {dur:.0f} | {acc("p1"):.0%} | {acc("p2"):.0%} | '
+                       f'{m(lambda r: r["result"] == "win" and r["how"] == "dec"):.0%} | '
+                       f'{m(lambda r: r["result"] == "loss" and r["how"] != "dec"):.0%} | {ko:.0%} | {dur:.0f} | {acc("p1"):.0%} | {racc(a)} | {acc("p2"):.0%} | '
                        f'{m(lambda r: int(r["kd_p1"])):.2f} / {m(lambda r: int(r["kd_p2"])):.2f} |')
         out.append(f'| {p} | ' + ' | '.join(cells) + ' |')
     return '\n'.join(out + det)
@@ -87,6 +103,7 @@ async def run(o):
     if o.rounds: opt['rounds'] = o.rounds
     if o.len: opt['len'] = o.len
     if o.full: opt['lite'] = False
+    if o.tune: opt['tune'] = json.loads(o.tune)
     async with async_playwright() as pw:
         b = await pw.chromium.launch(executable_path='/usr/bin/google-chrome',
             args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist',
@@ -115,7 +132,7 @@ async def run(o):
         w = csv.DictWriter(f, fieldnames=cols); w.writeheader(); w.writerows(rows)
     md = table(rows, pols, difs)
     info = (f'{len(rows)} боёв за {wall:.0f} с ({wall / 60:.1f} мин), {o.workers} стр., dt = {o.dt:.4f} с, площадка {o.loc}, seed {o.seed}…'
-            + (', полный frame()' if o.full else ''))
+            + (', полный frame()' if o.full else '') + (f', AI_MEM {o.tune}' if o.tune else ''))
     print('\n' + md + '\n\n' + info + f'\nCSV: {o.csv}')
     if o.md:
         with open(o.md, 'w') as f: f.write(md + '\n\n' + info + '\n')
