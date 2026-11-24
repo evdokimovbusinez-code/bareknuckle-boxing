@@ -89,11 +89,15 @@ function tutStepEnter() {
 }
 function tutRender() {
   const S = TUT_STEPS[TUT.step]; if (!S) return;
-  $('tut-n').textContent = `Шаг ${TUT.step + 1} / ${TUT_STEPS.length + 1}`;   // step 11 is the «Готово!» card
+  // R-16: 11 dots instead of «Шаг 1 / 11» (step 11 is the «Готово!» card): done = filled, the current one = long gold
+  const n = TUT_STEPS.length + 1, dots = $('tut-n');
+  if (dots.children.length !== n) { dots.textContent = ''; for (let i = 0; i < n; i++) dots.appendChild(document.createElement('i')); }
+  [...dots.children].forEach((d, i) => { d.className = i < TUT.step ? 'on' : i === TUT.step ? 'cur' : ''; });
+  dots.setAttribute('aria-label', `Шаг ${TUT.step + 1} из ${n}`); dots.title = `Шаг ${TUT.step + 1} / ${n}`;
   $('tut-h').textContent = S.h;
   $('tut-k').innerHTML = S.k; $('tut-g').innerHTML = S.g;
-  $('tut-k').className = 'tut-chip' + (TOUCH ? '' : ' prim');   // both are always shown; the platform's own one is bright
-  $('tut-g').className = 'tut-chip' + (TOUCH ? ' prim' : '');
+  $('tut-k').className = 'tut-chip' + (TOUCH ? ' off' : ' prim');   // R-16: only the platform's own way, in one row with the buttons
+  $('tut-g').className = 'tut-chip' + (TOUCH ? ' prim' : ' off');
   tutRenderProgress();
 }
 function tutRenderProgress() {
@@ -163,6 +167,22 @@ function tutTick(dt) {
   }
 }
 
+/* R-16: the lesson's camera keeps both heads whole under the hint panel (it covered them, mode-tutorial.jpg). Called by
+   camUpdate (10) in the fight branch on the wanted pose: a level camera at the height / distance where the top of the taller
+   head lands just under the panel's bottom edge and the soles stay above the bottom of the frame. Measured from the panel's
+   real box every frame, so the desktop, a short phone and a rotated portrait stage each get their own framing. */
+const TUT_CAM = { top: 0.2, gap: 0.035, foot: 0.965 };   // head bone → top of the headgear (m); margin under the panel, soles' line (frame fractions)
+function tutCam(cp, cl) {
+  const el = $('tut'); if (!el || el.hidden) return;
+  const par = el.offsetParent, H = par ? par.clientHeight : 0; if (!H) return;
+  const fp = (el.offsetTop + el.offsetHeight) / H + TUT_CAM.gap;              // the panel's bottom (+ margin), from the top of the frame
+  const top = Math.max(P1.headNow.y, P2.headNow.y) + TUT_CAM.top, t = Math.tan(SHK.fov0 * Math.PI / 360);
+  const span = (top + 0.02) / Math.max(0.3, TUT_CAM.foot - fp);               // world height the frame must hold at the men (z = 0)
+  const D = Math.max(cp.z, span / (2 * t)), Hv = 2 * t * D;                     // never closer than the fight camera
+  const y = top + fp * Hv - Hv / 2;                                              // the centre line that puts the head top at fp
+  cp.z = D; cp.y = y; cl.y = y; cl.z = 0;
+}
+
 /* boot: wire the offer / hint / final buttons, then offer the lesson on the very first visit */
 function tutBoot() {
   const on = (id, fn) => { const b = $(id); if (b) b.addEventListener('click', fn); };
@@ -184,4 +204,6 @@ window.__tut = {
   stick: y => { MV.sy = y; MV.sx = 0; },
   block: v => setBlock(v),
   dodge: n => press('dodge', n),
+  keys: () => ({ MV_KEYS, ACT_KEYS }),   // R-16: tut_test.py checks the README's table against these
+  cam: TUT_CAM,
 };
