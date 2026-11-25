@@ -25,10 +25,12 @@ const AI = { lat: 0, latT: 0, backT: 0, t: 1.2, combo: 0, seen: -1, dodgeAt: 0, 
      with (16 otherwise), oIn — m closer it stands (Fighter.footwork), oPow — power-shot odds added while he is gassed.
      Tuned on the R-02 bench (masher: was 100 / 100 / 100 % bot wins on easy / normal / hard);
    · aft — he slips after his own punches: the AI's next punch is the one that beats his usual slip.
-   The strength of all of it is aiRead() = DIFFS[diff].read mapped 0.5 / 0.7 / 0.86 → 0.22 / 0.65 / 1 (easy / normal / hard).
-   Reset per fight in startFight (aiMemReset); aiMemHit is called by resolveHit for every punch of the AI that reaches him. */
+   The strength of all of it is aiRead() = DIFFS[diff].read mapped 0.5 / 0.7 / 0.8 → 0.22 / 0.65 / 0.87 (easy / normal / hard).
+   Reset per fight in startFight (aiMemReset); aiMemHit is called by resolveHit for every punch of the AI that reaches him.
+   issue 89: oGap 0.4 → 0.6, oPow 0.5 → 1 (more and harder punches into a man who only mashes), oIn 0.1 → 0 (a man who keeps his
+   distance isn't «open» in the masher's sense — the step in took the mover's range away) */
 const AI_MEM = { win: 20, rep: 6, repN: 3, learn: 0.002, corner: 0.7, aft: 0.8, guardT: 4, blkRow: 3, ctrT: 2.5, ctrWait: 1.0,
-  oDodge: 0.2, oTrade: 0.9, oBlock: 0, oGap: 0.4, oCtr: 0.5, oShell: 1, oSta: 12, oIn: 0.1, oPow: 0.5 };
+  oDodge: 0.2, oTrade: 0.9, oBlock: 0, oGap: 0.6, oCtr: 0.5, oShell: 1, oSta: 12, oIn: 0, oPow: 1 };
 const aiRead = () => clamp((DIFFS[G.diff].read - 0.4) / 0.46, 0, 1);
 function aiMemReset() { AI.open = 0; AI.mem = { a: [], fam: {}, guard: 0, blkRow: 0, ctrT: 0, pid: -1, dObj: null, blk: false, lastP: -9, round: 1, ctrN: 0 }; }
 function aiMemPush(e) { const a = AI.mem.a; a.push(e); if (a.length > AI_MEM.win) a.shift(); }

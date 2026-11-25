@@ -18,12 +18,18 @@ const REACT = {
   light: 0.55,     // power at/below which a non-power shot is just a nod + a blink (a feeler jab)
   deflate: 0.5,    // s: a body shot leaves him winded, hands down, elbow tucked this long
   backStep: 0.14,  // extra knock-back per hit from the 2nd one on (he starts retreating)
-  tired: 0.35,     // R-10: stun after a punch thrown on empty (punchK 0.45) — × this; fresh (punchK ≥ 0.85) × 1. Was × 1 for all
+  tired: 0.1,      // R-10: stun after a punch thrown on empty (punchK 0.45) — × this; fresh (punchK ≥ 0.85) × 1. Was × 1 for all; issue 89: 0.35 → 0.1 (the masher's gassed arm punches no longer stun-lock the AI)
   kdCaught: 0.45,  // R-10: knockdown severity added when he walked onto the punch (was 0)
-  kdGassed: 0.45, // R-10: … and when his tank is empty (0 → this as stamina 20 → 0; was 0)
-  gas: 0.2,       // R-10: punchK (power) of a punch thrown at 0 stamina, rising to 1 at 45 (Fighter.startPunch; was 0.45)
+  kdGassed: 0.9,  // R-10: … and when his tank is empty (0 → this as stamina 20 → 0; was 0); issue 89: 0.45 → 0.9 (mashing on empty is how a man gets dropped)
+  gas: 0.1,       // R-10: punchK (power) of a punch thrown at 0 stamina, rising to 1 at 45 (Fighter.startPunch; was 0.45); issue 89: 0.2 → 0.1
 };
-const DIFFS = { easy: { label: 'Лёгкий', dodge: 0.18, read: 0.5, gap: 1.9, speed: 1.0, toAI: 1.25, toMe: 0.75 }, normal: { label: 'Норм', dodge: 0.4, read: 0.7, gap: 1.35, speed: 1.15, toAI: 1, toMe: 1 }, hard: { label: 'Жёсткий', dodge: 0.6, read: 0.86, gap: 0.95, speed: 1.3, toAI: 0.9, toMe: 1.15 } };
+/* issue 89: the knockdown roll of a clean head shot (resolveHit): odds = clamp((sev − at) · k, 0, max); up = the base of the count
+   he needs before he can rise (knockdown). Were the inline numbers 1.2 / 0.65 / 0.5 / 2; now at 1.4 (fewer knockdowns from a fresh
+   man's single shot), up 1 (the AI, who doesn't mash, got counted out of almost every fight it was dropped in) */
+const KDR = { at: 1.4, k: 0.65, max: 0.5, up: 1 };
+/* issue 89 (R-02 bench, docs/balance/): toMe was 0.75 / 1 / 1.15 → 0.53 / 0.7 / 0.8 — on normal the AI landed 40–55 % and dropped
+   the bot 7–10 times a fight, a mover lost every bout; hard read 0.86 → 0.8, dodge 0.6 → 0.5 (a mover won 0 % on hard) */
+const DIFFS = { easy: { label: 'Лёгкий', dodge: 0.18, read: 0.5, gap: 1.9, speed: 1.0, toAI: 1.25, toMe: 0.53 }, normal: { label: 'Норм', dodge: 0.4, read: 0.7, gap: 1.35, speed: 1.15, toAI: 1, toMe: 0.7 }, hard: { label: 'Жёсткий', dodge: 0.5, read: 0.8, gap: 0.95, speed: 1.3, toAI: 0.9, toMe: 0.8 } };
 const G = { state: 'load', t: 0, real: 0, hitstop: 0, slow: 1, slowT: 0, shake: 0, koT: 0, koCine: 0, koTitle: false, introT: 0, winner: null, loser: null, wins: 0, losses: 0, diff: 'normal', fallSnd: false };
 /* issue 46 — the knockout / knockdown cutscene, in seconds and fractions of speed.
    was: KO hitstop 0.09 / 0.3× for 0.75 s, the «Нокаут!» plate at the punch, the replay at koT + 2.3 s;
@@ -523,7 +529,7 @@ function resolveHit(att, name, contact) {
     // R-10: + walking onto it (caught) and + an empty tank (no legs left under him) — REACT.kdCaught / kdGassed (were 0)
     const sev = power * 0.85 + def.daze * 0.55 + (counter ? 0.3 : 0) + (1 - def.hp / 100) * 0.45 + (evading ? 0.2 : 0) - 0.6 * (def.hp / 100) ** 2 - 0.05 * SK(def, 'chin')
       + (caught ? REACT.kdCaught : 0) + REACT.kdGassed * (1 - sstep(0, 20, def.stamina));
-    if (rr() < clamp((sev - 1.2) * 0.65, 0, 0.5)) return knockdown(att, def, dir, power, name, fwd, sev);
+    if (rr() < clamp((sev - KDR.at) * KDR.k, 0, KDR.max)) return knockdown(att, def, dir, power, name, fwd, sev);
     if (sev > 0.85 && rr() < 0.55) { def.wobble = Math.max(def.wobble, 0.9 + 0.9 * rr()); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'повело', 'crit'); }
   }
 }
@@ -551,7 +557,7 @@ function knockdown(att, def, dir, power, name, fwd, sev, kind, bodyArg) {
   const body = !!bodyArg || kind === 'liver';
   const type = kind || window.__kdType || (body ? 'liver' : (sev > 1.8 || rr() < 0.4 ? 'fall' : 'knee'));
   // how long he stays down: the harder the shot and the more knockdowns already, the longer; past 9 he won't beat the count
-  let up = 2 + (sev - 1) * 3 + (def.kdCount - 1) * 1.5 + (1 - def.hp / 100) * 3.2 + rr() * 1.5;
+  let up = KDR.up + (sev - 1) * 3 + (def.kdCount - 1) * 1.5 + (1 - def.hp / 100) * 3.2 + rr() * 1.5;
   if (type === 'knee') up = Math.min(up, 7.5);
   if (type === 'liver') up = 5 + (1 - def.hp / 100) * 4 + rr() * 3.5;   // a liver shot often keeps a man down past ten
   G.kdHit = koMark(att, def, name, body, G.t);   // R-15: a count-out replays this punch
