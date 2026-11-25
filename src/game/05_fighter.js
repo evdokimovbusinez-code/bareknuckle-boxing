@@ -85,7 +85,6 @@ const BLK = {
   poleIn: 0.05, poleDown: 0.32, poleFwd: -0.08,  // elbow hint: in, down to the ribs, BEHIND the wrist (was +0.10 = forearm leant back into the face)
   chinLift: 0.20,    // rad: the head/neck nod back up in the guard so the eyes look at the opponent over the gloves (was ~23° down)
   palmIn: 0.5,       // how much of the palm's turn is toward the centre line (a little toward each other) vs straight back at the face
-  clench: 0.78,      // rad: extra curl at the knuckles — the fight clips leave the fingers half open (a hook), fold them into a fist
 };
 const blkSag = F => clamp((BLK.sagSta - F.stamina) / BLK.sagSta, 0, 1);   // 0 at 20 % stamina, 1 at empty
 class Fighter {
@@ -700,18 +699,7 @@ class Fighter {
     _ghQd.setFromRotationMatrix(_ghMt.multiply(_ghMc));
     const qc = this.mquat(H, _ghQc); _ghQn.copy(_ghQd).multiply(qc);
     qc.slerp(_ghQn, w); this.setMQuat(H, qc);
-    // The clips keep the fingers half-curled: a hook, not a fist. Fold the first phalanges further about the hand's
-    // transverse axis (Xt = fingers × palm) so the fingertips tuck into the palm and only the knuckles show. Applied
-    // in model space to the base phalanx, so it carries that finger's whole chain; blended in by the guard weight.
-    const k = (window.__blkTune || {}).clench ?? BLK.clench;
-    if (k > 0) {
-      _clQ.setFromAxisAngle(_ghXt, k);
-      for (const f of ['Index', 'Mid', 'Ring', 'Pinky']) {
-        const b = B[`CC_Base_${S}_${f}1`], q = this.mquat(b, _clQc);
-        _clQn.copy(_clQ).multiply(q);
-        q.slerp(_clQn, w); this.setMQuat(b, q);
-      }
-    }
+    // (the fingers: a full fist is folded on every frame by fistPose, 05b_motion.js — #87, replaces BLK.clench 0.78 rad)
   }
   tick(dt) {
     // the trunk catches the head's impulse ~65 ms later (issue 44): a whiplash, not a rigid shove. Timed on G.t
@@ -767,18 +755,22 @@ class Fighter {
     const wb = sstep(0, 0.6, this.wobble), dip = wb * (0.55 + 0.45 * Math.sin(G.t * 6.3 + this.ph)) * (0.7 + 0.3 * Math.sin(G.t * 2.9));
     const dz = Math.max(this.daze, wb), tt = G.t, sw = dz * Math.sin(tt * 1.9 + this.ph) + 1.8 * wb * Math.sin(tt * 2.6 + this.ph), sw2 = dz * Math.sin(tt * 1.3 + this.ph * 2);
     duck = Math.max(duck, 0.42 * dip, this.wind > G.t ? 0.55 : 0, this.liver ? 0.4 : 0, shell ? 0.32 : 0, 0.16 * defl);   // covering up: chin down, elbows in, hunched behind the gloves; a body shot folds him at the waist
-    const s = this.sp; let live = duck + lean + Math.abs(slip) + guardW + dz;   // s.bk (the recoil) also feeds live below
+    // #87 (05b_motion.js): the punch's drive from the legs, the stance rhythm
+    const FP = formPunch(this, _fmP), RY = formRhythm(this, dz, _fmR); this.heelUp = FP.heel;
+    const s = this.sp; let live = duck + lean + Math.abs(slip) + guardW + dz + FP.any + Math.abs(RY.y) + Math.abs(RY.z);   // s.bk (the recoil) also feeds live below
     for (const k in s) { const q = s[k]; if (dt > 0) { const n = dt > 0.02 ? 2 : 1; for (let i = 0; i < n; i++) q.step(dt / n); } live += Math.abs(q.x) + Math.abs(q.v) * 0.01; }
     const B = this.bones;
     if (live > 1e-4) {
       const fL = B.CC_Base_L_Foot, fR = B.CC_Base_R_Foot;
       const tL = this.mpos(fL, _po1), tR = this.mpos(fR, _po2), qL = this.mquat(fL, _poq1), qR = this.mquat(fR, _poq2);
       // R-12: out of a dodge the hips sit down at most STANCE.restDrop (guard + shell + daze + rubber legs used to stack to ~0.2 m)
-      const drop = -0.26 * duck - 0.04 * lean - 0.05 * Math.abs(slip) - 0.06 * this.blockW - 0.07 * dz + 0.015 * sw2;
-      this.setHip(_v1.copy(this.hipModel).add(_v2.set(0.09 * slip + 0.03 * sw, this.dodge ? drop : Math.max(drop, -STANCE.restDrop), -0.11 * duck - 0.13 * lean + clamp(s.hz.x, -0.12, 0.12))));
+      const drop = -0.26 * duck - 0.04 * lean - (0.05 + FORM.slipDrop) * Math.abs(slip) - 0.06 * this.blockW - 0.07 * dz + 0.015 * sw2 + RY.y;
+      this.setHip(_v1.copy(this.hipModel).add(_v2.set(0.09 * slip + 0.03 * sw, this.dodge ? drop : Math.max(drop, -STANCE.restDrop), -0.11 * duck - 0.13 * lean + clamp(s.hz.x, -0.12, 0.12) + RY.z + FP.fwd)));
+      // #87: the hips turn into a punch (the legs follow by IK below, the feet stay planted)
+      if (B.CC_Base_Pelvis && FP.yaw) this.rot(B.CC_Base_Pelvis, 0, 0.45 * FP.yaw, 0);
       // a shot on the guard rocks the trunk back behind the gloves (the recoil spring), on top of the standing reactions
-      this.rot(B.CC_Base_Waist, 0.22 * duck - 0.20 * lean + 0.06 * this.blockW + 0.4 * s.sp.x + 0.07 * sw2 - 0.5 * rc, 0, 0.4 * s.sr.x - 0.2 * slip - 0.12 * sw);
-      this.rot(B.CC_Base_Spine01, 0.16 * duck - 0.18 * lean + 0.08 * this.blockW - 0.7 * rc, 0, -0.14 * slip);
+      this.rot(B.CC_Base_Waist, 0.22 * duck - 0.20 * lean + 0.06 * this.blockW + 0.4 * s.sp.x + 0.07 * sw2 - 0.5 * rc + FORM.slipBend * Math.abs(slip) + 0.6 * FP.pitch, 0.55 * FP.yaw + RY.yaw, 0.4 * s.sr.x - 0.2 * slip - 0.12 * sw);
+      this.rot(B.CC_Base_Spine01, 0.16 * duck - 0.18 * lean + 0.08 * this.blockW - 0.7 * rc + 0.4 * FP.pitch, 0.45 * FP.yaw, -0.14 * slip);
       this.rot(B.CC_Base_Spine02, 0.10 * duck - 0.14 * lean + 0.6 * s.sp.x - 0.9 * rc, 0, 0.6 * s.sr.x - 0.1 * slip - 0.06 * sw);
       this.rot(B.CC_Base_NeckTwist01, -0.25 * duck + 0.2 * lean + 0.45 * s.hp.x - 0.3 * rc - 0.6 * chin, 0.4 * s.hy.x, 0.45 * s.hr.x);
       // shaking it off: a hard one landed, half a second later the head shakes (5–6 Hz, three swings) — "I'm fine"
@@ -800,8 +792,11 @@ class Fighter {
     const tiredSag = Math.min(1, clamp((35 - this.stamina) / 35, 0, 1) * (this.cur ? 0 : 1) + 0.7 * defl);   // winded by a body shot: the hands come down as if the tank were empty
     const stareDown = G.state === 'intro' ? G.stare || 0 : 0;   // the stare-down: the hands drop from the face (09b_cine.js)
     const gx = BT.x ?? BLK.guardX, gy = BT.y ?? BLK.guardY, gz = BT.z ?? BLK.guardZ;
-    if (guardW > 0.02 || dz > 0.02 || tiredSag > 0.02 || stareDown > 0.02) for (const S of ['L', 'R']) {
+    for (const S of ['L', 'R']) {
       if (this.aimW > 0.05 && this.aimArm === S) continue;
+      // #87 stance guard (FORM.lead / rear): on whenever no block is held; an arm lets go of it while its punch clip plays
+      const stW = FORM.on ? (1 - Math.min(1, FP[S])) * (1 - stareDown) * (1 - 0.5 * tiredSag) : 0;
+      if (!(guardW > 0.02 || stW > 0.02 || dz > 0.02 || tiredSag > 0.02 || stareDown > 0.02)) continue;
       const side = S === 'L' ? 1 : -1;
       const H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), hc = this.group.worldToLocal(this.head.getWorldPosition(_v3));   // the guard follows the head where it is now (ducked / slipped), not where it stands upright
       const g = _v4.set(side * gx, gy, gz).add(hc);
@@ -809,7 +804,9 @@ class Fighter {
       g.y -= 0.06 * defl;                          // a body shot drops them another 6 cm even with a full guard up
       g.z -= 0.35 * rc; g.y -= 0.65 * rc;          // a shot drives them 4…10 cm back / down onto the face, on a spring
       g.x += side * 0.27 * fly; g.y -= 0.17 * fly; g.z -= 0.05 * fly;   // broken: flung out to the sides
-      hand.lerp(g, guardW).add(_v5.set(0, (-0.2 * dz - 0.11 * tiredSag - 0.34 * stareDown) * (1 - guardW), 0.03 * dz - 0.03 * tiredSag - 0.06 * stareDown));   // dazed or out of breath: the hands come down
+      const W = Math.max(guardW, stW);
+      if (stW > guardW) g.lerp(_fmS.fromArray(S === 'L' ? FORM.lead : FORM.rear).add(hc), 1 - guardW / W);   // the stance guard under the block (the block alone at guardW = 1)
+      hand.lerp(g, W).add(_v5.set(0, (-0.2 * dz - 0.11 * tiredSag - 0.34 * stareDown) * (1 - guardW), 0.03 * dz - 0.03 * tiredSag - 0.06 * stareDown));   // dazed or out of breath: the hands come down
       const A = B[`CC_Base_${S}_Upperarm`], Fn = B[`CC_Base_${S}_Forearm`];
       // elbow hint: down at the ribs, a little in and forward of the shoulder; the forearm ends up vertical
       this.mpos(A, _bkP); _bkP.x -= side * (BT.in ?? BLK.poleIn); _bkP.y -= (BT.down ?? BLK.poleDown); _bkP.z += (BT.fwd ?? BLK.poleFwd);
@@ -817,7 +814,7 @@ class Fighter {
       // the fist is a straight continuation of the forearm, palm to the face (not folded back onto the hair):
       // ikPole only moved the arm, so refresh the matrices before measuring the hand bone's directions
       this.cc.updateMatrixWorld(true);
-      this.guardHand(S, H, Fn, hc, guardW);
+      this.guardHand(S, H, Fn, hc, W);
     }
     /* A clean body shot tucks the near elbow onto the struck ribs for ~0.5 s (issue 44). The hand is pulled toward
        the contact point in the man's own frame, with the elbow hinted down/in so it folds rather than reaching. */
@@ -937,7 +934,7 @@ class Fighter {
     }
     for (let i = 0; i < 2; i++) {
       const S = K[i], sK = SK[i], L = LB[S], foot = L.foot, st = F[sK];
-      const pinned = _v4; let dY = 0;   // the ankle's target (world) and how far the foot is turned off its animated heading (about y)
+      const pinned = _v4; let dY = 0, hl = false;   // the ankle's target (world) and how far the foot is turned off its animated heading (about y); hl: #87 heel lift
       if (st) {   // stepping: the foot travels from where it stood to where it should stand, lifting off the canvas on the way
         // R-12: the foot comes off the canvas first and only then travels (it used to skate the first few cm at floor height)
         st.t += dt / st.T; const k = sstep(STANCE.liftT, GAIT.land, Math.min(1, st.t)), lift = 0.055 * Math.pow(Math.sin(Math.PI * Math.min(1, st.t)), 0.6);
@@ -952,14 +949,16 @@ class Fighter {
         const o = X.o.subVectors(Bw[i], W[i]);   // ankle → ball as the animation has it (world)
         if (!F[BK[i]]) { F[BK[i]] = ringPt(_pf3.copy(F[S]).applyMatrix4(ARENA.matrixWorld).add(o), new V3()); F[YK[i]] = ry; }
         dY = yaw(i); if (dY) o.applyAxisAngle(X.up, dY);
+        if (S === 'R' && this.heelUp > 0.005 && !cel) hl = heelLift(this, o, this.heelUp);   // #87: a rear-hand punch turns the rear foot on its ball
         pinned.copy(F[BK[i]]); pinned.y = ringPt(Bw[i], _pf3).y; pinned.applyMatrix4(ARENA.matrixWorld).sub(o);
         ringPt(pinned, F[S]);   // (the ankle's spot: the stance box measures from it, a step starts from it)
       }
-      if (pinned.distanceToSquared(W[i]) < 1e-6 && Math.abs(dY) < 1e-4) continue;
+      if (pinned.distanceToSquared(W[i]) < 1e-6 && Math.abs(dY) < 1e-4 && !hl) continue;
       // (the group only turns about y: model y = world y; P2's is mirrored, scale.x = −1, so a turn about it goes the other way)
       const sc = this.group.scale; let q = this.mquat(foot, _pfq); if (dY) q = X.q.setFromAxisAngle(X.up, sc.x * sc.y * sc.z < 0 ? -dY : dY).multiply(q);
+      if (hl) q = heelFoot(this, q);
       const t = this.group.worldToLocal(_pf4.copy(pinned));   // not a shared _v*: ik() uses those itself
-      this.ik(L.thigh, L.calf, foot, t); this.setMQuat(foot, q);
+      this.ik(L.thigh, L.calf, foot, t); this.setMQuat(foot, q); if (hl) heelToe(this, L.toe);
     }
     this.cc.updateMatrixWorld(true);
   }
@@ -1019,7 +1018,7 @@ class Fighter {
   afterPose(dt) { if (this.cur) { if (!this.kPrev) { this.kPrev = new V3(); this.kOld = new V3(); } this.kOld.copy(this.kPrev); this.kPrev.copy(this.knuckle(_v4)); } const t = this.jo; this.jo = this.jp; this.jp = t; this.joints(this.jp); if (dt > 0) this.jdt = dt; this.headNow.copy(this.jp[15]); }
   update(dt) {
     if (this.frozen) return;
-    if (this.gu) { this.getUpStep(dt); this.afterPose(dt); return; }
+    if (this.gu) { this.getUpStep(dt); fistPose(this); this.afterPose(dt); return; }
     // between exchanges a fighter recovers part of what he took (breath, legs, head clears) — but the damage that stays (swelling,
     // cuts, the brain's accumulated shake) lowers the ceiling he can come back to
     if (G.state === 'fight' && !this.ko && G.t - this.hitT > 1.6 && this.hp < this.hpCap) this.hp = Math.min(this.hpCap, this.hp + dt * (this.stamina > 40 ? 2 : 1));
@@ -1033,7 +1032,7 @@ class Fighter {
       if (this.slide.t > 1.1) this.slide = null;
     }
     if (this.rag.on) {
-      this.rag.step(dt); this.rag.apply(); this.cc.updateMatrixWorld(true); this.afterPose(dt);
+      this.rag.step(dt); this.rag.apply(); if (this.rag.mode !== 'ko') fistPose(this); this.cc.updateMatrixWorld(true); this.afterPose(dt);
       const gp = this.rag.prof && this.rag.prof.getup;
       if (gp) { const R = this.rag, t = R.t - gp.t0; if (t > 0.6 && (R.fours > 0.6 || t > 2.6)) this.startGetUp('fours'); }
       return;
@@ -1047,7 +1046,7 @@ class Fighter {
       || ((G.state === 'ko' || G.state === 'result') && G.winner === this && !this.rag.on)) this.cineLayer();
     if (breakOn()) breakLayer(this);   // R-14: the forearms push off the other man's chest
     if (this.rag.hitOn) this.rag.hitStep(dt);
-    this.spreadTwist(); this.cc.updateMatrixWorld(true);
+    this.spreadTwist(); this.cc.updateMatrixWorld(true); fistPose(this);   // #87: a closed fist over every layer
     this.afterPose(dt);
   }
   simulate(dt) {
