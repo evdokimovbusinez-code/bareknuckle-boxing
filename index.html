@@ -1177,10 +1177,12 @@ const HEAD_FRAG = `#include <map_fragment>
  vec4 WW = wounds();
  diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 0.9, 0.5, 0.52 ), clamp( WW.w, 0.0, 1.0 ) * 0.5 );   // swollen, inflamed skin
  // blood: a thin film diluted by sweat stains the skin translucent red; where it runs thick it is an opaque, deep red layer
- diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 0.78, 0.1, 0.09 ), gFilm * ( 1.0 - 0.6 * WW.z ) );
- vec3 bloodC = mix( mix( vec3( 0.33, 0.012, 0.016 ), vec3( 0.13, 0.002, 0.007 ), smoothstep( 0.3, 1.0, gThick ) ), vec3( 0.075, 0.016, 0.012 ), WW.z );   // thin → thick, fresh → drying
- diffuseColor.rgb = mix( diffuseColor.rgb, bloodC, WW.x * 0.95 );
- diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.06, 0.0, 0.004 ), WW.y );                                          // the open cut
+ // (issue 88: the film was ×(0.78, 0.1, 0.09) — red paint; the stream was 0.95 opaque everywhere — now thin blood lets the skin through)
+ diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 0.68, 0.2, 0.18 ), gFilm * ( 1.0 - 0.6 * WW.z ) );
+ vec3 bloodC = mix( mix( vec3( 0.33, 0.012, 0.016 ), vec3( 0.1, 0.002, 0.006 ), smoothstep( 0.3, 1.0, gThick ) ), vec3( 0.07, 0.018, 0.013 ), WW.z );   // thin → thick, fresh → drying
+ diffuseColor.rgb = mix( diffuseColor.rgb, bloodC, WW.x * mix( 0.5, 0.97, smoothstep( 0.0, 0.6, gThick ) ) );
+ diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.42, 0.07, 0.07 ), gRim * 0.65 );                                  // raw lips of the split
+ diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.03, 0.0, 0.002 ), WW.y );                                          // the open cut
  gDrop = sweatBeads( vMapUv, uSweat * ( 1.0 - hairCover ) ); gH += gDrop * 0.00016 * ( 1.0 - WW.x );
  float bWet = clamp( max( WW.x * ( 1.0 - 0.85 * WW.z ), gFilm * 0.7 ) + WW.y + mWet, 0.0, 1.0 );
 `;
@@ -1250,7 +1252,7 @@ const FLESH_NORMAL = `#include <beginnormal_vertex>
    // a closed lid is a dome over the eyeball: bend its normal toward the radial direction (the crease normals would light it like a hole)
    float k = clamp( aLid.x * ( left ? uLid.x : uLid.y ) * 1.4, 0.0, 1.0 ); vLidK = k;
    objectNormal = normalize( mix( lidRot( objectNormal, a ), normalize( rp ) * length( objectNormal ), k * 0.85 ) );
-   fOff += normalize( rp ) * vEyeSw * 0.0075 * uU;   // haematoma: the lids and the cheek under the eye puff up
+   fOff += normalize( rp ) * vEyeSw * 0.0105 * uU;   // haematoma: the lids and the cheek under the eye puff up (issue 88: 7.5 → 10.5 mm at full)
  } else vLidK = 0.0;
 /*EXPR2*/
  if ( uFleshOn > 0.5 ) {
@@ -1327,35 +1329,56 @@ vec3 bruises( vec3 c ) {
     vec4 B = uBr[i]; if ( B.w <= 0.0 ) continue;
     float d = length( vBP - B.xyz ) / uU, n = skVN( vBP / uU * 90.0 ) * 0.5 + skVN( vBP / uU * 260.0 ) * 0.25;
     float m = smoothstep( 0.045 * ( 0.6 + 0.6 * B.w ), 0.0, d * ( 0.75 + 0.5 * n ) ) * min( B.w, 1.0 );
-    float age = uFT - uBrT[i].x, dark = smoothstep( 8.0, 40.0, age );
-    vec3 tint = mix( vec3( 1.0, 0.55, 0.55 ), vec3( 0.52, 0.3, 0.5 ), dark );
-    c = mix( c, c * tint, m * 0.75 );
+    // issue 88: red within seconds → purple over the first minute → blue-grey by the end of a round (it keeps going round to round)
+    float age = uFT - uBrT[i].x;
+    vec3 tint = mix( mix( vec3( 1.0, 0.55, 0.55 ), vec3( 0.5, 0.3, 0.48 ), smoothstep( 6.0, 50.0, age ) ), vec3( 0.42, 0.36, 0.54 ), smoothstep( 50.0, 120.0, age ) );
+    c = mix( c, c * tint, m * ( 0.75 + 0.1 * smoothstep( 6.0, 60.0, age ) ) );
   }
   return c;
 }
-// blood smeared or run onto skin (from the opponent's face onto the knuckles, drips running down the chest)
+/* blood smeared or run onto the skin. Issue 88: it was a flat opaque red (0.26, 0.01, 0.014) blob of up to 2.6 cm plus a 3–5 cm red
+   film per smear — 28 of them painted half a face like make-up. Now a smear has a thickness: dark and opaque where it is thick, a
+   translucent stain (the skin shows through) where it thins out. uSmD = direction · (1 + t0) (its length carries the birth time: the
+   film dries and darkens) and the length of the run: w > 0 a wipe (a fist dragged across a bleeding face: 3–4 fingers of blood along
+   the punch, thinning away from where it landed), w < 0 a run (drips down the chest: one narrow rivulet ending in a bead). */
+float gSmT = 0.0, gSmD = 0.0;
 vec4 smears() {
-  float a = 0.0, dry = 0.0;
+  float a = 0.0, fl = 0.0;
   for ( int i = 0; i < 28; i++ ) {
     vec4 S = uSm[i]; if ( S.w <= 0.0 ) continue;
-    vec3 v = ( vBP - S.xyz ) / uU; vec4 D = uSmD[i]; float al = dot( v, D.xyz ), lat = length( v - D.xyz * al );
-    float n = skVN( vBP / uU * 140.0 + S.xyz );
-    float blob = smoothstep( 0.012 + 0.012 * S.w, 0.002, length( v ) * ( 0.7 + 0.6 * n ) );
-    float ww = ( 0.0035 + 0.0025 * n ) * ( 1.0 - 0.4 * clamp( al / max( D.w, 1e-3 ), 0.0, 1.0 ) );
-    float streak = smoothstep( ww, ww * 0.35, lat ) * smoothstep( -0.003, 0.0, al ) * smoothstep( D.w, D.w - 0.01, al );
-    float film = smoothstep( 0.03 + 0.02 * S.w, 0.004, length( v ) * ( 0.7 + 0.6 * n ) ) * 0.6 + smoothstep( ww * 3.0, ww, lat ) * smoothstep( -0.003, 0.0, al ) * smoothstep( D.w, D.w - 0.01, al ) * 0.5;
-    float b = max( blob, streak ) * min( S.w, 1.0 );
-    a = max( a, b ); dry = max( dry, film * min( S.w, 1.0 ) );
+    vec3 v = ( vBP - S.xyz ) / uU; if ( dot( v, v ) > 0.01 ) continue;   // nothing of a smear reaches past 10 cm
+    vec4 D = uSmD[i]; float dl = length( D.xyz ); vec3 dd = D.xyz / dl; float age = max( uFT - ( dl - 1.0 ), 0.0 ), run = step( D.w, 0.0 ), len = abs( D.w );
+    float al = dot( v, dd ); vec3 lv = v - dd * al; float lat = length( lv ), u = clamp( al / max( len, 1e-3 ), 0.0, 1.0 );
+    float n = skVN( vBP / uU * 140.0 + S.xyz ), amt = min( S.w, 1.0 ), inR = smoothstep( -0.004, 0.0, al ) * smoothstep( len + 0.002, len - 0.006, al );
+    float th;
+    if ( run > 0.5 ) {
+      float ww = ( 0.0022 + 0.0016 * n ) * ( 1.0 - 0.35 * u ) * ( 0.7 + 0.5 * amt );
+      th = smoothstep( ww, ww * 0.3, lat ) * inR * ( 0.75 + 0.25 * u ) + smoothstep( 0.0035 + 0.002 * amt, 0.001, length( v - dd * len ) );   // the rivulet, the bead at its end
+    } else {
+      // fingers across the drag: the knuckles leave parallel stripes that break up and thin out along the punch
+      float sideC = dot( lv, normalize( cross( dd, normalize( vBN ) ) ) ), w0 = 0.007 + 0.009 * amt;
+      float fing = 0.6 + 0.4 * sin( sideC * ( 700.0 + 350.0 * n ) + n * 2.5 + S.x * 300.0 ), brk = skVN( vec3( al * 220.0, sideC * 300.0, S.y * 50.0 ) );
+      th = smoothstep( w0, w0 * 0.5, lat * ( 0.8 + 0.4 * n ) ) * inR * fing * smoothstep( 1.05, 0.2, u ) * smoothstep( 0.15, 0.55, brk + 0.35 * ( 1.0 - u ) );
+      th = max( th, smoothstep( 0.006 + 0.005 * amt, 0.0015, length( v ) * ( 0.75 + 0.5 * n ) ) );   // where the fist landed: the thickest
+    }
+    th *= amt;
+    float film = smoothstep( 0.0, 0.25, th ) * 0.6 + ( run > 0.5 ? 0.0 : smoothstep( 0.012 + 0.008 * amt, 0.003, lat ) * inR * ( 1.0 - u ) * 0.25 * amt );
+    if ( th > a ) { a = th; gSmD = smoothstep( 10.0, 60.0, age ); }
+    fl = max( fl, film );
   }
-  return vec4( a, dry, 0.0, 0.0 );   // x: blood, y: diluted film
+  gSmT = a;
+  return vec4( smoothstep( 0.12, 0.6, a ), fl, a, gSmD );   // x: opaque blood, y: the translucent stain, z: thickness, w: dried
 }
 vec3 skinMarks( vec3 c, out float wet ) {
   c = bruises( c );
   // black eye: periorbital haematoma — swollen, tight and shiny, red-purple
   c = mix( c, c * vec3( 0.55, 0.25, 0.4 ), clamp( vEyeSw, 0.0, 1.0 ) * 0.8 );
-  vec4 S = smears(); c = mix( c, c * vec3( 0.7, 0.08, 0.07 ), S.y ); c = mix( c, vec3( 0.26, 0.01, 0.014 ), S.x * 0.9 );
-  gH += S.x * 0.0004 + S.y * 0.00012;
-  wet = max( S.x * 0.85, S.y * 0.5 ) + clamp( vEyeSw, 0.0, 1.0 ) * 0.3;
+  vec4 S = smears();
+  c = mix( c, c * vec3( 0.66, 0.2, 0.18 ), S.y * 0.6 );   // thin: a stain the skin shows through
+  vec3 bc = mix( mix( vec3( 0.3, 0.014, 0.018 ), vec3( 0.09, 0.003, 0.006 ), smoothstep( 0.4, 1.0, S.z ) ), vec3( 0.07, 0.02, 0.016 ), S.w * 0.8 );   // thin → thick, fresh → dry
+  c = mix( c, bc, S.x * 0.92 );
+  gH += S.z * 0.00035 * ( 1.0 - 0.6 * S.w ) + S.y * 0.00006;
+  wet = max( S.x * 0.9 * ( 1.0 - 0.8 * S.w ), S.y * 0.35 ) + clamp( vEyeSw, 0.0, 1.0 ) * 0.3;
   return c;
 }
 `;
@@ -1365,6 +1388,7 @@ uniform vec4 uWD[8];
 uniform vec4 uWN[8];
 uniform vec4 uWT[8];
 uniform vec4 uSw[6];
+float gRim = 0.0;
 vec4 wounds() {
   float bl = 0.0, ct = 0.0, dry = 0.0, sw = 0.0;
   vec3 bn = normalize( vBN );
@@ -1382,20 +1406,27 @@ vec4 wounds() {
     float w = ( 0.0022 + 0.0034 * sev ) * ( 1.0 - 0.45 * clamp( al / max( L, 1e-3 ), 0.0, 1.0 ) ) * ( 0.7 + 0.6 * nw );
     float run = smoothstep( -0.003, 0.0, al ) * smoothstep( L + 0.0005, L - 0.003, al );
     float s1 = smoothstep( w, w * 0.3, abs( lat - wig ) ) * run;
-    gFilm = max( gFilm, smoothstep( w * 3.2, w * 0.8, abs( lat - wig ) ) * run * df * 0.75 * smoothstep( 0.0, 0.3, age ) );
-    gFilm = max( gFilm, smoothstep( 0.016 + 0.012 * sev, 0.003, length( vt ) ) * df * 0.8 );
+    // issue 88: the diluted film round the stream / the source was 0.75 / 0.8 strong over 2–3 cm (a red mask); now a narrow halo
+    gFilm = max( gFilm, smoothstep( w * 2.4, w * 0.8, abs( lat - wig ) ) * run * df * 0.45 * smoothstep( 0.0, 0.3, age ) );
+    gFilm = max( gFilm, smoothstep( 0.009 + 0.008 * sev, 0.002, length( vt ) ) * df * 0.45 );
+    float ru = clamp( al / max( L, 1e-3 ), 0.0, 1.0 );   // 0 at the wound … 1 at the tip of the run
     float br = fract( P.w * 3.7 ) > 0.5 ? 1.0 : -1.0;
     float s2 = sev > 0.45 ? smoothstep( w * 0.55, w * 0.15, abs( lat - wig - br * 0.007 * smoothstep( 0.008, 0.035, al ) ) ) * smoothstep( 0.008, 0.012, al ) * smoothstep( L * 0.75, L * 0.75 - 0.003, al ) : 0.0;
     float bead = smoothstep( 0.0026 + 0.0018 * sev, 0.0008, length( vt - fd * L ) ) * step( 0.006, L );
     float pool = smoothstep( 0.0035 + 0.006 * sev, 0.0008, length( vt ) );
     float b = max( max( s1, s2 ), max( bead, pool ) ) * df * smoothstep( 0.0, 0.08, age );
-    bl = max( bl, b ); dry = max( dry, b * smoothstep( 8.0, 45.0, age ) );
-    float th = max( max( bead, pool ), s1 * ( 1.0 - clamp( abs( lat - wig ) / w, 0.0, 1.0 ) ) ) * df;   // thickness: domed across the stream, beads at the tip
-    gThick = max( gThick, th ); gH = max( gH, th * ( 0.0003 + 0.0005 * sev ) * ( 1.0 - 0.7 * smoothstep( 8.0, 45.0, age ) ) );
+    // the wound keeps feeding its source: fresh at the pool, the old blood down the run dries first (was: the whole run dried with the wound's age)
+    float dr = smoothstep( 8.0, 45.0, age ) * smoothstep( 0.1, 0.8, ru ) * ( 1.0 - pool );
+    bl = max( bl, b ); dry = max( dry, b * dr );
+    // thickness: domed across the stream, thick at the wound, thinning down the run, beads at the tip
+    float th = max( max( bead, pool ), s1 * ( 1.0 - clamp( abs( lat - wig ) / w, 0.0, 1.0 ) ) * ( 1.0 - 0.55 * ru ) ) * df;
+    gThick = max( gThick, th ); gH = max( gH, th * ( 0.0003 + 0.0005 * sev ) * ( 1.0 - 0.7 * dr ) );
     if ( Tg.w > 0.0 ) {
       float c1 = dot( vt, Tg.xyz ), cn = abs( dot( vt, cross( Tg.xyz, N.xyz ) ) ) + 0.0002 * sin( c1 * 900.0 );
-      float open = smoothstep( 0.0, 0.12, age ) * ( 0.0009 + 0.0009 * sev ) * ( 1.0 - 0.6 * smoothstep( Tg.w * 0.2, Tg.w * 0.5, abs( c1 ) ) );
-      ct = max( ct, smoothstep( open, open * 0.25, cn ) * smoothstep( Tg.w * 0.5, Tg.w * 0.5 - 0.002, abs( c1 ) ) * df );
+      float open = smoothstep( 0.0, 0.12, age ) * ( 0.0012 + 0.0013 * sev ) * ( 1.0 - 0.6 * smoothstep( Tg.w * 0.2, Tg.w * 0.5, abs( c1 ) ) );
+      float alongC = smoothstep( Tg.w * 0.5, Tg.w * 0.5 - 0.002, abs( c1 ) ) * df;
+      ct = max( ct, smoothstep( open, open * 0.25, cn ) * alongC );
+      gRim = max( gRim, smoothstep( open * 3.2, open * 1.2, cn ) * smoothstep( open * 0.6, open * 1.1, cn ) * alongC );   // the split skin's swollen, raw lips either side of the gap
       sw = max( sw, smoothstep( 0.016, 0.0, length( vt ) ) * df * 0.8 );
     }
   }
@@ -2285,7 +2316,8 @@ async function buildTemplates() {
   { const o = fbx.parse(bufs.wraps, 'assets/'); o.updateMatrixWorld(true); let sm; o.traverse(x => { if (x.isSkinnedMesh) sm = x; });
     T.wraps = { geo: sm.geometry, bind: sm.bindMatrix.clone(), names: sm.skeleton.bones.map(b => b.name) };
     T.wrapMat = new THREE.MeshStandardMaterial({ map: tex.wraps_d, normalMap: tex.wraps_n, roughness: 0.88 });
-    T.tailMat = new THREE.MeshStandardMaterial({ color: '#e6e0d4', roughness: 0.92, side: THREE.DoubleSide }); }
+    // issue 88: a thin strip of cotton lets light through — with no light on the side the camera sees, it read as a dark slate needle by the head
+    T.tailMat = new THREE.MeshStandardMaterial({ color: '#e6e0d4', roughness: 0.92, side: THREE.DoubleSide, emissive: '#5a554c' }); }
   HEAD.restInv.copy(ccBones.CC_Base_Head.matrixWorld).invert();
   HEAD.restInvT.copy(HEAD.restInv).multiply(new M4().makeTranslation(HEAD.C.x, HEAD.C.y, HEAD.C.z));
   // under-layer of hair and the stubble are rigid on the head: build once, share
@@ -3312,6 +3344,34 @@ function rotVec(R, out) {
 
 /* ───────── flesh: soft-tissue impact, swelling, cuts, nose bleeds (bind space of the skinned body; see FLESH_VDECL / WOUND_FDECL) ───────── */
 const V4 = THREE.Vector4, _f1 = new V3(), _f2 = new V3(), _f3 = new V3();
+/* issue 88: what the injuries do to the fight — soft multipliers, all on the host (resolveHit, ai, Fighter.tick: a P2P guest only shows them).
+   Swelling = Flesh.u.uEyeSw (0 … 1 per eye, the lid starts to close at 0.25), nose = sev of the nose wound (0 … 1), ribs = Flesh.ribs. */
+const INJ = {
+  eyeSee: 0.5,     // the AI's chance to slip / block a punch coming from the side of his closing eye × (1 − eyeSee · swell)
+  eyeEva: 0.35,    // a slip / duck that would have beaten a punch from the blind side still fails with chance eyeEva · swell (both men)
+  eyeLeak: 0.6,    // a punch from the blind side taken on the guard: damage × (1 + eyeLeak · swell)
+  eyeAim: 1.5,     // the AI's hooks / overhands / uppercuts with the arm on the side of the player's closing eye: weight × (1 + eyeAim · swell)
+  noseSta: 0.22,   // a bleeding nose: stamina regen × (1 − noseSta · sev), ×1.6 of that once broken (he breathes through the mouth)
+  noseBleed: 1.6,  // a broken nose: the run grows and drips this much faster
+  ribSta: 0.3,     // bruised ribs / liver: stamina regen × (1 − ribSta · ribs)
+  ribHit: 0.07,    // ribs per unit of power of a clean body shot (a liver shot: + 2 × ribHit more)
+  ribHeal: 0.25,   // the share of it the minute in the corner takes off
+  staMin: 0.45,    // the regen never drops below this share
+};
+const _ij = new V3();
+// the swelling of def's eye on the side of att's arm (hooks / overhands / uppercuts come round on the side of their arm); sides are
+// compared in world z — the men face each other along x (P2's group is mirrored, the bones' world positions are not)
+function injArm(def, att, arm) {
+  const E = def.flesh.u.uEyeSw.value; if (E.x + E.y < 0.05) return 0;
+  const zA = _ij.setFromMatrixPosition(att.bones[`CC_Base_${arm}_Upperarm`].matrixWorld).z - att.group.position.z;
+  const zL = _ij.setFromMatrixPosition(def.bones.CC_Base_L_Eye.matrixWorld).z - def.headNow.z;
+  return (zA > 0) === (zL > 0) ? E.x : E.y;
+}
+function injEye(def, att, name) { const P = PUNCH[name]; return P ? injArm(def, att, P.arm) * (P.type === 'straight' ? 0.5 : 1) : 0; }   // straights: down the middle, half
+function injSta(F) {   // stamina regen multiplier: nose + ribs
+  const fl = F.flesh; let ns = 0; for (const w of fl.wounds) if (w.kind === 'nose' && w.sev > ns) ns = w.sev;
+  return Math.max(INJ.staMin, (1 - INJ.noseSta * ns * (fl.u.uNB.value.w > 0 ? 1.6 : 1)) * (1 - INJ.ribSta * fl.ribs));
+}
 function skinVerts(geo, mi) {   // the vertices of one material group, in bind space
   const idx = geo.index ? geo.index.array : null, pos = geo.attributes.position.array, nor = geo.attributes.normal.array, seen = new Set();
   for (const g of geo.groups) if (g.materialIndex === mi) for (let i = g.start; i < g.start + g.count; i++) seen.add(idx ? idx[i] : i);
@@ -3331,7 +3391,7 @@ class Flesh {
       uEyeL: { value: new V3() }, uEyeR: { value: new V3() }, uLidAx: { value: new V3(1, 0, 0) }, uLid: { value: new V4() },
       uEyeSw: { value: new THREE.Vector2() }, uEmo: { value: new V4() }, uEmo2: { value: new V4() }, uFUp: { value: new V3() }, uFFw: { value: new V3() }, uFMid: { value: new V3() }, uBr: { value: v4(10, 0) }, uBrT: { value: v4(10, 0) }, uSm: { value: v4(28, 0) }, uGear: { value: new V4() }, uGearT: { value: 0 }, uGlv: { value: 0 }, uSmD: { value: v4(28, 0) },
       uFMT: { value: T.fm ? T.fm.tex : null }, uFMN: { value: T.fm ? T.fm.n : 0 }, uFW: { value: new Float32Array(FACE_SHAPES.length) } };   // face blend shapes (03b_face_shapes.js)
-    this.eyeSwell = [0, 0]; this.brI = 0; this.smI = 0; this.lipBleed = 0;
+    this.eyeSwell = [0, 0]; this.brI = 0; this.smI = 0; this.lipBleed = 0; this.ribs = 0; this.said = {};
     this.M = new M4(); this.Mi = new M4(); this.t = 0; this.ii = 0; this.wounds = []; this.vel = new V3();
     if (!T.headV) { T.headV = skinVerts(body.geometry, T.matNames.indexOf('Std_Skin_Head')); T.bodyV = skinVerts(body.geometry, T.matNames.indexOf('Std_Skin_Body')); }
     // bind pose now (group at the origin): find the nose tip (most forward head vertex on the midline) and the nostrils under it
@@ -3389,7 +3449,7 @@ class Flesh {
     return { p: new V3().fromArray(A, 3 * bi), n: new V3().fromArray(V.N, 3 * bi).normalize() };
   }
   reset() {
-    this.wounds.length = 0; const u = this.u; this.eyeSwell = [0, 0]; u.uEyeSw.value.set(0, 0); this.lipBleed = 0;
+    this.wounds.length = 0; const u = this.u; this.eyeSwell = [0, 0]; u.uEyeSw.value.set(0, 0); this.lipBleed = 0; this.ribs = 0; this.said = {};
     for (const v of u.uBr.value) v.w = 0; for (const v of u.uSm.value) v.w = 0;
     for (const v of u.uImp.value) v.w = -1; for (const v of u.uSw.value) v.set(0, 0, 0, 0); for (const v of u.uWP.value) v.w = -1e4; u.uNB.value.w = 0;
   }
@@ -3398,10 +3458,13 @@ class Flesh {
     for (let i = 0; i < B.length; i++) if (B[i].w > 0 && _f1.set(B[i].x, B[i].y, B[i].z).distanceToSquared(P) < r2) { B[i].w = Math.min(1.3, B[i].w + a); return; }
     const i = this.brI++ % B.length; B[i].set(P.x, P.y, P.z, a); this.u.uBrT.value[i].x = this.t;
   }
-  smear(P, a, dirB, len) {   // blood on the skin (bind space), with a run of length len along dirB
-    const S = this.u.uSm.value, D = this.u.uSmD.value, r2 = (0.02 * this.U) ** 2;
-    for (let i = 0; i < S.length; i++) if (S[i].w > 0 && _f1.set(S[i].x, S[i].y, S[i].z).distanceToSquared(P) < r2) { S[i].w = Math.min(1.2, S[i].w + a); D[i].w = Math.max(D[i].w, len); return; }
-    const i = this.smI++ % S.length; S[i].set(P.x, P.y, P.z, a); D[i].set(dirB.x, dirB.y, dirB.z, len);
+  // blood on the skin (bind space): a wipe of length len along dirB, or (run) a rivulet running down it. uSmD packs the unit direction
+  // scaled by (1 + birth time) — the shader dries the film from it — and ±len (< 0: a run). A fresh smear over an old one wets it again
+  smear(P, a, dirB, len, run = false) {
+    const S = this.u.uSm.value, D = this.u.uSmD.value, r2 = (0.02 * this.U) ** 2, k = 1 + this.t;
+    for (let i = 0; i < S.length; i++) if (S[i].w > 0 && _f1.set(S[i].x, S[i].y, S[i].z).distanceToSquared(P) < r2 && (D[i].w < 0) === run) {
+      S[i].w = Math.min(1.2, S[i].w + a); const l = Math.max(Math.abs(D[i].w), len); _f1.set(D[i].x, D[i].y, D[i].z).setLength(k); D[i].set(_f1.x, _f1.y, _f1.z, run ? -l : l); return; }
+    const i = this.smI++ % S.length; S[i].set(P.x, P.y, P.z, a); D[i].set(dirB.x * k, dirB.y * k, dirB.z * k, run ? -len : len);
   }
   // a world point on this fighter's skin → nearest skin vertex (bind space), using the bone that carries that area
   skinAt(pw, boneIdx, verts) { this.b2w(boneIdx, this.M); this.Mi.copy(this.M).invert(); return this.snap(verts, pw.clone().applyMatrix4(this.Mi)); }
@@ -3426,13 +3489,20 @@ class Flesh {
     const at = this.snap(body ? T.bodyV : T.headV, cW.clone().applyMatrix4(this.Mi)), db = dirW.clone().transformDirection(this.Mi);
     const w = clamp(power, 0.25, 1.5); this.dent(at.p, db, w); this.bruise(at.p, 0.22 * w);
     const res = { dent: [at.p.clone(), db.clone(), w], skin: at.p.clone().applyMatrix4(this.M), spray: [] };
-    if (body) return res;
+    if (body) { this.ribs = Math.min(1, this.ribs + INJ.ribHit * w); return res; }   // issue 88: bruised ribs slow the breath (INJ.ribSta)
     this.swell(at.p, 0.2 * w);
-    // a fist landing on a bloody face drags the blood across it (bare knuckle: the face ends up painted, not dotted)
-    if (this.wounds.length) { const bl = Math.min(1, this.wounds.reduce((a, x) => a + x.sev, 0)); if (bl > 0.15) this.smear(at.p, 0.25 + 0.45 * bl, db.clone().addScaledVector(this.down(_f1), 0.6).normalize(), (0.03 + 0.05 * w) * bl); }
-    // periorbital haematoma: shots landing around an eye swell the lids and cheek until the eye closes
-    [this.u.uEyeL.value, this.u.uEyeR.value].forEach((e, i) => { const d = at.p.distanceTo(e) / this.U; if (d < 0.05) this.eyeSwell[i] = Math.min(1, this.eyeSwell[i] + 0.16 * w * (1 - d / 0.05) * (0.7 + 0.6 * rr())); });
+    // a fist landing where the face is bleeding drags the blood across it, along the punch (issue 88: only where there is blood — a wound
+    // or an earlier smear within a few cm — it used to paint wherever the punch landed once he bled anywhere)
+    if (this.wounds.length) {
+      const bl = Math.min(1, this.wounds.reduce((a, x) => a + x.sev, 0)), r = 0.05 * this.U, S = this.u.uSm.value;
+      const wet = this.wounds.some(x => x.p.distanceTo(at.p) < r + x.L * this.U) || S.some(s => s.w > 0.2 && _f1.set(s.x, s.y, s.z).distanceTo(at.p) < 0.6 * r);
+      if (bl > 0.15 && wet) { const dir = db.clone().addScaledVector(at.n, -db.dot(at.n)).addScaledVector(this.down(_f1), 0.3).normalize(); this.smear(at.p, 0.3 + 0.45 * bl, dir, (0.025 + 0.045 * w) * (0.5 + 0.5 * bl)); }
+    }
+    // periorbital haematoma: shots landing around an eye swell the lids and cheek until the eye closes (issue 88: reach 5 → 7 cm and
+    // +0.16 → +0.22 a shot — it took 90 s of a masher for 0.14, the lid never visibly closed)
+    [this.u.uEyeL.value, this.u.uEyeR.value].forEach((e, i) => { const d = at.p.distanceTo(e) / this.U; if (d < 0.07) this.eyeSwell[i] = Math.min(1, this.eyeSwell[i] + 0.22 * w * (1 - d / 0.07) * (0.7 + 0.6 * rr())); });
     this.u.uEyeSw.value.set(Math.max(this.u.uEyeSw.value.x, this.eyeSwell[0]), Math.max(this.u.uEyeSw.value.y, this.eyeSwell[1]));
+    if (!this.said.eye && Math.max(...this.eyeSwell) > 0.4) { this.said.eye = true; res.eye = true; }
     // the mouth: lips split on the teeth, the mouth fills with blood
     { const lips = this.lips || (this.lips = this.snap(T.headV, this.nose.tip.clone().addScaledVector(this.up, -0.024 * this.U)));
       const d = at.p.distanceTo(lips.p) / this.U;
@@ -3451,7 +3521,7 @@ class Flesh {
       if (near) { near.sev = Math.min(1, near.sev + 0.25 * w); near.L *= 0.5; res.spray.push(near); }
       else if (rr() < (0.05 + 0.25 * hurt * w + (P.type === 'hook' || P.type === 'over' ? 0.08 : 0)) * (pvp('blood') ? 3.5 : 1) * (knux ? KNUX.cut : 1)) {   // «Кровавая бойня»: cuts ×3.5; a knux punch (issue 52): ×KNUX.cut more often
         const tan = _f1.crossVectors(at.n, this.up).normalize().clone();
-        const c = sparOn() ? null : this.wound('cut', at, 0.35 + 0.4 * rr() * w, tan, 0.012 + 0.012 * rr()); if (c) { res.spray.push(c); res.cut = true; }   // the headgear's padding: no cuts in sparring
+        const c = sparOn() ? null : this.wound('cut', at, 0.35 + 0.4 * rr() * w, tan, 0.012 + 0.012 * rr()); if (c) { res.spray.push(c); res.cut = true; res.brow = l.y > 0.005; }   // the headgear's padding: no cuts in sparring
       }
     }
     // the nose: straights and overhands to the middle of the face
@@ -3480,19 +3550,20 @@ class Flesh {
     // swelling builds for a while after the blow (the haematoma keeps filling)
     if (dt > 0) for (let i = 0; i < 2; i++) if (this.eyeSwell[i] > 0) this.u.uEyeSw.value.setComponent(i, Math.min(1, this.u.uEyeSw.value.getComponent(i) + (this.eyeSwell[i] * 1.15 - this.u.uEyeSw.value.getComponent(i)) * dt * 0.25));
     if (!this.wounds.length) return;
-    const down = this.down(_f1), a = 1 - Math.exp(-dt * 0.9);
+    const down = this.down(_f1), a = 1 - Math.exp(-dt * 0.9), broke = u.uNB.value.w > 0 ? INJ.noseBleed : 1;
     this.wounds.forEach((w, i) => {
-      w.d.lerp(down, a).normalize();
-      if (dt > 0) w.L = Math.min(w.Lmax, w.L + dt * (0.004 + 0.022 * w.sev) * (w.kind === 'cut' && this.t - w.t0 < 0.15 ? 0 : 1));
+      w.d.lerp(down, a).normalize(); const kb = w.kind === 'nose' ? broke : 1;   // issue 88: a broken nose runs and drips faster
+      if (dt > 0) w.L = Math.min(w.Lmax, w.L + dt * (0.004 + 0.022 * w.sev) * kb * (w.kind === 'cut' && this.t - w.t0 < 0.15 ? 0 : 1));
       // a drop gathers at the end of the rivulet and falls
       if (dt > 0 && w.L > w.Lmax * 0.92 && (w.drip -= dt) < 0) {
-        w.drip = 0.5 + rr() * 2.5 / (0.3 + w.sev);
+        w.drip = (0.5 + rr() * 2.5 / (0.3 + w.sev)) / kb;
         const fl = _f2.copy(w.d).addScaledVector(w.n, -w.d.dot(w.n)); if (fl.lengthSq() > 0.04) { fl.normalize(); FX.drop(_f3.copy(w.p).addScaledVector(fl, w.L * this.U).applyMatrix4(this.M), _f2.copy(this.vel).multiplyScalar(0.5), 0.1, 0.0025 + 0.002 * w.sev); }
         // standing up, what drips off the chin lands on the chest and runs down it
         if (!F.rag.on && (w.kind === 'nose' || w.kind === 'lip' || rr() < 0.4) && rr() < 0.6) {
           const si = this.si, cw = _f3.copy(F.headNow).add(_f2.set(0, -0.25 - rr() * 0.08, 0)).addScaledVector(_f1.subVectors(F.other.headNow, F.headNow).setY(0).normalize(), 0.11);
           cw.x += (rr() - 0.5) * 0.06; cw.z += (rr() - 0.5) * 0.08;
-          this.smear(this.skinAt(cw, si, T.bodyV).p, 0.25 + 0.3 * w.sev, this.downIn(si), 0.03 + 0.06 * rr());
+          this.smear(this.skinAt(cw, si, T.bodyV).p, 0.3 + 0.35 * w.sev, this.downIn(si), 0.04 + 0.08 * rr(), true);
+          if (rr() < 0.4) FX.drop(cw.add(_f2.set(0, -0.12, 0)), _ij.set(0, -0.3, 0), 0.05, 0.002 + 0.002 * w.sev);   // issue 88: …and off the chest onto the canvas (a stain)
           this.b2w(this.hi, this.M);
         }
       }
@@ -3567,7 +3638,7 @@ class Face {
     this.droop += ((ko ? 0 : 0.18 * dz + 0.1 * tired) - this.droop) * Math.min(1, dt * 3);
     let lid = Math.max(bl, this.squint * 0.45 + this.droop + (F.cur ? 0.12 : 0));
     if (ko) { const k = sstep(0.25, 0.9, this.koT); lid = this.koLid * k; }
-    const E = F.flesh.u.uEyeSw.value, sw = [sstep(0.35, 1, E.x) * 0.85, sstep(0.35, 1, E.y) * 0.85];   // swelling closes an eye
+    const E = F.flesh.u.uEyeSw.value, sw = [sstep(0.25, 0.9, E.x) * 0.9, sstep(0.25, 0.9, E.y) * 0.9];   // swelling closes an eye (issue 88: from 0.25, was 0.35 … 1 → 0.85)
     this.lids[0] = Math.min(1, Math.max(lid, sw[0])); this.lids[1] = Math.min(1, Math.max(lid, sw[1]));
     F.flesh.u.uLid.value.set(this.lids[0], this.lids[1], this.lids[0] * 0.6, this.lids[1] * 0.6);
     // jaw: spring toward the target opening
@@ -7170,7 +7241,7 @@ class Fighter {
       this.rxFollow = null;
       s.sp.v += (dm.z * 2.4 - dm.y * 1.2) * k * kt; s.sr.v -= dm.x * 2.2 * k * kt; s.hz.v += dm.z * 1.5 * k * kt;
     }
-    if (G.t > this.staT) this.stamina = Math.min(100, this.stamina + 26 * dt * (1 + 0.08 * SK(this, 'sta')));
+    if (G.t > this.staT) this.stamina = Math.min(100, this.stamina + 26 * dt * (1 + 0.08 * SK(this, 'sta')) * injSta(this));   // issue 88: a bleeding / broken nose, bruised ribs (INJ)
     // holding the guard costs a little breath; keep the regen paused while it is up so the drain is net (issue 41)
     if (G.state === 'fight' && this.blockW > 0.55 && !this.cur && !(this.guardDown > G.t)) {
       this.stamina = Math.max(0, this.stamina - BLK.holdDrain * dt);
@@ -7626,11 +7697,22 @@ const MIST = (() => {
 
 /* ───────── blood, sweat, floor stains ───────── */
 const FX = (() => {
-  const N = 380, mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 5), new THREE.MeshStandardMaterial({ roughness: 0.18 }), N);
-  mesh.frustumCulled = false; mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.castShadow = false; mesh.matrixAutoUpdate = false; mesh.visible = false; scene.add(mesh);   // hidden while no drop is alive (it was a draw call of 380 empty instances in every pass)
+  /* issue 88: blood and sweat are two meshes now. Sweat used to share the blood's lit standard material with a grey-blue instance
+     colour (#7f8a99 = 0.21 / 0.25 / 0.32 linear): with no light on the side the camera sees it went near black, and stretched ×7 along
+     the motion it read as dark needles round the head. Sweat = a clear drop: a faint body, a bright Fresnel rim and a specular glint
+     from a fixed view-space light (never darker than the rim, whatever the place's lights); blood keeps the lit material (wet, glossy)
+     with a deep-red emissive floor so a drop in shadow stays dark red, never black. Slot i lives in the mesh of its kind. */
+  const N = 380, sgeo = new THREE.SphereGeometry(1, 6, 5), mesh = new THREE.InstancedMesh(sgeo, new THREE.MeshStandardMaterial({ color: '#8a0912', roughness: 0.2, emissive: '#3a0306' }), N);
+  const smesh = new THREE.InstancedMesh(sgeo, new THREE.ShaderMaterial({ transparent: true, depthWrite: false,
+    vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * instanceMatrix * vec4( position, 1.0 ); vN = normalize( normalMatrix * mat3( instanceMatrix ) * normal ); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec3 n = normalize( vN ), v = normalize( vV ); float fr = pow( 1.0 - max( dot( n, v ), 0.0 ), 2.0 );' +
+      ' float sp = pow( max( dot( reflect( -normalize( vec3( 0.35, 0.85, 0.4 ) ), n ), v ), 0.0 ), 20.0 );' +
+      ' gl_FragColor = vec4( vec3( 0.8, 0.86, 0.92 ) * ( 0.22 + 0.7 * fr ) + vec3( 1.6 ) * sp, clamp( 0.22 + 0.5 * fr + sp, 0.0, 0.92 ) ); }' }), N);
+  for (const M of [mesh, smesh]) { M.frustumCulled = false; M.instanceMatrix.setUsage(THREE.DynamicDrawUsage); M.castShadow = false; M.matrixAutoUpdate = false; M.visible = false; scene.add(M); }   // hidden while no drop is alive (it was a draw call of 380 empty instances in every pass)
   const P = new Float32Array(N * 3), Vl = new Float32Array(N * 3), life = new Float32Array(N), size = new Float32Array(N), kind = new Uint8Array(N); let head = 0;
-  const cB = new THREE.Color('#7d0710'), cS = new THREE.Color('#7f8a99'), m = new M4(), zero = new M4().makeScale(0, 0, 0);
-  for (let i = 0; i < N; i++) { mesh.setMatrixAt(i, zero); mesh.setColorAt(i, cB); }
+  const m = new M4(), zero = new M4().makeScale(0, 0, 0);
+  for (let i = 0; i < N; i++) { mesh.setMatrixAt(i, zero); smesh.setMatrixAt(i, zero); }
+  const slot = (i, k) => { if (life[i] > 0 && kind[i] !== k) (kind[i] ? mesh : smesh).setMatrixAt(i, zero); kind[i] = k; };   // a slot taken over by the other kind: clear it there
   const DN = 240, dgeo = new THREE.CircleGeometry(1, 14).rotateX(-Math.PI / 2);
   const dmesh = new THREE.InstancedMesh(dgeo, new THREE.MeshStandardMaterial({ color: '#4d0408', roughness: 0.42, envMapIntensity: 0.4, transparent: true, opacity: 0.88, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }), DN);
   dmesh.frustumCulled = false; dmesh.receiveShadow = true; dmesh.matrixAutoUpdate = false; dmesh.visible = false; ARENA.add(dmesh); let dh = 0, live = 0;
@@ -7658,10 +7740,10 @@ const FX = (() => {
     dmesh.setMatrixAt(dh % DN, m.compose(p3, q, s3)); dh++; dmesh.instanceMatrix.needsUpdate = true; dmesh.visible = true;
   }
   function emit(pos, dir, sp, spread, k, sz, jit = 0.05) {
-    const i = head++ % N, j = 3 * i;
+    const i = head++ % N, j = 3 * i; slot(i, k);
     P[j] = pos.x + (rr() - 0.5) * jit; P[j + 1] = pos.y + (rr() - 0.5) * jit; P[j + 2] = pos.z + (rr() - 0.5) * jit;
     Vl[j] = dir.x * sp + (rr() - 0.5) * spread; Vl[j + 1] = dir.y * sp + (rr() - 0.2) * spread; Vl[j + 2] = dir.z * sp + (rr() - 0.5) * spread;
-    life[i] = 1.2 + rr(); size[i] = sz; kind[i] = k; mesh.setColorAt(i, k ? cB : cS); mesh.instanceColor.needsUpdate = true; live = 1;
+    life[i] = 1.2 + rr(); size[i] = sz; live = 1;
   }
   return {
     // sweat flicked off the skin at the point of contact
@@ -7671,22 +7753,23 @@ const FX = (() => {
     mist(pos, dir, power, amt) { MIST.burst(pos, dir, power, amt); const nd = (amt * (4 + power * 10) * GFX.particles) | 0; for (let i = 0; i < nd; i++) emit(pos, _xm.copy(dir).add(_xm2.set(rr() - 0.5, rr() * 0.6, rr() - 0.5)).normalize(), 1.5 + rr() * 3.5 * power, 1.2, 1, 0.002 + rr() * 0.004, 0.02); },
     // one drop of blood leaving a wound
     drop(pos, vel, spread, sz) {
-      const i = head++ % N, j = 3 * i; P[j] = pos.x; P[j + 1] = pos.y; P[j + 2] = pos.z;
+      const i = head++ % N, j = 3 * i; slot(i, 1); P[j] = pos.x; P[j + 1] = pos.y; P[j + 2] = pos.z;
       Vl[j] = vel.x + (rr() - 0.5) * spread; Vl[j + 1] = vel.y + (rr() - 0.3) * spread; Vl[j + 2] = vel.z + (rr() - 0.5) * spread;
-      life[i] = 2.5; size[i] = sz; kind[i] = 1; mesh.setColorAt(i, cB); mesh.instanceColor.needsUpdate = true; live = 1;
+      life[i] = 2.5; size[i] = sz; live = 1;
     },
     update(dt) {
-      if (!live) return; live = 0;   // nothing in the air: no loop, no buffer upload, no draw call
+      if (!live) return; live = 0; let lb = 0, ls = 0;   // nothing in the air: no loop, no buffer upload, no draw call
       for (let i = 0; i < N; i++) {
-        if (life[i] <= 0) continue; const j = 3 * i;
+        if (life[i] <= 0) continue; const j = 3 * i, M = kind[i] ? mesh : smesh;
         if (dt > 0) { Vl[j + 1] -= 9.81 * dt; const d = 1 - 0.8 * dt; Vl[j] *= d; Vl[j + 2] *= d; P[j] += Vl[j] * dt; P[j + 1] += Vl[j + 1] * dt; P[j + 2] += Vl[j + 2] * dt; life[i] -= dt; }
-        if (P[j + 1] < 0.006 || life[i] <= 0) { if (kind[i] && P[j + 1] < 0.02) decal(P[j], P[j + 2], size[i]); life[i] = 0; mesh.setMatrixAt(i, zero); continue; }
+        if (P[j + 1] < 0.006 || life[i] <= 0) { if (kind[i] && P[j + 1] < 0.02) decal(P[j], P[j + 2], size[i]); life[i] = 0; M.setMatrixAt(i, zero); continue; }
         // drops are drawn stretched along their motion (what the eye sees of a fast droplet), round once they slow down
-        const s = size[i] * 0.5, vx = Vl[j], vy = Vl[j + 1], vz = Vl[j + 2], sp = Math.hypot(vx, vy, vz), k = Math.min(1 + sp * 0.006 / s, 7);
+        // (sweat ≤ ×3: thin long streaks of a clear drop read as scratches, not water)
+        const s = size[i] * 0.5, vx = Vl[j], vy = Vl[j + 1], vz = Vl[j + 2], sp = Math.hypot(vx, vy, vz), k = Math.min(1 + sp * 0.006 / s, kind[i] ? 5 : 3);
         if (sp > 1e-3) q.setFromUnitVectors(up, s3.set(vx / sp, vy / sp, vz / sp)); else q.identity();
-        mesh.setMatrixAt(i, m.compose(p3.set(P[j], P[j + 1], P[j + 2]), q, s3.set(s, s * k, s))); live = 1;
+        M.setMatrixAt(i, m.compose(p3.set(P[j], P[j + 1], P[j + 2]), q, s3.set(s, s * k, s))); live = 1; if (kind[i]) lb = 1; else ls = 1;
       }
-      mesh.instanceMatrix.needsUpdate = true; mesh.visible = !!live;
+      mesh.instanceMatrix.needsUpdate = true; smesh.instanceMatrix.needsUpdate = true; mesh.visible = !!lb; smesh.visible = !!ls;
     },
     // R-04: the contact flash (resolveHit / followHit, the replay, the P2P guest); drawn on top, nudged 8 cm towards the camera
     flash(pos, dir, power, blocked) {
@@ -7703,7 +7786,7 @@ const FX = (() => {
         if (age > 2 || age < 1) { F.s.visible = false; continue; }
         if (age === 2) { F.s.scale.set(F.sz * 1.35, F.sz * 1.35, 1); F.s.material.color.multiplyScalar(0.4); } }
     },
-    clearAir() { for (const F of FL.pool) F.s.visible = false; for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); } mesh.instanceMatrix.needsUpdate = true; mesh.visible = false; live = 0; MIST.clear(); },
+    clearAir() { for (const F of FL.pool) F.s.visible = false; for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); smesh.setMatrixAt(i, zero); } mesh.instanceMatrix.needsUpdate = smesh.instanceMatrix.needsUpdate = true; mesh.visible = smesh.visible = false; live = 0; MIST.clear(); },
     clearFloor() { for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero); dmesh.instanceMatrix.needsUpdate = true; dmesh.visible = false; dh = 0; },
   };
 })();
@@ -8518,7 +8601,8 @@ function resolveHit(att, name, contact) {
   const def = att.other; if (def.ko || G.state !== 'fight') { if (followOK(att)) followHit(att, name, contact); return; }
   if (BAG.on) { if (att === P1) bagHit(att, name, contact); return; }
   const P = PUNCH[name], d = def.dodge, evading = !!d && d.t > 0.05 && d.t < 0.44, body = att.bodyShot, knux = !!att.gear.knux;
-  const evaded = evading && evades(att, name, d);
+  const blind = injEye(def, att, name);   // issue 88: his eye on that side is closing (INJ, 03_flesh_face.js)
+  const evaded = evading && evades(att, name, d) && !(blind > 0 && rr() < INJ.eyeEva * blind);
   // contactTest hands back the shared temp _v6 (overwritten in takeHit before a block's sweat / flash / replay event used it): copy it
   let pos = contact ? contact.clone() : (body ? def.ribs[att.ribIdx].w.clone() : def.headNow.clone().add(_v3.copy(att.knuckle(_v4)).sub(def.headNow).setLength(0.1)));
   if (evaded) {
@@ -8543,7 +8627,7 @@ function resolveHit(att, name, contact) {
   const breakIt = blocked && def.stamina < BLK.breakSta * (knux ? KNUX.brk : 1) && (isPow || isHook);   // issue 52: the metal gets through the guard sooner
   const sag = blocked ? blkSag(def) : 0;   // < 20 % stamina: gloves at the chin, up to ×2 damage leaks through
   if (blocked) {
-    dmg *= (body ? 0.6 : P.type === 'upper' ? 0.55 : 0.18) * (1 + sag);   // was a flat ×0.18 / ×0.55 / ×0.6
+    dmg *= (body ? 0.6 : P.type === 'upper' ? 0.55 : 0.18) * (1 + sag) * (body ? 1 : 1 + INJ.eyeLeak * blind);   // was a flat ×0.18 / ×0.55 / ×0.6; issue 88: he doesn't see it coming round on his blind side
     def.stamina = Math.max(0, def.stamina - clamp(1.5 + 6.5 * bforce, 3, 12));   // was a flat 7, now ∝ the shot, 3…12
     def.sp.bk.v += (0.5 + bforce) * 1.9;   // gloves spring back onto the face; the head / trunk follow in pose()
     if (isPow) def.knock = (def.knock || 0) + 0.7 * bforce;   // a power shot takes a short step back
@@ -8580,6 +8664,7 @@ function resolveHit(att, name, contact) {
   { const kn = att.knuckle(_v4); if (att.kOld) { _v3.copy(kn).sub(att.kOld); if (_v3.lengthSq() > 1e-6) dir.lerp(_v3.normalize(), 0.6).normalize(); } }
   // R-10: a body shot thrown on an empty tank takes about half the breath (×0.5 at stunK 0.35; was 18 always)
   if (body) { def.stamina = Math.max(0, def.stamina - 18 * Math.min(1, rx.stunK + 0.15)); popup(pos, 'по корпусу', 'dodge'); }
+  if (body && !blocked && def.flesh.ribs + INJ.ribHit * power > 0.45 && !def.flesh.said.ribs) { def.flesh.said.ribs = true; popup(_v4.copy(def.headNow).add(_v5.set(0, 0.3, 0)), 'рёбра отбиты', 'crit'); }   // issue 88 (onHit adds the ribs below)
   // debug hook (issue 41): one row per punch that lands on a guard
   if (blocked && window.__blk && window.__blk.log) window.__blk.log.push({
     kind: name, pow: !!isPow, dmg: +dmg.toFixed(2),
@@ -8626,8 +8711,12 @@ function resolveHit(att, name, contact) {
       const hi = att.body.skeleton.bones.findIndex(b => b.name === `CC_Base_${A}_Hand`); if (hi >= 0) Fl.smear(Fl.skinAt(hw, hi, T.bodyV).p, 0.35, Fl.downIn(hi), 0.012);
       att.wrapU.uWB.value[A === 'L' ? 'x' : 'y'] = Math.min(1, att.wrapU.uWB.value[A === 'L' ? 'x' : 'y'] + 0.22);
     }
-    if (fr.cut) popup(_v4.copy(pos).add(_v5.set(0, 0.12, 0)), 'рассечение', 'crit');
-    if (fr.broke) popup(_v4.copy(pos).add(_v5.set(0, 0.12, 0)), 'сломан нос', 'crit');
+    // issue 88: the first time an injury shows, one caption names it (later cuts: the short one)
+    const said = def.flesh.said, cap = t => popup(_v4.copy(pos).add(_v5.set(0, 0.12, 0)), t, 'crit');
+    if (fr.cut) { cap(said.cut ? 'рассечение' : fr.brow ? 'рассечение над глазом' : 'рассечена скула'); said.cut = true; }
+    else if (fr.broke) cap('сломан нос');
+    else if (fr.nose && !said.nose) { said.nose = true; cap('разбит нос'); }
+    else if (fr.eye) cap('глаз заплывает');
   }
   // the flash: on the skin for a clean hit, at the knuckles for a block (the point on his head is behind the gloves)
   // (a block's flash goes by the raw force of the shot, bforce: its `power` is what got through the guard)
@@ -8655,7 +8744,7 @@ function resolveHit(att, name, contact) {
   // and can't get his breath; a straight shot into the solar plexus knocks the wind out of him (bent over a second or two)
   if (body && !blocked && G.state === 'fight' && !window.__noKD) {
     const liverSide = name === 'hookL' || (name === 'jab' && rr() < 0.3);
-    if (liverSide && rr() < clamp((power - 0.55) * 0.6 + (1 - def.hp / 100) * 0.25 + (counter ? 0.15 : 0), 0, 0.45)) { def.liver = { t: G.t + 0.5 + rr() * 0.7, t0: G.t, att, dir: dir.clone(), name, fwd }; def.cancelPunch(); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'печень', 'crit'); }
+    if (liverSide && rr() < clamp((power - 0.55) * 0.6 + (1 - def.hp / 100) * 0.25 + (counter ? 0.15 : 0), 0, 0.45)) { def.liver = { t: G.t + 0.5 + rr() * 0.7, t0: G.t, att, dir: dir.clone(), name, fwd }; def.cancelPunch(); def.flesh.ribs = Math.min(1, def.flesh.ribs + 2 * INJ.ribHit); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'печень', 'crit'); }
     else if (P.type === 'straight' && rr() < 0.3 * power) { def.wind = G.t + 1.0 + rr() * 1.2; def.cancelPunch(); }
   }
   // knockdowns and "his legs went": a clean shot to an already shaken, tiring man can put him down without putting him out
@@ -9151,7 +9240,8 @@ function ai(dt) {
     const n = pl.cur, P = PUNCH[n], react = Math.max(0, (P.impact - P.start) / pl.speed - 0.17 - rr() * 0.08);
     // R-10: a punch he keeps repeating is seen coming (fam), and so is his counter after three of ours on his guard (ctrT)
     const known = Math.max(aiRep(n) >= AI_MEM.repN ? A * (M.fam[n] || 0) : 0, M.ctrT > G.t ? 0.85 * A : 0);
-    const kd = Math.max(known, open), pD = D.dodge * S.dodge, pB = D.dodge * 0.6 * S.block, busy = (me.cur ? 0.25 : 1) * (1 - 0.6 * me.daze);
+    const see = 1 - INJ.eyeSee * injEye(me, pl, n);   // issue 88: a punch coming round on his closing eye is seen late
+    const kd = Math.max(known, open) * see, pD = D.dodge * S.dodge * see, pB = D.dodge * 0.6 * S.block * see, busy = (me.cur ? 0.25 : 1) * (1 - 0.6 * me.daze);
     if (rr() < (pD + Math.max(0, (open > known ? AI_MEM.oDodge : 0.8) - pD) * kd) * busy) {
       const good = rr() < D.read + (1 - D.read) * known, ok = pl.bodyShot ? ['lean'] : EV[n], all = ['slipL', 'slipR', 'duck', 'lean'];
       AI.dodgeType = good ? ok[(rr() * ok.length) | 0] : all[(rr() * 4) | 0]; AI.dodgeAt = G.t + react;
@@ -9186,6 +9276,9 @@ function ai(dt) {
       if (counter) { w.hookL += 2; w.upperR += 1; } if (pl.daze > 0.4) { w.over += 1.5; w.hookR += 1.5; }
       const shell = A * sstep(0.45, 0.8, M.guard);   // R-10: he lives behind his guard → around it (hooks), under it (body), through it (power)
       if (shell) { w.hookL += 3 * shell; w.hookR += 3 * shell; w.jab *= 1 - 0.6 * shell; }
+      { const eL = injArm(pl, me, 'L'), eR = injArm(pl, me, 'R');   // issue 88: he goes round to the side the man's eye is closing on
+        // (towards the worse eye: by the difference, so two swollen eyes don't just mean more hooks overall)
+        if (eL !== eR) for (const k of PN) if (PUNCH[k].type !== 'straight') w[k] *= Math.max(0.3, 1 + INJ.eyeAim * (PUNCH[k].arm === 'L' ? eL - eR : eR - eL)); }
       let tot = 0; for (const k of PN) tot += w[k]; let r = rr() * tot, pick = 'jab'; for (const k of PN) { r -= w[k]; if (r <= 0) { pick = k; break; } }
       me.wantBody = (PUNCH[pick].type === 'straight' || PUNCH[pick].type === 'hook') && rr() < S.body + (0.55 - S.body) * shell;
       me.powerNext = rr() < (S === STYLES.brawler ? 0.3 : 0.15) * (pl.daze > 0.4 ? 2 : 1) + 0.4 * shell + AI_MEM.oPow * open * (1 - sstep(10, 25, pl.stamina)); me.startPunch(pick);   // R-10: sit down on it vs a gassed, open man
@@ -9384,6 +9477,7 @@ function toBreak(c) {
 function corner(F, k) {   // the minute in the corner, compressed: breath back, the cutman on the cuts, ice on the eye
   F.stamina = Math.min(100, F.stamina + 55 * k); F.hp = Math.min(F.hpCap ?? 100, F.hp + 10 * k); F.daze = Math.max(0, F.daze - 0.6 * k); F.wobble = 0;
   for (const w of F.flesh.wounds) { w.sev *= 1 - 0.45 * k; w.L *= 1 - 0.7 * k; }
+  F.flesh.ribs *= 1 - INJ.ribHeal * k;   // issue 88: the ribs only ease a little
   const E = F.flesh.u.uEyeSw.value; E.multiplyScalar(1 - 0.15 * k); F.flesh.eyeSwell = F.flesh.eyeSwell.map(v => v * (1 - 0.15 * k));
 }
 function decision() {

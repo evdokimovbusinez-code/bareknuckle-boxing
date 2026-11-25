@@ -371,7 +371,8 @@ function resolveHit(att, name, contact) {
   const def = att.other; if (def.ko || G.state !== 'fight') { if (followOK(att)) followHit(att, name, contact); return; }
   if (BAG.on) { if (att === P1) bagHit(att, name, contact); return; }
   const P = PUNCH[name], d = def.dodge, evading = !!d && d.t > 0.05 && d.t < 0.44, body = att.bodyShot, knux = !!att.gear.knux;
-  const evaded = evading && evades(att, name, d);
+  const blind = injEye(def, att, name);   // issue 88: his eye on that side is closing (INJ, 03_flesh_face.js)
+  const evaded = evading && evades(att, name, d) && !(blind > 0 && rr() < INJ.eyeEva * blind);
   // contactTest hands back the shared temp _v6 (overwritten in takeHit before a block's sweat / flash / replay event used it): copy it
   let pos = contact ? contact.clone() : (body ? def.ribs[att.ribIdx].w.clone() : def.headNow.clone().add(_v3.copy(att.knuckle(_v4)).sub(def.headNow).setLength(0.1)));
   if (evaded) {
@@ -396,7 +397,7 @@ function resolveHit(att, name, contact) {
   const breakIt = blocked && def.stamina < BLK.breakSta * (knux ? KNUX.brk : 1) && (isPow || isHook);   // issue 52: the metal gets through the guard sooner
   const sag = blocked ? blkSag(def) : 0;   // < 20 % stamina: gloves at the chin, up to ×2 damage leaks through
   if (blocked) {
-    dmg *= (body ? 0.6 : P.type === 'upper' ? 0.55 : 0.18) * (1 + sag);   // was a flat ×0.18 / ×0.55 / ×0.6
+    dmg *= (body ? 0.6 : P.type === 'upper' ? 0.55 : 0.18) * (1 + sag) * (body ? 1 : 1 + INJ.eyeLeak * blind);   // was a flat ×0.18 / ×0.55 / ×0.6; issue 88: he doesn't see it coming round on his blind side
     def.stamina = Math.max(0, def.stamina - clamp(1.5 + 6.5 * bforce, 3, 12));   // was a flat 7, now ∝ the shot, 3…12
     def.sp.bk.v += (0.5 + bforce) * 1.9;   // gloves spring back onto the face; the head / trunk follow in pose()
     if (isPow) def.knock = (def.knock || 0) + 0.7 * bforce;   // a power shot takes a short step back
@@ -433,6 +434,7 @@ function resolveHit(att, name, contact) {
   { const kn = att.knuckle(_v4); if (att.kOld) { _v3.copy(kn).sub(att.kOld); if (_v3.lengthSq() > 1e-6) dir.lerp(_v3.normalize(), 0.6).normalize(); } }
   // R-10: a body shot thrown on an empty tank takes about half the breath (×0.5 at stunK 0.35; was 18 always)
   if (body) { def.stamina = Math.max(0, def.stamina - 18 * Math.min(1, rx.stunK + 0.15)); popup(pos, 'по корпусу', 'dodge'); }
+  if (body && !blocked && def.flesh.ribs + INJ.ribHit * power > 0.45 && !def.flesh.said.ribs) { def.flesh.said.ribs = true; popup(_v4.copy(def.headNow).add(_v5.set(0, 0.3, 0)), 'рёбра отбиты', 'crit'); }   // issue 88 (onHit adds the ribs below)
   // debug hook (issue 41): one row per punch that lands on a guard
   if (blocked && window.__blk && window.__blk.log) window.__blk.log.push({
     kind: name, pow: !!isPow, dmg: +dmg.toFixed(2),
@@ -479,8 +481,12 @@ function resolveHit(att, name, contact) {
       const hi = att.body.skeleton.bones.findIndex(b => b.name === `CC_Base_${A}_Hand`); if (hi >= 0) Fl.smear(Fl.skinAt(hw, hi, T.bodyV).p, 0.35, Fl.downIn(hi), 0.012);
       att.wrapU.uWB.value[A === 'L' ? 'x' : 'y'] = Math.min(1, att.wrapU.uWB.value[A === 'L' ? 'x' : 'y'] + 0.22);
     }
-    if (fr.cut) popup(_v4.copy(pos).add(_v5.set(0, 0.12, 0)), 'рассечение', 'crit');
-    if (fr.broke) popup(_v4.copy(pos).add(_v5.set(0, 0.12, 0)), 'сломан нос', 'crit');
+    // issue 88: the first time an injury shows, one caption names it (later cuts: the short one)
+    const said = def.flesh.said, cap = t => popup(_v4.copy(pos).add(_v5.set(0, 0.12, 0)), t, 'crit');
+    if (fr.cut) { cap(said.cut ? 'рассечение' : fr.brow ? 'рассечение над глазом' : 'рассечена скула'); said.cut = true; }
+    else if (fr.broke) cap('сломан нос');
+    else if (fr.nose && !said.nose) { said.nose = true; cap('разбит нос'); }
+    else if (fr.eye) cap('глаз заплывает');
   }
   // the flash: on the skin for a clean hit, at the knuckles for a block (the point on his head is behind the gloves)
   // (a block's flash goes by the raw force of the shot, bforce: its `power` is what got through the guard)
@@ -508,7 +514,7 @@ function resolveHit(att, name, contact) {
   // and can't get his breath; a straight shot into the solar plexus knocks the wind out of him (bent over a second or two)
   if (body && !blocked && G.state === 'fight' && !window.__noKD) {
     const liverSide = name === 'hookL' || (name === 'jab' && rr() < 0.3);
-    if (liverSide && rr() < clamp((power - 0.55) * 0.6 + (1 - def.hp / 100) * 0.25 + (counter ? 0.15 : 0), 0, 0.45)) { def.liver = { t: G.t + 0.5 + rr() * 0.7, t0: G.t, att, dir: dir.clone(), name, fwd }; def.cancelPunch(); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'печень', 'crit'); }
+    if (liverSide && rr() < clamp((power - 0.55) * 0.6 + (1 - def.hp / 100) * 0.25 + (counter ? 0.15 : 0), 0, 0.45)) { def.liver = { t: G.t + 0.5 + rr() * 0.7, t0: G.t, att, dir: dir.clone(), name, fwd }; def.cancelPunch(); def.flesh.ribs = Math.min(1, def.flesh.ribs + 2 * INJ.ribHit); popup(_v4.copy(def.headNow).add(_v5.set(0, 0.25, 0)), 'печень', 'crit'); }
     else if (P.type === 'straight' && rr() < 0.3 * power) { def.wind = G.t + 1.0 + rr() * 1.2; def.cancelPunch(); }
   }
   // knockdowns and "his legs went": a clean shot to an already shaken, tiring man can put him down without putting him out

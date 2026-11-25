@@ -150,6 +150,7 @@ function toBreak(c) {
 function corner(F, k) {   // the minute in the corner, compressed: breath back, the cutman on the cuts, ice on the eye
   F.stamina = Math.min(100, F.stamina + 55 * k); F.hp = Math.min(F.hpCap ?? 100, F.hp + 10 * k); F.daze = Math.max(0, F.daze - 0.6 * k); F.wobble = 0;
   for (const w of F.flesh.wounds) { w.sev *= 1 - 0.45 * k; w.L *= 1 - 0.7 * k; }
+  F.flesh.ribs *= 1 - INJ.ribHeal * k;   // issue 88: the ribs only ease a little
   const E = F.flesh.u.uEyeSw.value; E.multiplyScalar(1 - 0.15 * k); F.flesh.eyeSwell = F.flesh.eyeSwell.map(v => v * (1 - 0.15 * k));
 }
 function decision() {

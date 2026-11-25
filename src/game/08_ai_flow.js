@@ -80,7 +80,8 @@ function ai(dt) {
     const n = pl.cur, P = PUNCH[n], react = Math.max(0, (P.impact - P.start) / pl.speed - 0.17 - rr() * 0.08);
     // R-10: a punch he keeps repeating is seen coming (fam), and so is his counter after three of ours on his guard (ctrT)
     const known = Math.max(aiRep(n) >= AI_MEM.repN ? A * (M.fam[n] || 0) : 0, M.ctrT > G.t ? 0.85 * A : 0);
-    const kd = Math.max(known, open), pD = D.dodge * S.dodge, pB = D.dodge * 0.6 * S.block, busy = (me.cur ? 0.25 : 1) * (1 - 0.6 * me.daze);
+    const see = 1 - INJ.eyeSee * injEye(me, pl, n);   // issue 88: a punch coming round on his closing eye is seen late
+    const kd = Math.max(known, open) * see, pD = D.dodge * S.dodge * see, pB = D.dodge * 0.6 * S.block * see, busy = (me.cur ? 0.25 : 1) * (1 - 0.6 * me.daze);
     if (rr() < (pD + Math.max(0, (open > known ? AI_MEM.oDodge : 0.8) - pD) * kd) * busy) {
       const good = rr() < D.read + (1 - D.read) * known, ok = pl.bodyShot ? ['lean'] : EV[n], all = ['slipL', 'slipR', 'duck', 'lean'];
       AI.dodgeType = good ? ok[(rr() * ok.length) | 0] : all[(rr() * 4) | 0]; AI.dodgeAt = G.t + react;
@@ -115,6 +116,9 @@ function ai(dt) {
       if (counter) { w.hookL += 2; w.upperR += 1; } if (pl.daze > 0.4) { w.over += 1.5; w.hookR += 1.5; }
       const shell = A * sstep(0.45, 0.8, M.guard);   // R-10: he lives behind his guard → around it (hooks), under it (body), through it (power)
       if (shell) { w.hookL += 3 * shell; w.hookR += 3 * shell; w.jab *= 1 - 0.6 * shell; }
+      { const eL = injArm(pl, me, 'L'), eR = injArm(pl, me, 'R');   // issue 88: he goes round to the side the man's eye is closing on
+        // (towards the worse eye: by the difference, so two swollen eyes don't just mean more hooks overall)
+        if (eL !== eR) for (const k of PN) if (PUNCH[k].type !== 'straight') w[k] *= Math.max(0.3, 1 + INJ.eyeAim * (PUNCH[k].arm === 'L' ? eL - eR : eR - eL)); }
       let tot = 0; for (const k of PN) tot += w[k]; let r = rr() * tot, pick = 'jab'; for (const k of PN) { r -= w[k]; if (r <= 0) { pick = k; break; } }
       me.wantBody = (PUNCH[pick].type === 'straight' || PUNCH[pick].type === 'hook') && rr() < S.body + (0.55 - S.body) * shell;
       me.powerNext = rr() < (S === STYLES.brawler ? 0.3 : 0.15) * (pl.daze > 0.4 ? 2 : 1) + 0.4 * shell + AI_MEM.oPow * open * (1 - sstep(10, 25, pl.stamina)); me.startPunch(pick);   // R-10: sit down on it vs a gassed, open man

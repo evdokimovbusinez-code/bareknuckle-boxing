@@ -36,10 +36,12 @@ const HEAD_FRAG = `#include <map_fragment>
  vec4 WW = wounds();
  diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 0.9, 0.5, 0.52 ), clamp( WW.w, 0.0, 1.0 ) * 0.5 );   // swollen, inflamed skin
  // blood: a thin film diluted by sweat stains the skin translucent red; where it runs thick it is an opaque, deep red layer
- diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 0.78, 0.1, 0.09 ), gFilm * ( 1.0 - 0.6 * WW.z ) );
- vec3 bloodC = mix( mix( vec3( 0.33, 0.012, 0.016 ), vec3( 0.13, 0.002, 0.007 ), smoothstep( 0.3, 1.0, gThick ) ), vec3( 0.075, 0.016, 0.012 ), WW.z );   // thin → thick, fresh → drying
- diffuseColor.rgb = mix( diffuseColor.rgb, bloodC, WW.x * 0.95 );
- diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.06, 0.0, 0.004 ), WW.y );                                          // the open cut
+ // (issue 88: the film was ×(0.78, 0.1, 0.09) — red paint; the stream was 0.95 opaque everywhere — now thin blood lets the skin through)
+ diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 0.68, 0.2, 0.18 ), gFilm * ( 1.0 - 0.6 * WW.z ) );
+ vec3 bloodC = mix( mix( vec3( 0.33, 0.012, 0.016 ), vec3( 0.1, 0.002, 0.006 ), smoothstep( 0.3, 1.0, gThick ) ), vec3( 0.07, 0.018, 0.013 ), WW.z );   // thin → thick, fresh → drying
+ diffuseColor.rgb = mix( diffuseColor.rgb, bloodC, WW.x * mix( 0.5, 0.97, smoothstep( 0.0, 0.6, gThick ) ) );
+ diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.42, 0.07, 0.07 ), gRim * 0.65 );                                  // raw lips of the split
+ diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.03, 0.0, 0.002 ), WW.y );                                          // the open cut
  gDrop = sweatBeads( vMapUv, uSweat * ( 1.0 - hairCover ) ); gH += gDrop * 0.00016 * ( 1.0 - WW.x );
  float bWet = clamp( max( WW.x * ( 1.0 - 0.85 * WW.z ), gFilm * 0.7 ) + WW.y + mWet, 0.0, 1.0 );
 `;
@@ -109,7 +111,7 @@ const FLESH_NORMAL = `#include <beginnormal_vertex>
    // a closed lid is a dome over the eyeball: bend its normal toward the radial direction (the crease normals would light it like a hole)
    float k = clamp( aLid.x * ( left ? uLid.x : uLid.y ) * 1.4, 0.0, 1.0 ); vLidK = k;
    objectNormal = normalize( mix( lidRot( objectNormal, a ), normalize( rp ) * length( objectNormal ), k * 0.85 ) );
-   fOff += normalize( rp ) * vEyeSw * 0.0075 * uU;   // haematoma: the lids and the cheek under the eye puff up
+   fOff += normalize( rp ) * vEyeSw * 0.0105 * uU;   // haematoma: the lids and the cheek under the eye puff up (issue 88: 7.5 → 10.5 mm at full)
  } else vLidK = 0.0;
 /*EXPR2*/
  if ( uFleshOn > 0.5 ) {
@@ -186,35 +188,56 @@ vec3 bruises( vec3 c ) {
     vec4 B = uBr[i]; if ( B.w <= 0.0 ) continue;
     float d = length( vBP - B.xyz ) / uU, n = skVN( vBP / uU * 90.0 ) * 0.5 + skVN( vBP / uU * 260.0 ) * 0.25;
     float m = smoothstep( 0.045 * ( 0.6 + 0.6 * B.w ), 0.0, d * ( 0.75 + 0.5 * n ) ) * min( B.w, 1.0 );
-    float age = uFT - uBrT[i].x, dark = smoothstep( 8.0, 40.0, age );
-    vec3 tint = mix( vec3( 1.0, 0.55, 0.55 ), vec3( 0.52, 0.3, 0.5 ), dark );
-    c = mix( c, c * tint, m * 0.75 );
+    // issue 88: red within seconds → purple over the first minute → blue-grey by the end of a round (it keeps going round to round)
+    float age = uFT - uBrT[i].x;
+    vec3 tint = mix( mix( vec3( 1.0, 0.55, 0.55 ), vec3( 0.5, 0.3, 0.48 ), smoothstep( 6.0, 50.0, age ) ), vec3( 0.42, 0.36, 0.54 ), smoothstep( 50.0, 120.0, age ) );
+    c = mix( c, c * tint, m * ( 0.75 + 0.1 * smoothstep( 6.0, 60.0, age ) ) );
   }
   return c;
 }
-// blood smeared or run onto skin (from the opponent's face onto the knuckles, drips running down the chest)
+/* blood smeared or run onto the skin. Issue 88: it was a flat opaque red (0.26, 0.01, 0.014) blob of up to 2.6 cm plus a 3–5 cm red
+   film per smear — 28 of them painted half a face like make-up. Now a smear has a thickness: dark and opaque where it is thick, a
+   translucent stain (the skin shows through) where it thins out. uSmD = direction · (1 + t0) (its length carries the birth time: the
+   film dries and darkens) and the length of the run: w > 0 a wipe (a fist dragged across a bleeding face: 3–4 fingers of blood along
+   the punch, thinning away from where it landed), w < 0 a run (drips down the chest: one narrow rivulet ending in a bead). */
+float gSmT = 0.0, gSmD = 0.0;
 vec4 smears() {
-  float a = 0.0, dry = 0.0;
+  float a = 0.0, fl = 0.0;
   for ( int i = 0; i < 28; i++ ) {
     vec4 S = uSm[i]; if ( S.w <= 0.0 ) continue;
-    vec3 v = ( vBP - S.xyz ) / uU; vec4 D = uSmD[i]; float al = dot( v, D.xyz ), lat = length( v - D.xyz * al );
-    float n = skVN( vBP / uU * 140.0 + S.xyz );
-    float blob = smoothstep( 0.012 + 0.012 * S.w, 0.002, length( v ) * ( 0.7 + 0.6 * n ) );
-    float ww = ( 0.0035 + 0.0025 * n ) * ( 1.0 - 0.4 * clamp( al / max( D.w, 1e-3 ), 0.0, 1.0 ) );
-    float streak = smoothstep( ww, ww * 0.35, lat ) * smoothstep( -0.003, 0.0, al ) * smoothstep( D.w, D.w - 0.01, al );
-    float film = smoothstep( 0.03 + 0.02 * S.w, 0.004, length( v ) * ( 0.7 + 0.6 * n ) ) * 0.6 + smoothstep( ww * 3.0, ww, lat ) * smoothstep( -0.003, 0.0, al ) * smoothstep( D.w, D.w - 0.01, al ) * 0.5;
-    float b = max( blob, streak ) * min( S.w, 1.0 );
-    a = max( a, b ); dry = max( dry, film * min( S.w, 1.0 ) );
+    vec3 v = ( vBP - S.xyz ) / uU; if ( dot( v, v ) > 0.01 ) continue;   // nothing of a smear reaches past 10 cm
+    vec4 D = uSmD[i]; float dl = length( D.xyz ); vec3 dd = D.xyz / dl; float age = max( uFT - ( dl - 1.0 ), 0.0 ), run = step( D.w, 0.0 ), len = abs( D.w );
+    float al = dot( v, dd ); vec3 lv = v - dd * al; float lat = length( lv ), u = clamp( al / max( len, 1e-3 ), 0.0, 1.0 );
+    float n = skVN( vBP / uU * 140.0 + S.xyz ), amt = min( S.w, 1.0 ), inR = smoothstep( -0.004, 0.0, al ) * smoothstep( len + 0.002, len - 0.006, al );
+    float th;
+    if ( run > 0.5 ) {
+      float ww = ( 0.0022 + 0.0016 * n ) * ( 1.0 - 0.35 * u ) * ( 0.7 + 0.5 * amt );
+      th = smoothstep( ww, ww * 0.3, lat ) * inR * ( 0.75 + 0.25 * u ) + smoothstep( 0.0035 + 0.002 * amt, 0.001, length( v - dd * len ) );   // the rivulet, the bead at its end
+    } else {
+      // fingers across the drag: the knuckles leave parallel stripes that break up and thin out along the punch
+      float sideC = dot( lv, normalize( cross( dd, normalize( vBN ) ) ) ), w0 = 0.007 + 0.009 * amt;
+      float fing = 0.6 + 0.4 * sin( sideC * ( 700.0 + 350.0 * n ) + n * 2.5 + S.x * 300.0 ), brk = skVN( vec3( al * 220.0, sideC * 300.0, S.y * 50.0 ) );
+      th = smoothstep( w0, w0 * 0.5, lat * ( 0.8 + 0.4 * n ) ) * inR * fing * smoothstep( 1.05, 0.2, u ) * smoothstep( 0.15, 0.55, brk + 0.35 * ( 1.0 - u ) );
+      th = max( th, smoothstep( 0.006 + 0.005 * amt, 0.0015, length( v ) * ( 0.75 + 0.5 * n ) ) );   // where the fist landed: the thickest
+    }
+    th *= amt;
+    float film = smoothstep( 0.0, 0.25, th ) * 0.6 + ( run > 0.5 ? 0.0 : smoothstep( 0.012 + 0.008 * amt, 0.003, lat ) * inR * ( 1.0 - u ) * 0.25 * amt );
+    if ( th > a ) { a = th; gSmD = smoothstep( 10.0, 60.0, age ); }
+    fl = max( fl, film );
   }
-  return vec4( a, dry, 0.0, 0.0 );   // x: blood, y: diluted film
+  gSmT = a;
+  return vec4( smoothstep( 0.12, 0.6, a ), fl, a, gSmD );   // x: opaque blood, y: the translucent stain, z: thickness, w: dried
 }
 vec3 skinMarks( vec3 c, out float wet ) {
   c = bruises( c );
   // black eye: periorbital haematoma — swollen, tight and shiny, red-purple
   c = mix( c, c * vec3( 0.55, 0.25, 0.4 ), clamp( vEyeSw, 0.0, 1.0 ) * 0.8 );
-  vec4 S = smears(); c = mix( c, c * vec3( 0.7, 0.08, 0.07 ), S.y ); c = mix( c, vec3( 0.26, 0.01, 0.014 ), S.x * 0.9 );
-  gH += S.x * 0.0004 + S.y * 0.00012;
-  wet = max( S.x * 0.85, S.y * 0.5 ) + clamp( vEyeSw, 0.0, 1.0 ) * 0.3;
+  vec4 S = smears();
+  c = mix( c, c * vec3( 0.66, 0.2, 0.18 ), S.y * 0.6 );   // thin: a stain the skin shows through
+  vec3 bc = mix( mix( vec3( 0.3, 0.014, 0.018 ), vec3( 0.09, 0.003, 0.006 ), smoothstep( 0.4, 1.0, S.z ) ), vec3( 0.07, 0.02, 0.016 ), S.w * 0.8 );   // thin → thick, fresh → dry
+  c = mix( c, bc, S.x * 0.92 );
+  gH += S.z * 0.00035 * ( 1.0 - 0.6 * S.w ) + S.y * 0.00006;
+  wet = max( S.x * 0.9 * ( 1.0 - 0.8 * S.w ), S.y * 0.35 ) + clamp( vEyeSw, 0.0, 1.0 ) * 0.3;
   return c;
 }
 `;
@@ -224,6 +247,7 @@ uniform vec4 uWD[8];
 uniform vec4 uWN[8];
 uniform vec4 uWT[8];
 uniform vec4 uSw[6];
+float gRim = 0.0;
 vec4 wounds() {
   float bl = 0.0, ct = 0.0, dry = 0.0, sw = 0.0;
   vec3 bn = normalize( vBN );
@@ -241,20 +265,27 @@ vec4 wounds() {
     float w = ( 0.0022 + 0.0034 * sev ) * ( 1.0 - 0.45 * clamp( al / max( L, 1e-3 ), 0.0, 1.0 ) ) * ( 0.7 + 0.6 * nw );
     float run = smoothstep( -0.003, 0.0, al ) * smoothstep( L + 0.0005, L - 0.003, al );
     float s1 = smoothstep( w, w * 0.3, abs( lat - wig ) ) * run;
-    gFilm = max( gFilm, smoothstep( w * 3.2, w * 0.8, abs( lat - wig ) ) * run * df * 0.75 * smoothstep( 0.0, 0.3, age ) );
-    gFilm = max( gFilm, smoothstep( 0.016 + 0.012 * sev, 0.003, length( vt ) ) * df * 0.8 );
+    // issue 88: the diluted film round the stream / the source was 0.75 / 0.8 strong over 2–3 cm (a red mask); now a narrow halo
+    gFilm = max( gFilm, smoothstep( w * 2.4, w * 0.8, abs( lat - wig ) ) * run * df * 0.45 * smoothstep( 0.0, 0.3, age ) );
+    gFilm = max( gFilm, smoothstep( 0.009 + 0.008 * sev, 0.002, length( vt ) ) * df * 0.45 );
+    float ru = clamp( al / max( L, 1e-3 ), 0.0, 1.0 );   // 0 at the wound … 1 at the tip of the run
     float br = fract( P.w * 3.7 ) > 0.5 ? 1.0 : -1.0;
     float s2 = sev > 0.45 ? smoothstep( w * 0.55, w * 0.15, abs( lat - wig - br * 0.007 * smoothstep( 0.008, 0.035, al ) ) ) * smoothstep( 0.008, 0.012, al ) * smoothstep( L * 0.75, L * 0.75 - 0.003, al ) : 0.0;
     float bead = smoothstep( 0.0026 + 0.0018 * sev, 0.0008, length( vt - fd * L ) ) * step( 0.006, L );
     float pool = smoothstep( 0.0035 + 0.006 * sev, 0.0008, length( vt ) );
     float b = max( max( s1, s2 ), max( bead, pool ) ) * df * smoothstep( 0.0, 0.08, age );
-    bl = max( bl, b ); dry = max( dry, b * smoothstep( 8.0, 45.0, age ) );
-    float th = max( max( bead, pool ), s1 * ( 1.0 - clamp( abs( lat - wig ) / w, 0.0, 1.0 ) ) ) * df;   // thickness: domed across the stream, beads at the tip
-    gThick = max( gThick, th ); gH = max( gH, th * ( 0.0003 + 0.0005 * sev ) * ( 1.0 - 0.7 * smoothstep( 8.0, 45.0, age ) ) );
+    // the wound keeps feeding its source: fresh at the pool, the old blood down the run dries first (was: the whole run dried with the wound's age)
+    float dr = smoothstep( 8.0, 45.0, age ) * smoothstep( 0.1, 0.8, ru ) * ( 1.0 - pool );
+    bl = max( bl, b ); dry = max( dry, b * dr );
+    // thickness: domed across the stream, thick at the wound, thinning down the run, beads at the tip
+    float th = max( max( bead, pool ), s1 * ( 1.0 - clamp( abs( lat - wig ) / w, 0.0, 1.0 ) ) * ( 1.0 - 0.55 * ru ) ) * df;
+    gThick = max( gThick, th ); gH = max( gH, th * ( 0.0003 + 0.0005 * sev ) * ( 1.0 - 0.7 * dr ) );
     if ( Tg.w > 0.0 ) {
       float c1 = dot( vt, Tg.xyz ), cn = abs( dot( vt, cross( Tg.xyz, N.xyz ) ) ) + 0.0002 * sin( c1 * 900.0 );
-      float open = smoothstep( 0.0, 0.12, age ) * ( 0.0009 + 0.0009 * sev ) * ( 1.0 - 0.6 * smoothstep( Tg.w * 0.2, Tg.w * 0.5, abs( c1 ) ) );
-      ct = max( ct, smoothstep( open, open * 0.25, cn ) * smoothstep( Tg.w * 0.5, Tg.w * 0.5 - 0.002, abs( c1 ) ) * df );
+      float open = smoothstep( 0.0, 0.12, age ) * ( 0.0012 + 0.0013 * sev ) * ( 1.0 - 0.6 * smoothstep( Tg.w * 0.2, Tg.w * 0.5, abs( c1 ) ) );
+      float alongC = smoothstep( Tg.w * 0.5, Tg.w * 0.5 - 0.002, abs( c1 ) ) * df;
+      ct = max( ct, smoothstep( open, open * 0.25, cn ) * alongC );
+      gRim = max( gRim, smoothstep( open * 3.2, open * 1.2, cn ) * smoothstep( open * 0.6, open * 1.1, cn ) * alongC );   // the split skin's swollen, raw lips either side of the gap
       sw = max( sw, smoothstep( 0.016, 0.0, length( vt ) ) * df * 0.8 );
     }
   }

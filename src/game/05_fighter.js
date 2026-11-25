@@ -721,7 +721,7 @@ class Fighter {
       this.rxFollow = null;
       s.sp.v += (dm.z * 2.4 - dm.y * 1.2) * k * kt; s.sr.v -= dm.x * 2.2 * k * kt; s.hz.v += dm.z * 1.5 * k * kt;
     }
-    if (G.t > this.staT) this.stamina = Math.min(100, this.stamina + 26 * dt * (1 + 0.08 * SK(this, 'sta')));
+    if (G.t > this.staT) this.stamina = Math.min(100, this.stamina + 26 * dt * (1 + 0.08 * SK(this, 'sta')) * injSta(this));   // issue 88: a bleeding / broken nose, bruised ribs (INJ)
     // holding the guard costs a little breath; keep the regen paused while it is up so the drain is net (issue 41)
     if (G.state === 'fight' && this.blockW > 0.55 && !this.cur && !(this.guardDown > G.t)) {
       this.stamina = Math.max(0, this.stamina - BLK.holdDrain * dt);

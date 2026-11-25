@@ -80,7 +80,8 @@ async function buildTemplates() {
   { const o = fbx.parse(bufs.wraps, 'assets/'); o.updateMatrixWorld(true); let sm; o.traverse(x => { if (x.isSkinnedMesh) sm = x; });
     T.wraps = { geo: sm.geometry, bind: sm.bindMatrix.clone(), names: sm.skeleton.bones.map(b => b.name) };
     T.wrapMat = new THREE.MeshStandardMaterial({ map: tex.wraps_d, normalMap: tex.wraps_n, roughness: 0.88 });
-    T.tailMat = new THREE.MeshStandardMaterial({ color: '#e6e0d4', roughness: 0.92, side: THREE.DoubleSide }); }
+    // issue 88: a thin strip of cotton lets light through — with no light on the side the camera sees, it read as a dark slate needle by the head
+    T.tailMat = new THREE.MeshStandardMaterial({ color: '#e6e0d4', roughness: 0.92, side: THREE.DoubleSide, emissive: '#5a554c' }); }
   HEAD.restInv.copy(ccBones.CC_Base_Head.matrixWorld).invert();
   HEAD.restInvT.copy(HEAD.restInv).multiply(new M4().makeTranslation(HEAD.C.x, HEAD.C.y, HEAD.C.z));
   // under-layer of hair and the stubble are rigid on the head: build once, share
