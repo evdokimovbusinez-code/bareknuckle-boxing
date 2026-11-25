@@ -21,7 +21,7 @@ const REACT = {
   tired: 0.1,      // R-10: stun after a punch thrown on empty (punchK 0.45) — × this; fresh (punchK ≥ 0.85) × 1. Was × 1 for all; issue 89: 0.35 → 0.1 (the masher's gassed arm punches no longer stun-lock the AI)
   kdCaught: 0.2,   // R-10: knockdown severity added when he walked onto the punch (was 0); issue 89: 0.45 → 0.2 (the AI, always trading into the masher's volume, was «caught» on 4 of 5 knockdown rolls)
   kdGassed: 0.3,  // R-10: … and when his tank is empty (0 → this as stamina 20 → 0; was 0); issue 89: 0.45 → 0.3 (bench probe: vs the masher it is the AI that runs empty — and the AI can't mash its way up off the canvas)
-  gas: 0.055,     // R-10: punchK (power) of a punch thrown at 0 stamina, rising to 1 at 45 (Fighter.startPunch; was 0.45); issue 89: 0.2 → 0.055 — the lever that decides the masher: 0.1 → 100 % wins on normal, 0.04 → 0 %
+  gas: 0.045,     // R-10: punchK (power) of a punch thrown at 0 stamina, rising to 1 at 45 (Fighter.startPunch; was 0.45); issue 89: 0.2 → 0.045 — the lever that decides the masher on normal: 0.1 → 100 % wins, 0.055 → 75 %, 0.045 → 25 %, 0.04 → 0 %
 };
 /* issue 89: the knockdown roll of a clean head shot (resolveHit): odds = clamp((sev − at) · k, 0, max); up = the base of the count
    he needs before he can rise (knockdown). Were the inline numbers 1.2 / 0.65 / 0.5 / 2; now at 1.4 (fewer knockdowns from a fresh
