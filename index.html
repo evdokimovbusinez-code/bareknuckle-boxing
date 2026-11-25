@@ -8379,7 +8379,7 @@ const AUDIO = (() => {
 /* ───────── game state ───────── */
 /* damage per landed punch is scaled so a fight lasts: ~25–35 clean head shots to empty a full bar, so cuts and swelling
    have time to show (BKFC bouts that end inside the distance mostly end in rounds 1–3, not in the first ten seconds) */
-const DMG_K = 0.18;
+const DMG_K = 0.16;   // issue 89: 0.18 → 0.16 — no bout went the distance (100 % KO); now a share of them reaches the cards
 /* issue 52 — brass knuckles (04i_knux.js): one object for the whole mechanic. A punch from a worn,
    allowed knux does ×KNUX.dmg damage, opens cuts (Flesh.onHit, 03) ×KNUX.cut as often, and breaks
    the guard at BLK.breakSta × KNUX.brk stamina, i.e. earlier. 06_fx_sound.js adds the metallic ring. */
@@ -8397,9 +8397,9 @@ const REACT = {
   deflate: 0.5,    // s: a body shot leaves him winded, hands down, elbow tucked this long
   backStep: 0.14,  // extra knock-back per hit from the 2nd one on (he starts retreating)
   tired: 0.1,      // R-10: stun after a punch thrown on empty (punchK 0.45) — × this; fresh (punchK ≥ 0.85) × 1. Was × 1 for all; issue 89: 0.35 → 0.1 (the masher's gassed arm punches no longer stun-lock the AI)
-  kdCaught: 0.45,  // R-10: knockdown severity added when he walked onto the punch (was 0)
-  kdGassed: 0.9,  // R-10: … and when his tank is empty (0 → this as stamina 20 → 0; was 0); issue 89: 0.45 → 0.9 (mashing on empty is how a man gets dropped)
-  gas: 0.1,       // R-10: punchK (power) of a punch thrown at 0 stamina, rising to 1 at 45 (Fighter.startPunch; was 0.45); issue 89: 0.2 → 0.1
+  kdCaught: 0.2,   // R-10: knockdown severity added when he walked onto the punch (was 0); issue 89: 0.45 → 0.2 (the AI, always trading into the masher's volume, was «caught» on 4 of 5 knockdown rolls)
+  kdGassed: 0.3,  // R-10: … and when his tank is empty (0 → this as stamina 20 → 0; was 0); issue 89: 0.45 → 0.3 (bench probe: vs the masher it is the AI that runs empty — and the AI can't mash its way up off the canvas)
+  gas: 0.055,     // R-10: punchK (power) of a punch thrown at 0 stamina, rising to 1 at 45 (Fighter.startPunch; was 0.45); issue 89: 0.2 → 0.055 — the lever that decides the masher: 0.1 → 100 % wins on normal, 0.04 → 0 %
 };
 /* issue 89: the knockdown roll of a clean head shot (resolveHit): odds = clamp((sev − at) · k, 0, max); up = the base of the count
    he needs before he can rise (knockdown). Were the inline numbers 1.2 / 0.65 / 0.5 / 2; now at 1.4 (fewer knockdowns from a fresh
