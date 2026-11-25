@@ -33,11 +33,22 @@ const MIST = (() => {
 
 /* ───────── blood, sweat, floor stains ───────── */
 const FX = (() => {
-  const N = 380, mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 5), new THREE.MeshStandardMaterial({ roughness: 0.18 }), N);
-  mesh.frustumCulled = false; mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.castShadow = false; mesh.matrixAutoUpdate = false; mesh.visible = false; scene.add(mesh);   // hidden while no drop is alive (it was a draw call of 380 empty instances in every pass)
+  /* issue 88: blood and sweat are two meshes now. Sweat used to share the blood's lit standard material with a grey-blue instance
+     colour (#7f8a99 = 0.21 / 0.25 / 0.32 linear): with no light on the side the camera sees it went near black, and stretched ×7 along
+     the motion it read as dark needles round the head. Sweat = a clear drop: a faint body, a bright Fresnel rim and a specular glint
+     from a fixed view-space light (never darker than the rim, whatever the place's lights); blood keeps the lit material (wet, glossy)
+     with a deep-red emissive floor so a drop in shadow stays dark red, never black. Slot i lives in the mesh of its kind. */
+  const N = 380, sgeo = new THREE.SphereGeometry(1, 6, 5), mesh = new THREE.InstancedMesh(sgeo, new THREE.MeshStandardMaterial({ color: '#8a0912', roughness: 0.2, emissive: '#3a0306' }), N);
+  const smesh = new THREE.InstancedMesh(sgeo, new THREE.ShaderMaterial({ transparent: true, depthWrite: false,
+    vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * instanceMatrix * vec4( position, 1.0 ); vN = normalize( normalMatrix * mat3( instanceMatrix ) * normal ); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec3 n = normalize( vN ), v = normalize( vV ); float fr = pow( 1.0 - max( dot( n, v ), 0.0 ), 2.0 );' +
+      ' float sp = pow( max( dot( reflect( -normalize( vec3( 0.35, 0.85, 0.4 ) ), n ), v ), 0.0 ), 20.0 );' +
+      ' gl_FragColor = vec4( vec3( 0.8, 0.86, 0.92 ) * ( 0.22 + 0.7 * fr ) + vec3( 1.6 ) * sp, clamp( 0.22 + 0.5 * fr + sp, 0.0, 0.92 ) ); }' }), N);
+  for (const M of [mesh, smesh]) { M.frustumCulled = false; M.instanceMatrix.setUsage(THREE.DynamicDrawUsage); M.castShadow = false; M.matrixAutoUpdate = false; M.visible = false; scene.add(M); }   // hidden while no drop is alive (it was a draw call of 380 empty instances in every pass)
   const P = new Float32Array(N * 3), Vl = new Float32Array(N * 3), life = new Float32Array(N), size = new Float32Array(N), kind = new Uint8Array(N); let head = 0;
-  const cB = new THREE.Color('#7d0710'), cS = new THREE.Color('#7f8a99'), m = new M4(), zero = new M4().makeScale(0, 0, 0);
-  for (let i = 0; i < N; i++) { mesh.setMatrixAt(i, zero); mesh.setColorAt(i, cB); }
+  const m = new M4(), zero = new M4().makeScale(0, 0, 0);
+  for (let i = 0; i < N; i++) { mesh.setMatrixAt(i, zero); smesh.setMatrixAt(i, zero); }
+  const slot = (i, k) => { if (life[i] > 0 && kind[i] !== k) (kind[i] ? mesh : smesh).setMatrixAt(i, zero); kind[i] = k; };   // a slot taken over by the other kind: clear it there
   const DN = 240, dgeo = new THREE.CircleGeometry(1, 14).rotateX(-Math.PI / 2);
   const dmesh = new THREE.InstancedMesh(dgeo, new THREE.MeshStandardMaterial({ color: '#4d0408', roughness: 0.42, envMapIntensity: 0.4, transparent: true, opacity: 0.88, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }), DN);
   dmesh.frustumCulled = false; dmesh.receiveShadow = true; dmesh.matrixAutoUpdate = false; dmesh.visible = false; ARENA.add(dmesh); let dh = 0, live = 0;
@@ -65,10 +76,10 @@ const FX = (() => {
     dmesh.setMatrixAt(dh % DN, m.compose(p3, q, s3)); dh++; dmesh.instanceMatrix.needsUpdate = true; dmesh.visible = true;
   }
   function emit(pos, dir, sp, spread, k, sz, jit = 0.05) {
-    const i = head++ % N, j = 3 * i;
+    const i = head++ % N, j = 3 * i; slot(i, k);
     P[j] = pos.x + (rr() - 0.5) * jit; P[j + 1] = pos.y + (rr() - 0.5) * jit; P[j + 2] = pos.z + (rr() - 0.5) * jit;
     Vl[j] = dir.x * sp + (rr() - 0.5) * spread; Vl[j + 1] = dir.y * sp + (rr() - 0.2) * spread; Vl[j + 2] = dir.z * sp + (rr() - 0.5) * spread;
-    life[i] = 1.2 + rr(); size[i] = sz; kind[i] = k; mesh.setColorAt(i, k ? cB : cS); mesh.instanceColor.needsUpdate = true; live = 1;
+    life[i] = 1.2 + rr(); size[i] = sz; live = 1;
   }
   return {
     // sweat flicked off the skin at the point of contact
@@ -78,22 +89,23 @@ const FX = (() => {
     mist(pos, dir, power, amt) { MIST.burst(pos, dir, power, amt); const nd = (amt * (4 + power * 10) * GFX.particles) | 0; for (let i = 0; i < nd; i++) emit(pos, _xm.copy(dir).add(_xm2.set(rr() - 0.5, rr() * 0.6, rr() - 0.5)).normalize(), 1.5 + rr() * 3.5 * power, 1.2, 1, 0.002 + rr() * 0.004, 0.02); },
     // one drop of blood leaving a wound
     drop(pos, vel, spread, sz) {
-      const i = head++ % N, j = 3 * i; P[j] = pos.x; P[j + 1] = pos.y; P[j + 2] = pos.z;
+      const i = head++ % N, j = 3 * i; slot(i, 1); P[j] = pos.x; P[j + 1] = pos.y; P[j + 2] = pos.z;
       Vl[j] = vel.x + (rr() - 0.5) * spread; Vl[j + 1] = vel.y + (rr() - 0.3) * spread; Vl[j + 2] = vel.z + (rr() - 0.5) * spread;
-      life[i] = 2.5; size[i] = sz; kind[i] = 1; mesh.setColorAt(i, cB); mesh.instanceColor.needsUpdate = true; live = 1;
+      life[i] = 2.5; size[i] = sz; live = 1;
     },
     update(dt) {
-      if (!live) return; live = 0;   // nothing in the air: no loop, no buffer upload, no draw call
+      if (!live) return; live = 0; let lb = 0, ls = 0;   // nothing in the air: no loop, no buffer upload, no draw call
       for (let i = 0; i < N; i++) {
-        if (life[i] <= 0) continue; const j = 3 * i;
+        if (life[i] <= 0) continue; const j = 3 * i, M = kind[i] ? mesh : smesh;
         if (dt > 0) { Vl[j + 1] -= 9.81 * dt; const d = 1 - 0.8 * dt; Vl[j] *= d; Vl[j + 2] *= d; P[j] += Vl[j] * dt; P[j + 1] += Vl[j + 1] * dt; P[j + 2] += Vl[j + 2] * dt; life[i] -= dt; }
-        if (P[j + 1] < 0.006 || life[i] <= 0) { if (kind[i] && P[j + 1] < 0.02) decal(P[j], P[j + 2], size[i]); life[i] = 0; mesh.setMatrixAt(i, zero); continue; }
+        if (P[j + 1] < 0.006 || life[i] <= 0) { if (kind[i] && P[j + 1] < 0.02) decal(P[j], P[j + 2], size[i]); life[i] = 0; M.setMatrixAt(i, zero); continue; }
         // drops are drawn stretched along their motion (what the eye sees of a fast droplet), round once they slow down
-        const s = size[i] * 0.5, vx = Vl[j], vy = Vl[j + 1], vz = Vl[j + 2], sp = Math.hypot(vx, vy, vz), k = Math.min(1 + sp * 0.006 / s, 7);
+        // (sweat ≤ ×3: thin long streaks of a clear drop read as scratches, not water)
+        const s = size[i] * 0.5, vx = Vl[j], vy = Vl[j + 1], vz = Vl[j + 2], sp = Math.hypot(vx, vy, vz), k = Math.min(1 + sp * 0.006 / s, kind[i] ? 5 : 3);
         if (sp > 1e-3) q.setFromUnitVectors(up, s3.set(vx / sp, vy / sp, vz / sp)); else q.identity();
-        mesh.setMatrixAt(i, m.compose(p3.set(P[j], P[j + 1], P[j + 2]), q, s3.set(s, s * k, s))); live = 1;
+        M.setMatrixAt(i, m.compose(p3.set(P[j], P[j + 1], P[j + 2]), q, s3.set(s, s * k, s))); live = 1; if (kind[i]) lb = 1; else ls = 1;
       }
-      mesh.instanceMatrix.needsUpdate = true; mesh.visible = !!live;
+      mesh.instanceMatrix.needsUpdate = true; smesh.instanceMatrix.needsUpdate = true; mesh.visible = !!lb; smesh.visible = !!ls;
     },
     // R-04: the contact flash (resolveHit / followHit, the replay, the P2P guest); drawn on top, nudged 8 cm towards the camera
     flash(pos, dir, power, blocked) {
@@ -110,7 +122,7 @@ const FX = (() => {
         if (age > 2 || age < 1) { F.s.visible = false; continue; }
         if (age === 2) { F.s.scale.set(F.sz * 1.35, F.sz * 1.35, 1); F.s.material.color.multiplyScalar(0.4); } }
     },
-    clearAir() { for (const F of FL.pool) F.s.visible = false; for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); } mesh.instanceMatrix.needsUpdate = true; mesh.visible = false; live = 0; MIST.clear(); },
+    clearAir() { for (const F of FL.pool) F.s.visible = false; for (let i = 0; i < N; i++) { life[i] = 0; mesh.setMatrixAt(i, zero); smesh.setMatrixAt(i, zero); } mesh.instanceMatrix.needsUpdate = smesh.instanceMatrix.needsUpdate = true; mesh.visible = smesh.visible = false; live = 0; MIST.clear(); },
     clearFloor() { for (let i = 0; i < DN; i++) dmesh.setMatrixAt(i, zero); dmesh.instanceMatrix.needsUpdate = true; dmesh.visible = false; dh = 0; },
   };
 })();

@@ -434,13 +434,13 @@ window.__bot = {
   run(policy = 'masher', diff = 'normal', n = 1, o = {}) {
     const T0 = performance.now(), rows = [], save = { cine: OPT.cine, shake: OPT.shake, rounds: ROUNDS, len: ROUND_LEN, mode: G.mode, diff: G.diff, loc: G.loc };
     OPT.cine = false; OPT.shake = false; if (o.rounds) ROUNDS = o.rounds; if (o.len) ROUND_LEN = o.len;
-    const unlite = o.lite === false ? () => {} : BOT_LITE(), mem0 = Object.assign({}, AI_MEM), react0 = Object.assign({}, REACT);
-    // R-10: try other values of the AI's memory constants (AI_MEM) or of the hit reactions (REACT) for this run (balance.py --tune JSON)
-    for (const [k, v] of Object.entries(o.tune || {})) { if (k in AI_MEM) AI_MEM[k] = v; else if (k in REACT) REACT[k] = v; else throw new Error('tune? ' + k); }
+    const unlite = o.lite === false ? () => {} : BOT_LITE(), mem0 = Object.assign({}, AI_MEM), react0 = Object.assign({}, REACT), inj0 = Object.assign({}, INJ);
+    // R-10: try other values of the AI's memory constants (AI_MEM), of the hit reactions (REACT) or (issue 88) of the injuries (INJ) for this run (balance.py --tune JSON)
+    for (const [k, v] of Object.entries(o.tune || {})) { if (k in AI_MEM) AI_MEM[k] = v; else if (k in REACT) REACT[k] = v; else if (k in INJ) INJ[k] = v; else throw new Error('tune? ' + k); }
     try {
       for (let i = 0; i < n; i++) { const r = botFight(policy, diff, o, (o.seed ?? 1) + i); rows.push(r); if (o.log) o.log(r); }
     } finally {
-      unlite(); Object.assign(AI_MEM, mem0); Object.assign(REACT, react0); OPT.cine = save.cine; OPT.shake = save.shake; ROUNDS = save.rounds; ROUND_LEN = save.len; G.diff = save.diff; G.loc = save.loc; G.mode = save.mode;
+      unlite(); Object.assign(AI_MEM, mem0); Object.assign(REACT, react0); Object.assign(INJ, inj0); OPT.cine = save.cine; OPT.shake = save.shake; ROUNDS = save.rounds; ROUND_LEN = save.len; G.diff = save.diff; G.loc = save.loc; G.mode = save.mode;
     }
     return { rows, csv: botCSV(rows), summary: botSummary(rows), sec: +((performance.now() - T0) / 1000).toFixed(1) };
   },
