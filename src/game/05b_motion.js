@@ -170,4 +170,4 @@ function heelLift(F, o, h) {
 /* the foot's model quaternion turned with the heel; after it is set, the toes turn back so they stay flat on the canvas */
 function heelFoot(F, q) { return _fmQ.setFromAxisAngle(F.heelAx, F.heelA).multiply(q); }
 function heelToe(F, toe) { if (toe) F.setMQuat(toe, _fmQ.setFromAxisAngle(F.heelAx, -F.heelA).multiply(F.mquat(toe, _fmQ2))); }
-window.__fist = { FIST, FORM, min: fistMin, rig: fistRig };
+window.__fist = { FIST, FORM, min: fistMin, rig: fistRig, pitch: chestPitch };

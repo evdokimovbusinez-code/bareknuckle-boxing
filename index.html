@@ -7800,7 +7800,7 @@ function heelLift(F, o, h) {
 /* the foot's model quaternion turned with the heel; after it is set, the toes turn back so they stay flat on the canvas */
 function heelFoot(F, q) { return _fmQ.setFromAxisAngle(F.heelAx, F.heelA).multiply(q); }
 function heelToe(F, toe) { if (toe) F.setMQuat(toe, _fmQ.setFromAxisAngle(F.heelAx, -F.heelA).multiply(F.mquat(toe, _fmQ2))); }
-window.__fist = { FIST, FORM, min: fistMin, rig: fistRig };
+window.__fist = { FIST, FORM, min: fistMin, rig: fistRig, pitch: chestPitch };
 /* ───────── punch smear: a short fading ribbon behind the knuckles while a punch is on its way ─────────
    A cheap stand-in for motion blur (a full-screen velocity blur costs too much on phones): one camera-facing strip per
    hand, N samples of the knuckle path, drawn additive, tapering and fading towards the tail. It is on only from the start
