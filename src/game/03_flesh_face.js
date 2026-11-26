@@ -263,7 +263,7 @@ class Face {
   }
   reset() {
     this.t = 0; this.blinkT = 1 + rr() * 3; this.bl = -1; this.jawA = 0; this.jawV = 0; this.squint = 0; this.droop = 0;
-    this.jolt = new V3(); this.sacc = new V3(); this.saccT = 0; this.drift = new V3(); this.koRoll = 0; this.koLid = 0.4 + rr() * 0.4; this.lids = [0, 0];
+    this.jolt = new V3(); this.sacc = new V3(); this.saccT = 0; this.drift = new V3(); this.koRoll = 0; this.koLid = 0.74 + rr() * 0.16;   /* issue 90 (critic: «у лежащего горят белым глаза»): was 0.4 + 0.4 rr — the rolled-up whites filled half-open lids */ this.lids = [0, 0];
     this.breath = rr() * 6; this.koT = 0;
     // blend-shape moods (faceWeights): smoothed in update; asym = this man's own lopsidedness, smSide = the corner he smirks with
     this.x = { focus: 0, effort: 0, arm: 0, pain: 0, side: 0, daze: 0, tired: 0, smirk: 0, mean: 0, roar: 0, sad: 0, slack: 0, show: 0 };
@@ -346,7 +346,7 @@ class Face {
     if ((this.saccT -= dt) < 0) { this.saccT = 0.2 + rr() * 1.3; const a = (0.015 + 0.04 * dz) * (G.state === 'intro' && G.stare > 0.01 ? 0.25 : 1); this.sacc.set((rr() - 0.5) * a, (rr() - 0.5) * a * 0.6, 0); }
     if (dz > 0) { this.drift.x += (Math.sin(this.t * 0.7 + F.ph) * 0.12 * dz - this.drift.x) * dt * 2; this.drift.y += (Math.sin(this.t * 0.5 + 2 * F.ph) * 0.06 * dz - this.drift.y) * dt * 2; }
     else this.drift.multiplyScalar(Math.exp(-dt * 3));
-    if (ko) this.koRoll += ((this.koT > 0.3 ? 0.42 : 0) - this.koRoll) * Math.min(1, dt * 4);
+    if (ko) this.koRoll += ((this.koT > 0.3 ? 0.3 : 0) - this.koRoll) * Math.min(1, dt * 4);   // issue 90: roll 0.42 → 0.3 rad
     this.eyes.forEach((e, i) => {
       const ep = F.mpos(e.b, _fv3), dir = _fv1.copy(tgt).sub(ep).normalize().applyQuaternion(_fq2.copy(D).invert());   // in the head's bind frame
       let yaw = Math.atan2(dir.x, dir.z), pit = Math.asin(clamp(dir.y, -1, 1));

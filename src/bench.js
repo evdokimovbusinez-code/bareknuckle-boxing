@@ -436,7 +436,7 @@ window.__bot = {
     OPT.cine = false; OPT.shake = false; if (o.rounds) ROUNDS = o.rounds; if (o.len) ROUND_LEN = o.len;
     const unlite = o.lite === false ? () => {} : BOT_LITE(), mem0 = Object.assign({}, AI_MEM), react0 = Object.assign({}, REACT), inj0 = Object.assign({}, INJ);
     // issue 89: also «normal.toMe» (a field of DIFFS), «BLK.breakSta», «KDR.at» (knockdown odds / get-up), «dmgK» (DMG_K through __tw)
-    const tabs = { BLK, KDR }, diffs0 = JSON.stringify(DIFFS), blk0 = Object.assign({}, BLK), kdr0 = Object.assign({}, KDR), tw0 = window.__tw;
+    const tabs = { BLK, KDR, FORM }, diffs0 = JSON.stringify(DIFFS), blk0 = Object.assign({}, BLK), kdr0 = Object.assign({}, KDR), form0 = Object.assign({}, FORM), tw0 = window.__tw;   // issue 90: + «FORM.pitchMax» …
     // R-10: try other values of the AI's memory constants (AI_MEM), of the hit reactions (REACT) or (issue 88) of the injuries (INJ) for this run (balance.py --tune JSON)
     for (const [k, v] of Object.entries(o.tune || {})) { const [a, b] = k.split('.');
       if (k in AI_MEM) AI_MEM[k] = v; else if (k in REACT) REACT[k] = v; else if (k in INJ) INJ[k] = v;
@@ -445,7 +445,7 @@ window.__bot = {
     try {
       for (let i = 0; i < n; i++) { const r = botFight(policy, diff, o, (o.seed ?? 1) + i); rows.push(r); if (o.log) o.log(r); }
     } finally {
-      unlite(); Object.assign(AI_MEM, mem0); Object.assign(REACT, react0); Object.assign(INJ, inj0); Object.assign(BLK, blk0); Object.assign(KDR, kdr0); window.__tw = tw0;
+      unlite(); Object.assign(AI_MEM, mem0); Object.assign(REACT, react0); Object.assign(INJ, inj0); Object.assign(BLK, blk0); Object.assign(KDR, kdr0); Object.assign(FORM, form0); window.__tw = tw0;
       { const d0 = JSON.parse(diffs0); for (const d in d0) Object.assign(DIFFS[d], d0[d]); } OPT.cine = save.cine; OPT.shake = save.shake; ROUNDS = save.rounds; ROUND_LEN = save.len; G.diff = save.diff; G.loc = save.loc; G.mode = save.mode;
     }
     return { rows, csv: botCSV(rows), summary: botSummary(rows), sec: +((performance.now() - T0) / 1000).toFixed(1) };

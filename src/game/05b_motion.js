@@ -24,7 +24,9 @@ const FORM = {
   // stance guard, the WRIST's target off the head centre, model space (x + = his left side, y up, z toward the opponent), metres.
   // Was: no layer — the idle clip's hands, both fists level at the temples and equally far out. Now (the reference): lead fist in
   // front of the face at nose level ~25 cm out, rear fist pulled back to the cheek / chin, elbows down on the ribs (BLK.pole*).
-  lead: [0.03, -0.145, 0.33], rear: [-0.075, -0.15, 0.14],
+  // issue 90 (critic: «лицо открыто между кулаками»): lead 0.33 → 0.27 m out and 1.5 cm higher, rear 0.14 → 0.11 m out, 1 cm higher;
+  // chin: the head nods down this far (rad) in the stance guard (the block has its own tuck, BLK.chinLift)
+  lead: [0.03, -0.13, 0.27], rear: [-0.07, -0.14, 0.11], chin: 0.09,
   // rhythm in the stance (new): the hips dip 0…bob m at hz (a springy bounce), rock ±sway m along the fight line at hz / 2 (the
   // weight from the front foot to the rear one), the trunk turns ±yaw rad; at empty stamina only (1 − tiredK) of it is left.
   // A dazed man has his own sway (Fighter.pose: dz) — the bounce fades with it.
@@ -39,6 +41,13 @@ const FORM = {
   // a slip (startDodge 'slipL' / 'slipR'): extra knee bend (m of hip drop) and waist bend toward the slip (rad). Was: −0.05 m and
   // the trunk's roll only — it read as a neck move.
   slipDrop: 0.05, slipBend: 0.10,
+  // posture in a punch (issue 90, critic: «апперкот и оверхенд — нырок головой вперёд», «джеб — выпад фехтовальщика»). The clips
+  // sink the hips 10–20 cm and pitch the chest 25–35° forward at the impact: the head went 16–21 cm down into the other man's chest.
+  // Now the hips sink at most dropMax below where they stood (F.hipRestY, followed out of a punch / dodge) and rise by lift[punch]
+  // into the uppercut; the chest (Spine02's up axis, model space) pitches at most pitchMax forward — the waist takes the excess back.
+  dropMax: 0.05, lift: { upperL: 0.02, upperR: 0.04 }, pitchMax: 0.38,
+  // how far (m) the aim IK may pull an uppercut's fist onto the target (Fighter.pose; was 0.62 inline, straights / hooks 0.42)
+  aimUp: 0.62,
 };
 function fistRig(F) {
   if (F.fistR) return F.fistR;
@@ -113,13 +122,28 @@ function fistMin(F) {
 /* punch envelope of each arm and the leg drive, once per pose(): w = the punch clip's weight (rises in 0.08 s, fades 0.24 s after the
    release), times how far the clip is from its start to the impact */
 function formPunch(F, o) {
-  o.L = 0; o.R = 0; o.yaw = 0; o.fwd = 0; o.heel = 0; o.pitch = 0; o.any = 0;
+  o.L = 0; o.R = 0; o.yaw = 0; o.fwd = 0; o.heel = 0; o.pitch = 0; o.any = 0; o.lift = 0;
   if (!FORM.on) return o;
   for (const n of PN) { const w = F.w[n]; if (!(w > 0.001)) continue; const P = PUNCH[n], a = F.act[n]; o[P.arm] += w; o.any += w;
-    const e = w * sstep(P.start, P.impact, a.time), D = FORM.P[n]; if (!D) continue;
+    const e = w * sstep(P.start, P.impact, a.time), D = FORM.P[n]; o.lift += e * (FORM.lift[n] || 0); if (!D) continue;
     o.yaw += e * D[0] * FORM.pk; o.fwd += e * D[1] * FORM.pk; o.heel += e * D[2]; o.pitch += e * D[3]; }
   o.any = Math.min(1, o.any); return o;
 }
+/* issue 90: the hip height this frame — the clip's, held up to FORM.dropMax below the stance height (+ lift) while a punch plays */
+function formHipY(F, y, FP, dt) {
+  if (!FORM.on) return y;
+  if (FP.any < 0.02 && !F.dodge) F.hipRestY = F.hipRestY == null ? y : F.hipRestY + (y - F.hipRestY) * Math.min(1, dt * 4);
+  if (F.hipRestY == null || FP.any < 0.001) return y;
+  const floor = F.hipRestY - FORM.dropMax + FP.lift;
+  return y < floor ? y + (floor - y) * Math.min(1, FP.any) : y;
+}
+const _fcQ = new Quat(), _fcU = new V3();
+/* forward pitch (rad) of F's chest in model space: Spine02's up axis against the bind */
+function chestPitch(F) {
+  F.mquat(F.bones.CC_Base_Spine02, _fcQ).multiply(_fcQ2.copy(F.chestBind).invert());
+  _fcU.set(0, 1, 0).applyQuaternion(_fcQ); return Math.atan2(_fcU.z, _fcU.y);
+}
+const _fcQ2 = new Quat();
 /* the stance rhythm at G.t: [hip dip (≤ 0), hip shift along z, trunk yaw]; 0 in a punch, a dodge, a daze, out of the fight */
 function formRhythm(F, dz, o) {
   o.y = 0; o.z = 0; o.yaw = 0;
@@ -146,4 +170,4 @@ function heelLift(F, o, h) {
 /* the foot's model quaternion turned with the heel; after it is set, the toes turn back so they stay flat on the canvas */
 function heelFoot(F, q) { return _fmQ.setFromAxisAngle(F.heelAx, F.heelA).multiply(q); }
 function heelToe(F, toe) { if (toe) F.setMQuat(toe, _fmQ.setFromAxisAngle(F.heelAx, -F.heelA).multiply(F.mquat(toe, _fmQ2))); }
-window.__fist = { FIST, FORM, min: fistMin, rig: fistRig };
+window.__fist = { FIST, FORM, min: fistMin, rig: fistRig, pitch: chestPitch };

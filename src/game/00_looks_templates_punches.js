@@ -79,7 +79,11 @@ async function buildTemplates() {
   T.shortsNormal = shortsNormal();
   { const o = fbx.parse(bufs.wraps, 'assets/'); o.updateMatrixWorld(true); let sm; o.traverse(x => { if (x.isSkinnedMesh) sm = x; });
     T.wraps = { geo: sm.geometry, bind: sm.bindMatrix.clone(), names: sm.skeleton.bones.map(b => b.name) };
-    T.wrapMat = new THREE.MeshStandardMaterial({ map: tex.wraps_d, normalMap: tex.wraps_n, roughness: 0.88 });
+    // issue 90 (critic: «надпись на бинте зеркальная»): the wraps' UV islands read «BARE KNUCKLE» backwards on the hand. The texture's
+    // right half is the left half's mirror (layout) with the print set the right way round, so u → 1 − u gives each hand the other
+    // island: same band layout on the hand, print readable. The normal map's tangent x flips with it (normalScale.x = −1).
+    { const uv = T.wraps.geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i)); uv.needsUpdate = true; }
+    T.wrapMat = new THREE.MeshStandardMaterial({ map: tex.wraps_d, normalMap: tex.wraps_n, normalScale: new THREE.Vector2(-1, 1), roughness: 0.88 });
     // issue 88: a thin strip of cotton lets light through — with no light on the side the camera sees, it read as a dark slate needle by the head
     T.tailMat = new THREE.MeshStandardMaterial({ color: '#e6e0d4', roughness: 0.92, side: THREE.DoubleSide, emissive: '#5a554c' }); }
   HEAD.restInv.copy(ccBones.CC_Base_Head.matrixWorld).invert();

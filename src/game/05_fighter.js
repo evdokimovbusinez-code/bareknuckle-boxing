@@ -765,18 +765,21 @@ class Fighter {
       const tL = this.mpos(fL, _po1), tR = this.mpos(fR, _po2), qL = this.mquat(fL, _poq1), qR = this.mquat(fR, _poq2);
       // R-12: out of a dodge the hips sit down at most STANCE.restDrop (guard + shell + daze + rubber legs used to stack to ~0.2 m)
       const drop = -0.26 * duck - 0.04 * lean - (0.05 + FORM.slipDrop) * Math.abs(slip) - 0.06 * this.blockW - 0.07 * dz + 0.015 * sw2 + RY.y;
-      this.setHip(_v1.copy(this.hipModel).add(_v2.set(0.09 * slip + 0.03 * sw, this.dodge ? drop : Math.max(drop, -STANCE.restDrop), -0.11 * duck - 0.13 * lean + clamp(s.hz.x, -0.12, 0.12) + RY.z + FP.fwd)));
+      _v1.copy(this.hipModel); _v1.y = formHipY(this, _v1.y, FP, dt);
+      this.setHip(_v1.add(_v2.set(0.09 * slip + 0.03 * sw, this.dodge ? drop : Math.max(drop, -STANCE.restDrop), -0.11 * duck - 0.13 * lean + clamp(s.hz.x, -0.12, 0.12) + RY.z + FP.fwd)));
       // #87: the hips turn into a punch (the legs follow by IK below, the feet stay planted)
       if (B.CC_Base_Pelvis && FP.yaw) this.rot(B.CC_Base_Pelvis, 0, 0.45 * FP.yaw, 0);
       // a shot on the guard rocks the trunk back behind the gloves (the recoil spring), on top of the standing reactions
       this.rot(B.CC_Base_Waist, 0.22 * duck - 0.20 * lean + 0.06 * this.blockW + 0.4 * s.sp.x + 0.07 * sw2 - 0.5 * rc + FORM.slipBend * Math.abs(slip) + 0.6 * FP.pitch, 0.55 * FP.yaw + RY.yaw, 0.4 * s.sr.x - 0.2 * slip - 0.12 * sw);
       this.rot(B.CC_Base_Spine01, 0.16 * duck - 0.18 * lean + 0.08 * this.blockW - 0.7 * rc + 0.4 * FP.pitch, 0.45 * FP.yaw, -0.14 * slip);
+      // issue 90: no nose-dive into a punch — the waist takes back the chest's pitch above FORM.pitchMax
+      if (FORM.on && FP.any > 0.01) { const ex = chestPitch(this) - FORM.pitchMax; if (ex > 0) this.rot(B.CC_Base_Waist, -ex * Math.min(1, FP.any), 0, 0); }
       this.rot(B.CC_Base_Spine02, 0.10 * duck - 0.14 * lean + 0.6 * s.sp.x - 0.9 * rc, 0, 0.6 * s.sr.x - 0.1 * slip - 0.06 * sw);
       this.rot(B.CC_Base_NeckTwist01, -0.25 * duck + 0.2 * lean + 0.45 * s.hp.x - 0.3 * rc - 0.6 * chin, 0.4 * s.hy.x, 0.45 * s.hr.x);
       // shaking it off: a hard one landed, half a second later the head shakes (5–6 Hz, three swings) — "I'm fine"
       const sk = G.t - (this.shakeT ?? -9), shake = sk > 0.35 && sk < 1.0 ? 0.16 * Math.sin((sk - 0.35) * 34) * (1 - (sk - 0.35) / 0.65) : 0;
       // the chin tucks a little in the high guard and nods back on the recoil — with the guard lift above, the eyes stay on the opponent
-      this.rot(this.head, s.hp.x + 0.12 * dz + 0.03 * this.blockW - 0.6 * rc - 0.4 * chin, s.hy.x + shake, s.hr.x + 0.15 * sw);
+      this.rot(this.head, s.hp.x + 0.12 * dz + 0.03 * this.blockW - 0.6 * rc - 0.4 * chin + (FORM.on ? FORM.chin * (1 - Math.min(1, FP.any)) * (1 - this.blockW) * (1 - Math.min(1, dz)) : 0), s.hy.x + shake, s.hr.x + 0.15 * sw);
       // shoulders come up round the tucked chin — a symmetric, mirrored lift of the shoulder girdle
       if (this.blockW > 0.02) for (const S of ['L', 'R']) {
         const cl = B[`CC_Base_${S}_Clavicle`]; if (cl) this.rot(cl, 0, 0, (S === 'L' ? 1 : -1) * 0.055 * this.blockW);
@@ -830,7 +833,7 @@ class Fighter {
     }
     if (this.aimW > 0.02 && this.aimTarget) {
       const S = this.aimArm, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), kn = this.mpos(B[`CC_Base_${S}_Mid1`], _po4);
-      const d = this.group.worldToLocal(_v1.copy(this.aimTarget)).sub(kn).clampLength(0, this.bodyShot ? 0.5 : PUNCH[this.cur] && PUNCH[this.cur].type === 'upper' ? 0.62 : 0.42).multiplyScalar(this.aimW);
+      const d = this.group.worldToLocal(_v1.copy(this.aimTarget)).sub(kn).clampLength(0, this.bodyShot ? 0.5 : PUNCH[this.cur] && PUNCH[this.cur].type === 'upper' ? FORM.aimUp : 0.42).multiplyScalar(this.aimW);
       this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, hand.add(d));
     }
     this.cc.updateMatrixWorld(true);

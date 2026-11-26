@@ -2315,7 +2315,11 @@ async function buildTemplates() {
   T.shortsNormal = shortsNormal();
   { const o = fbx.parse(bufs.wraps, 'assets/'); o.updateMatrixWorld(true); let sm; o.traverse(x => { if (x.isSkinnedMesh) sm = x; });
     T.wraps = { geo: sm.geometry, bind: sm.bindMatrix.clone(), names: sm.skeleton.bones.map(b => b.name) };
-    T.wrapMat = new THREE.MeshStandardMaterial({ map: tex.wraps_d, normalMap: tex.wraps_n, roughness: 0.88 });
+    // issue 90 (critic: «надпись на бинте зеркальная»): the wraps' UV islands read «BARE KNUCKLE» backwards on the hand. The texture's
+    // right half is the left half's mirror (layout) with the print set the right way round, so u → 1 − u gives each hand the other
+    // island: same band layout on the hand, print readable. The normal map's tangent x flips with it (normalScale.x = −1).
+    { const uv = T.wraps.geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i)); uv.needsUpdate = true; }
+    T.wrapMat = new THREE.MeshStandardMaterial({ map: tex.wraps_d, normalMap: tex.wraps_n, normalScale: new THREE.Vector2(-1, 1), roughness: 0.88 });
     // issue 88: a thin strip of cotton lets light through — with no light on the side the camera sees, it read as a dark slate needle by the head
     T.tailMat = new THREE.MeshStandardMaterial({ color: '#e6e0d4', roughness: 0.92, side: THREE.DoubleSide, emissive: '#5a554c' }); }
   HEAD.restInv.copy(ccBones.CC_Base_Head.matrixWorld).invert();
@@ -3607,7 +3611,7 @@ class Face {
   }
   reset() {
     this.t = 0; this.blinkT = 1 + rr() * 3; this.bl = -1; this.jawA = 0; this.jawV = 0; this.squint = 0; this.droop = 0;
-    this.jolt = new V3(); this.sacc = new V3(); this.saccT = 0; this.drift = new V3(); this.koRoll = 0; this.koLid = 0.4 + rr() * 0.4; this.lids = [0, 0];
+    this.jolt = new V3(); this.sacc = new V3(); this.saccT = 0; this.drift = new V3(); this.koRoll = 0; this.koLid = 0.74 + rr() * 0.16;   /* issue 90 (critic: «у лежащего горят белым глаза»): was 0.4 + 0.4 rr — the rolled-up whites filled half-open lids */ this.lids = [0, 0];
     this.breath = rr() * 6; this.koT = 0;
     // blend-shape moods (faceWeights): smoothed in update; asym = this man's own lopsidedness, smSide = the corner he smirks with
     this.x = { focus: 0, effort: 0, arm: 0, pain: 0, side: 0, daze: 0, tired: 0, smirk: 0, mean: 0, roar: 0, sad: 0, slack: 0, show: 0 };
@@ -3690,7 +3694,7 @@ class Face {
     if ((this.saccT -= dt) < 0) { this.saccT = 0.2 + rr() * 1.3; const a = (0.015 + 0.04 * dz) * (G.state === 'intro' && G.stare > 0.01 ? 0.25 : 1); this.sacc.set((rr() - 0.5) * a, (rr() - 0.5) * a * 0.6, 0); }
     if (dz > 0) { this.drift.x += (Math.sin(this.t * 0.7 + F.ph) * 0.12 * dz - this.drift.x) * dt * 2; this.drift.y += (Math.sin(this.t * 0.5 + 2 * F.ph) * 0.06 * dz - this.drift.y) * dt * 2; }
     else this.drift.multiplyScalar(Math.exp(-dt * 3));
-    if (ko) this.koRoll += ((this.koT > 0.3 ? 0.42 : 0) - this.koRoll) * Math.min(1, dt * 4);
+    if (ko) this.koRoll += ((this.koT > 0.3 ? 0.3 : 0) - this.koRoll) * Math.min(1, dt * 4);   // issue 90: roll 0.42 → 0.3 rad
     this.eyes.forEach((e, i) => {
       const ep = F.mpos(e.b, _fv3), dir = _fv1.copy(tgt).sub(ep).normalize().applyQuaternion(_fq2.copy(D).invert());   // in the head's bind frame
       let yaw = Math.atan2(dir.x, dir.z), pit = Math.asin(clamp(dir.y, -1, 1));
@@ -7285,18 +7289,21 @@ class Fighter {
       const tL = this.mpos(fL, _po1), tR = this.mpos(fR, _po2), qL = this.mquat(fL, _poq1), qR = this.mquat(fR, _poq2);
       // R-12: out of a dodge the hips sit down at most STANCE.restDrop (guard + shell + daze + rubber legs used to stack to ~0.2 m)
       const drop = -0.26 * duck - 0.04 * lean - (0.05 + FORM.slipDrop) * Math.abs(slip) - 0.06 * this.blockW - 0.07 * dz + 0.015 * sw2 + RY.y;
-      this.setHip(_v1.copy(this.hipModel).add(_v2.set(0.09 * slip + 0.03 * sw, this.dodge ? drop : Math.max(drop, -STANCE.restDrop), -0.11 * duck - 0.13 * lean + clamp(s.hz.x, -0.12, 0.12) + RY.z + FP.fwd)));
+      _v1.copy(this.hipModel); _v1.y = formHipY(this, _v1.y, FP, dt);
+      this.setHip(_v1.add(_v2.set(0.09 * slip + 0.03 * sw, this.dodge ? drop : Math.max(drop, -STANCE.restDrop), -0.11 * duck - 0.13 * lean + clamp(s.hz.x, -0.12, 0.12) + RY.z + FP.fwd)));
       // #87: the hips turn into a punch (the legs follow by IK below, the feet stay planted)
       if (B.CC_Base_Pelvis && FP.yaw) this.rot(B.CC_Base_Pelvis, 0, 0.45 * FP.yaw, 0);
       // a shot on the guard rocks the trunk back behind the gloves (the recoil spring), on top of the standing reactions
       this.rot(B.CC_Base_Waist, 0.22 * duck - 0.20 * lean + 0.06 * this.blockW + 0.4 * s.sp.x + 0.07 * sw2 - 0.5 * rc + FORM.slipBend * Math.abs(slip) + 0.6 * FP.pitch, 0.55 * FP.yaw + RY.yaw, 0.4 * s.sr.x - 0.2 * slip - 0.12 * sw);
       this.rot(B.CC_Base_Spine01, 0.16 * duck - 0.18 * lean + 0.08 * this.blockW - 0.7 * rc + 0.4 * FP.pitch, 0.45 * FP.yaw, -0.14 * slip);
+      // issue 90: no nose-dive into a punch — the waist takes back the chest's pitch above FORM.pitchMax
+      if (FORM.on && FP.any > 0.01) { const ex = chestPitch(this) - FORM.pitchMax; if (ex > 0) this.rot(B.CC_Base_Waist, -ex * Math.min(1, FP.any), 0, 0); }
       this.rot(B.CC_Base_Spine02, 0.10 * duck - 0.14 * lean + 0.6 * s.sp.x - 0.9 * rc, 0, 0.6 * s.sr.x - 0.1 * slip - 0.06 * sw);
       this.rot(B.CC_Base_NeckTwist01, -0.25 * duck + 0.2 * lean + 0.45 * s.hp.x - 0.3 * rc - 0.6 * chin, 0.4 * s.hy.x, 0.45 * s.hr.x);
       // shaking it off: a hard one landed, half a second later the head shakes (5–6 Hz, three swings) — "I'm fine"
       const sk = G.t - (this.shakeT ?? -9), shake = sk > 0.35 && sk < 1.0 ? 0.16 * Math.sin((sk - 0.35) * 34) * (1 - (sk - 0.35) / 0.65) : 0;
       // the chin tucks a little in the high guard and nods back on the recoil — with the guard lift above, the eyes stay on the opponent
-      this.rot(this.head, s.hp.x + 0.12 * dz + 0.03 * this.blockW - 0.6 * rc - 0.4 * chin, s.hy.x + shake, s.hr.x + 0.15 * sw);
+      this.rot(this.head, s.hp.x + 0.12 * dz + 0.03 * this.blockW - 0.6 * rc - 0.4 * chin + (FORM.on ? FORM.chin * (1 - Math.min(1, FP.any)) * (1 - this.blockW) * (1 - Math.min(1, dz)) : 0), s.hy.x + shake, s.hr.x + 0.15 * sw);
       // shoulders come up round the tucked chin — a symmetric, mirrored lift of the shoulder girdle
       if (this.blockW > 0.02) for (const S of ['L', 'R']) {
         const cl = B[`CC_Base_${S}_Clavicle`]; if (cl) this.rot(cl, 0, 0, (S === 'L' ? 1 : -1) * 0.055 * this.blockW);
@@ -7350,7 +7357,7 @@ class Fighter {
     }
     if (this.aimW > 0.02 && this.aimTarget) {
       const S = this.aimArm, H = B[`CC_Base_${S}_Hand`], hand = this.mpos(H, _po3), kn = this.mpos(B[`CC_Base_${S}_Mid1`], _po4);
-      const d = this.group.worldToLocal(_v1.copy(this.aimTarget)).sub(kn).clampLength(0, this.bodyShot ? 0.5 : PUNCH[this.cur] && PUNCH[this.cur].type === 'upper' ? 0.62 : 0.42).multiplyScalar(this.aimW);
+      const d = this.group.worldToLocal(_v1.copy(this.aimTarget)).sub(kn).clampLength(0, this.bodyShot ? 0.5 : PUNCH[this.cur] && PUNCH[this.cur].type === 'upper' ? FORM.aimUp : 0.42).multiplyScalar(this.aimW);
       this.ik(B[`CC_Base_${S}_Upperarm`], B[`CC_Base_${S}_Forearm`], H, hand.add(d));
     }
     this.cc.updateMatrixWorld(true);
@@ -7647,7 +7654,9 @@ const FORM = {
   // stance guard, the WRIST's target off the head centre, model space (x + = his left side, y up, z toward the opponent), metres.
   // Was: no layer — the idle clip's hands, both fists level at the temples and equally far out. Now (the reference): lead fist in
   // front of the face at nose level ~25 cm out, rear fist pulled back to the cheek / chin, elbows down on the ribs (BLK.pole*).
-  lead: [0.03, -0.145, 0.33], rear: [-0.075, -0.15, 0.14],
+  // issue 90 (critic: «лицо открыто между кулаками»): lead 0.33 → 0.27 m out and 1.5 cm higher, rear 0.14 → 0.11 m out, 1 cm higher;
+  // chin: the head nods down this far (rad) in the stance guard (the block has its own tuck, BLK.chinLift)
+  lead: [0.03, -0.13, 0.27], rear: [-0.07, -0.14, 0.11], chin: 0.09,
   // rhythm in the stance (new): the hips dip 0…bob m at hz (a springy bounce), rock ±sway m along the fight line at hz / 2 (the
   // weight from the front foot to the rear one), the trunk turns ±yaw rad; at empty stamina only (1 − tiredK) of it is left.
   // A dazed man has his own sway (Fighter.pose: dz) — the bounce fades with it.
@@ -7662,6 +7671,13 @@ const FORM = {
   // a slip (startDodge 'slipL' / 'slipR'): extra knee bend (m of hip drop) and waist bend toward the slip (rad). Was: −0.05 m and
   // the trunk's roll only — it read as a neck move.
   slipDrop: 0.05, slipBend: 0.10,
+  // posture in a punch (issue 90, critic: «апперкот и оверхенд — нырок головой вперёд», «джеб — выпад фехтовальщика»). The clips
+  // sink the hips 10–20 cm and pitch the chest 25–35° forward at the impact: the head went 16–21 cm down into the other man's chest.
+  // Now the hips sink at most dropMax below where they stood (F.hipRestY, followed out of a punch / dodge) and rise by lift[punch]
+  // into the uppercut; the chest (Spine02's up axis, model space) pitches at most pitchMax forward — the waist takes the excess back.
+  dropMax: 0.05, lift: { upperL: 0.02, upperR: 0.04 }, pitchMax: 0.38,
+  // how far (m) the aim IK may pull an uppercut's fist onto the target (Fighter.pose; was 0.62 inline, straights / hooks 0.42)
+  aimUp: 0.62,
 };
 function fistRig(F) {
   if (F.fistR) return F.fistR;
@@ -7736,13 +7752,28 @@ function fistMin(F) {
 /* punch envelope of each arm and the leg drive, once per pose(): w = the punch clip's weight (rises in 0.08 s, fades 0.24 s after the
    release), times how far the clip is from its start to the impact */
 function formPunch(F, o) {
-  o.L = 0; o.R = 0; o.yaw = 0; o.fwd = 0; o.heel = 0; o.pitch = 0; o.any = 0;
+  o.L = 0; o.R = 0; o.yaw = 0; o.fwd = 0; o.heel = 0; o.pitch = 0; o.any = 0; o.lift = 0;
   if (!FORM.on) return o;
   for (const n of PN) { const w = F.w[n]; if (!(w > 0.001)) continue; const P = PUNCH[n], a = F.act[n]; o[P.arm] += w; o.any += w;
-    const e = w * sstep(P.start, P.impact, a.time), D = FORM.P[n]; if (!D) continue;
+    const e = w * sstep(P.start, P.impact, a.time), D = FORM.P[n]; o.lift += e * (FORM.lift[n] || 0); if (!D) continue;
     o.yaw += e * D[0] * FORM.pk; o.fwd += e * D[1] * FORM.pk; o.heel += e * D[2]; o.pitch += e * D[3]; }
   o.any = Math.min(1, o.any); return o;
 }
+/* issue 90: the hip height this frame — the clip's, held up to FORM.dropMax below the stance height (+ lift) while a punch plays */
+function formHipY(F, y, FP, dt) {
+  if (!FORM.on) return y;
+  if (FP.any < 0.02 && !F.dodge) F.hipRestY = F.hipRestY == null ? y : F.hipRestY + (y - F.hipRestY) * Math.min(1, dt * 4);
+  if (F.hipRestY == null || FP.any < 0.001) return y;
+  const floor = F.hipRestY - FORM.dropMax + FP.lift;
+  return y < floor ? y + (floor - y) * Math.min(1, FP.any) : y;
+}
+const _fcQ = new Quat(), _fcU = new V3();
+/* forward pitch (rad) of F's chest in model space: Spine02's up axis against the bind */
+function chestPitch(F) {
+  F.mquat(F.bones.CC_Base_Spine02, _fcQ).multiply(_fcQ2.copy(F.chestBind).invert());
+  _fcU.set(0, 1, 0).applyQuaternion(_fcQ); return Math.atan2(_fcU.z, _fcU.y);
+}
+const _fcQ2 = new Quat();
 /* the stance rhythm at G.t: [hip dip (≤ 0), hip shift along z, trunk yaw]; 0 in a punch, a dodge, a daze, out of the fight */
 function formRhythm(F, dz, o) {
   o.y = 0; o.z = 0; o.yaw = 0;
@@ -7769,7 +7800,7 @@ function heelLift(F, o, h) {
 /* the foot's model quaternion turned with the heel; after it is set, the toes turn back so they stay flat on the canvas */
 function heelFoot(F, q) { return _fmQ.setFromAxisAngle(F.heelAx, F.heelA).multiply(q); }
 function heelToe(F, toe) { if (toe) F.setMQuat(toe, _fmQ.setFromAxisAngle(F.heelAx, -F.heelA).multiply(F.mquat(toe, _fmQ2))); }
-window.__fist = { FIST, FORM, min: fistMin, rig: fistRig };
+window.__fist = { FIST, FORM, min: fistMin, rig: fistRig, pitch: chestPitch };
 /* ───────── punch smear: a short fading ribbon behind the knuckles while a punch is on its way ─────────
    A cheap stand-in for motion blur (a full-screen velocity blur costs too much on phones): one camera-facing strip per
    hand, N samples of the knuckle path, drawn additive, tapering and fading towards the tail. It is on only from the start
@@ -8399,7 +8430,7 @@ const REACT = {
   tired: 0.1,      // R-10: stun after a punch thrown on empty (punchK 0.45) — × this; fresh (punchK ≥ 0.85) × 1. Was × 1 for all; issue 89: 0.35 → 0.1 (the masher's gassed arm punches no longer stun-lock the AI)
   kdCaught: 0.2,   // R-10: knockdown severity added when he walked onto the punch (was 0); issue 89: 0.45 → 0.2 (the AI, always trading into the masher's volume, was «caught» on 4 of 5 knockdown rolls)
   kdGassed: 0.3,  // R-10: … and when his tank is empty (0 → this as stamina 20 → 0; was 0); issue 89: 0.45 → 0.3 (bench probe: vs the masher it is the AI that runs empty — and the AI can't mash its way up off the canvas)
-  gas: 0.045,     // R-10: punchK (power) of a punch thrown at 0 stamina, rising to 1 at 45 (Fighter.startPunch; was 0.45); issue 89: 0.2 → 0.045 — the lever that decides the masher on normal: 0.1 → 100 % wins, 0.055 → 75 %, 0.045 → 25 %, 0.04 → 0 %
+  gas: 0.03,      // R-10: punchK (power) of a punch thrown at 0 stamina, rising to 1 at 45 (Fighter.startPunch; was 0.45); issue 89: 0.2 → 0.045 — the lever that decides the masher on normal: 0.1 → 100 % wins, 0.055 → 75 %, 0.045 → 25 %, 0.04 → 0 %. Issue 90 (upright punches, FORM.pitchMax, land more: masher accuracy 42 → 50 %): 0.045 → 0.03 (0.04 → 67 %, 0.035 → 62 %, 0.03 → 17 %, normal.toMe 0.6)
 };
 /* issue 89: the knockdown roll of a clean head shot (resolveHit): odds = clamp((sev − at) · k, 0, max); up = the base of the count
    he needs before he can rise (knockdown). Were the inline numbers 1.2 / 0.65 / 0.5 / 2; now at 1.4 (fewer knockdowns from a fresh
@@ -8407,7 +8438,8 @@ const REACT = {
 const KDR = { at: 1.4, k: 0.65, max: 0.5, up: 1 };
 /* issue 89 (R-02 bench, docs/balance/): toMe was 0.75 / 1 / 1.15 → 0.53 / 0.7 / 0.8 — on normal the AI landed 40–55 % and dropped
    the bot 7–10 times a fight, a mover lost every bout; hard read 0.86 → 0.8, dodge 0.6 → 0.5 (a mover won 0 % on hard) */
-const DIFFS = { easy: { label: 'Лёгкий', dodge: 0.18, read: 0.5, gap: 1.9, speed: 1.0, toAI: 1.25, toMe: 0.53 }, normal: { label: 'Норм', dodge: 0.4, read: 0.7, gap: 1.35, speed: 1.15, toAI: 1, toMe: 0.7 }, hard: { label: 'Жёсткий', dodge: 0.5, read: 0.8, gap: 0.95, speed: 1.3, toAI: 0.9, toMe: 0.8 } };
+// issue 90: normal.toMe 0.7 → 0.6 — upright punches (FORM.pitchMax) land more for both men; the mover, jabs only, gained nothing (50 → 12 % wins)
+const DIFFS = { easy: { label: 'Лёгкий', dodge: 0.18, read: 0.5, gap: 1.9, speed: 1.0, toAI: 1.25, toMe: 0.53 }, normal: { label: 'Норм', dodge: 0.4, read: 0.7, gap: 1.35, speed: 1.15, toAI: 1, toMe: 0.6 }, hard: { label: 'Жёсткий', dodge: 0.5, read: 0.8, gap: 0.95, speed: 1.3, toAI: 0.9, toMe: 0.8 } };
 const G = { state: 'load', t: 0, real: 0, hitstop: 0, slow: 1, slowT: 0, shake: 0, koT: 0, koCine: 0, koTitle: false, introT: 0, winner: null, loser: null, wins: 0, losses: 0, diff: 'normal', fallSnd: false };
 /* issue 46 — the knockout / knockdown cutscene, in seconds and fractions of speed.
    was: KO hitstop 0.09 / 0.3× for 0.75 s, the «Нокаут!» plate at the punch, the replay at koT + 2.3 s;
